@@ -48,9 +48,11 @@ so, delete this exception statement from your version.
 #include "sslhelper.h"
 #include "xwrappers.h"
 #include "xevents.h"
+#include "win_utils.h"
 #include "macosx.h"
 #include "macosxCG.h"
 #include "userinput.h"
+#include "pointer.h"
 #include "xi2_devices.h"
 
 /*
@@ -94,6 +96,11 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
     int len, FILE *output);
 int check_access(char *addr);
 void client_set_net(rfbClientPtr client);
+char *get_xprop(char *prop, Window win);
+int set_xprop(char *prop, Window win, char *value);
+char *bcx_xattach(char *str, int *pg_init, int *kg_init);
+void grab_state(int *ptr_grabbed, int *kbd_grabbed);
+char *wininfo(Window win, int show_children);
 
 static rfbClientPtr *client_match(char *str);
 static void free_client_data(rfbClientPtr client);
@@ -607,7 +614,7 @@ int run_user_command(char *cmd, rfbClientPtr client, char *mode, char *input,
 			int j, k = -1;
 			if (0) fprintf(stderr, "line: %s", line);
 			/* take care to handle embedded nulls */
-			for (j=0; j < sizeof(line); j++) {
+			for (j=0; j < (int) sizeof(line); j++) {
 				if (line[j] != '\0') {
 					k = j;
 				}
@@ -2767,6 +2774,503 @@ void read_x11vnc_remote_prop(int nomsg) {
 #endif	/* NO_X11 */
 }
 
+void grab_state(int *ptr_grabbed, int *kbd_grabbed) {
+	int rcp, rck;
+	double t0, t1;
+	double ta, tb, tc;
+	*ptr_grabbed = -1;
+	*kbd_grabbed = -1;
+
+	if (!dpy) {
+		return;
+	}
+	*ptr_grabbed = 0;
+	*kbd_grabbed = 0;
+
+#if !NO_X11
+	X_LOCK;
+
+	XSync(dpy, False);
+
+	ta = t0 = dnow();
+
+	rcp = XGrabPointer(dpy, window, False, 0, GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
+	XUngrabPointer(dpy, CurrentTime);
+
+	tb = dnow();
+	
+	rck = XGrabKeyboard(dpy, window, False, GrabModeAsync, GrabModeAsync, CurrentTime);
+	XUngrabKeyboard(dpy, CurrentTime);
+
+	tc = dnow();
+
+	XSync(dpy, False);
+
+	t1 = dnow();
+
+	X_UNLOCK;
+	if (rcp == AlreadyGrabbed || rcp == GrabFrozen) {
+		*ptr_grabbed = 1;
+	}
+	if (rck == AlreadyGrabbed || rck == GrabFrozen) {
+		*kbd_grabbed = 1;
+	}
+	rfbLog("grab_state: checked %d,%d in %.6f sec (%.6f %.6f)\n",
+	    *ptr_grabbed, *kbd_grabbed, t1-t0, tb-ta, tc-tb);
+#endif
+}
+
+static void pmove(int x, int y) {
+	if (x < 0 || y < 0) {
+		rfbLog("pmove: skipping negative x or y: %d %d\n", x, y);
+		return;
+	}
+	rfbLog("pmove: x y: %d %d\n", x, y);
+	pointer(0, x, y, NULL);
+	XFlush_wr(dpy);
+}
+
+
+char *bcx_xattach(char *str, int *pg_init, int *kg_init) {
+	int grab_check = 1;
+	int shift = 20;
+	int final_x = 30, final_y = 30;
+	int extra_x = -1, extra_y = -1;
+	int t1, t2, dt = 40 * 1000;
+	int ifneeded = 0;
+	char *dir = "none", *flip = "none", *q;
+	int pg1, kg1, pg2, kg2;
+	char _bcx_res[128];
+	
+	/* str:[up,down,left,right]+nograbcheck+shift=n+final=x+y+extra_move=x+y+[master_to_slave,slave_to_master,M2S,S2M]+dt=n+retry=n+ifneeded */
+
+	if (strstr(str, "up")) {
+		dir = "up";
+	} else if (strstr(str, "down")) {
+		dir = "down";
+	} else if (strstr(str, "left")) {
+		dir = "left";
+	} else if (strstr(str, "right")) {
+		dir = "right";
+	} else {
+		return strdup("FAIL,NO_DIRECTION_SPECIFIED");
+	}
+
+	if (strstr(str, "master_to_slave") || strstr(str, "M2S")) {
+		flip = "M2S";
+	} else if (strstr(str, "slave_to_master") || strstr(str, "S2M")) {
+		flip = "S2M";
+	} else {
+		return strdup("FAIL,NO_MODE_CHANGE_SPECIFIED");
+	}
+
+	if (strstr(str, "nograbcheck")) {
+		grab_check = 0;
+	}
+	if (strstr(str, "ifneeded")) {
+		ifneeded = 1;
+	}
+	q = strstr(str, "shift=");
+	if (q && sscanf(q, "shift=%d", &t1) == 1) {
+		shift = t1;
+	}
+	q = strstr(str, "final=");
+	if (q && sscanf(q, "final=%d+%d", &t1, &t2) == 2) {
+		final_x = t1;
+		final_y = t2;
+	}
+	q = strstr(str, "extra_move=");
+	if (q && sscanf(q, "extra_move=%d+%d", &t1, &t2) == 2) {
+		extra_x = t1;
+		extra_y = t2;
+	}
+	q = strstr(str, "dt=");
+	if (q && sscanf(q, "dt=%d", &t1) == 1) {
+		dt = t1 * 1000;
+	}
+
+	if (grab_check) {
+		int read_init = 0;
+
+		if (*pg_init >=0 && *kg_init >=0)  {
+			pg1 = *pg_init;
+			kg1 = *kg_init;
+			read_init = 1;
+		} else {
+			grab_state(&pg1, &kg1);
+			read_init = 0;
+		}
+
+		if (!strcmp(flip, "M2S")) {
+			if (ifneeded && pg1 == 1 && kg1 == 1) {
+				rfbLog("bcx_xattach: M2S grab state is already what we want, skipping moves:  %d,%d\n", pg1, kg1);
+				return strdup("DONE,GRAB_OK");
+			}
+		} else if (!strcmp(flip, "S2M")) {
+			if (ifneeded && pg1 == 0 && kg1 == 0) {
+				rfbLog("bcx_xattach: S2M grab state is already what we want, skipping moves:  %d,%d\n", pg1, kg1);
+				return strdup("DONE,GRAB_OK");
+			}
+		}
+
+		if (read_init) {
+			;
+		} else if (!strcmp(flip, "M2S")) {
+			if (pg1 != 0 || kg1 != 0) {
+				rfbLog("bcx_xattach: M2S init grab state incorrect:  %d,%d\n", pg1, kg1);
+				usleep(2*dt);
+				grab_state(&pg1, &kg1);
+				rfbLog("bcx_xattach: slept and retried, grab is now: %d,%d\n", pg1, kg1);
+			}
+		} else if (!strcmp(flip, "S2M")) {
+			if (pg1 != 1 || kg1 != 1) {
+				rfbLog("bcx_xattach: S2M init grab state incorrect:  %d,%d\n", pg1, kg1);
+				usleep(2*dt);
+				grab_state(&pg1, &kg1);
+				rfbLog("bcx_xattach: slept and retried, grab is now: %d,%d\n", pg1, kg1);
+			}
+		}
+		if (!read_init) {
+			*pg_init = pg1;
+			*kg_init = kg1;
+		}
+	}
+
+	/*
+	 * A guide for BARCO xattach:
+	 *
+	 *   For -cursor_rule 'b(0):%:t(1),t(1):%:b(0)'
+	 *	down+M2S  up+S2M
+	 *   For -cursor_rule 'r(0):%:l(1),l(1):%:r(0)'
+	 *	right+M2S  left+S2M
+	 *
+	 *   For -cursor_rule 't(0):%:b(1),b(1):%:t(0)'
+	 *	up+M2S  down+S2M
+	 *   For -cursor_rule 'l(0):%:r(1),r(1):%:l(0)'
+	 *	left+M2S  right+S2M
+	 *   For -cursor_rule 'l(0):%:r(1),r(1):%:l(0),r(0):%:l(1),l(1):%:r(0)'
+	 *	left+M2S  right+S2M  (we used to do both 'right')
+	 */
+
+	if (!strcmp(flip, "M2S")) {
+		if (!strcmp(dir, "up")) {
+			pmove(shift, 0);		/* go to top edge */
+			usleep(dt);
+			pmove(shift+1, 0);		/* move 1 for MotionNotify */
+		} else if (!strcmp(dir, "down")) {
+			pmove(shift,   dpy_y-1);	/* go to bottom edge */
+			usleep(dt);
+			pmove(shift+1, dpy_y-1);	/* move 1 for MotionNotify */
+		} else if (!strcmp(dir, "left")) {
+			pmove(0, shift);		/* go to left edge */
+			usleep(dt);
+			pmove(0, shift+1);		/* move 1 for MotionNotify */
+		} else if (!strcmp(dir, "right")) {
+			pmove(dpy_x-1, shift);		/* go to right edge */
+			usleep(dt);
+			pmove(dpy_x-1, shift+1);	/* move 1 for Motion Notify  */
+		}
+	} else if (!strcmp(flip, "S2M")) {
+		int dts = dt/2;
+		if (!strcmp(dir, "up")) {
+			pmove(shift, 2);		/* Approach top edge in 3 moves.  1st move */
+			usleep(dts);
+			pmove(shift, 1);		/* 2nd move */
+			usleep(dts);
+			pmove(shift, 0);		/* 3rd move */
+			usleep(dts);
+			pmove(shift+1, 0);		/* move 1 for MotionNotify */
+			usleep(dts);
+			pmove(shift+1, dpy_y-2);	/* go to height-2 for extra pixel (slave y now == 0?) */
+			usleep(dts);
+			pmove(shift,   dpy_y-2);	/* move 1 for MotionNotify */
+			usleep(dts);
+			pmove(shift, 1);		/* go to 1 to be sure slave y == 0 */
+			usleep(dts);
+			pmove(shift+1, 1);		/* move 1 for MotionNotify */
+		} else if (!strcmp(dir, "down")) {
+			pmove(shift,   dpy_y-3);	/* Approach bottom edge in 3 moves.  1st move */
+			usleep(dts);
+			pmove(shift,   dpy_y-2);	/* 2nd move */
+			usleep(dts);
+			pmove(shift,   dpy_y-1);	/* 3rd move */
+			usleep(dts);
+			pmove(shift+1, dpy_y-1);	/* move 1 for MotionNotify */
+			usleep(dts);
+			pmove(shift+1, 1);		/* go to 1 for extra pixel (slave y now == dpy_y-1?) */
+			usleep(dts);
+			pmove(shift, 1);		/* move 1 for MotionNotify */
+			usleep(dts);
+			pmove(shift,   dpy_y-2);	/* go to dpy_y-2 to be sure slave y == dpy_y-1 */
+			usleep(dts);
+			pmove(shift+1, dpy_y-2);	/* move 1 for MotionNotify */
+		} else if (!strcmp(dir, "left")) {
+			pmove(2, shift);		/* Approach left edge in 3 moves.  1st move */
+			usleep(dts);
+			pmove(1, shift);		/* 2nd move */
+			usleep(dts);
+			pmove(0, shift);		/* 3rd move */
+			usleep(dts);
+			pmove(0, shift+1);		/* move 1 for MotionNotify */
+			usleep(dts);
+			pmove(dpy_x-2, shift+1);	/* go to width-2 for extra pixel (slave x now == 0?) */
+			usleep(dts);
+			pmove(dpy_x-2, shift);		/* move 1 for MotionNotify */
+			usleep(dts);
+			pmove(1, shift);		/* go to 1 to be sure slave x == 0 */
+			usleep(dts);
+			pmove(1, shift+1);		/* move 1 for MotionNotify */
+		} else if (!strcmp(dir, "right")) {
+			pmove(dpy_x-3, shift);		/* Approach right edge in 3 moves.  1st move */
+			usleep(dts);
+			pmove(dpy_x-2, shift);		/* 2nd move */
+			usleep(dts);
+			pmove(dpy_x-1, shift);		/* 3rd move */
+			usleep(dts);
+			pmove(dpy_x-1, shift+1);	/* move 1 for MotionNotify */
+			usleep(dts);
+			pmove(1, shift+1);		/* go to 1 to extra pixel (slave x now == dpy_x-1?) */
+			usleep(dts);
+			pmove(1, shift);		/* move 1 for MotionNotify */
+			usleep(dts);
+			pmove(dpy_x-2, shift);		/* go to dpy_x-2 to be sure slave x == dpy_x-1 */
+			usleep(dts);
+			pmove(dpy_x-2, shift+1);	/* move 1 for MotionNotify */
+		}
+	}
+
+	usleep(dt);
+	pmove(final_x, final_y);
+	usleep(dt);
+
+	if (extra_x >= 0 && extra_y >= 0) {
+		pmove(extra_x, extra_y);
+		usleep(dt);
+	}
+
+	strcpy(_bcx_res, "DONE");
+
+	if (grab_check) {
+		char st[64];
+
+		usleep(3*dt);
+		grab_state(&pg2, &kg2);
+
+		if (!strcmp(flip, "M2S")) {
+			if (pg2 != 1 || kg2 != 1) {
+				rfbLog("bcx_xattach: M2S fini grab state incorrect:  %d,%d\n", pg2, kg2);
+				usleep(2*dt);
+				grab_state(&pg2, &kg2);
+				rfbLog("bcx_xattach: slept and retried, grab is now: %d,%d\n", pg2, kg2);
+			}
+		} else if (!strcmp(flip, "S2M")) {
+			if (pg2 != 0 || kg2 != 0) {
+				rfbLog("bcx_xattach: S2M fini grab state incorrect:  %d,%d\n", pg2, kg2);
+				usleep(2*dt);
+				grab_state(&pg2, &kg2);
+				rfbLog("bcx_xattach: slept and retried, grab is now: %d,%d\n", pg2, kg2);
+			}
+		}
+
+		sprintf(st, ":%d,%d-%d,%d", pg1, kg1, pg2, kg2);
+
+		if (getenv("GRAB_CHECK_LOOP")) {
+			int i, n = atoi(getenv("GRAB_CHECK_LOOP"));
+			rfbLog("grab st: %s\n", st);
+			for (i=0; i < n; i++) {
+				usleep(dt);
+				grab_state(&pg2, &kg2);
+				sprintf(st, ":%d,%d-%d,%d", pg1, kg1, pg2, kg2);
+				rfbLog("grab st: %s\n", st);
+			}
+		}
+
+		if (!strcmp(flip, "M2S")) {
+			if (pg1 == 0 && kg1 == 0 && pg2 == 1 && kg2 == 1) {
+				strcat(_bcx_res, ",GRAB_OK");
+			} else {
+				rfbLog("bcx_xattach: M2S grab state incorrect: %d,%d -> %d,%d\n", pg1, kg1, pg2, kg2);
+				strcat(_bcx_res, ",GRAB_FAIL");
+				if (pg2 == 1 && kg2 == 1) {
+					strcat(_bcx_res, "_INIT");
+				} else if (pg1 == 0 && kg1 == 0) {
+					strcat(_bcx_res, "_FINAL");
+				}
+				strcat(_bcx_res, st);
+			}
+		} else if (!strcmp(flip, "S2M")) {
+			if (pg1 == 1 && kg1 == 1 && pg2 == 0 && kg2 == 0) {
+				strcat(_bcx_res, ",GRAB_OK");
+			} else {
+				rfbLog("bcx_xattach: S2M grab state incorrect: %d,%d -> %d,%d\n", pg1, kg1, pg2, kg2);
+				strcat(_bcx_res, ",GRAB_FAIL");
+				if (pg2 == 0 && kg2 == 0) {
+					strcat(_bcx_res, "_INIT");
+				} else if (pg1 == 1 && kg1 == 1) {
+					strcat(_bcx_res, "_FINAL");
+				}
+				strcat(_bcx_res, st);
+			}
+		}
+	}
+	return strdup(_bcx_res);
+}
+
+int set_xprop(char *prop, Window win, char *value) {
+	int rc = -1;
+#if !NO_X11
+	Atom aprop;
+
+	RAWFB_RET(rc)
+
+	if (!prop || !value) {
+		return rc;
+	}
+	if (win == None) {
+		win = rootwin;
+	}
+	aprop = XInternAtom(dpy, prop, False);
+	rc = XChangeProperty(dpy, win, aprop, XA_STRING, 8,
+	    PropModeReplace, (unsigned char *)value, strlen(value));
+	return rc;
+#else
+	RAWFB_RET(rc)
+	if (!prop || !win || !value) {}
+	return rc;
+#endif	/* NO_X11 */
+}
+
+char *get_xprop(char *prop, Window win) {
+#if NO_X11
+	RAWFB_RET(NULL)
+	if (!prop || !win) {}
+	return NULL;
+#else
+	Atom type, aprop;
+	int format, slen, dlen;
+	unsigned long nitems = 0, bytes_after = 0;
+	unsigned char* data = NULL;
+	char get_str[VNC_CONNECT_MAX+1];
+
+	RAWFB_RET(NULL)
+
+	if (prop == NULL || !strcmp(prop, "")) {
+		return NULL;
+	}
+	if (win == None) {
+		win = rootwin;
+	}
+	aprop = XInternAtom(dpy, prop, True);
+	if (aprop == None) {
+		return NULL;
+	}
+
+	get_str[0] = '\0';
+	slen = 0;
+
+	/* read the property value into get_str: */
+	do {
+		if (XGetWindowProperty(dpy, win, aprop, nitems/4,
+		    VNC_CONNECT_MAX/16, False, AnyPropertyType, &type,
+		    &format, &nitems, &bytes_after, &data) == Success) {
+
+			dlen = nitems * (format/8);
+			if (slen + dlen > VNC_CONNECT_MAX) {
+				/* too big */
+				rfbLog("get_xprop: warning: truncating large '%s'"
+				   " string > %d bytes.\n", prop, VNC_CONNECT_MAX);
+				XFree_wr(data);
+				break;
+			}
+			memcpy(get_str+slen, data, dlen);
+			slen += dlen;
+			get_str[slen] = '\0';
+			XFree_wr(data);
+		}
+	} while (bytes_after > 0);
+
+	get_str[VNC_CONNECT_MAX] = '\0';
+	rfbLog("get_prop: read: '%s' = '%s'\n", prop, get_str);
+
+	return strdup(get_str);
+#endif	/* NO_X11 */
+}
+
+static char _win_fmt[1000];
+
+static char *win_fmt(Window win, XWindowAttributes a) {
+	memset(_win_fmt, 0, sizeof(_win_fmt));
+	sprintf(_win_fmt, "0x%lx:%dx%dx%d+%d+%d-map:%d-bw:%d-cl:%d-vis:%d-bs:%d/%d",
+	    win, a.width, a.height, a.depth, a.x, a.y, a.map_state, a.border_width, a.class,
+	    (int) ((a.visual)->visualid), a.backing_store, a.save_under);
+	return _win_fmt;
+}
+
+char *wininfo(Window win, int show_children) {
+#if NO_X11
+	RAWFB_RET(NULL)
+	if (!win || !show_children) {}
+	return NULL;
+#else
+	XWindowAttributes attr;
+	int n, size = X11VNC_REMOTE_MAX;
+	char get_str[X11VNC_REMOTE_MAX+1];
+	unsigned int nchildren;
+	Window rr, pr, *children; 
+
+	RAWFB_RET(NULL)
+
+	if (win == None) {
+		return strdup("None");
+	}
+
+	X_LOCK;
+	if (!valid_window(win, &attr, 1)) {
+		X_UNLOCK;
+		return strdup("Invalid");
+	}
+	get_str[0] = '\0';
+
+	if (show_children) {
+		XQueryTree_wr(dpy, win, &rr, &pr, &children, &nchildren);
+	} else {
+		nchildren = 1;
+		children = (Window *) calloc(2 * sizeof(Window), 1);
+		children[0] = win;
+	}
+	for (n=0; n < nchildren; n++) {
+		char tmp[32];
+		char *str = "Invalid";
+		Window w = children[n];
+		if (valid_window(w, &attr, 1)) {
+			if (!show_children) {
+				str = win_fmt(w, attr);
+			} else {
+				sprintf(tmp, "0x%lx", w);
+				str = tmp;
+			}
+		}
+		if (strlen(get_str) + 1 + strlen(str) >= size) {
+			break;
+		}
+		if (n > 0) {
+			strcat(get_str, ",");
+		}
+		strcat(get_str, str);
+	}
+	get_str[size] = '\0';
+	if (!show_children) {
+		free(children);
+	} else if (nchildren) {
+		XFree_wr(children);
+	}
+	rfbLog("wininfo computed: %s\n", get_str);
+	X_UNLOCK;
+
+	return strdup(get_str);
+#endif	/* NO_X11 */
+}
+
 /*
  * check if client_connect has been set, if so make the reverse connections.
  */
@@ -3101,6 +3605,8 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		return(RFB_CLIENT_REFUSE);
 	}
 
+	/* We will RFB_CLIENT_ACCEPT or RFB_CLIENT_ON_HOLD from here on. */
+
 	if (passwdfile) {
 		if (strstr(passwdfile, "read:") == passwdfile ||
 		    strstr(passwdfile, "cmd:") == passwdfile) {
@@ -3201,7 +3707,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	cd->cmp_bytes_sent = 0;
 	cd->raw_bytes_sent = 0;
 
-	rfbLog("incr accepted_client for %s:%d.\n", client->host, get_remote_port(client->sock));
+	rfbLog("incr accepted_client for %s:%d  sock=%d\n", client->host, get_remote_port(client->sock), client->sock);
 	accepted_client++;
 	last_client = time(NULL);
 
@@ -3268,7 +3774,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 			unixpw_login_viewonly = 1;
 			client->viewOnly = FALSE;
 		}
-		unixpw_last_try_time = time(NULL);
+		unixpw_last_try_time = time(NULL) + 10;
 
 		unixpw_screen(1);
 		unixpw_keystroke(0, 0, 1);
@@ -3467,11 +3973,16 @@ void check_new_clients(void) {
 	int run_after_accept = 0;
 
 	if (unixpw_in_progress) {
+		static double lping = 0.0;
+		if (lping < dnow() + 5) {
+			mark_rect_as_modified(0, 0, 1, 1, 1);
+			lping = dnow();
+		}
 		if (unixpw_client && unixpw_client->viewOnly) {
 			unixpw_login_viewonly = 1;
 			unixpw_client->viewOnly = FALSE;
 		}
-		if (time(NULL) > unixpw_last_try_time + 25) {
+		if (time(NULL) > unixpw_last_try_time + 45) {
 			rfbLog("unixpw_deny: timed out waiting for reply.\n");
 			unixpw_deny();
 		}

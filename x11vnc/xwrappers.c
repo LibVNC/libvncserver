@@ -757,7 +757,6 @@ if (db) fprintf(stderr, "lseek 0 ps: %d  sz: %d off: %d bpl: %d\n", pixelsize, s
 			del = 0;
 			while (len > 0) {
 				n = read(raw_fb_fd, dst + del, len);
-//if (db > 2) fprintf(stderr, "len: %d n: %d\n", len, n);
 
 				if (n > 0) {
 					del += n;
@@ -769,7 +768,6 @@ if (db) fprintf(stderr, "lseek 0 ps: %d  sz: %d off: %d bpl: %d\n", pixelsize, s
 				}
 			}
 			if (bpl > sz) {
-//if (db > 1) fprintf(stderr, "bpl>sz %d %d\n", bpl, sz);
 				off = (off_t) (bpl - sz);
 				lseek(raw_fb_fd, off, SEEK_CUR);
 			}

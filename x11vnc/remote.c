@@ -76,12 +76,18 @@ static void if_8bpp_do_new_fb(void);
 static void reset_httpport(int old, int new);
 static void reset_rfbport(int old, int new) ;
 
+char *query_result = NULL;
 
 /*
  * for the wild-n-crazy -remote/-R interface.
  */
 int send_remote_cmd(char *cmd, int query, int wait) {
 	FILE *in = NULL;
+
+	if (query_result != NULL) {
+		free(query_result);
+		query_result = NULL;
+	}
 
 	if (client_connect_file) {
 		umask(077);
@@ -118,13 +124,26 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 
 	if (query || wait) {
 		char line[X11VNC_REMOTE_MAX];	
-		int rc=1, i=0, max=70, ms_sl=50;
+		int rc=1, i=0, max=140, ms_sl=25;
 
 		if (!strcmp(cmd, "cmd=stop")) {
-			max = 20;
+			max = 40;
+		}
+		if (strstr(cmd, "script:")) {
+			max = 400;
+		}
+		if (strstr(cmd, "bcx_xattach:")) {
+			max = 400;
+		}
+		if (getenv("X11VNC_SYNC_TIMEOUT")) {
+			max = (int) ((1000. * atof(getenv("X11VNC_SYNC_TIMEOUT")))/ms_sl);
 		}
 		for (i=0; i<max; i++) {
-			usleep(ms_sl * 1000);
+			if (i==0) {
+				usleep(10 * 1000);
+			} else {
+				usleep(ms_sl * 1000);
+			}
 			if (client_connect_file) {
 				char *q;
 				in = fopen(client_connect_file, "r");
@@ -147,8 +166,9 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 				strncpy(line, x11vnc_remote_str,
 				    X11VNC_REMOTE_MAX);
 			}
-			if (strcmp(cmd, line)){
-				if (query) {
+			if (strcmp(cmd, line)) {
+				if (query || wait) {
+					query_result = strdup(line);
 					fprintf(stdout, "%s\n", line);
 					fflush(stdout);
 				}
@@ -170,11 +190,19 @@ int send_remote_cmd(char *cmd, int query, int wait) {
 int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync,
     int qdefault) {
 	char *rcmd = NULL, *qcmd = NULL;
-	int rc = 1;
+	int rc = 1, direct = 0;
 
 	if (qdefault && !query_cmd) {
 		query_cmd = remote_cmd;
 		remote_cmd = NULL;
+	}
+	if (remote_cmd && strstr(remote_cmd, "DIRECT:") == remote_cmd) {
+		direct = 1;
+		remote_cmd += strlen("DIRECT:");
+	}
+	if (query_cmd && strstr(query_cmd, "DIRECT:") == query_cmd) {
+		direct = 1;
+		query_cmd += strlen("DIRECT:");
 	}
 
 	if (remote_cmd) {
@@ -186,6 +214,19 @@ int do_remote_query(char *remote_cmd, char *query_cmd, int remote_sync,
 		qcmd = (char *) malloc(strlen(query_cmd) + 5);
 		strcpy(qcmd, "qry=");
 		strcat(qcmd, query_cmd);
+	}
+	if (direct) {
+		char *res;
+		if (rcmd) {
+			res = process_remote_cmd(rcmd, 1);
+			fprintf(stdout, "%s\n", res);
+		}
+		if (qcmd) {
+			res = process_remote_cmd(qcmd, 1);
+			fprintf(stdout, "%s\n", res);
+		}
+		fflush(stdout);
+		return 0;
 	}
 	if (qdefault) {
 		char *res;
@@ -366,13 +407,17 @@ int check_httpdir(void) {
 		len = strlen(prog) + 21 + 1;
 		*q = '\0';
 		httpdir = (char *) malloc(len);
-		if (!enc_str && (use_openssl || use_stunnel || http_ssl)) {
+		if (use_stunnel && http_ssl) {
+			snprintf(httpdir, len, "%s/../share/x11vnc/classes/ssl", prog);
+		} else if (!enc_str && (use_openssl || use_stunnel || http_ssl)) {
 			snprintf(httpdir, len, "%s/../share/x11vnc/classes/ssl", prog);
 		} else {
 			snprintf(httpdir, len, "%s/../share/x11vnc/classes", prog);
 		}
 		if (stat(httpdir, &sbuf) != 0) {
-			if (!enc_str && (use_openssl || use_stunnel || http_ssl)) {
+			if (use_stunnel && http_ssl) {
+				snprintf(httpdir, len, "%s/../classes/ssl", prog);
+			} else if (!enc_str && (use_openssl || use_stunnel || http_ssl)) {
 				snprintf(httpdir, len, "%s/../classes/ssl", prog);
 			} else {
 				snprintf(httpdir, len, "%s/../classes", prog);
@@ -400,7 +445,9 @@ int check_httpdir(void) {
 				"/usr/share/x11vnc/classes/ssl",
 				NULL
 			};
-			if (!enc_str && (use_openssl || use_stunnel || http_ssl)) {
+			if (use_stunnel && http_ssl) {
+				use = ssllist;
+			} else if (!enc_str && (use_openssl || use_stunnel || http_ssl)) {
 				use = ssllist;
 			} else {
 				use = list;
@@ -445,6 +492,10 @@ void http_connections(int on) {
 		if (check_httpdir()) {
 			screen->httpDir = http_dir;
 			rfbHttpInitSockets(screen);
+			if (screen->httpPort != 0 && screen->httpListenSock < 0) {
+				rfbLog("http_connections: failed to listen on http port: %d\n", screen->httpPort);
+				clean_up_exit(1);
+			}
 		}
 	} else {
 		rfbLog("http_connections: turning off http service.\n");
@@ -474,6 +525,9 @@ static void reset_httpport(int old, int new) {
 		rfbLog("reset_httpport: setting httpport %d -> %d.\n",
 		    old == -1 ? hp : old, hp);
 		rfbHttpInitSockets(screen);
+		if (screen->httpPort != 0 && screen->httpListenSock < 0) {
+			rfbLog("reset_httpport: failed to listen on http port: %d\n", screen->httpPort);
+		}
 	}
 }
 
@@ -699,16 +753,95 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 	}
 
+
 	strcpy(buf, "");
 	if (strstr(cmd, "cmd=") == cmd) {
 		p += strlen("cmd=");
+		if (strstr(p, "script:") == p) {
+			char *s, *q, **pieces, tmp[1024];
+			int k = 0, n = 0, dp = 1;
+
+			p += strlen("script:");
+
+			if (strstr(p, "file=") == p) {
+				FILE *f;
+				struct stat sbuf;
+
+				p += strlen("file=");
+
+				rfbLog("reading script from file '%s'\n", p);
+
+				if (stat(p, &sbuf) != 0) {
+					rfbLogPerror("stat");
+					return NULL;
+				}
+
+				f = fopen(p, "r");
+				if (f == NULL) {
+					rfbLogPerror("fopen");
+					return NULL;
+				}
+
+				p = (char *) calloc(sbuf.st_size + 1, 1);
+				dp = 0;
+				while (fgets(tmp, 1024, f) != NULL) {
+					char *c = strchr(tmp, '#');
+					if (c) *c = '\0';
+					if (strlen(p) + strlen(tmp) > sbuf.st_size) {
+						break;
+					}
+					strcat(p, tmp);
+				}
+				fclose(f);
+			}
+
+			pieces = (char **) malloc(strlen(p) * sizeof(char *));
+			if (dp) {
+				s = strdup(p);
+			} else {
+				s = p;
+			}
+			q = strtok(s, ";"); 
+
+			while (q) {
+				char *t = lblanks(q);
+				if (strstr(t, "cmd=") != t && strstr(t, "qry=") != t) {
+					strcpy(tmp, "cmd=");
+				} else {
+					strcpy(tmp, "");
+				}
+				strncat(tmp, t, 1000);
+				pieces[n] = strdup(tmp);
+				n++;
+				q = strtok(NULL, ";");
+			}
+			free(s);
+
+			for (k=0; k < n; k++) {
+				char *c = pieces[k];
+				char *t = c + strlen(c) - 1;	/* shortest is "cmd=" */
+				while (isspace((unsigned char) (*t))) {
+					*t = '\0';
+					if (t <= c) break;
+					t--;
+				}
+				if (k < n - 1) {
+					process_remote_cmd(c, 1);
+				} else {
+					process_remote_cmd(c, 0);
+				}
+			}
+			for (k=0; k<n; k++) {
+				free(pieces[k]);
+			}
+			free(pieces);
+			return NULL;
+		}
 	} else if (strstr(cmd, "qry=") == cmd) {
 		query = 1;
 		if (strchr(cmd, ',')) {
 			/* comma separated batch mode */
-			char *s, *q, *res;
-			char tmp[512];
-			char **pieces;
+			char *s, *q, *res, **pieces, tmp[1024];
 			int k = 0, n = 0;
 
 			pieces = (char **) malloc(strlen(cmd) * sizeof(char *));
@@ -717,7 +850,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 			while (q) {
 				strcpy(tmp, "qry=");
-				strncat(tmp, q, 500);
+				strncat(tmp, q, 1000);
 				pieces[n] = strdup(tmp);
 				n++;
 				q = strtok(NULL, ",");
@@ -725,7 +858,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			free(s);
 
 			strcpy(buf, "");
-			for (k=0; k<n; k++) {
+			for (k=0; k < n; k++) {
 				res = process_remote_cmd(pieces[k], 1);
 				if (res && strlen(buf)+strlen(res)
 				    >= X11VNC_REMOTE_MAX - 1) {
@@ -797,6 +930,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 /*
  * Maybe add: passwdfile logfile bg rfbauth passwd...
  */
+	if (!strcmp(p, "")) {	/* skip-cmd-list */
+		NOTAPP
+		rfbLog("remote_cmd: empty command.\n");
+		goto done;
+	}
 	if (strstr(p, "CR:") == p) {	/* skip-cmd-list */
 		/* CR:WxH+X+Y,dx,dy */
 		int w, h, x, y, dx, dy;
@@ -829,7 +967,8 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		close_all_clients();
 		goto done;
 	}
-	if (!strcmp(p, "ping")) {
+	if (!strcmp(p, "ping")
+	    || strstr(p, "ping:") == p) { /* skip-cmd-list */
 		query = 1;
 		if (rfb_desktop_name) {
 			snprintf(buf, bufn, "ans=%s:%s", p, rfb_desktop_name);
@@ -837,6 +976,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			snprintf(buf, bufn, "ans=%s:%s", p, "unknown");
 		}
 		goto qry;
+		goto done;
+	}
+	if (!strcmp(p, "resend_cutbuffer")) {
+		NOTAPP
+		resend_selection("cutbuffer");
+		goto done;
+	}
+	if (!strcmp(p, "resend_clipboard")) {
+		NOTAPP
+		resend_selection("clipboard");
+		goto done;
+	}
+	if (!strcmp(p, "resend_primary")) {
+		NOTAPP
+		resend_selection("primary");
 		goto done;
 	}
 	if (!strcmp(p, "blacken") || !strcmp(p, "zero")) {
@@ -911,7 +1065,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		p += strlen("id:");
-		if (*p == '\0' || !strcmp("root", p)) {
+		if (*p == '\0' || !strcmp("root", p)) { /* skip-cmd-list */
 			/* back to root win */
 			twin = 0x0;
 			ok = 1;
@@ -953,7 +1107,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		p += strlen("sid:");
-		if (*p == '\0' || !strcmp("root", p)) {
+		if (*p == '\0' || !strcmp("root", p)) { /* skip-cmd-list */
 			/* back to root win */
 			twin = 0x0;
 			ok = 1;
@@ -1513,7 +1667,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			free(connect_proxy);
 			connect_proxy = NULL;
 		}
-		if (!strcmp(p, "") || !strcasecmp(p, "none")) {
+		if (!strcmp(p, "") || !strcasecmp(p, "none")) { /* skip-cmd-list */
 			rfbLog("remote_cmd: disabled -proxy\n");
 		} else {
 			connect_proxy = strdup(p);
@@ -3749,7 +3903,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		p += strlen("input:");
-		if (allowed_input_str && !strcmp(p, allowed_input_str)) {
+		if (allowed_input_str && !strcmp(p, allowed_input_str)) { /* skip-cmd-list */
 			doit = 0;
 		}
 		rfbLog("remote_cmd: setting input %s\n", p);
@@ -3957,27 +4111,259 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		goto done;
 	}
 	if (strstr(p, "keycode") == p) {
-		int kc;
+		int kc, down = -1;
+		char *c;
 		NOTAPP
 		COLON_CHECK("keycode:")
 		p += strlen("keycode:");
 		kc = atoi(p);
 		if (kc < 0) kc = 0;
 		kc = kc % 256;
-		rfbLog("remote_cmd: insert keycode %d\n", kc);
+		c = strchr(p, ',');
+		if (c) down = atoi(c+1);
+		rfbLog("remote_cmd: insert keycode %d down=%d\n", kc, down);
 
 		if (macosx_console) {
 #ifdef MACOSX
-			macosxCG_keycode_inject(1, kc);
-			usleep(100*1000);
-			macosxCG_keycode_inject(0, kc);
+			if (down == -1) {
+				macosxCG_keycode_inject(1, kc);
+				usleep(50*1000);
+				macosxCG_keycode_inject(0, kc);
+			} else {
+				macosxCG_keycode_inject(down, kc);
+			}
 #endif
 		} else {
-   		        XTestFakeKeyEvent_wr(dpy, -1, kc, 1, CurrentTime);
-			usleep(100*1000);
-			XTestFakeKeyEvent_wr(dpy, -1, kc, 0, CurrentTime);
+			if (down == -1) {
+ 			        XTestFakeKeyEvent_wr(dpy, -1, kc, 1, CurrentTime);
+				usleep(50*1000);
+			        XTestFakeKeyEvent_wr(dpy, -1, kc, 0, CurrentTime);
+			} else {
+			        XTestFakeKeyEvent_wr(dpy, -1, kc, down, CurrentTime);
+			}
 		}
 		goto done;
+	}
+	if (strstr(p, "keysym") == p) {
+		int down = -1;
+		unsigned int in;
+		KeySym ks;
+		char *c, *str;
+		NOTAPP
+		COLON_CHECK("keysym:")
+		p += strlen("keysym:");
+
+		c = strchr(p, ',');
+		if (c) {
+			down = atoi(c+1);
+			*c = '\0';
+		}
+
+		if (sscanf(p, "0x%x", &in) == 1) {
+			ks = (KeySym) in;
+		} else if (sscanf(p, "%u", &in) == 1) {
+			ks = (KeySym) in;
+		} else if ((ks = XStringToKeysym(p)) != NoSymbol) {
+			;
+		} else {
+			rfbLog("remote_cmd: bad keysym: %s\n", p);
+			goto done;
+		}
+		str = XKeysymToString(ks);
+		str = str ? str : "NoSymbol";
+		rfbLog("remote_cmd: insert keysym %s 0x%x '%s' down=%d\n", p, ks, str, down);
+		if (down == -1) {
+			keyboard(1, ks, NULL);
+			usleep(50*1000);
+			keyboard(0, ks, NULL);
+		} else {
+			keyboard(down, ks, NULL);
+		}
+		goto done;
+	}
+	if (strstr(p, "ptr") == p) {
+		int x, y, m = 0;
+		NOTAPP
+		COLON_CHECK("ptr:")
+		p += strlen("ptr:");
+		rfbLog("remote_cmd: insert pointer event: %s\n", p);
+		if (sscanf(p, "%d,%d,%d", &x, &y, &m) == 3) {
+			pointer(m, x, y, NULL);
+		} else if (sscanf(p, "%d,%d", &x, &y) == 2) {
+			pointer(m, x, y, NULL);
+		} else {
+			rfbLog("remote_cmd: bad ptr:x,y,mask\n");
+		}
+
+		goto done;
+	}
+	if (strstr(p, "sleep") == p) {
+		NOTAPP
+		COLON_CHECK("sleep:")
+		p += strlen("sleep:");
+		rfbLog("remote_cmd: sleeping: %s\n", p);
+		usleep((int) (1.0e+6 * atof(p)));
+		rfbLog("remote_cmd: done sleeping.\n");
+		goto done;
+	}
+	if (strstr(p, "get_xprop") == p) {
+		char *res;
+		unsigned long id;
+		Window win = None;	/* None implies root in get_xprop() */
+
+		/* note we force query and assume the colon is there. */
+		query = 1;
+		if (strstr(p, "get_xprop:") != p) { /* skip-cmd-list */
+			snprintf(buf, bufn, "ans=%s:N/A", p);
+			goto qry;
+		}
+		p += strlen("get_xprop:");
+
+		if (strstr(p, "id=") == p) {	/* skip-cmd-list */
+			p += strlen("id=");
+			if (scan_hexdec(p, &id)) {
+				win = (Window) id;
+			}
+			if (strchr(p, ':')) {
+				p = strchr(p, ':') + 1;
+			}
+		}
+
+		res = get_xprop(p, win);
+		if (res == NULL) {
+			res = strdup("NULL");
+		}
+		snprintf(buf, bufn, "ans=get_xprop:%s:%s", p, res);
+		free(res);
+
+		goto qry;
+	}
+	if (strstr(p, "set_xprop") == p) {
+		char *q;
+		int rc = -2;
+		unsigned long id;
+		Window win = None;	/* None implies root in set_xprop() */
+
+		/* note we force query and assume the colon is there. */
+		query = 1;
+		if (strstr(p, "set_xprop:") != p) { /* skip-cmd-list */
+			snprintf(buf, bufn, "ans=%s:N/A", p);
+			goto qry;
+		}
+		p += strlen("set_xprop:");
+
+		if (strstr(p, "id=") == p) {	/* skip-cmd-list */
+			p += strlen("id=");
+			if (scan_hexdec(p, &id)) {
+				win = (Window) id;
+			}
+			if (strchr(p, ':')) {
+				p = strchr(p, ':') + 1;
+			}
+		}
+
+		q = strchr(p, ':');
+		if (q) {
+			*q = '\0';
+			rc = set_xprop(p, win, q+1);
+			*q = ':';
+		}
+		snprintf(buf, bufn, "ans=set_xprop:%s:%d", p, rc);
+
+		goto qry;
+	}
+	if (strstr(p, "wininfo") == p) {
+		char *res, *t = "";
+		unsigned long id;
+		Window win = None;
+		int show_children = 0;
+
+		/* note we force query and assume the colon is there. */
+		query = 1;
+		if (strstr(p, "wininfo:") != p) { /* skip-cmd-list */
+			snprintf(buf, bufn, "ans=%s:N/A", p);
+			goto qry;
+		}
+		p += strlen("wininfo:");
+
+		if (p[0] == '+') {
+			show_children = 1;
+			t = "+";
+			p++;
+		}
+		if (!strcmp(p, "root")) { /* skip-cmd-list */
+			win = rootwin;
+		} else if (scan_hexdec(p, &id)) {
+			win = (Window) id;
+		}
+
+		res = wininfo(win, show_children);
+		if (res == NULL) {
+			res = strdup("NULL");
+		}
+		snprintf(buf, bufn, "ans=wininfo:%s%s:%s", t, p, res);
+		free(res);
+
+		goto qry;
+	}
+	if (strstr(p, "bcx_xattach") == p) {
+		char *res;
+		int pg_init = -1, kg_init = -1;
+		int try = 0, max_tries = 4;
+
+		/* note we force query and assume the colon is there. */
+		query = 1;
+		if (strstr(p, "bcx_xattach:") != p) { /* skip-cmd-list */
+			snprintf(buf, bufn, "ans=%s:N/A", p);
+			goto qry;
+		}
+		p += strlen("bcx_xattach:");
+
+		if (strstr(p, "retry=")) { /* skip-cmd-list */
+			int n;
+			char *q = strstr(p, "retry="); /* skip-cmd-list */
+			if (sscanf(q, "retry=%d", &n) == 1) {
+				if (n < 0) n = 0;
+				max_tries = 1 + n;
+			}
+		}
+
+		try_again:
+
+		res = bcx_xattach(p, &pg_init, &kg_init);
+		try++;
+		if (res == NULL) {
+			res = strdup("NULL");
+		} else if (strstr(res, "GRAB_FAIL_INIT")) {
+			rfbLog("bcx_xattach: failed grab check for '%s': %s.  Final state OK, not Retrying.\n", p, res);
+		} else if (strstr(res, "GRAB_FAIL") && try < max_tries) {
+			rfbLog("bcx_xattach: failed grab check for '%s': %s.  Retrying[%d]...\n", p, res, try);
+			free(res);
+			pointer(0, dpy_x/2 + try, dpy_y/2 + try, NULL);
+			XFlush_wr(dpy);
+#if !NO_X11
+			if (dpy) {
+				if (try == 2) {
+					XSync(dpy, False);
+				} else if (try == 3) {
+					XSync(dpy, True);
+				}
+			}
+#endif
+			if (try == 1) {
+				usleep(250*1000);
+			} else if (try <= 4) {
+				usleep(try*400*1000);
+			} else {
+				usleep(4*500*1000);
+			}
+			goto try_again;
+		}
+
+		snprintf(buf, bufn, "ans=bcx_xattach:%s:%s", p, res);
+		free(res);
+
+		goto qry;
 	}
 	if (strstr(p, "deferupdate") == p) {
 		int d;
@@ -4030,6 +4416,17 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("setdefer:");
 		set_defer = atoi(p);
 		rfbLog("remote_cmd: setting set_defer to %d\n", set_defer);
+		goto done;
+	}
+	if (strstr(p, "extra_fbur") == p) {
+		COLON_CHECK("extra_fbur:")
+		if (query) {
+			snprintf(buf, bufn, "ans=%s%s%d", p, co, extra_fbur);
+			goto qry;
+		}
+		p += strlen("extra_fbur:");
+		extra_fbur = atoi(p);
+		rfbLog("remote_cmd: setting extra_fbur to %d\n", extra_fbur);
 		goto done;
 	}
 	if (strstr(p, "wait_ui") == p) {
@@ -5169,6 +5566,11 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			    NONUL(guess_desktop()));
 			goto qry;
 		}
+		if (!strcmp(p, "guess_dbus")) {
+			snprintf(buf, bufn, "aro=%s:%s", p,
+			    NONUL(dbus_session()));
+			goto qry;
+		}
 		if (!strcmp(p, "http_url")) {
 			if (!screen) {
 				snprintf(buf, bufn, "aro=%s:", p);
@@ -5446,6 +5848,38 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		if (!strcmp(p, "mouse_y")) {
 			snprintf(buf, bufn, "aro=%s:%d", p, cursor_y);
+			goto qry;
+		}
+		if (!strcmp(p, "grab_state")) {
+			int ptr_grabbed, kbd_grabbed;
+
+			grab_state(&ptr_grabbed, &kbd_grabbed);
+			snprintf(buf, bufn, "aro=%s:%d,%d", p, ptr_grabbed, kbd_grabbed);
+			rfbLog("remote_cmd: ptr,kbd: %s\n", buf);
+			goto qry;
+		}
+
+		if (!strcmp(p, "pointer_pos")) {
+			int px = -1, py = -1; 
+			int wx, wy;
+			unsigned int m;
+			Window r, c;
+			
+
+			snprintf(buf, bufn, "aro=%s:%d,%d", p, px, py);
+			if (!dpy) {
+				goto qry;
+			}
+#if NO_X11
+			goto qry;
+#else
+			X_LOCK;
+			XQueryPointer_wr(dpy, rootwin, &r, &c, &px, &py, &wx, &wy, &m);
+			X_UNLOCK;
+#endif
+
+			snprintf(buf, bufn, "aro=%s:%d,%d", p, px, py);
+			rfbLog("remote_cmd: pointer_pos: %s\n", buf);
 			goto qry;
 		}
 		if (!strcmp(p, "bpp")) {

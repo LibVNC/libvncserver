@@ -76,7 +76,7 @@ void set_server_input(rfbClientPtr cl, int s);
 void set_text_chat(rfbClientPtr cl, int l, char *t);
 int get_keyboard_led_state_hook(rfbScreenInfoPtr s);
 int get_file_transfer_permitted(rfbClientPtr cl);
-void get_prop(char *str, int len, Atom prop);
+void get_prop(char *str, int len, Atom prop, Window w);
 
 static void initialize_xevents(int reset);
 static void print_xevent_bases(void);
@@ -212,7 +212,7 @@ static void print_xevent_bases(void) {
 	fprintf(stderr, "  SelClear=%d, Expose=%d\n", SelectionClear, Expose);
 }
 
-void get_prop(char *str, int len, Atom prop) {
+void get_prop(char *str, int len, Atom prop, Window w) {
 	int i;
 #if !NO_X11
 	Atom type;
@@ -235,9 +235,12 @@ void get_prop(char *str, int len, Atom prop) {
 #else
 
 	slen = 0;
-	
+	if (w == None) {
+		w = DefaultRootWindow(dpy);
+	}
+
 	do {
-		if (XGetWindowProperty(dpy, DefaultRootWindow(dpy),
+		if (XGetWindowProperty(dpy, w,
 		    prop, nitems/4, len/16, False,
 		    AnyPropertyType, &type, &format, &nitems, &bytes_after,
 		    &data) == Success) {
@@ -584,7 +587,7 @@ static void grab_buster_watch(int parent, char *dstr) {
 			break;
 		}
 
-		get_prop(propval, 128, ticker_atom);
+		get_prop(propval, 128, ticker_atom, None);
 		if (db) fprintf(stderr, "got_prop:   %s\n", propval);
 
 		if (!process_watch(propval, parent, db)) {
@@ -871,20 +874,48 @@ void check_autorepeat(void) {
 		}
 	} else {
 		if (idle_reset) {
-			int i, state[256];
+			int i, state[256], didmsg = 0, pressed = 0;
+			int mwt = 600, mmax = 20;
+			static int msgcnt = 0;
+			static double lastmsg = 0.0;
+
 			for (i=0; i<256; i++) {
 				state[i] = 0;
 			}
 			if (use_threads) {X_LOCK;}
 			get_keystate(state);
 			if (use_threads) {X_UNLOCK;}
+
 			for (i=0; i<256; i++) {
 				if (state[i] != 0) {
 					/* better wait until all keys are up  */
-					rfbLog("active keyboard: waiting until"
-					    " all keys are up. key_down=%d\n", i);
-					return;
+					pressed++;
+					if (msgcnt < mmax || dnow() > lastmsg + mwt) {
+						char *str = "unset";
+#if !NO_X11
+						if (use_threads) {X_LOCK;}
+						str = XKeysymToString(XKeycodeToKeysym(dpy, i, 0));
+						if (use_threads) {X_UNLOCK;}
+#endif
+						str = str ? str : "nosymbol";
+						didmsg++;
+						rfbLog("active keyboard: waiting until "
+						    "all keys are up. key_down=%d %s.  "
+						    "If the key is inaccessible via keyboard, "
+						    "consider 'x11vnc -R clear_all'\n", i, str);
+					}
 				}
+			}
+			if (didmsg > 0) {
+				msgcnt++;
+				if (msgcnt == mmax) {
+					rfbLog("active keyboard: last such "
+					    "message for %d secs.\n", mwt);
+				}
+				lastmsg = dnow();
+			}
+			if (pressed > 0) {
+				return;
 			}
 		}
 		if (idle_reset) {
@@ -1055,38 +1086,83 @@ void check_xevents(int reset) {
 		last_call = now;
 	}
 
-	/* check for CUT_BUFFER0 and VNC_CONNECT changes: */
+	/* check for CUT_BUFFER0, VNC_CONNECT, X11VNC_REMOTE changes: */
 	if (XCheckTypedEvent(dpy, PropertyNotify, &xev)) {
-		if (xev.type == PropertyNotify) {
-			if (xev.xproperty.atom == XA_CUT_BUFFER0) {
-				/*
-				 * Go retrieve CUT_BUFFER0 and send it.
-				 *
-				 * set_cutbuffer is a flag to try to avoid
-				 * processing our own cutbuffer changes.
-				 */
-				if (have_clients && watch_selection
-				    && ! set_cutbuffer) {
-					cutbuffer_send();
-					sent_some_sel = 1;
+		int got_cutbuffer = 0;
+		int got_vnc_connect = 0;
+		int got_x11vnc_remote = 0;
+		static int prop_dbg = -1;
+
+		/* to avoid piling up between calls, read all PropertyNotify now */
+		do {
+			if (xev.type == PropertyNotify) {
+				if (xev.xproperty.atom == XA_CUT_BUFFER0) {
+					got_cutbuffer++;
+				} else if (vnc_connect && vnc_connect_prop != None
+				    && xev.xproperty.atom == vnc_connect_prop) {
+					got_vnc_connect++;
+				} else if (vnc_connect && x11vnc_remote_prop != None
+				    && xev.xproperty.atom == x11vnc_remote_prop) {
+					got_x11vnc_remote++;
 				}
-				set_cutbuffer = 0;
-			} else if (vnc_connect && vnc_connect_prop != None
-		    	    && xev.xproperty.atom == vnc_connect_prop) {
-				/*
-				 * Go retrieve VNC_CONNECT string.
-				 */
-				read_vnc_connect_prop(0);
-			} else if (vnc_connect && x11vnc_remote_prop != None
-		    	    && xev.xproperty.atom == x11vnc_remote_prop) {
-				/*
-				 * Go retrieve X11VNC_REMOTE string.
-				 */
-				read_x11vnc_remote_prop(0);
-
-
+				set_prop_atom(xev.xproperty.atom);
 			}
-			set_prop_atom(xev.xproperty.atom);
+		} while (XCheckTypedEvent(dpy, PropertyNotify, &xev));
+
+		if (prop_dbg < 0) {
+			prop_dbg = 0;
+			if (getenv("PROP_DBG")) {
+				prop_dbg = 1;
+			}
+		}
+
+		if (prop_dbg && (got_cutbuffer > 1 || got_vnc_connect > 1 || got_x11vnc_remote > 1)) {
+			static double lastmsg = 0.0;
+			static int count = 0;
+			double now = dnow();
+
+			if (1 && now > lastmsg + 300.0) {
+				if (got_cutbuffer > 1) {
+					rfbLog("check_xevents: warning: %d cutbuffer events since last check.\n", got_cutbuffer);
+				}
+				if (got_vnc_connect > 1) {
+					rfbLog("check_xevents: warning: %d vnc_connect events since last check.\n", got_vnc_connect);
+				}
+				if (got_x11vnc_remote > 1) {
+					rfbLog("check_xevents: warning: %d x11vnc_remote events since last check.\n", got_x11vnc_remote);
+				}
+				count++;
+				if (count >= 3) {
+					lastmsg = now;
+					count = 0;
+				}
+			}
+		}
+
+		if (got_cutbuffer)  {
+			/*
+			 * Go retrieve CUT_BUFFER0 and send it.
+			 *
+			 * set_cutbuffer is a flag to try to avoid
+			 * processing our own cutbuffer changes.
+			 */
+			if (have_clients && watch_selection && !set_cutbuffer) {
+				cutbuffer_send();
+				sent_some_sel = 1;
+			}
+			set_cutbuffer = 0;
+		} 
+		if (got_vnc_connect) {
+			/*
+			 * Go retrieve VNC_CONNECT string.
+			 */
+			read_vnc_connect_prop(0);
+		} 
+		if (got_x11vnc_remote) {
+			/*
+			 * Go retrieve X11VNC_REMOTE string.
+			 */
+			read_x11vnc_remote_prop(0);
 		}
 	}
 
@@ -1364,6 +1440,39 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	}
 	get_allowed_input(cl, &input);
 	if (!input.clipboard) {
+		return;
+	}
+
+	if (remote_prefix != NULL && strstr(text, remote_prefix) == text) {
+		char *result, *rcmd = text + strlen(remote_prefix);
+		char *tmp = (char *) calloc(len + 8, 1);
+
+		if (strstr(rcmd, "cmd=") != rcmd && strstr(rcmd, "qry=") != rcmd) {
+			strcat(tmp, "qry=");
+		}
+		strncat(tmp, rcmd, len - strlen(remote_prefix));
+
+		rfbLog("remote_prefix command: '%s'\n", tmp);
+
+		result = process_remote_cmd(tmp, 1);
+		if (result == NULL ) {
+			result = strdup("null");
+		} else if (!strcmp(result, "")) {
+			free(result);
+			result = strdup("none");
+		}
+		rfbLog("remote_prefix result:  '%s'\n", result);
+
+		free(tmp);
+		tmp = (char *) calloc(strlen(remote_prefix) + strlen(result) + 1, 1);
+
+		strcat(tmp, remote_prefix);
+		strcat(tmp, result);
+		free(result);
+
+		rfbSendServerCutText(screen, tmp, strlen(tmp));
+		free(tmp);
+
 		return;
 	}
 

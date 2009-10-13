@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <rfb/rfbclient.h>
 #ifdef WIN32
+#undef SOCKET
 #include <winsock2.h>
 #define EWOULDBLOCK WSAEWOULDBLOCK
 #define close closesocket

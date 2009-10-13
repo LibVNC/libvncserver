@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "August 2009" "x11vnc " "User Commands"
+.TH X11VNC "1" "October 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.9, lastmod: 2009-08-10
+         version: 0.9.9, lastmod: 2009-10-07
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -884,7 +884,7 @@ A familiar "login:" and "Password:" dialog is
 presented to the user on a black screen inside the
 vncviewer.  The connection is dropped if the user fails
 to supply the correct password in 3 tries or does not
-send one before a 25 second timeout.  Existing clients
+send one before a 45 second timeout.  Existing clients
 are view-only during this period.
 .IP
 If the first character received is "Escape" then the
@@ -1192,6 +1192,10 @@ XDM/GDM/KDM prompt.  Subsequent re-connections will
 only require the \fB-unixpw\fR password.  See the discussion
 under \fB-display\fR WAIT:... for more details about XDM,
 etc configuration.
+.IP
+Remember to enable XDMCP in the xdm-config, gdm.conf,
+or kdmrc configuration file.  See \fB-display\fR WAIT: for
+more info.
 .PP
 \fB-sshxdmsvc\fR
 .IP
@@ -1206,6 +1210,50 @@ the XDM GDM KDM prompt. Subsequent re-connections will
 only only require the SSH login.  See the discussion
 under \fB-display\fR WAIT:... for more details about XDM,
 etc configuration.
+.IP
+Remember to enable XDMCP in the xdm-config, gdm.conf,
+or kdmrc configuration file.  See \fB-display\fR WAIT: for
+more info.
+.PP
+\fB-unixpw_system_greeter\fR
+.IP
+Present a "Press 'Escape' for System Greeter" option
+to the connecting VNC client in combined \fB-unixpw\fR
+and xdmcp FINDCREATEDISPLAY modes (e.g. \fB-xdmsvc).\fR
+.IP
+Normally in a \fB-unixpw\fR mode the VNC client must
+supply a valid username and password to gain access.
+However, if \fB-unixpw_system_greeter\fR is supplied AND
+the FINDCREATEDISPLAY command matches 'xdmcp', then
+the user has the option to press Escape and then get a
+XDM/GDM/KDM login/greeter panel instead. They will then
+supply a username and password directly to the greeter.
+.IP
+Otherwise, in xdmcp FINDCREATEDISPLAY mode the user
+must supply his username and password TWICE.  First to
+the initial unixpw login dialog, and second to the
+subsequent XDM/GDM/KDM greeter.  Note that if the user
+re-connects and supplies his username and password in
+the unixpw dialog the xdmcp greeter is skipped and
+he is connected directly to his existing X session.
+So the \fB-unixpw_system_greeter\fR option avoids the extra
+password at X session creation time.
+.IP
+Example:  x11vnc \fB-xdmsvc\fR \fB-unixpw_system_greeter\fR
+See \fB-unixpw\fR and \fB-display\fR WAIT:... for more info.
+.IP
+The special options after a colon at the end of the
+username (e.g. user:solid) described under \fB-display\fR
+WAIT: are also applied in this mode if they are typed
+in before the user hits Escape.  The username is ignored
+but the colon options are not.
+.IP
+If the user pressed Escape the FINDCREATEDISPLAY command
+will be run with the env. var. X11VNC_XDM_ONLY=1.
+.IP
+Remember to enable XDMCP in the xdm-config, gdm.conf,
+or kdmrc configuration file.  See \fB-display\fR WAIT: for
+more info.
 .PP
 \fB-redirect\fR \fIport\fR
 .IP
@@ -1285,12 +1333,13 @@ helper program supports RFB_UNIXPW_CMD_RUN (see the
 Also in the case of \fB-unixpw,\fR the user logging in can
 place a colon at the end of her username and supply
 a few options: scale=, scale_cursor= (or sc=), solid
-(or so), id=, clear_mods (or cm), clear_keys (or ck),
-repeat, speeds= (or sp=), readtimeout= (or rd=),
-rotate= (or ro=), or noncache (or nc), all separated by
-commas if there is more than one.  After the user logs
-in successfully, these options will be applied to the
-VNC screen.  For example,
+(or so), id=, clear_mods (or cm), clear_keys (or
+ck), clear_all (or ca), repeat, speeds= (or sp=),
+readtimeout= (or rd=), viewonly (or vo), nodisplay=
+(or nd=), rotate= (or ro=), or noncache (or nc),
+all separated by commas if there is more than one.
+After the user logs in successfully, these options will
+be applied to the VNC screen.  For example,
 .IP
 login: fred:scale=3/4,sc=1,repeat
 Password: ...
@@ -1301,6 +1350,9 @@ for convenience m/n implies scale= e.g. fred:3/4  If you
 type and enter your password incorrectly, to retrieve
 your long "login:" line press the Up arrow once
 (before typing anything else).
+.IP
+In the login panel, press F1 to get a list of the
+available options that you can add after the username.
 .IP
 Another option is "geom=WxH" or "geom=WxHxD" (or
 ge=). This only has an effect in FINDCREATEDISPLAY
@@ -1381,7 +1433,9 @@ comma separated list of displays (e.g. ":0,:1") to
 ignore in the finding process.  The ":" is optional.
 Ranges n-m e.g. 0-20 can also be supplied. This string
 can also be set by the connecting user via "nd="
-using "+" instead of ","
+using "+" instead of ","  If "nd=all" or you set
+X11VNC_SKIP_DISPLAY=all then all display finding fails
+as if you set X11VNC_FINDDISPLAY_ALWAYS_FAILS=1 (below.)
 .IP
 Automatic Creation of User X Sessions:
 .IP
@@ -1441,6 +1495,8 @@ See the \fB-svc/-service\fR option alias above.
 If for some reason you do not want x11vnc to ever
 try to find an existing display set the env. var
 X11VNC_FINDDISPLAY_ALWAYS_FAILS=1 (also \fB-env\fR ...)
+This is the same as setting X11VNC_SKIP_DISPLAY=all or
+supplying "nd=all" after "username:"
 .IP
 Use WAIT:cmd=FINDCREATEDISPLAY-print to print out the
 script that is used for this.
@@ -1474,12 +1530,15 @@ to pass to the X server. You can also set FD_PROG to
 be the full path to the session/windowmanager program.
 .IP
 More FD tricks:  FD_CUPS=port or FD_CUPS=host:port
-will set the cups printing environment.  Similarly
-for FD_ESD=port or FD_ESD=host:port for esddsp sound
-redirection.  FD_XDUMMY_NOROOT means the Xdummy server
-does not need to be started as root (e.g. it will sudo
-automatically).  Set FD_EXTRA to a command to be run
-a few seconds after the X server starts up.
+will set the cups printing environment.  Similarly for
+FD_ESD=port or FD_ESD=host:port for esddsp sound
+redirection.  FD_XDUMMY_NOROOT means the Xdummy
+server does not need to be started as root (e.g. it
+will sudo automatically).  Set FD_EXTRA to a command
+to be run a few seconds after the X server starts up.
+Set FD_TAG to be a unique name for the session, it is
+set as an X property, that makes FINDDISPLAY only find
+sessions with that tag value.
 .IP
 If you want the FINDCREATEDISPLAY session to contact an
 XDMCP login manager (xdm/gdm/kdm) on the same machine,
@@ -1561,8 +1620,9 @@ username+passwd method is enabled for Unix logins.
 Otherwise in \fB-unixpw\fR mode the normal login panel is
 provided.
 .IP
-You *MUST* supply the \fB-ssl\fR option for VeNCrypt to be
-active.  This option only fine-tunes its operation.
+You *MUST* supply the \fB-ssl\fR option for VeNCrypt to
+be active.  The \fB-vencrypt\fR option only fine-tunes its
+operation.
 .PP
 \fB-anontls\fR \fImode\fR
 .IP
@@ -1599,8 +1659,9 @@ description of "plain:" under \fB-vencrypt.\fR
 .IP
 Long example: \fB-anontls\fR newdh:plain:support
 .IP
-You *MUST* supply the \fB-ssl\fR option for ANONTLS to be
-active.  This option only fine-tunes its operation.
+You *MUST* supply the \fB-ssl\fR option for ANONTLS to
+be active.  The \fB-anontls\fR option only fine-tunes its
+operation.
 .PP
 \fB-sslonly\fR
 .IP
@@ -1631,16 +1692,17 @@ to unset any *earlier* \fB-ssl\fR option (or \fB-svc...)\fR
 .IP
 Use the openssl library (www.openssl.org) to provide a
 built-in encrypted SSL/TLS tunnel between VNC viewers
-and x11vnc.  This requires libssl support to be compiled
-into x11vnc at build time.  If x11vnc is not built
-with libssl support it will exit immediately when \fB-ssl\fR
-is prescribed.
+and x11vnc.  This requires libssl support to be
+compiled into x11vnc at build time.  If x11vnc is not
+built with libssl support it will exit immediately when
+\fB-ssl\fR is prescribed.  See the \fB-stunnel\fR option below for
+an alternative.
 .IP
 The VNC Viewer-side needs to support SSL/TLS as well.
 See this URL and also the discussion below for
 ideas on how to enable SSL support for the viewer:
 http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tun
-nel-viewers x11vnc provides an SSL enabled Java
+nel-viewers .  x11vnc provides an SSL enabled Java
 viewer applet in the classes/ssl directory (-http or
 \fB-httpdir\fR options.)  The SSVNC viewer package supports
 SSL tunnels too.
@@ -1737,6 +1799,11 @@ a SSL PEM you created or the default "SAVE" method.
 .IP
 See \fB-ssldir\fR below to use a directory besides the
 default ~/.vnc/certs
+.IP
+If your x11vnc binary was not compiled with OpenSSL
+library support, use of the \fB-ssl\fR option will induce an
+immediate failure and exit.  For such binaries, consider
+using the \fB-stunnel\fR option for SSL encrypted connections.
 .IP
 Misc Info: In temporary cert creation mode "TMP", set
 the env. var. X11VNC_SHOW_TMP_PEM=1 to have x11vnc print
@@ -1847,7 +1914,7 @@ See the \fB-sslGenCA\fR and \fB-sslGenCert\fR options below for
 how to set up and manage the CA framework.
 .IP
 NOTE: the following utilities, \fB-sslGenCA,\fR \fB-sslGenCert,\fR
-\fB-sslEncKey,\fR and \fB-sslCertInfo\fR are provided for
+\fB-sslEncKey,\fR \fB-sslCertInfo,\fR and \fB-sslCRL\fR are provided for
 completeness, but for casual usage they are overkill.
 .IP
 They provide VNC Certificate Authority (CA) key creation
@@ -1901,8 +1968,9 @@ the ss_vncviewer example script in the FAQ and SSVNC.)
 \fB-sslCRL\fR \fIpath\fR
 .IP
 Set the Certificate Revocation Lists (CRL) to \fIpath\fR.
+This setting applies for both \fB-ssl\fR and \fB-stunnel\fR modes.
 .IP
-If path is a file, the file contains one more more CRLs
+If path is a file, the file contains one or more CRLs
 in PEM format.  If path is a directory, it contains
 hash named files of CRLs in the usual OpenSSL manner.
 See the OpenSSL and 
@@ -1915,6 +1983,10 @@ supplied: it checks for revocation along the
 certificate chain used to verify the VNC client.
 The \fB-sslCRL\fR setting will be ignored when \fB-sslverify\fR is
 not specified.
+.IP
+Note that if a CRL's expiration date has passed, all
+SSL connections will fail regardless of if they are
+related to the subject of the CRL or not.
 .IP
 Only rarely will one's x11vnc \fB-ssl\fR infrastructure be so
 large that this option would be useful (since normally
@@ -2034,11 +2106,13 @@ delete the line.
 .IP
 Similar to \fB-sslGenCA,\fR you will be prompted to fill
 in some information that will be recorded in the
-certificate when it is created.  Tip: if you know
-the fully-qualified hostname other people will be
-connecting to you can use that as the CommonName "CN"
-to avoid some applications (e.g. web browsers and java
-plugin) complaining it does not match the hostname.
+certificate when it is created.
+.IP
+Tip: if you know the fully-qualified hostname other
+people will be connecting to, you can use that as the
+CommonName "CN" to avoid some applications (e.g. web
+browsers and java plugin) complaining that it does not
+match the hostname.
 .IP
 You will also need to supply the CA private key
 passphrase to unlock the private key created from
@@ -2062,14 +2136,14 @@ e.g. ~/.vnc/certs/clients/<name>.pem contains both
 the cert and private key.  The <name>.crt contains the
 certificate only.
 .IP
-NOTE: It is very important to know one should always
+NOTE: It is very important to know one should
 generate new keys with a passphrase.  Otherwise if an
 untrusted user steals the key file he could use it to
 masquerade as the x11vnc server (or VNC viewer client).
 You will be prompted whether to encrypt the key with
 a passphrase or not.  It is recommended that you do.
 One inconvenience to a passphrase is that it must
-be suppled every time x11vnc or the client app is
+be typed in EVERY time x11vnc or the client app is
 started up.
 .IP
 Examples:
@@ -2180,16 +2254,30 @@ encrypted SSL tunnel between viewers and x11vnc.
 .IP
 This external tunnel method was implemented prior to the
 integrated \fB-ssl\fR encryption described above.  It still
-works well.  This requires stunnel to be installed
-on the system and available via PATH (n.b. stunnel is
-often installed in sbin directories).  Version 4.x of
-stunnel is assumed (but see \fB-stunnel3\fR below.)
+works well and avoids the requirement of linking with
+the OpenSSL libraries.  This mode requires stunnel
+to be installed on the system and available via PATH
+(n.b. stunnel is often installed in sbin directories).
+Version 4.x of stunnel is assumed (but see \fB-stunnel3\fR
+below.)
 .IP
 [pem] is optional, use "\fB-stunnel\fR \fI/path/to/stunnel.pem\fR"
 to specify a PEM certificate file to pass to stunnel.
-Whether one is needed or not depends on your stunnel
-configuration.  stunnel often generates one at install
-time.  See the stunnel documentation for details.
+See the \fB-ssl\fR option for more info on certificate files.
+.IP
+Whether or not your stunnel has its own certificate
+depends on your stunnel configuration; stunnel often
+generates one at install time.  See your stunnel
+documentation for details.  In any event, if you want to
+use this certificate you must supply the full path to it
+as [pem].  Note: the file may only be readable by root.
+.IP
+[pem] may also be the special strings "TMP", "SAVE",
+and "SAVE..." as described in the \fB-ssl\fR option.
+If [pem] is not supplied, "SAVE" is assumed.
+.IP
+Note that the VeNCrypt, ANONTLS, and "ANON" modes
+are not supported in \fB-stunnel\fR mode.
 .IP
 stunnel is started up as a child process of x11vnc and
 any SSL connections stunnel receives are decrypted and
@@ -2197,22 +2285,37 @@ sent to x11vnc over a local socket.  The strings
 "The SSL VNC desktop is ..." and "SSLPORT=..."
 are printed out at startup to indicate this.
 .IP
-The \fB-localhost\fR option is enforced by default
-to avoid people routing around the SSL channel.
-Set STUNNEL_DISABLE_LOCALHOST=1 before starting x11vnc
-to disable the requirement.
+The \fB-localhost\fR option is enforced by default to avoid
+people routing around the SSL channel.  Use \fB-env\fR
+STUNNEL_DISABLE_LOCALHOST=1 to disable this security
+requirement.
 .IP
-Your VNC viewer will also need to be able to connect via
-SSL.  Unfortunately not too many do this.  UltraVNC has
-an encryption plugin but it does not seem to be SSL.
+Set \fB-env\fR STUNNEL_DEBUG=1 for more debugging printout.
 .IP
-Also, in the x11vnc distribution, a patched TightVNC
-Java applet is provided in classes/ssl that does SSL
-connections (only).
+Your VNC viewer will also need to be able to connect
+via SSL.  Unfortunately not too many do this.  See the
+information about SSL viewers under the \fB-ssl\fR option.
 .IP
-It is also not too difficult to set up an stunnel or
-other SSL tunnel on the viewer side.  A simple example
-on Unix using stunnel 3.x is:
+Also, in the x11vnc distribution, patched TightVNC
+and UltraVNC Java applet jar files are provided in
+the classes/ssl directory that do SSL connections.
+Enable serving them with the \fB-http,\fR \fB-http_ssl,\fR \fB-https,\fR
+or \fB-httpdir\fR (see the option descriptions for more info.)
+.IP
+Note that for the Java viewer applet usage the
+"?PORT=xxxx" in the various URLs printed at startup
+will need to be supplied to the web browser to connect
+properly.
+.IP
+Currently the automatic "single port" HTTPS mode of
+\fB-ssl\fR is not fully supported in \fB-stunnel\fR mode.  However,
+it can be emulated via:
+.IP
+% x11vnc \fB-stunnel\fR \fB-http_ssl\fR \fB-http_oneport\fR ...
+.IP
+In general, it is also not too difficult to set up
+an stunnel or other SSL tunnel on the viewer side.
+A simple example on Unix using stunnel 3.x is:
 .IP
 % stunnel \fB-c\fR \fB-d\fR localhost:5901 \fB-r\fR remotehost:5900
 % vncviewer localhost:1
@@ -2224,7 +2327,8 @@ and SSVNC for more examples.
 \fB-stunnel3\fR \fI[pem]\fR
 .IP
 Use version 3.x stunnel command line syntax instead of
-version 4.x
+version 4.x.  The \fB-http/-httpdir\fR Java applet serving
+is currently not available in this mode.
 .PP
 \fB-enc\fR \fIcipher:keyfile\fR
 .IP
@@ -2245,7 +2349,7 @@ that you do not have control over.
 Note that this mode will NOT work with the UltraVNC DSM
 plugins because they alter the RFB protocol in addition
 to tunnelling with the symmetric cipher (an unfortunate
-choice of implementation).
+choice of implementation...)
 .IP
 cipher can be one of:  arc4, aesv2, aes-cfb, blowfish,
 aes256, or 3des.  See the OpenSSL documentation for
@@ -2321,9 +2425,9 @@ salt,ivec sizes (in GUI or, e.g. arc4@8,16).
 .PP
 \fB-https\fR \fI[port]\fR
 .IP
-Use a special, separate HTTPS port (-ssl mode only)
-for HTTPS Java viewer applet downloading. I.e. not 5900
-and not 5800 (the defaults.)
+Use a special, separate HTTPS port (-ssl and
+\fB-stunnel\fR modes only) for HTTPS Java viewer applet
+downloading. I.e. not 5900 and not 5800 (the defaults.)
 .IP
 BACKGROUND: In \fB-ssl\fR mode, it turns out you can use the
 single VNC port (e.g. 5900) for both VNC and HTTPS
@@ -2342,6 +2446,8 @@ unreliable (especially if the user takes much time to
 ponder the Certificate dialogs in his browser, Java VM,
 or VNC Viewer applet.  That's right 3 separate "Are
 you sure you want to connect?" dialogs!)
+.IP
+END OF BACKGROUND.
 .IP
 USAGE: So use the \fB-https\fR option to provide a separate,
 more reliable HTTPS port that x11vnc will listen on.  If
@@ -2377,10 +2483,12 @@ other ports must be explicitly indicated, for example:
 https://mygateway.com:8000/?PORT=8000.  To avoid having
 to include the PORT= in the browser URL, simply supply
 "\fB-httpsredir\fR" to x11vnc.
+.IP
+This options does not work in \fB-stunnel\fR mode.
 .PP
 \fB-http_oneport\fR
 .IP
-For un-encrypted connections mode (i.e. no \fB-ssl,\fR
+For UN-encrypted connections mode (i.e. no \fB-ssl,\fR
 \fB-stunnel,\fR or \fB-enc\fR options), allow the Java VNC Viewer
 applet to be downloaded thru the VNC port via HTTP.
 .IP
@@ -4041,13 +4149,24 @@ times for more output.
 .PP
 \fB-defer\fR \fItime\fR
 .IP
-Time in ms to wait for updates before sending to client
+Time in ms to delay sending updates to connected clients
 (deferUpdateTime)  Default: 20
 .PP
 \fB-wait\fR \fItime\fR
 .IP
 Time in ms to pause between screen polls.  Used to cut
 down on load.  Default: 20
+.PP
+\fB-extra_fbur\fR \fIn\fR
+.IP
+Perform extra FrameBufferUpdateRequests checks to
+try to be in better sync with the client's requests.
+What this does is perform extra polls of the client
+socket at critical times (before '-defer' and '-wait'
+calls.)  The default is n=1.  Set to a larger number to
+insert more checks or set to n=0 to disable.  A downside
+of these extra calls is that more mouse input may be
+processed than desired.
 .PP
 \fB-wait_ui\fR \fIfactor\fR
 .IP
@@ -4104,14 +4223,14 @@ Default: take naps
 .IP
 Time in seconds after NO activity (e.g. screen blank)
 to really throttle down the screen polls (i.e. sleep
-for about 1.5 secs). Use 0 to disable.  Default: 20
+for about 1.5 secs). Use 0 to disable.  Default: 60
 .PP
 \fB-readtimeout\fR \fIn\fR
 .IP
 Set libvncserver rfbMaxClientWait to n seconds. On
 slow links that take a long time to paint the first
 screen libvncserver may hit the timeout and drop the
-connection.  Default: 60 seconds.
+connection.  Default: 20 seconds.
 .PP
 \fB-ping\fR \fIn\fR
 .IP
@@ -4987,6 +5106,28 @@ If you do not intend to start x11vnc from the gui
 gui process can run on a different machine from the
 x11vnc server as long as X permissions, etc. permit
 communication between the two.
+.IP
+FONTS: On some systems the tk fonts can be too small,
+jagged, or otherwise unreadable.  There are 4 env vars
+you can set to be the tk font you prefer:
+.IP
+X11VNC_FONT_BOLD   main font for menus and buttons.
+X11VNC_FONT_FIXED  font for fixed width text.
+.IP
+X11VNC_FONT_BOLD_SMALL  tray icon font.
+X11VNC_FONT_REG_SMALL   tray icon menu font.
+.IP
+The last two only apply for the tray icon mode.
+.IP
+Here are some examples:
+.IP
+\fB-env\fR X11VNC_FONT_BOLD='Helvetica \fB-16\fR bold'
+\fB-env\fR X11VNC_FONT_FIXED='Courier \fB-14'\fR
+\fB-env\fR X11VNC_FONT_REG_SMALL='Helvetica \fB-12'\fR
+.IP
+You can put the lines like the above (without the
+quotes) in your ~/.x11vncrc file to avoid having to
+specify them on the x11vnc command line.
 .PP
 \fB-remote\fR \fIcommand\fR
 .IP
@@ -5013,6 +5154,18 @@ For example: 'x11vnc \fB-remote\fR stop' (which is the same as
 \'x11vnc \fB-R\fR shared' will enable shared connections, and
 \'x11vnc \fB-R\fR scale:3/4' will rescale the desktop.
 .IP
+To run a bunch of commands in a sequence use something
+like: x11vnc \fB-R\fR 'script:firstcmd;secondcmd;...'
+.IP
+Use x11vnc \fB-R\fR script:file=/path/to/file to read commands
+from a file (can be multi-line and use the comment '#'
+character in the normal way.  The ';' separator must
+still be used to separate each command.)
+.IP
+To not try to contact another x11vnc process and instead
+just run the command (or query) directly, prefix the
+command with the string "DIRECT:"
+.IP
 .IP
 The following \fB-remote/-R\fR commands are supported:
 .IP
@@ -5020,7 +5173,10 @@ stop            terminate the server, same as "quit"
 "exit" or "shutdown".
 .IP
 ping            see if the x11vnc server responds.
-Return is: ans=ping:<xdisplay>
+return is: ans=ping:<display>
+.IP
+ping:mystring   as above, but use your own unique string.
+return is: ans=ping:mystring:<xdisplay>
 .IP
 blacken         try to push a black fb update to all
 clients (due to timings a client
@@ -5174,6 +5330,8 @@ grabalways      enable  \fB-grabalways\fR mode.
 .IP
 nograbalways    disable \fB-grabalways\fR mode.
 .IP
+grablocal:n     set \fB-grablocal\fR to n.
+.IP
 client_input:str set the K, M, B \fB-input\fR on a per-client
 basis.  select which client as for
 disconnect, e.g. client_input:host:MB
@@ -5322,6 +5480,12 @@ setclipboard    disable \fB-nosetclipboard\fR mode.
 .IP
 seldir:str      set \fB-seldir\fR to "str"
 .IP
+resend_cutbuffer resend the most recent CUTBUFFER0 copy
+.IP
+resend_clipboard resend the most recent CLIPBOARD copy
+.IP
+resend_primary   resend the most recent PRIMARY copy
+.IP
 cursor:mode     enable  \fB-cursor\fR "mode".
 .IP
 show_cursor     enable  showing a cursor.
@@ -5465,9 +5629,41 @@ debug_keyboard   enable  \fB-debug_keyboard,\fR same as "dk"
 .IP
 nodebug_keyboard disable \fB-debug_keyboard,\fR same as "nodk"
 .IP
+keycode:n       inject keystroke 'keycode' (xmodmap \fB-pk)\fR
+.IP
+keycode:n,down  inject 'keycode' (down=0,1)
+.IP
+keysym:str      inject keystroke 'keysym' (number/name)
+.IP
+keysym:str,down inject 'keysym' (down=0,1)
+.IP
+ptr:x,y,mask    inject pointer event x, y, button-mask
+.IP
+sleep:t         sleep floating point time t.
+.IP
+get_xprop:p     get X property named 'p'.
+.IP
+set_xprop:p:val set X property named 'p' to 'val'.
+p -> id=NNN:p for hex/dec window id.
+.IP
+wininfo:id      get info about X window id.  use 'root'
+for root window, use +id for children.
+.IP
+grab_state      get state of pointer and keyboard grab.
+.IP
+pointer_pos     print XQueryPointer x,y cursor position.
+.IP
+mouse_x         print x11vnc's idea of cursor position.
+.IP
+mouse_y         print x11vnc's idea of cursor position.
+.IP
+noop            do nothing.
+.IP
 defer:n         set \fB-defer\fR to n ms,same as deferupdate:n
 .IP
 wait:n          set \fB-wait\fR to n ms.
+.IP
+extra_fbur:n    set \fB-extra_fbur\fR to n.
 .IP
 wait_ui:f       set \fB-wait_ui\fR factor to f.
 .IP
@@ -5545,6 +5741,8 @@ rawfb:str       set \fB-rawfb\fR mode to "str".
 .IP
 uinput_accel:f  set uinput_accel to f.
 .IP
+uinput_thresh:n set uinput_thresh to n.
+.IP
 uinput_reset:n  set uinput_reset to n ms.
 .IP
 uinput_always:n set uinput_always to 1/0.
@@ -5578,7 +5776,11 @@ maciconanim:n   set \fB-maciconanim\fR to n.
 .IP
 macmenu         enable  \fB-macmenu\fR  mode.
 .IP
-macnomenu       disable \fB-macnmenu\fR mode.
+macnomenu       disable \fB-macmenu\fR  mode.
+.IP
+macuskbd        enable  \fB-macuskbd\fR mode.
+.IP
+macnouskbd      disable \fB-macuskbd\fR mode.
 .IP
 httpport:n      set \fB-httpport\fR to n.
 .IP
@@ -5644,33 +5846,116 @@ noremote        disable the \fB-remote\fR command processing,
 it cannot be turned back on.
 .IP
 .IP
+bcx_xattach:str  This remote control command is for
+use with the BARCO xattach program or the x2x program.
+Both of these programs are for 'pointer and keyboard'
+sharing between separate X displays.  In general the
+two displays are usually nearby, e.g. on the same desk,
+and this allows the user to share a single pointer and
+keyboard between them.  The user moves the mouse to
+an edge and then the mouse pointer appears to 'jump'
+to the other display screen.  Thus it emulates what a
+single X server would do for two screens (e.g. :0.0 and
+:0.1) The illusion of a single Xserver with multiple
+screens is achieved by forwarding events to the 2nd
+one via the XTEST extension.
+.IP
+What the x11vnc bcx_xattach command does is to perform
+some pointer movements to try to INDUCE xattach/x2x
+to 'jump' to the other display.  In what follows the
+\'master' display refers to the one that when it has
+\'focus' it is basically doing nothing besides watching
+for the mouse to go over an edge.  The 'slave'
+display refers to the one to which the mouse and
+keyboard is redirected to once an edge in the master
+has been crossed.  Note that the x11vnc executing the
+bcx_xattach command MUST be the one connected to the
+*master* display.
+.IP
+Also note that when input is being redirected (via
+XTEST) from the master display to the slave display,
+the master display's pointer and keyboard are *grabbed*
+by xattach/x2x.  x11vnc can use this info to verify that
+the master/slave mode change has taken place correctly.
+If you specify the "ifneeded" option (see below)
+and the initial grab state is that of the desired
+final state, then no pointer movements are injected
+and "DONE,GRAB_OK" is returned.
+.IP
+"str" must contain one of "up", "down", "left",
+or "right" to indicate the direction of the 'jump'.
+"str" must also contain one of "master_to_slave"
+or "slave_to_master" to indicate the type of mode
+change induced by the jump.  Use "M2S" and "S2M"
+as shorter aliases.
+.IP
+"str" may be a "+" separated list of additional
+tuning options.  The "shift=n" option indicates an
+offset shift position away from (0,0) (default 20).
+"final=x+y" specifies the final position of the cursor
+at the end of the normal move sequence; default 30+30.
+"extra_move=x+y" means to do one more pointer move
+after "final" to x+y.  "dt=n" sets the sleep time
+in milliseconds between pointer moves (default: 40ms)
+"retry=n" specifies the maximum number of retries if
+the grab state change fails. "ifneeded" means to not
+apply the pointer movements if the initial grab state is
+that of the desired final state. "nograbcheck" means
+to not check if the grab state changed as expected and
+only apply the pointer movements (default is to check
+the grab states.)
+.IP
+If you do not specify "up", etc., to bcx_xattach
+nothing will be attempted and the command returns
+the string FAIL,NO_DIRECTION_SPECIFIED.  If you do
+not specify "master_to_slave" or "M2S", etc., to
+bcx_xattach nothing will be attempted and the command
+returns the string FAIL,NO_MODE_CHANGE_SPECIFIED.
+.IP
+Otherwise, the returned string will contain "DONE".
+It will be "DONE,GRAB_OK" if the grab state changed
+as expected (or if "ifneeded" was supplied and
+the initial grab state was already the desired
+one.)  If the initial grab state was incorrect,
+but the final grab state was correct then it is
+"DONE,GRAB_FAIL_INIT".  If the initial grab state
+was correct, but the final grab state was incorrect
+then it is "DONE,GRAB_FAIL_FINAL".  If both are
+incorrect it will be "DONE,GRAB_FAIL".  Under grab
+failure the string will be followed by ":p1,k1-p2,k2"
+where  p1,k1 indicates the initial pointer and keyboard
+grab states and p2,k2 the final ones. If GRAB_FAIL or
+GRAB_FAIL_FINAL occurs, the action will be retried up
+to 3 times; trying to reset the state and sleeping a
+bit between each try.  Set retry=n to adjust the number
+of retries, zero to disable retries.
+.IP
+Examples:
+\fB-R\fR bcx_xattach:down+M2S
+\fB-R\fR bcx_xattach:up+S2M
+\fB-R\fR bcx_xattach:up+S2M+nograbcheck+dt=30
+\fB-R\fR bcx_xattach:down+M2S+extra_move=100+100
+.IP
+or use \fB-Q\fR instead of \fB-R\fR to retrieve the result text.
+.IP
+End of the bcx_xattach:str description.
+.IP
 The 
 .IR vncconnect (1)
 command from standard VNC
-.IP
 distributions may also be used if string is prefixed
-.IP
 with "cmd=" E.g. 'vncconnect cmd=stop'.  Under some
-.IP
 circumstances 
 .IR xprop (1)
 can used if it supports \fB-set\fR
-.IP
 (see the FAQ).
 .IP
-.IP
 If "\fB-connect\fR \fI/path/to/file\fR" has been supplied to the
-.IP
 running x11vnc server then that file can be used as a
-.IP
 communication channel (this is the only way to remote
-.IP
 control one of many x11vnc's polling the same X display)
-.IP
 Simply run: 'x11vnc \fB-connect\fR /path/to/file \fB-remote\fR ...'
-.IP
 or you can directly write to the file via something
-.IP
 like: "echo cmd=stop > /path/to/file", etc.
 .PP
 \fB-query\fR \fIvariable\fR
@@ -5689,7 +5974,8 @@ these cases the value returned is "N/A".  To direct a
 query straight to the X11VNC_REMOTE property or connect
 file use "qry=..." instead of "cmd=..."
 .IP
-ans= stop quit exit shutdown ping blacken zero
+ans= stop quit exit shutdown ping resend_cutbuffer
+resend_clipboard resend_primary blacken zero
 refresh reset close disconnect id sid waitmapped
 nowaitmapped clip flashcmap noflashcmap shiftcmap
 truecolor notruecolor overlay nooverlay overlay_cursor
@@ -5700,7 +5986,7 @@ viewonly noviewonly shared noshared forever noforever
 once timeout tightfilexfer notightfilexfer ultrafilexfer
 noultrafilexfer rfbversion deny lock nodeny unlock
 avahi mdns zeroconf noavahi nomdns nozeroconf connect
-proxy  allowonce allow localhost nolocalhost listen
+proxy allowonce allow localhost nolocalhost listen
 lookup nolookup accept afteraccept gone shm noshm
 flipbyteorder noflipbyteorder onetile noonetile
 solid_color solid nosolid blackout xinerama noxinerama
@@ -5710,10 +5996,10 @@ nocapslock skip_lockkeys noskip_lockkeys skip_keycodes
 sloppy_keys nosloppy_keys skip_dups noskip_dups
 add_keysyms noadd_keysyms clear_mods noclear_mods
 clear_keys noclear_keys clear_all clear_locks keystate
-remap repeat norepeat fb nofb bell nobell sel nosel
-primary noprimary setprimary nosetprimary clipboard
-noclipboard setclipboard nosetclipboard seldir
-cursorshape nocursorshape cursorpos nocursorpos
+remap repeat norepeat fb nofb bell nobell sendbell
+sel nosel primary noprimary setprimary nosetprimary
+clipboard noclipboard setclipboard nosetclipboard
+seldir cursorshape nocursorshape cursorpos nocursorpos
 cursor_drag nocursor_drag cursor show_cursor
 noshow_cursor nocursor arrow xfixes noxfixes xdamage
 noxdamage xd_area xd_mem alphacut alphafrac alpharemove
@@ -5729,16 +6015,18 @@ debug_ncache nodebug_ncache wireframe_mode wireframe wf
 nowireframe nowf wireframelocal wfl nowireframelocal
 nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-scr_parms scrollcopyrect scr noscrollcopyrect noscr
-fixscreen noxrecord xrecord reset_record pointer_mode pm
-input_skip allinput noallinput input grabkbd nograbkbd
-grabptr nograbptr grabalways nograbalways grablocal
-client_input ssltimeout speeds wmdt debug_pointer dp
-nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-nodk keycode deferupdate defer setdefer wait_ui
-wait_bog nowait_bog slow_fb xrefresh wait readtimeout
-nap nonap sb screen_blank fbpm nofbpm dpms nodpms
-clientdpms noclientdpms forcedpms noforcedpms
+scr_parms scrollcopyrect scr noscrollcopyrect
+noscr fixscreen noxrecord xrecord reset_record
+pointer_mode pm input_skip allinput noallinput input
+grabkbd nograbkbd grabptr nograbptr grabalways
+nograbalways grablocal client_input ssltimeout
+speeds wmdt debug_pointer dp nodebug_pointer nodp
+debug_keyboard dk nodebug_keyboard nodk keycode
+keysym ptr sleep get_xprop set_xprop wininfo
+bcx_xattach deferupdate defer setdefer extra_fbur
+wait_ui wait_bog nowait_bog slow_fb xrefresh wait
+readtimeout nap nonap sb screen_blank fbpm nofbpm dpms
+nodpms clientdpms noclientdpms forcedpms noforcedpms
 noserverdpms serverdpms noultraext ultraext chatwindow
 nochatwindow chaton chatoff fs gaps grow fuzz snapfb
 nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
@@ -5756,21 +6044,23 @@ nomacnowait macwheel macnoswap macswap nomacnoswap
 macnoresize macresize nomacnoresize maciconanim macmenu
 macnomenu nomacmenu macuskbd nomacuskbd noremote
 .IP
-aro=  noop display vncdisplay desktopname guess_desktop
-http_url auth xauth users rootshift clipshift scale_str
-scaled_x scaled_y scale_numer scale_denom scale_fac_x
+aro=  noop display vncdisplay autoport loop loopbg
+desktopname guess_desktop http_url auth xauth
+users rootshift clipshift scale_str scaled_x
+scaled_y scale_numer scale_denom scale_fac_x
 scale_fac_y scaling_blend scaling_nomult4 scaling_pad
 scaling_interpolate inetd privremote unsafe safer
 nocmds passwdfile unixpw unixpw_nis unixpw_list ssl
 ssl_pem sslverify stunnel stunnel_pem https httpsredir
-usepw using_shm logfile o flag rc norc h help V version
-lastmod bg sigpipe threads readrate netrate netlatency
-pipeinput clients client_count pid ext_xtest ext_xtrap
-ext_xrecord ext_xkb ext_xshm ext_xinerama ext_overlay
-ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
-button_mask mouse_x mouse_y bpp depth indexed_color
-dpy_x dpy_y wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y
-coff_x coff_y rfbauth passwd viewpasswd
+usepw using_shm logfile o flag rmflag rc norc h help
+V version lastmod bg sigpipe threads readrate netrate
+netlatency pipeinput clients client_count pid ext_xtest
+ext_xtrap ext_xrecord ext_xkb ext_xshm ext_xinerama
+ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin
+num_buttons button_mask mouse_x mouse_y grab_state
+pointer_pos bpp depth indexed_color dpy_x dpy_y wdpy_x
+wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth
+passwd viewpasswd
 .PP
 \fB-QD\fR \fIvariable\fR
 .IP
@@ -5794,10 +6084,47 @@ first (synchronously: no need for \fB-sync),\fR and then
 the \fB-query\fR request is processed in the normal way.
 This allows for a reliable way to see if the \fB-remote\fR
 command was processed by querying for any new settings.
-Note however that there is timeout of a few seconds so
-if the x11vnc takes longer than that to process the
-requests the requester will think that a failure has
-taken place.
+Note however that there is timeout of a few seconds
+(see the next paragraph) so if the x11vnc takes longer
+than that to process the requests the requester will
+think that a failure has taken place.
+.IP
+The default is to wait 3.5 seconds.  Or if cmd=stop
+only 1.0 seconds.  If cmd matches 'script:' then it
+will wait up to 10.0 seconds.  Set X11VNC_SYNC_TIMEOUT
+to the number of seconds you want it to wait.
+.PP
+\fB-query_retries\fR \fIstr\fR
+.IP
+If a query fails to get a response from an x11vnc
+server, retry up to n times.  \fIstr\fR is specified as
+n[:t][/match]  Optionally the delay between tries may
+be specified by "t" a floating point time (default
+0.5 seconds.)  Note: the response is not checked for
+validity or whether it corresponds to the query sent.
+The query "ping:mystring" may be used to help uniquely
+identify the query.  Optionally, a matching string after
+a "/" will be used to check the result text.  Up to
+n retries will take place until the matching string is
+found in the output text.  If the match string is never
+found the program's exit code is 1; if the match is
+found it exits with 0.  Note that there may be stdout
+printed for each retry (i.e. multiple lines printed
+out to stdout.)
+Example: \fB-query_retries\fR 4:1.5/grab_state
+.PP
+\fB-remote_prefix\fR \fIstr\fR
+.IP
+Enable a remote-control communication channel for
+connected VNC clients.  str is a non-empty string. If a
+VNC client sends rfbCutText having the prefix \fIstr\fR
+then the part after it is processed as though it were
+sent via 'x11vnc \fB-remote\fR ...'.  If it begins with
+neither 'cmd=' nor 'qry=' then 'qry=' is assumed.
+Any corresponding output text for that remote control
+command is sent back to all client as rfbCutText.
+The returned output is also prefixed with \fIstr\fR.
+Example: \fB-remote_prefix\fR DO_THIS:
 .PP
 \fB-noremote,\fR \fB-yesremote\fR
 .IP

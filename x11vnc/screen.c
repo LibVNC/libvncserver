@@ -1179,6 +1179,8 @@ static char* vnc_reflect_get_password(rfbClient* client) {
 	char *q, *p, *str = getenv("X11VNC_REFLECT_PASSWORD");
 	int len = 110;
 
+	if (client) {}
+
 	if (str) {
 		len += 2*strlen(str);	
 	}
@@ -2366,7 +2368,7 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 
 	again:
 	if (subwin) {
-		int shift = 0;
+	        int shift = 0, fit = 0;
 		int subwin_x, subwin_y;
 		int disp_x = DisplayWidth(dpy, scr);
 		int disp_y = DisplayHeight(dpy, scr);
@@ -2377,23 +2379,35 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 		XTranslateCoordinates(dpy, window, rootwin, 0, 0, &subwin_x,
 		    &subwin_y, &twin);
 
+		if (wdpy_x > disp_x ) {
+		        fit = 1;
+			dpy_x = wdpy_x = disp_x - 3;
+		}
+		if (wdpy_y > disp_y) {
+		        fit = 1;
+			dpy_y = wdpy_y = disp_y - 3;
+		}
+
 		if (subwin_x + wdpy_x > disp_x) {
 			shift = 1;
-			subwin_x = disp_x - wdpy_x - 3;
+			subwin_x = off_x = disp_x - wdpy_x - 3;
 		}
 		if (subwin_y + wdpy_y > disp_y) {
 			shift = 1;
-			subwin_y = disp_y - wdpy_y - 3;
+			subwin_y = off_y = disp_y - wdpy_y - 3;
 		}
 		if (subwin_x < 0) {
 			shift = 1;
-			subwin_x = 1;
+			subwin_x = off_x = 1;
 		}
 		if (subwin_y < 0) {
 			shift = 1;
-			subwin_y = 1;
+			subwin_y = off_y = 1;
 		}
 
+		if (fit) {
+			XResizeWindow(dpy, window, wdpy_x, wdpy_y);
+		}
 		if (shift) {
 			XMoveWindow(dpy, window, subwin_x, subwin_y);
 		}
@@ -2846,10 +2860,16 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	/* n.b. samplesPerPixel (set = 1 here) seems to be unused. */
 	if (create_screen) {
-		if (use_openssl) {
-			openssl_init(0);
-		} else if (use_stunnel) {
+		if (use_stunnel) {
 			setup_stunnel(0, argc, argv);
+		}
+		if (use_openssl) {
+			if (use_stunnel && enc_str && !strcmp(enc_str, "none")) {
+				/* emulating HTTPS oneport */
+				;
+			} else {
+				openssl_init(0);
+			}
 		}
 		screen = rfbGetScreen(argc, argv, width, height,
 		    bits_per_color, 1, fb_bpp/8);
@@ -3367,6 +3387,10 @@ void announce(int lport, int ssl, char *iface) {
 	char *host = this_host();
 	char *tvdt;
 
+	if (remote_direct) {
+		return;
+	}
+
 	if (! ssl) {
 		tvdt = "The VNC desktop is:     ";
 	} else {
@@ -3422,12 +3446,12 @@ void announce(int lport, int ssl, char *iface) {
 	}
 }
 
-static void announce_http(int lport, int ssl, char *iface) {
+static void announce_http(int lport, int ssl, char *iface, char *extra) {
 	
 	char *host = this_host();
 	char *jvu;
 
-	if (enc_str && !strcmp(enc_str, "none")) {
+	if (enc_str && !strcmp(enc_str, "none") && !use_stunnel) {
 		jvu = "Java viewer URL:         http";
 	} else if (ssl == 1) {
 		jvu = "Java SSL viewer URL:     https";
@@ -3442,11 +3466,76 @@ static void announce_http(int lport, int ssl, char *iface) {
 	}
 	if (host != NULL) {
 		if (! inetd) {
-			fprintf(stderr, "%s://%s:%d/\n", jvu, host, lport);
-			if (screen && enc_str && !strcmp(enc_str, "none")) {
-				fprintf(stderr, "%s://%s:%d/\n", jvu, host, screen->port);
+			fprintf(stderr, "%s://%s:%d/%s\n", jvu, host, lport, extra);
+		}
+	}
+}
+
+void do_announce_http(void) {
+	if (!screen) {
+		return;
+	}
+	if (remote_direct) {
+		return;
+	}
+
+	if (screen->httpListenSock > -1 && screen->httpPort) {
+		int enc_none = (enc_str && !strcmp(enc_str, "none"));
+		char *SPORT = "   (single port)";
+		if (use_openssl && ! enc_none) {
+			announce_http(screen->port, 1, listen_str, SPORT);
+			if (https_port_num >= 0) {
+				announce_http(https_port_num, 1,
+				    listen_str, "");
+			}
+			announce_http(screen->httpPort, 2, listen_str, "");
+		} else if (use_stunnel) {
+			char pmsg[100];
+			pmsg[0] = '\0';
+			if (stunnel_port) {
+				sprintf(pmsg, "?PORT=%d", stunnel_port);
+			}
+			announce_http(screen->httpPort, 2, listen_str, pmsg);
+			if (stunnel_http_port > 0) {
+				announce_http(stunnel_http_port, 1, NULL, pmsg);
+			}
+			if (enc_none) {
+				strcat(pmsg, SPORT);
+				announce_http(stunnel_port, 1, NULL, pmsg);
+			}
+		} else {
+			announce_http(screen->httpPort, 0, listen_str, "");
+			if (enc_none) {
+				announce_http(screen->port, 1, NULL, SPORT);
 			}
 		}
+	}
+}
+
+void do_mention_java_urls(void) {
+	if (! quiet && screen) {
+		if (screen->httpListenSock > -1 && screen->httpPort) {
+			rfbLog("\n");
+			rfbLog("The URLs printed out below ('Java ... viewer URL') can\n");
+			rfbLog("be used for Java enabled Web browser connections.\n");
+			if (!stunnel_port && enc_str && !strcmp(enc_str, "none")) {
+				;
+			} else if (use_openssl || stunnel_port) {
+				rfbLog("Here are some additional possibilities:\n");
+				rfbLog("\n");
+				rfbLog("https://host:port/proxy.vnc (MUST be used if Web Proxy used)\n");
+				rfbLog("\n");
+				rfbLog("https://host:port/ultra.vnc (Use UltraVNC Java Viewer)\n");
+				rfbLog("https://host:port/ultraproxy.vnc (Web Proxy with UltraVNC)\n");
+				rfbLog("https://host:port/ultrasigned.vnc (Signed UltraVNC Filexfer)\n");
+				rfbLog("\n");
+				rfbLog("Where you replace \"host:port\" with that printed below, or\n");
+				rfbLog("whatever is needed to reach the host e.g. Internet IP number\n");
+				rfbLog("\n");
+				rfbLog("Append ?GET=1 to a URL for faster loading.\n");
+			}
+		}
+		rfbLog("\n");
 	}
 }
 
@@ -3456,30 +3545,12 @@ void set_vnc_desktop_name(void) {
 		sprintf(vnc_desktop_name, "%s/inetd-no-further-clients",
 		    this_host());
 	}
+	if (remote_direct) {
+		return;
+	}
 	if (screen->port) {
 
-		if (! quiet) {
-			if (screen->httpListenSock > -1 && screen->httpPort) {
-				rfbLog("\n");
-				rfbLog("The URLs printed out below ('Java ... viewer URL') can\n");
-				rfbLog("be used for Java enabled Web browser connections.\n");
-				if (enc_str && !strcmp(enc_str, "none")) {
-					;
-				} else if (use_openssl || stunnel_port) {
-					rfbLog("Here are some additional possibilities:\n");
-					rfbLog("\n");
-					rfbLog("https://host:port/proxy.vnc (MUST be used if Web Proxy used)\n");
-					rfbLog("\n");
-					rfbLog("https://host:port/ultra.vnc (Use UltraVNC Java Viewer)\n");
-					rfbLog("https://host:port/ultraproxy.vnc (Web Proxy with UltraVNC)\n");
-					rfbLog("https://host:port/ultrasigned.vnc (Signed UltraVNC Filexfer)\n");
-					rfbLog("\n");
-					rfbLog("Where you replace \"host:port\" with that printed below, or\n");
-					rfbLog("whatever is needed to reach the host e.g. Internet IP number\n");
-				}
-			}
-			rfbLog("\n");
-		}
+		do_mention_java_urls();
 
 		if (use_openssl) {
 			announce(screen->port, 1, listen_str);
@@ -3489,24 +3560,8 @@ void set_vnc_desktop_name(void) {
 		if (stunnel_port) {
 			announce(stunnel_port, 1, NULL);
 		}
-		if (screen->httpListenSock > -1 && screen->httpPort) {
-			if (use_openssl) {
-				if (enc_str && !strcmp(enc_str, "none")) {
-					;
-				} else {
-					announce_http(screen->port, 1, listen_str);
-				}
-				if (https_port_num >= 0) {
-					announce_http(https_port_num, 1,
-					    listen_str);
-				}
-				announce_http(screen->httpPort, 2, listen_str);
-			} else if (use_stunnel) {
-				announce_http(screen->httpPort, 2, listen_str);
-			} else {
-				announce_http(screen->httpPort, 0, listen_str);
-			}
-		}
+
+		do_announce_http();
 		
 		fflush(stderr);	
 		if (inetd) {
@@ -3954,13 +4009,19 @@ void watch_loop(void) {
 				 * see quickly (just 1 rfbPE will likely
 				 * only process the subsequent "up" event)
 				 */
-				if (tm < last_keyboard_time + 0.16) {
+				if (tm < last_keyboard_time + 0.20) {
 					rfbPE(0);
 					rfbPE(0);
 					rfbPE(-1);
 					rfbPE(0);
 					rfbPE(0);
 				} else {
+					if (extra_fbur > 0) {
+						int i;
+						for (i=0; i < extra_fbur; i++) {
+							rfbPE(0);
+						}
+					}
 					rfbPE(-1);
 				}
 				if (x11vnc_current < last_new_client + 0.5) {
@@ -4126,6 +4187,7 @@ void watch_loop(void) {
 		} else {
 			static double last_dt = 0.0;
 			double xdamage_thrash = 0.4; 
+			static int tilecut = -1;
 
 			check_cursor_changes();
 
@@ -4176,8 +4238,15 @@ void watch_loop(void) {
 				last_dt = dt;
 			}
 
+			if (tilecut < 0) {
+				if (getenv("TILECUT")) {
+					tilecut = atoi(getenv("TILECUT"));
+				}
+				if (tilecut < 0) tilecut = 4;
+			}
+
 			if ((debug_tiles || debug_scroll > 1 || debug_wireframe > 1)
-			    && (tile_diffs > 4 || debug_tiles > 1)) {
+			    && (tile_diffs > tilecut || debug_tiles > 1)) {
 				double rate = (tile_x * tile_y * bpp/8 * tile_diffs) / dt;
 				fprintf(stderr, "============================= TILES: %d  dt: %.4f"
 				    "  t: %.4f  %.2f MB/s nap_ok: %d\n", tile_diffs, dt,
@@ -4188,13 +4257,33 @@ void watch_loop(void) {
 
 		/* sleep a bit to lessen load */
 		wait = choose_delay(dt);
+
 		if (urgent_update) {
 			;
 		} else if (wait > 2*waitms) {
 			/* bog case, break it up */
 			nap_sleep(wait, 10);
 		} else {
+			double t1, t2;
+			int idt;
+			if (extra_fbur > 0) {
+				int i;
+				for (i=0; i <= extra_fbur; i++) {
+					int r = rfbPE(0);
+					if (!r) break;
+				}
+			}
+
+			/* sometimes the sleep is too short, so measure it: */
+			t1 = dnow();
 			usleep(wait * 1000);
+			t2 = dnow();
+
+			idt = (int) (1000. * (t2 - t1));
+			if (idt > 0 && idt < wait) {
+				/* try to sleep the remainder */
+				usleep((wait - idt) * 1000);
+			}
 		}
 
 		cnt++;

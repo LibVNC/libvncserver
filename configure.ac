@@ -691,11 +691,23 @@ AM_CONDITIONAL(WITH_TIGHTVNC_FILETRANSFER, test "$with_tightvnc_filetransfer" = 
 AM_CONDITIONAL(HAVE_LIBZ, test ! -z "$HAVE_ZLIB_H")
 AM_CONDITIONAL(HAVE_LIBJPEG, test ! -z "$HAVE_JPEGLIB_H")
 
+
+SDLCONFIG="sdl-config"
+AC_ARG_WITH(sdl-config,
+[[  --with-sdl-config=FILE
+    Use the given path to sdl-config when determining
+    SDL configuration; defaults to "sdl-config"]],
+[
+    if test "$withval" != "yes" -a "$withval" != ""; then
+        SDLCONFIG=$withval
+    fi
+])
+
 if test -z "$with_sdl"; then
-	if sdl-config --version >/dev/null 2>&1; then
+	if $SDLCONFIG --version >/dev/null 2>&1; then
 		with_sdl=yes
-		SDL_CFLAGS=`sdl-config --cflags`
-		SDL_LIBS=`sdl-config --libs`
+		SDL_CFLAGS=`$SDLCONFIG --cflags`
+		SDL_LIBS=`$SDLCONFIG --libs`
 	else
 		with_sdl=no
 	fi
@@ -704,7 +716,9 @@ AM_CONDITIONAL(HAVE_LIBSDL, test "x$with_sdl" = "xyes")
 AC_SUBST(SDL_CFLAGS)
 AC_SUBST(SDL_LIBS)
 
-MINGW=`uname -s | grep MINGW 2>/dev/null`
+
+AC_CANONICAL_HOST
+MINGW=`echo $host_os | grep mingw32  2>/dev/null`
 AM_CONDITIONAL(MINGW, test ! -z "$MINGW" )
 if test ! -z "$MINGW"; then
 	WSOCKLIB="-lws2_32"

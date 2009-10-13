@@ -49,7 +49,7 @@ so, delete this exception statement from your version.
 
 
 void check_stunnel(void);
-int start_stunnel(int stunnel_port, int x11vnc_port);
+int start_stunnel(int stunnel_port, int x11vnc_port, int hport, int x11vnc_hport);
 void stop_stunnel(void);
 void setup_stunnel(int rport, int *argc, char **argv);
 char *get_Cert_dir(char *cdir_in, char **tmp_in);
@@ -86,14 +86,14 @@ void check_stunnel(void) {
 	}
 }
 
-int start_stunnel(int stunnel_port, int x11vnc_port) {
+int start_stunnel(int stunnel_port, int x11vnc_port, int hport, int x11vnc_hport) {
 #ifdef SSLCMDS
 	char extra[] = ":/usr/sbin:/usr/local/sbin:/dist/sbin";
 	char *path, *p, *exe;
 	char *stunnel_path = NULL;
 	struct stat verify_buf;
 	struct stat crl_buf;
-	int status;
+	int status, tmp_pem = 0;
 
 	if (stunnel_pid) {
 		stop_stunnel();
@@ -167,9 +167,33 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 			    " saved PEM.\n");	
 			clean_up_exit(1);
 		}
+	} else if (!stunnel_pem) {
+		stunnel_pem = create_tmp_pem(NULL, 0);
+		if (! stunnel_pem) {
+			rfbLog("start_stunnel: could not create temporary,"
+			    " self-signed PEM.\n");	
+			clean_up_exit(1);
+		}
+		tmp_pem = 1;
+		if (getenv("X11VNC_SHOW_TMP_PEM")) {
+			FILE *in = fopen(stunnel_pem, "r");
+			if (in != NULL) {
+				char line[128];
+				fprintf(stderr, "\n");
+				while (fgets(line, 128, in) != NULL) {
+					fprintf(stderr, "%s", line);
+				}
+				fprintf(stderr, "\n");
+				fclose(in);
+			}
+		}
 	}
 
 	if (ssl_verify) {
+		char *file = get_ssl_verify_file(ssl_verify);
+		if (file) {
+			ssl_verify = file;
+		}
 		if (stat(ssl_verify, &verify_buf) != 0) {
 			rfbLog("stunnel: %s does not exist.\n", ssl_verify);
 			clean_up_exit(1);
@@ -245,6 +269,7 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 		if (! in) {
 			exit(1);
 		}
+
 		fprintf(in, "foreground = yes\n");
 		fprintf(in, "pid =\n");
 		if (stunnel_pem) {
@@ -263,7 +288,6 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 			} else {
 				fprintf(in, "CAfile = %s\n", ssl_verify);
 			}
-			/* XXX double check -v 2 */
 			fprintf(in, "verify = 2\n");
 		}
 		fprintf(in, ";debug = 7\n\n");
@@ -271,8 +295,24 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 		fprintf(in, "accept = %d\n", stunnel_port);
 		fprintf(in, "connect = %d\n", x11vnc_port);
 
+		if (hport > 0 && x11vnc_hport > 0) {
+			fprintf(in, "\n[x11vnc_http]\n");
+			fprintf(in, "accept = %d\n", hport);
+			fprintf(in, "connect = %d\n", x11vnc_hport);
+		}
+
 		fflush(in);
 		rewind(in);
+
+		if (getenv("STUNNEL_DEBUG")) {
+			char line[1000];
+			fprintf(stderr, "\nstunnel config contents:\n\n");
+			while (fgets(line, sizeof(line), in) != NULL) {
+				fprintf(stderr, "%s", line);
+			}
+			fprintf(stderr, "\n");
+			rewind(in);
+		}
 		
 		sprintf(fd, "%d", fileno(in));
 		execlp(stunnel_path, stunnel_path, "-fd", fd, (char *) NULL);
@@ -280,9 +320,21 @@ int start_stunnel(int stunnel_port, int x11vnc_port) {
 	}
 
 	free(exe);
-	usleep(500 * 1000);
+	usleep(750 * 1000);
 
 	waitpid(stunnel_pid, &status, WNOHANG); 
+
+	if (ssl_verify && strstr(ssl_verify, "/sslverify-tmp-load-")) {
+		/* temporary file */
+		usleep(1000 * 1000);
+		unlink(ssl_verify);
+	}
+	if (tmp_pem) {
+		/* temporary cert */
+		usleep(1500 * 1000);
+		unlink(stunnel_pem);
+	}
+
 	if (kill(stunnel_pid, 0) != 0) {
 		waitpid(stunnel_pid, &status, WNOHANG); 
 		stunnel_pid = 0;
@@ -315,13 +367,13 @@ void stop_stunnel(void) {
 }
 
 void setup_stunnel(int rport, int *argc, char **argv) {
-	int i, xport = 0;
+	int i, xport = 0, hport = 0, xhport = 0;
+
 	if (! rport && argc && argv) {
 		for (i=0; i< *argc; i++) {
 			if (argv[i] && !strcmp(argv[i], "-rfbport")) {
 				if (i < *argc - 1) {
 					rport = atoi(argv[i+1]);
-					break;
 				}
 			}
 		}
@@ -340,7 +392,36 @@ void setup_stunnel(int rport, int *argc, char **argv) {
 		goto stunnel_fail; 
 	}
 
-	if (start_stunnel(rport, xport)) {
+	if (https_port_num > 0) {
+		hport = https_port_num;
+	}
+
+	if (! hport && argc && argv) {
+		for (i=0; i< *argc; i++) {
+			if (argv[i] && !strcmp(argv[i], "-httpport")) {
+				if (i < *argc - 1) {
+					hport = atoi(argv[i+1]);
+				}
+			}
+		}
+	}
+
+	if (! hport && http_try_it) {
+		hport = find_free_port(rport-100, rport-1);
+		if (! hport) {
+			goto stunnel_fail;
+		}
+	}
+	if (hport) {
+		xhport = find_free_port(5850, 5899);
+		if (! xhport) {
+			goto stunnel_fail; 
+		}
+		stunnel_http_port = hport;
+	}
+	
+
+	if (start_stunnel(rport, xport, hport, xhport)) {
 		int tweaked = 0;
 		char tmp[30];
 		sprintf(tmp, "%d", xport);

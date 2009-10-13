@@ -8,7 +8,8 @@
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; version 2 of the License.
+ *  the Free Software Foundation; version 2 of the License, or (at
+ *  your option) any later version.
  *
  *  This software is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -457,7 +458,7 @@ if (tstk[j] != 0) fprintf(stderr, "B redir[%d][%d] = %d  %s\n", i, j, tstk[j], t
 					int p0, p, found = -1, jzero = -1;
 					int conn = -1;
 
-					get_prop(num, 32, atom[i]);
+					get_prop(num, 32, atom[i], None);
 					p0 = atoi(num);
 
 					for (j = TSSTK-1; j >= 0; j--) {
@@ -655,7 +656,7 @@ void do_tsd(void) {
 	prop[0] = '\0';
 	a = XInternAtom(dpy, "TS_REDIR_LIST", False);
 	if (a != None) {
-		get_prop(prop, 512, a);
+		get_prop(prop, 512, a, None);
 	}
 	if (db) fprintf(stderr, "TS_REDIR_LIST Atom: %d = '%s'\n", (int) a, prop);
 
@@ -785,7 +786,7 @@ static void check_redir_services(void) {
 	a = XInternAtom(dpy, "TS_REDIR_PID", False);
 	if (a != None) {
 		prop[0] = '\0';
-		get_prop(prop, 512, a);
+		get_prop(prop, 512, a, None);
 		if (prop[0] != '\0') {
 			pid = (pid_t) atoi(prop);
 		}
@@ -807,7 +808,7 @@ static void check_redir_services(void) {
 	prop[0] = '\0';
 	a = XInternAtom(dpy, "TS_REDIR", False);
 	if (a != None) {
-		get_prop(prop, 512, a);
+		get_prop(prop, 512, a, None);
 	}
 	if (db) fprintf(stderr, "TS_REDIR Atom: %d = '%s'\n", (int) a, prop);
 	if (prop[0] == '\0') {
@@ -1855,6 +1856,9 @@ char msg2[] =
 	if (quiet) {
 		return;
 	}
+	if (remote_direct) {
+		return;
+	}
 	if (nofb) {
 		return;
 	}
@@ -1863,7 +1867,7 @@ char msg2[] =
 #endif
 
 	if (ncache == 0) {
-		fprintf(stderr, msg2);
+		fprintf(stderr, "%s", msg2);
 		ncache0 = ncache = 0;
 	} else {
 		fprintf(stderr, msg, ncache);
@@ -1908,6 +1912,7 @@ static void do_sleepin(char *sleep) {
 }
 
 extern int dragum(void);
+extern int is_decimal(char *);
 
 int main(int argc, char* argv[]) {
 
@@ -1917,6 +1922,9 @@ int main(int argc, char* argv[]) {
 	int remote_sync = 0;
 	char *remote_cmd = NULL;
 	char *query_cmd  = NULL;
+	int query_retries = 0;
+	double query_delay = 0.5;
+	char *query_match  = NULL;
 	char *gui_str = NULL;
 	int got_gui_pw = 0;
 	int pw_loc = -1, got_passwd = 0, got_rfbauth = 0, nopw = NOPW;
@@ -2444,6 +2452,10 @@ int main(int argc, char* argv[]) {
 			got_localhost = 1;
 			continue;
 		}
+		if (!strcmp(arg, "-unixpw_system_greeter")) {
+			unixpw_system_greeter = 1;
+			continue;
+		}
 		if (!strcmp(arg, "-unixpw_cmd")
 		    || !strcmp(arg, "-unixpw_cmd_unsafe")) {
 			CHECK_ARGC
@@ -2697,7 +2709,11 @@ int main(int argc, char* argv[]) {
 						stunnel_pem = strdup(s);
 					}
 					i++;
+				} else {
+					stunnel_pem = strdup("SAVE");
 				}
+			} else {
+				stunnel_pem = strdup("SAVE");
 			}
 			continue;
 		}
@@ -2713,7 +2729,11 @@ int main(int argc, char* argv[]) {
 						stunnel_pem = strdup(s);
 					}
 					i++;
+				} else {
+					stunnel_pem = strdup("SAVE");
 				}
+			} else {
+				stunnel_pem = strdup("SAVE");
 			}
 			continue;
 		}
@@ -3401,6 +3421,11 @@ int main(int argc, char* argv[]) {
 			got_waitms = 1;
 			continue;
 		}
+		if (!strcmp(arg, "-extra_fbur")) {
+			CHECK_ARGC
+			extra_fbur = atoi(argv[++i]);
+			continue;
+		}
 		if (!strcmp(arg, "-wait_ui")) {
 			CHECK_ARGC
 			wait_ui = atof(argv[++i]);
@@ -3710,15 +3735,37 @@ int main(int argc, char* argv[]) {
 				remote_cmd = str;
 			    }
 			}
-			quiet = 1;
+			if (!getenv("QUERY_VERBOSE")) {
+				quiet = 1;
+			}
 			xkbcompat = 0;
 			continue;
 		}
 		if (!strcmp(arg, "-query") || !strcmp(arg, "-Q")) {
 			CHECK_ARGC
 			query_cmd = strdup(argv[++i]);
-			quiet = 1;
+			if (!getenv("QUERY_VERBOSE")) {
+				quiet = 1;
+			}
 			xkbcompat = 0;
+			continue;
+		}
+		if (!strcmp(arg, "-query_retries")) {
+			char *s;
+			CHECK_ARGC
+			s = strdup(argv[++i]);
+			/* n[:t][/match] */
+			if (strchr(s, '/')) {
+				char *q = strchr(s, '/');
+				query_match = strdup(q+1);
+				*q = '\0';
+			}
+			if (strchr(s, ':')) {
+				char *q = strchr(s, ':');
+				query_delay = atof(q+1);
+			}
+			query_retries = atoi(s);
+			free(s);
 			continue;
 		}
 		if (!strcmp(arg, "-QD")) {
@@ -3733,6 +3780,11 @@ int main(int argc, char* argv[]) {
 		}
 		if (!strcmp(arg, "-nosync")) {
 			remote_sync = 0;
+			continue;
+		}
+		if (!strcmp(arg, "-remote_prefix")) {
+			CHECK_ARGC
+			remote_prefix = strdup(argv[++i]);
 			continue;
 		}
 		if (!strcmp(arg, "-noremote")) {
@@ -3794,9 +3846,22 @@ int main(int argc, char* argv[]) {
 			}
 			if (!strcmp(arg, "-rfbport") && i < argc-1) {
 				got_rfbport = 1;
+				if (!strcasecmp(argv[i+1], "prompt")) {
+					;
+				} else if (!is_decimal(argv[i+1])) {
+					rfbLog("Invalid -rfbport value: '%s'\n", argv[i+1]);
+					rfbLog("setting it to '-1' to induce failure.\n");
+					argv[i+1] = strdup("-1");
+				}
 				got_rfbport_str = strdup(argv[i+1]);
 				got_rfbport_pos = argc_vnc+1;
 				got_rfbport_val = atoi(argv[i+1]);
+			}
+			if (!strcmp(arg, "-httpport") && i < argc-1) {
+				if (!is_decimal(argv[i+1])) {
+					rfbLog("Invalid -httpport value: '%s'\n", argv[i+1]);
+					clean_up_exit(1);
+				}
 			}
 			if (!strcmp(arg, "-alwaysshared ")) {
 				got_alwaysshared = 1;
@@ -3823,6 +3888,11 @@ int main(int argc, char* argv[]) {
 	if (! getenv("NO_LIBXCB_ALLOW_SLOPPY_LOCK")) {
 		/* libxcb is a bit too strict for us sometimes... */
 		set_env("LIBXCB_ALLOW_SLOPPY_LOCK", "1");
+	}
+
+	if (getenv("PATH") == NULL || !strcmp(getenv("PATH"), "")) {
+		/* set a minimal PATH, usually only null in inetd. */
+		set_env("PATH", "/bin:/usr/bin");
 	}
 
 	/* set OS struct UT */
@@ -4062,8 +4132,25 @@ int main(int argc, char* argv[]) {
 		 * similar for query_default.
 		 */
 		if (client_connect_file || query_default) {
-			int rc = do_remote_query(remote_cmd, query_cmd,
-			     remote_sync, query_default);
+			int i, rc = 1;
+			for (i=0; i <= query_retries; i++) {
+				rc = do_remote_query(remote_cmd, query_cmd,
+				    remote_sync, query_default);
+				if (rc == 0) {
+					if (query_match) {
+						if (query_result && strstr(query_result, query_match)) {
+							break;
+						}
+						rc = 1;
+					} else {
+						break;
+					}
+				}
+				if (i < query_retries) {
+					fprintf(stderr, "sleep: %.3f\n", query_delay);
+					usleep( (int) (query_delay * 1000 * 1000) );
+				}
+			}
 			fflush(stderr);
 			fflush(stdout);
 			exit(rc);
@@ -4436,6 +4523,8 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	http_try_it = try_http;
+
 	if (flip_byte_order && using_shm && ! quiet) {
 		rfbLog("warning: -flipbyte order only works with -noshm\n");
 	}
@@ -4502,11 +4591,13 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (debug_pointer || debug_keyboard) {
-		if (bg || quiet) {
-			rfbLog("disabling -bg/-q under -debug_pointer"
-			    "/-debug_keyboard\n");
-			bg = 0;
-			quiet = 0;
+		if (!logfile) {
+			if (bg || quiet) {
+				rfbLog("disabling -bg/-q under -debug_pointer"
+				    "/-debug_keyboard\n");
+				bg = 0;
+				quiet = 0;
+			}
 		}
 	}
 
@@ -4531,7 +4622,7 @@ int main(int argc, char* argv[]) {
 		if (verbose) {
 			print_settings(try_http, bg, gui_str);
 		}
-		rfbLog("x11vnc version: %s\n", lastmod);
+		rfbLog("x11vnc version: %s  pid: %d\n", lastmod, getpid());
 	} else {
 		rfbLogEnable(0);
 	}
@@ -4738,20 +4829,49 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 		window = save;
 	}
 
-	if (! quiet && ! raw_fb_str) {
-		rfbLog("\n");
-		rfbLog("------------------ USEFUL INFORMATION ------------------\n");
-	}
-
-	if (remote_cmd || query_cmd) {
-		int rc = do_remote_query(remote_cmd, query_cmd, remote_sync,
-		    query_default);
+	if (   (remote_cmd && strstr(remote_cmd, "DIRECT:") == remote_cmd)
+	    || (query_cmd  && strstr(query_cmd,  "DIRECT:") == query_cmd )) {
+		/* handled below after most everything is setup. */
+		if (getenv("QUERY_VERBOSE")) {
+			quiet = 0;
+		} else {
+			quiet = 1;
+			remote_direct = 1;
+		}
+		if (!auto_port) {
+			auto_port = 5970;
+		}
+	} else if (remote_cmd || query_cmd) {
+		int i, rc = 1;
+		for (i=0; i <= query_retries; i++) {
+			rc = do_remote_query(remote_cmd, query_cmd, remote_sync,
+			    query_default);
+			if (rc == 0) {
+				if (query_match) {
+					if (query_result && strstr(query_result, query_match)) {
+						break;
+					}
+					rc = 1;
+				} else {
+					break;
+				}
+			}
+			if (i < query_retries) {
+				fprintf(stderr, "sleep: %.3f\n", query_delay);
+				usleep( (int) (query_delay * 1000 * 1000) );
+			}
+		}
 		XFlush_wr(dpy);
 		fflush(stderr);
 		fflush(stdout);
 		usleep(30 * 1000);	/* still needed? */
 		XCloseDisplay_wr(dpy);
 		exit(rc);
+	}
+
+	if (! quiet && ! raw_fb_str) {
+		rfbLog("\n");
+		rfbLog("------------------ USEFUL INFORMATION ------------------\n");
 	}
 
 	if (priv_remote) {
@@ -5125,7 +5245,9 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 	}
 #endif
 
-	check_pm();
+	if (!getenv("X11VNC_NO_CHECK_PM")) {
+		check_pm();
+	}
 
 	if (! quiet && ! raw_fb_str) {
 		rfbLog("--------------------------------------------------------\n");
@@ -5359,6 +5481,13 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 
 	if (ncache_beta_tester && (ncache != 0 || ncache_msg)) {
 		ncache_beta_tester_message();
+	}
+
+	if (remote_cmd || query_cmd) {
+		/* This is DIRECT: case */
+		do_remote_query(remote_cmd, query_cmd, remote_sync, query_default);
+		if (getenv("SLEEP")) sleep(atoi(getenv("SLEEP")));
+		clean_up_exit(0);
 	}
 
 #if LIBVNCSERVER_HAVE_FORK && LIBVNCSERVER_HAVE_SETSID
