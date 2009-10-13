@@ -413,6 +413,7 @@ Tuning
 	gaps:
 	grow:
 	fuzz:
+	extra_fbur:
 	wait_ui:
 	setdefer:
 	nowait_bog
@@ -749,7 +750,8 @@ more) via Properties -> Advanced -> Actions -> Quit
                       non-standard listening port use \"host:port\".
 
                       Pressing \"OK\" will initiate the reverse
-                      connection.  Use a blank hostname to skip it.
+                      connection.  Use a blank hostname to skip it, or
+                      delete (\"X-out\") the window.
     
 "
 
@@ -2985,7 +2987,12 @@ proc all_query_vars {} {
 	}
 	set cache_all_query_vars $qry
 
-#puts $qry
+	global env
+	if [info exists env(TKX11VNC_PRINT_ALL_VARS)] {
+		puts "--------------- BEGIN ALL VARS ---------------"
+		puts $qry
+		puts "--------------- END ALL VARS ---------------"
+	}
 
 	return $qry
 }
@@ -6261,11 +6268,11 @@ proc run_remote_cmd_via_sock {opts} {
 		}
 
 		if {$db} {puts stderr "run_remote_cmd_via_sock: $docmd \"$str\""}
-		puts $client_sock $str
+		catch {puts $client_sock $str}
 		if {$db} {puts stderr "run_remote_cmd_via_sock: flush"}
-		flush $client_sock
+		catch {flush $client_sock}
 		if {$db} {puts stderr "run_remote_cmd_via_sock: gets"}
-		gets $client_sock res
+		catch {gets $client_sock res}
 		if {$db} {puts stderr "run_remote_cmd_via_sock: \"$res\""}
 		set res [string trim $res]
 
@@ -6535,18 +6542,18 @@ proc do_port_prompt {} {
 	} else {
 		frame .pp.f -bd 1 -relief ridge -pady 2
 	}
-	label .pp.f.l -text "Port: "
-	entry .pp.f.e -width 8 -textvariable port_set
+	label .pp.f.l -text "Port: " -font $bfont
+	entry .pp.f.e -width 8 -textvariable port_set -font $ffont
 	global enable_ssl; set enable_ssl 0
 	if [info exists env(X11VNC_SSL_ENABLED)] {
 		set enable_ssl 1
 	}
-	checkbutton .pp.f.ssl -relief raised -pady 3 -padx 3 -text "Enable SSL" -variable enable_ssl
+	checkbutton .pp.f.ssl -relief raised -pady 3 -padx 3 -text "Enable SSL" -variable enable_ssl -font $bfont
 	global localhost; set localhost 0
 	if [info exists env(X11VNC_LOCALHOST_ENABLED)] {
 		set localhost 1
 	}
-	checkbutton .pp.f.loc -relief raised -pady 3 -padx 3 -text "Listen on localhost" -variable localhost
+	checkbutton .pp.f.loc -relief raised -pady 3 -padx 3 -text "Listen on localhost" -variable localhost -font $bfont
 	pack .pp.f.l .pp.f.e -side left
 	pack .pp.f.loc .pp.f.ssl -side right
 
@@ -6559,15 +6566,15 @@ proc do_port_prompt {} {
 	if [info exists env(X11VNC_FILETRANSFER_ENABLED)] {
 		set file_transfer $env(X11VNC_FILETRANSFER_ENABLED)
 	}
-	label .pp.t.l -text "File Transfer: "
-	radiobutton .pp.t.none  -text "None" -variable file_transfer -value "none"
-	radiobutton .pp.t.ultra -text "UltraVNC" -variable file_transfer -value "ultra"
-	radiobutton .pp.t.tight -text "TightVNC" -variable file_transfer -value "tight"
+	label .pp.t.l -text "File Transfer: " -font $bfont
+	radiobutton .pp.t.none  -text "None" -variable file_transfer -value "none" -font $bfont
+	radiobutton .pp.t.ultra -text "UltraVNC" -variable file_transfer -value "ultra" -font $bfont
+	radiobutton .pp.t.tight -text "TightVNC" -variable file_transfer -value "tight" -font $bfont
 	pack .pp.t.l .pp.t.none .pp.t.ultra .pp.t.tight -side left
 
 	frame .pp.o -bd 1 -relief ridge
-	button .pp.o.ok -text "OK" -command "set port_reply 1; destroy .pp"
-	button .pp.o.cancel -text "Cancel" -command "set port_reply 0; destroy .pp"
+	button .pp.o.ok -text "OK" -command "set port_reply 1; destroy .pp" -font $bfont
+	button .pp.o.cancel -text "Cancel" -command "set port_reply 0; destroy .pp" -font $bfont
 	pack .pp.o.ok .pp.o.cancel -side left -fill x -expand 1
 	pack .pp.m -side top -fill x -expand 1 
 	pack .pp.f .pp.t .pp.o -side top -fill x
@@ -6794,6 +6801,24 @@ set sfont "-adobe-helvetica-bold-r-*-*-*-100-*-*-*-*-*-*"
 set snfont "-adobe-helvetica-medium-r-*-*-*-100-*-*-*-*-*-*"
 set ffont "fixed"
 
+set got_helv 0
+catch {
+	foreach fam [font families]  {
+		if {$fam == "helvetica"} {
+			set got_helv 1
+		}
+		if {$fam == "Helvetica"} {
+			set got_helv 1
+		}
+	}
+}
+
+if {$got_helv} {
+	set bfont  "Helvetica -12 bold"
+	set sfont  "Helvetica -10 bold"
+	set snfont "Helvetica -10"
+}
+
 set ls ""
 catch {set ls [font metrics $bfont -linespace]}
 if {$ls != "" && $ls > 14} {
@@ -6914,11 +6939,6 @@ if {"$argv" == "-spit"} {
 	puts ";"
 	exit 0
 }
-if {"$argv" == "-portprompt"} {
-	do_port_prompt
-	exit 0
-}
-
 
 set_view_variable "full"
 
@@ -6975,6 +6995,19 @@ if {[info exists env(X11VNC_GUI_PARAMS)]} {
 	set x11vnc_gui_params $env(X11VNC_GUI_PARAMS);
 } else {
 	set x11vnc_gui_params ""
+}
+
+if {[info exists env(X11VNC_FONT_BOLD)]} {
+	set bfont $env(X11VNC_FONT_BOLD)
+}
+if {[info exists env(X11VNC_FONT_BOLD_SMALL)]} {
+	set sfont $env(X11VNC_FONT_BOLD_SMALL)
+}
+if {[info exists env(X11VNC_FONT_REG_SMALL)]} {
+	set snfont $env(X11VNC_FONT_REG_SMALL)
+}
+if {[info exists env(X11VNC_FONT_FIXED)]} {
+	set ffont $env(X11VNC_FONT_FIXED)
 }
 
 if {[info exists env(X11VNC_CONNECT_FILE)]} {
@@ -7084,6 +7117,11 @@ if {[regexp -nocase {IRIX} $osname]} {
 if {[regexp -nocase {Darwin} $osname]} {
 	set ffont {Monaco 10}
 	set bfont {system}
+}
+
+if {"$argv" == "-portprompt"} {
+	do_port_prompt
+	exit 0
 }
 
 #puts [exec env]

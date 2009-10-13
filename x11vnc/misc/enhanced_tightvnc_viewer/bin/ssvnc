@@ -1,13 +1,103 @@
 #!/bin/sh
 #
-# Copyright (c) 2006 by Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2006-2009 by Karl J. Runge <runge@karlrunge.com>
 #
-# sslvnc:
+# ssvnc:
 #
 #    A wrapper for ssvnc_cmd using a tcl/tk gui.
 #
 # See ssvnc_cmd for details.
 #
+if [ "X$1" = "X-help" -o "X$1" = "X-h" ]; then
+	cat << END
+ssvnc - a GUI wrapper for SSL and SSH VNC connections.
+
+SYNOPSIS
+       ssvnc
+       ssvnc [host][:display]
+       ssvnc [saved-profile-name]
+       ssvnc [options] [host-or-profile]
+       ssvnc --help
+
+DESCRIPTION
+       ssvnc  is  a tcl/tk gui wrapper that runs on Unix, MacOSX, and Windows.
+       It sets up an SSL or SSH tunnel to  the  remote  VNC  Server  and  then
+       launches  the  VNC  viewer (either the one provided or another one that
+       you have specified) to use that encrypted tunnel to connect to the  VNC
+       Server.   The  use  of  Proxies and Gateways to make the connections is
+       implemented.
+
+OPTIONS
+       -help, -h   Print this help.
+
+       --help Starts  up  the  GUI  as though the 'Help' button was pressed to
+              show the main Help panel.
+
+       -profiles
+              List the saved SSVNC profiles you have created.  A profile is  a
+              destination host with specific parameter settings.
+
+       -list  Same as -profiles
+
+       -ssh   Start  in  "SSH  Only Mode".  No SSL aspects are shown.  Same as
+              running the command sshvnc
+
+       -ts    Start in "Terminal Services  Mode".   This  is  like  "SSH  Only
+              Mode", but simpler and assumes x11vnc is available on the remote
+              side to start and manage X and VNC sessions.   Same  as  running
+              the command tsvnc
+
+       -tso   Same as -ts "Terminal Services Mode", however never let the user
+              leave this mode (no button to switch modes is  provided.)   Same
+              as SSVNC_TS_ALWAYS=1.
+
+       -ssl   Force the full GUI Mode: both SSL and SSH.  This is the default.
+              Same as -ss.
+
+       -nv    Toggle the "Verify All Certs" button to be off at startup.
+
+       -nvb   Never show the "Verify All Certs" button.  Same as SSVNC_NO_VER-
+              IFY_ALL_BUTTON=1.
+
+       -bigger
+              Make  the  Profile  Selection  Dialog  window  bigger.   Same as
+              SSVNC_BIGGER_DIALOG=1.
+
+       -noenc Start off in a mode where a  'No  Encryption'  check  button  is
+              present.   You  can  toggle  the  mode  with  Ctrl-E.   Same  as
+              SSVNC_DISABLE_ENCRYPTION_BUTTON=1.  Or  noenc=1  in  ~/.ssvncrc.
+              Selecting  no  encryption  is  the same as the vnc:// and Vnc://
+              prefixes described below.  -enc implies the opposite.
+
+       -killstunnel
+              On Windows, automatically terminate the STUNNEL process when the
+              viewer  exits instead of prompting you (same as killstunnel=1 in
+              ssvnc_rc or toggle in Options menu)
+
+       -nokillstunnel
+              On Windows, disable -killstunnel mode.  Same as killstunnel=0 in
+              ssvnc_rc or toggle in Options menu.  Note that -killstunnel mode
+              is now the default.
+
+       -mycert /path/to/mycert.pem
+              Set the default "MyCert" to  be  /path/to/mycert.pem.   Same  as
+              -cert.  If the file does not exist, ~/.vnc/certs is prefixed and
+              tried. You can also set mycert=/path/to/mycert.pem in ~/.ssvncrc
+
+       -cacert /path/to/cacert.crt
+              Set the default "ServerCert" to be /path/to/cacert.crt.  Same as
+              -ca.  If the file does not exist, ~/.vnc/certs is  prefixed  and
+              tried. You can also set cacert=/path/to/cacert.crt in ~/.ssvncrc
+
+       -crl /path/to/mycrl.pem
+              Set   the   default   Certificate   Revocation   List   to    be
+              /path/to/mycrl.pem.  If the file does not exist, ~/.vnc/certs is
+              prefixed and tried.  You can also set crl=/path/to/mycrl.pem  in
+              ~/.ssvncrc.
+END
+	exit 0
+fi
+
 if [ "X$XTERM_PRINT" != "X" ]; then
 	XTERM_PRINT=""
 	cat > /dev/null
@@ -17,6 +107,7 @@ if [ "X$1" = "X-bg" ]; then
 	$0 "$@" &
 	exit 0
 fi
+
 
 PATH=$PATH:/usr/bin:/bin:/usr/bin/X11:/usr/X11R6/bin:/usr/openwin/bin:/usr/sfw/bin:/usr/local/bin
 export PATH

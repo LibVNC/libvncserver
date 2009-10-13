@@ -73,8 +73,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2009-06-19 10:23:50.000000000 -0400
-@@ -0,0 +1,1726 @@
++++ vnc_javasrc/SSLSocketToMe.java	2009-08-13 09:16:42.000000000 -0400
+@@ -0,0 +1,1727 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -83,7 +83,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 + *
 + *  This is free software; you can redistribute it and/or modify
 + *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; version 2 of the License.
++ *  the Free Software Foundation; version 2 of the License, or
++ *  (at your option) any later version.
 + *
 + *  This software is distributed in the hope that it will be useful,
 + *  but WITHOUT ANY WARRANTY; without even the implied warranty of

@@ -1,3 +1,37 @@
+2009-10-08  Karl Runge <runge@karlrunge.com>
+	* x11vnc: bcx_xattach/x2x desktop switching facility.
+	  More remote control features: grab_state, ping:mystring,
+	  grablocal, resend_cutbuffer, resend_clipboard, resend_primary,
+	  keycode, keysym, ptr, sleep, get_xprop, set_xprop, wininfo,
+	  pointer_pos, mouse_xy, noop, guess_dbus Add DIRECT: for
+	  remote control w/o server.  X11VNC_NO_CHECK_PM for more
+	  quiet DIRECT: usage.  Options -query_retries, -remote_prefix,
+	  and X11VNC_SYNC_TIMEOUT for remote control.  Add scripting
+	  to remote control.  ping clients during in unixpw login.
+	  Option -unixpw_system_greeter as shortcut to XDM/GDM/etc panel.
+	  Add clear_all, viewonly, nodisplay, to unixpw username:opts.
+	  F1 help for options (including smaller console font).
+	  Document FD_TAG.  Eat multiple property change events in one
+	  sitting (also PROP_DBG=1).  Support more -ssl features (special
+	  cert names, single port, client certs, etc.) in -stunnel
+	  external SSL helper mode.  Reorganize openssl code to allow
+	  integration with stunnel features if not compiled with openssl.
+	  X11VNC_HTTPS_VS_VNC_TIMEOUT Fix dbus session address for -solid
+	  in gnome.  Use dbus-launch in -create mode if available.
+	  X11VNC_SKIP_DISPLAY=all in -find/-create mode.  let noxauth
+	  unset XAUTHORITY for use with su - $USER. CREATE_DISPLAY_EXEC
+	  debugging.  Add x_terminal_emulator to -create cmd search.
+	  Option -extra_fbur to tune fb update requests tracking; make
+	  default tracking more aggressive.  RATE_VERB/CHECK_RATE env. for
+	  fbur rate.  Env. vars to set Tk gui fonts.  Catch closed
+	  socket reads/writes.  Try to detect 'crazy' xdamage insertion,
+	  e.g. from some xscreensavers (needs work.).  Don't switch
+	  on server autorepeat if any keys are pressed down to work
+	  around Xorg server and/or gnome bug.  If PATH is empty, set
+	  it to minimal one.  Fix bug with -bg and -dp/-dk printout if
+	  logfile present.
+	* classes/ssl: license statement.
+
 2009-06-18  Karl Runge <runge@karlrunge.com>
 	* classes/ssl: java viewer now handles auth-basic proxy logins.
 	* misc/enhanced_tightvnc_viewer: update ssvnc.

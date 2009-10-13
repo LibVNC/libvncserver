@@ -141,6 +141,7 @@ if uname | grep Darwin >/dev/null; then
 fi
 
 # work out which stunnel to use (debian installs as stunnel4)
+stunnel_set_here=""
 if [ "X$STUNNEL" = "X" ]; then
 	check_stunnel=1
 	if [ "X$SSVNC_BASEDIRNAME" != "X" ]; then
@@ -161,6 +162,7 @@ if [ "X$STUNNEL" = "X" ]; then
 			STUNNEL=stunnel
 		fi
 	fi
+	stunnel_set_here=1
 fi
 
 help() {
@@ -286,6 +288,8 @@ do
 	"-escape")	shift; VNCVIEWER_ESCAPE="$1"; export VNCVIEWER_ESCAPE
                 ;;
 	"-ssvnc_encodings")	shift; VNCVIEWER_ENCODINGS="$1"; export VNCVIEWER_ENCODINGS
+                ;;
+	"-ssvnc_extra_opts")	shift; VNCVIEWERCMD_EXTRA_OPTS="$1"; export VNCVIEWERCMD_EXTRA_OPTS
                 ;;
 	"-rfbversion")	shift; VNCVIEWER_RFBVERSION="$1"; export VNCVIEWER_RFBVERSION
                 ;;
@@ -687,6 +691,12 @@ if echo "$0" | grep vncip > /dev/null; then
 	VNCVIEWERCMD="$VNCIPCMD"
 fi
 
+if echo "$VNCVIEWERCMD" | egrep -i '^(xmessage|sleep )' > /dev/null; then
+	:
+elif [ "X$VNCVIEWERCMD_EXTRA_OPTS" != "X" ]; then
+	VNCVIEWERCMD="$VNCVIEWERCMD $VNCVIEWERCMD_EXTRA_OPTS"
+fi
+
 # trick for the undocumented rsh://host:port method.
 rsh_setup() {
 	if echo "$ssh_host" | grep '@' > /dev/null; then
@@ -719,11 +729,30 @@ rsh_viewer() {
 	fi
 }
 
+check_perl() {
+	if type "$1" > /dev/null 2>&1; then
+		:
+	elif [ ! -x "$1" ]; then
+		echo ""
+		echo "*******************************************************"
+		echo "** Problem finding the Perl command '$1': **"
+		echo ""
+		type "perl"
+		echo ""
+		echo "** Perhaps you need to install the Perl package. **"
+		echo "*******************************************************"
+		echo ""
+		sleep 5
+	fi
+}
+
 # this is the PPROXY tool.  used only here for now... 
 pcode() {
 	tf=$1
 	PPROXY_PROXY=$proxy; export PPROXY_PROXY
 	PPROXY_DEST="$host:$port"; export PPROXY_DEST
+	check_perl /usr/bin/perl
+
 	cod='#!/usr/bin/perl
 
 # A hack to glue stunnel to a Web proxy or SOCKS for client connections.
@@ -1535,6 +1564,26 @@ if [ "X$use_ssh" = "X1" ]; then
 	# let user override ssh via $SSH
 	ssh=${SSH:-"ssh -x"}
 
+	sshword=`echo "$ssh" | awk '{print $1}'`
+	if [ "X$sshword" != "X" ]; then
+		if [ -x "$sshword" ]; then
+			:
+		elif type "$sshword" > /dev/null 2>&1; then
+			:
+		else
+			echo ""
+			echo "*********************************************************"
+			echo "** Problem finding the SSH command '$sshword': **"
+			echo ""
+			type "$sshword"
+			echo ""
+			echo "** Perhaps you need to install the SSH client package. **"
+			echo "*********************************************************"
+			echo ""
+			sleep 5
+		fi
+	fi
+
 	if [ "X$SSVNC_LIM_ACCEPT_PRELOAD" != "X" ]; then
 		SSVNC_LIM_ACCEPT_PRELOAD="$SSVNC_BASEDIR/$SSVNC_UNAME/$SSVNC_LIM_ACCEPT_PRELOAD"
 	fi
@@ -1958,6 +2007,23 @@ if [ "X$use_ssh" = "X1" ]; then
 	fi
 fi
 
+if [ "X$stunnel_set_here" = "X1" -a "X$showcert" = "X" ]; then
+	if type $STUNNEL > /dev/null 2>&1; then
+		:
+	else
+		echo ""
+		echo "***************************************************************"
+		echo "** Problem finding the Stunnel command '$STUNNEL': **"
+		echo ""
+		type $STUNNEL
+		echo ""
+		echo "** Perhaps you need to install the stunnel/stunnel4 package. **"
+		echo "***************************************************************"
+		echo ""
+		sleep 5
+	fi
+fi
+
 # create the stunnel config file:
 if [ "X$verify" != "X" ]; then
 	if [ -d $verify ]; then
@@ -2033,6 +2099,19 @@ if [ "X$showcert" = "X1" ]; then
 	if [ "X$ciphers" != "X" ]; then
 		cipher_args=`echo "$ciphers" | sed -e 's/ciphers=/-cipher /'`
 	fi
+	if type openssl > /dev/null 2>&1; then
+		:
+	else
+		echo ""
+		echo "********************************************************"
+		echo "** Problem finding the OpenSSL command 'openssl': **" 
+		echo ""
+		type openssl 2>&1
+		echo ""
+		echo "** Perhaps you need to install the 'openssl' package. **"
+		echo "********************************************************"
+		echo ""
+	fi
 	#echo "openssl s_client $cipher_args -connect $host:$port" 
 	if [ "X$reverse" = "X" ]; then
 		openssl s_client $cipher_args -prexit -connect $host:$port 2>&1 < /dev/null
@@ -2051,6 +2130,9 @@ if [ "X$showcert" = "X1" ]; then
 		tmp_err=`mytmp "$tmp_err"`
 
 		#echo "openssl s_server $cipher_args $cert_args -accept $port -verify 2 > $tmp_out 2> $tmp_err" 1>&2
+
+		# assume we have perl:
+		check_perl perl
 
 		perl -e "
 			\$p = open(O, \"|openssl s_server $cipher_args $cert_args -accept $port -verify 2 1>$tmp_out 2> $tmp_err\");
@@ -2094,7 +2176,11 @@ if [ "X$showcert" = "X1" ]; then
 	if [ "X$SSVNC_PREDIGESTED_HANDSHAKE" != "X" ]; then
 		rm -f $SSVNC_PREDIGESTED_HANDSHAKE
 	fi
-	exit $rc
+	if [ "X$SSVNC_SHOWCERT_EXIT_0" = "X1" ]; then
+		exit 0
+	else
+		exit $rc
+	fi
 fi
 
 if [ "X$direct_connect" != "X" ]; then

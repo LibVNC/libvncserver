@@ -50,5 +50,6 @@ extern void selection_request(XEvent *ev, char *type);
 extern int check_sel_direction(char *dir, char *label, char *sel, int len);
 extern void cutbuffer_send(void);
 extern void selection_send(XEvent *ev);
+extern void resend_selection(char *type);
 
 #endif /* _X11VNC_SELECTION_H */

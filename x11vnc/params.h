@@ -63,8 +63,8 @@ so, delete this exception statement from your version.
 #define FB_REQ  0x4
 
 #define VNC_CONNECT_MAX 16384
-#define X11VNC_REMOTE_MAX 16384
-#define PROP_MAX (131072L)
+#define X11VNC_REMOTE_MAX 65536
+#define PROP_MAX (262144L)
 
 #define MAXN 256
 

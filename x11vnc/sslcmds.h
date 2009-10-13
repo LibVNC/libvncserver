@@ -36,7 +36,7 @@ so, delete this exception statement from your version.
 /* -- sslcmds.h -- */
 
 extern void check_stunnel(void);
-extern int start_stunnel(int stunnel_port, int x11vnc_port);
+extern int start_stunnel(int stunnel_port, int x11vnc_port, int hport, int x11vnc_hport);
 extern void stop_stunnel(void);
 extern void setup_stunnel(int rport, int *argc, char **argv);
 extern char *get_Cert_dir(char *cdir_in, char **tmp_in);

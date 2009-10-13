@@ -8,7 +8,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH ssvnc 1 "December 2008" "" "SSVNC"
+.TH ssvnc 1 "September 2009" "" "SSVNC"
 .SH NAME
 ssvnc \- a GUI wrapper for SSL and SSH VNC connections.
 .SH SYNOPSIS
@@ -67,8 +67,14 @@ The related commands \fBsshvnc\fR and \fBtsvnc\fR start up the GUI in
 simplified modes: SSH Only Mode, and Terminal Services Mode, respectively.
 See below and the application Help for more information on the modes.
 
+You can also place certain settings in your ~/.ssvncrc, see the
+SSVNC Help panel ('Tips') for more info.
+
 There are also some command line options described as follows.
 .SH OPTIONS
+.TP
+\fB\-help\fR, \fB\-h\fR
+Prints out to the terminal a brief description and the options.
 .TP
 \fB\--help\fR
 Starts up the GUI as though the 'Help' button was pressed to show the
@@ -180,9 +186,31 @@ You can put a few global parameters (e.g. mode=sshvnc) in your
 \fB$HOME/.ssvncrc\fR file (\fBssvnc_rc\fR on Windows); see the
 application Help for more information.
 
+.SH FONTS
+
+The following is from Tip 18 in the Help panel.
+
+Fonts: To change the tk fonts, set these environment variables
+before starting up ssvnc: SSVNC_FONT_DEFAULT and SSVNC_FONT_FIXED.
+For example:
+
+% env SSVNC_FONT_DEFAULT='helvetica -20 bold' ssvnc
+
+% env SSVNC_FONT_FIXED='courier -14' ssvnc
+
+or set both of them at once.
+
+To acheive the same effect, you can also
+set parameters in your ~/.ssvncrc file, for example:
+
+font_default=helvetica -20 bold
+
+font_fixed=courier -14
+
 .SH SEE ALSO
 \fBssvncviewer\fB(1), \fBvncviewer\fR(1), \fBstunnel\fR(8), \fBssh\fR(1), \fBx11vnc\fR(1), \fBvncserver\fR(1) 
 http://www.karlrunge.com/x11vnc http://www.karlrunge.com/x11vnc/ssvnc.html
 .SH AUTHORS
 Karl J. Runge <runge@karlrunge.com> wrote the SSVNC gui (tcl/tk) and
-associated wrapper scripts.
+associated wrapper scripts, and added features to the unix vncviewer
+source code. 

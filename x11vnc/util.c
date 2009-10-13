@@ -75,7 +75,7 @@ double dnowx(void);
 double rnow(void);
 double rfac(void);
 
-void rfbPE(long usec);
+int rfbPE(long usec);
 void rfbCFD(long usec);
 
 double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
@@ -171,6 +171,26 @@ void strzero(char *str) {
 			p++;
 		}
 	}
+}
+
+int is_decimal(char *str) {
+	char *p = str;
+	if (p != NULL) {
+		int first = 1;
+		while (*p != '\0') {
+			if (first && *p == '-') {
+				;
+			} else if (isdigit((int) *p)) {
+				;
+			} else {
+				return 0;
+			}
+			first = 0;
+			p++;
+		}
+		return 1;
+	}
+	return 0;
 }
 
 int scan_hexdec(char *str, unsigned long *num) {
@@ -450,26 +470,34 @@ double rfac(void) {
 
 void check_allinput_rate(void) {
 	static double last_all_input_check = 0.0;
-	static int set = 0;
+	static int set = 0, verb = -1;
 	if (use_threads) {
 		return;
+	}
+	if (verb < 0) {
+		verb = 0;
+		if (getenv("RATE_VERB")) verb = 1;
 	}
 	if (! set) {
 		set = 1;
 		last_all_input_check = dnow();
 	} else {
-		int dt = 4;
+		int dt = 5;
 		if (x11vnc_current > last_all_input_check + dt) {
 			int n, nq = 0;
 			while ((n = rfbCheckFds(screen, 0))) {
 				nq += n;
 			}
-			fprintf(stderr, "nqueued: %d\n", nq);
-			if (0 && nq > 25 * dt) {
+			if (verb) fprintf(stderr, "nqueued: %d\n", nq);
+			if (getenv("CHECK_RATE") && nq > 18 * dt) {
 				double rate = nq / dt;
-				rfbLog("Client is sending %.1f extra requests per second for the\n", rate);
-				rfbLog("past %d seconds! Switching to -allpinput mode. (queued: %d)\n", dt, nq);
-				all_input = 1;
+				if (verb) rfbLog("check_allinput_rate:\n");
+				if (verb) rfbLog("Client is sending %.1f extra requests per second for the\n", rate);
+				if (verb) rfbLog("past %d seconds! (queued: %d)\n", dt, nq);
+				if (strstr(getenv("CHECK_RATE"), "allinput") && !all_input) {
+					rfbLog("Switching to -allpinput mode.\n");
+					all_input = 1;
+				}
 			}
 			set = 0;
 		}
@@ -478,8 +506,8 @@ void check_allinput_rate(void) {
 
 static void do_allinput(long usec) {
 	static double last = 0.0;
-	static int meas = 0;
-	int n, f = 1, cnt = 0;
+	static int meas = 0, verb = -1;
+	int n, f = 1, cnt = 0, m = 0;
 	long usec0;
 	double now;
 	if (!screen || !screen->clientHead) {
@@ -495,21 +523,26 @@ static void do_allinput(long usec) {
 	if (last == 0.0) {
 		last = dnow();
 	}
+	if (verb < 0) {
+		verb = 0;
+		if (getenv("RATE_VERB")) verb = 1;
+	}
 	while ((n = rfbCheckFds(screen, usec)) > 0) {
 		if (f) {
-			fprintf(stderr, " *");
+			if (verb) fprintf(stderr, " *");
 			f = 0;
 		}
 		if (cnt++ > 30) {
 			break;
 		}
 		meas += n;
+		m += n;
 	}
-	fprintf(stderr, "-%d", cnt);
+	if (verb) fprintf(stderr, "+%d/%d", cnt, m);
 	now = dnow();
 	if (now > last + 2.0) {
 		double rate = meas / (now - last);
-		fprintf(stderr, "\n%.2f ", rate);
+		if (verb) fprintf(stderr, "\n allinput rate: %.2f ", rate);
 		meas = 0;
 		last = dnow();
 	}
@@ -520,15 +553,16 @@ static void do_allinput(long usec) {
  * checks that we are not in threaded mode.
  */
 #define USEC_MAX 999999		/* libvncsever assumes < 1 second */
-void rfbPE(long usec) {
+int rfbPE(long usec) {
 	int uip0 = unixpw_in_progress;
 	static int check_rate = -1;
+	int res = 0;
 	if (! screen) {
-		return;
+		return res;
 	}
  	if (unixpw && unixpw_in_progress && !unixpw_in_rfbPE) {
 		rfbLog("unixpw_in_rfbPE: skipping rfbPE\n");
- 		return;
+ 		return res;
  	}
 
 	if (debug_tiles > 2) {
@@ -541,7 +575,11 @@ void rfbPE(long usec) {
 		usec = USEC_MAX;
 	}
 	if (! use_threads) {
-		rfbProcessEvents(screen, usec);
+		rfbBool r;
+		r = rfbProcessEvents(screen, usec);
+		if (r) {
+			res = 1;
+		}
 	}
 
  	if (unixpw && unixpw_in_progress && !uip0) {
@@ -566,6 +604,7 @@ void rfbPE(long usec) {
 	if (all_input) {
 		do_allinput(usec);
 	}
+	return res;
 }
 
 void rfbCFD(long usec) {

@@ -37,9 +37,11 @@ so, delete this exception statement from your version.
 #include "xwrappers.h"
 #include "connections.h"
 #include "cleanup.h"
+#include "xevents.h"
 
 char *guess_desktop(void);
 void solid_bg(int restore);
+char *dbus_session(void);
 
 
 static void usr_bin_path(int restore);
@@ -550,31 +552,104 @@ static void solid_cde(char *color) {
 #endif	/* NO_X11 */
 }
 
+static char _dbus_str[1100];
+
+char *dbus_session(void) {
+	char *dbus_env = getenv("DBUS_SESSION_BUS_ADDRESS"); 
+	char tmp[1000];
+
+	if (dbus_env != NULL && strlen(dbus_env) > 0) {
+		return "";
+	}
+#if NO_X11
+	return "";
+#else
+	{
+		Atom dbus_prop;
+		Window r, w, *children;
+		unsigned int ui;
+		int rc, i;
+
+		memset(_dbus_str, 0, sizeof(_dbus_str));
+
+		X_LOCK;
+		dbus_prop = XInternAtom(dpy, "_DBUS_SESSION_BUS_ADDRESS", True);
+		X_UNLOCK;
+		if (dbus_prop == None) {
+			return "";
+		}
+
+		X_LOCK;
+		memset(tmp, 0, sizeof(tmp));
+		get_prop(tmp, sizeof(tmp)-1, dbus_prop, None);
+		X_UNLOCK;
+		if (strcmp(tmp, "")) {
+			if (!strchr(tmp, '\'')) {
+				sprintf(_dbus_str, "env DBUS_SESSION_BUS_ADDRESS='%s'", tmp);
+				return _dbus_str;
+			}
+		}
+
+		X_LOCK;
+		rc = XQueryTree_wr(dpy, rootwin, &r, &w, &children, &ui);
+		X_UNLOCK;
+		if (!rc || children == NULL || ui == 0) {
+			return "";
+		}
+		for (i=0; i < ui; i++) {
+			X_LOCK;
+			memset(tmp, 0, sizeof(tmp));
+			get_prop(tmp, sizeof(tmp)-1, dbus_prop, children[i]);
+			X_UNLOCK;
+
+			if (strcmp(tmp, "")) {
+				if (!strchr(tmp, '\'')) {
+					sprintf(_dbus_str, "env DBUS_SESSION_BUS_ADDRESS='%s'", tmp);
+					break;
+				}
+			}
+		}
+		X_LOCK;
+		XFree_wr(children);
+		X_UNLOCK;
+
+		return _dbus_str;
+	}
+#endif
+}
+
 static void solid_gnome(char *color) {
 #if NO_X11
 	RAWFB_RET_VOID
 	if (!color) {}
 	return;
 #else
-	char get_color[] = "gconftool-2 --get "
+	char get_color[] = "%s gconftool-2 --get "
 	    "/desktop/gnome/background/primary_color";
-	char set_color[] = "gconftool-2 --set "
-	    "/desktop/gnome/background/primary_color --type string '%s'";
-	char get_option[] = "gconftool-2 --get "
+	char set_color[] = "%s gconftool-2 --set --type string "
+	    "/desktop/gnome/background/primary_color '%s'";
+	char get_option[] = "%s gconftool-2 --get "
 	    "/desktop/gnome/background/picture_options";
-	char set_option[] = "gconftool-2 --set "
-	    "/desktop/gnome/background/picture_options --type string '%s'";
+	char set_option[] = "%s gconftool-2 --set --type string "
+	    "/desktop/gnome/background/picture_options '%s'";
 #if 0
-	char get_filename[] = "gconftool-2 --get "
+	char get_shading[] = "%s gconftool-2 --get "
+	    "/desktop/gnome/background/color_shading_type";
+	char set_shading[] = "%s gconftool-2 --set --type string "
+	    "/desktop/gnome/background/color_shading_type '%s'";
+	char get_filename[] = "%s gconftool-2 --get "
 	    "/desktop/gnome/background/picture_filename";
-	char set_filename[] = "gconftool-2 --set "
-	    "/desktop/gnome/background/picture_filename --type string '%s'";
+	char set_filename[] = "%s gconftool-2 --set --type string "
+	    "/desktop/gnome/background/picture_filename '%s'";
 #endif
 	static char *orig_color = NULL;
 	static char *orig_option = NULL;
-	char *cmd;
+	char *cmd, *dbus = "";
 
 	RAWFB_RET_VOID
+
+	dbus = dbus_session();
+	rfbLog("guessed dbus: %s\n", dbus);
 	
 	if (! color) {
 		if (! orig_color) {
@@ -591,14 +666,12 @@ static void solid_gnome(char *color) {
 			rfbLog("invalid option: %s\n", orig_option);
 			return;
 		}
-		cmd = (char *) malloc(strlen(set_option) - 2 +
-		    strlen(orig_option) + 1);
-		sprintf(cmd, set_option, orig_option);
+		cmd = (char *) malloc(strlen(set_option) - 2 + strlen(orig_option) + strlen(dbus) + 1);
+		sprintf(cmd, set_option, dbus, orig_option);
 		dt_cmd(cmd);
 		free(cmd);
-		cmd = (char *) malloc(strlen(set_color) - 2 +
-		    strlen(orig_color) + 1);
-		sprintf(cmd, set_color, orig_color);
+		cmd = (char *) malloc(strlen(set_color) - 2 + strlen(orig_color) + strlen(dbus) + 1);
+		sprintf(cmd, set_color, dbus, orig_color);
 		dt_cmd(cmd);
 		free(cmd);
 		return;
@@ -607,7 +680,10 @@ static void solid_gnome(char *color) {
 	if (! orig_color) {
 		char *q;
 		if (cmd_ok("dt")) {
-			orig_color = strdup(cmd_output(get_color));
+			cmd = (char *) malloc(strlen(get_color) + strlen(dbus) + 1);
+			sprintf(cmd, get_color, dbus);
+			orig_color = strdup(cmd_output(cmd));
+			free(cmd);
 		} else {
 			orig_color = "";
 		}
@@ -621,7 +697,10 @@ static void solid_gnome(char *color) {
 	if (! orig_option) {
 		char *q;
 		if (cmd_ok("dt")) {
-			orig_option = strdup(cmd_output(get_option));
+			cmd = (char *) malloc(strlen(get_option) + strlen(dbus) + 1);
+			sprintf(cmd, get_option, dbus);
+			orig_option = strdup(cmd_output(cmd));
+			free(cmd);
 		} else {
 			orig_color = "";
 		}
@@ -636,19 +715,19 @@ static void solid_gnome(char *color) {
 		rfbLog("invalid color: %s\n", color);
 		return;
 	}
-	cmd = (char *) malloc(strlen(set_color) + strlen(color) + 1);
-	sprintf(cmd, set_color, color);
+	cmd = (char *) malloc(strlen(set_color) + strlen(color) + strlen(dbus) + 1);
+	sprintf(cmd, set_color, dbus, color);
 	dt_cmd(cmd);
 	free(cmd);
 
-	cmd = (char *) malloc(strlen(set_option) + strlen("none") + 1);
-	sprintf(cmd, set_option, "none");
+	cmd = (char *) malloc(strlen(set_option) + strlen("none") + strlen(dbus) + 1);
+	sprintf(cmd, set_option, dbus, "none");
 	dt_cmd(cmd);
 	free(cmd);
 
 #if 0
 	cmd = (char *) malloc(strlen(set_filename) + strlen("none") + 1);
-	sprintf(cmd, set_filename, "none");
+	sprintf(cmd, set_filename, dbus, "none");
 	dt_cmd(cmd);
 	free(cmd);
 #endif

@@ -2,7 +2,7 @@
 Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
 
-x11vnc README file                         Date: Mon Aug 10 13:38:13 EDT 2009
+x11vnc README file                         Date: Wed Oct  7 23:29:05 EDT 2009
 
 The following information is taken from these URLs:
 
@@ -908,21 +908,54 @@ make
        the environment variable "RFB_UNIXPW_CMD_RUN" as the logged-in
        user. The mode "[126]-unixpw_nis ..." has also been made more
        consistent.
+     * The [127]-unixpw_system_greeter option, when used in combined
+       unixpw and XDMCP FINDCREATEDISPLAY mode (e.g. [128]-xdmsvc),
+       enables the user to press Escape to jump directly to the
+       XDM/GDM/KDM login greeter screen. This way the user avoids
+       entering his unix password twice at X session creation time. Also,
+       the unixpw login panel now has a short help displayed if the user
+       presses 'F1'.
+     * The [129]-stunnel option (like [130]-ssl but uses stunnel as an
+       external helper program) now works with the [131]-ssl "SAVE" and
+       "TMP" special certificate names. The [132]-sslverify and
+       [133]-sslCRL options now work correctly in [134]-stunnel mode.
+       Single port HTTPS connections are also supported for this mode.
+     * x11vnc now tries to be a little bit more aggressive in keeping up
+       with VNC client's framebuffer update requests. Some broken VNC
+       clients like Eggplant and JollysFastVNC continuously spray these
+       requests at VNC servers (regardless of whether they have received
+       any updates or not.) Under some circumstances this could lead to
+       x11vnc falling behind. The [135]-extra_fbur option allows one to
+       fine tune the setting. Additionally, one may also dial down
+       delays: e.g. "[136]-defer 5" and "[137]-wait 5" (or to 1 or even
+       0) or [138]-nonap or [139]-allinput to keep up with these VNC
+       clients at the expense of increased system load.
+     * The XDAMAGE mechanism is now automatically disabled for a period
+       of time if a game or screensaver generates too many XDAMAGE
+       rectangles per second. This avoids the X11 event queue from
+       soaking up too much memory.
+     * The fonts in the GUI ([140]-gui) can now by set via environment
+       variables, e.g. -env X11VNC_FONT_BOLD='Helvetica -16 bold' and
+       -env X11VNC_FONT_FIXED='Courier -14'.
+     * The remote control command [141]-R can be used to instruct x11vnc
+       to resend its most recent copy of the Clipboard, Primary, or
+       Cutbuffer selections: "x11vnc -R resend_clipboard", "x11vnc -R
+       resend_primary", and "x11vnc -R resend_cutbuffer".
      * There is an experimental workaround: "-env X11VNC_WATCH_DX_DY=1"
        that tries to avoid problems with poorly constructed menu themes
        that place the initial position of the mouse cursor inside a menu
-       item's active zone. More information [127]can be found here.
+       item's active zone. More information [142]can be found here.
 
 
    Here are some features that appeared in the 0.9.8 release:
-     * Stability improvements to [128]-threads mode. Running x11vnc this
+     * Stability improvements to [143]-threads mode. Running x11vnc this
        way is more reliable now. Threaded operation sometimes gives
        better interactive response and faster updates: try it out. The
        threaded mode now supports multiple VNC viewers using the same VNC
        encoding. The threaded mode can also yield a performance
        enhancement in the many client case (e.g. class-room broadcast.)
        We have tested with 30 to 50 simultaneous clients. See also
-       [129]-reflect.
+       [144]-reflect.
        For simultaneous clients: the ZRLE encoding is thread safe on all
        platforms, and the Tight and Zlib encodings are currently only
        thread safe on Linux where thread local storage, __thread, is
@@ -931,12 +964,12 @@ make
        connected client, all encodings are safe on all platforms. Note
        that some features (e.g. scroll detection and -ncache) may be
        disabled or run with reduced functionality in -threads mode.
-     * Automatically tries to work around an [130]Xorg server bug
+     * Automatically tries to work around an [145]Xorg server bug
        involving infinitely repeating keys when turning off key
-       repeating. Use [131]-repeat if the automatic workaround fails.
+       repeating. Use [146]-repeat if the automatic workaround fails.
      * Improved reliability of the Single Port SSL VNC and HTTPS java
        viewer applet delivery mechanism.
-     * The [132]-clip mode works under [133]-rawfb.
+     * The [147]-clip mode works under [148]-rawfb.
 
 
    Here are some features that appeared in the 0.9.7 release:
@@ -946,38 +979,38 @@ make
        case the special file /dev/vcsa2 is used to retrieve vt2's current
        text. Text and colors are shown, but no graphics.
      * Support for less than 8 bits per pixel framebuffers (e.g. 4 or 1
-       bpp) in the [134]-rawfb mode.
+       bpp) in the [149]-rawfb mode.
      * The SSL enabled UltraVNC Java viewer applet now has a [Home] entry
        in the "drives" drop down menu. This menu can be configured with
        the ftpDropDown applet parameter. All of the applet parameters are
        documented in classes/ssl/README.
-     * Experimental support for [135]VirtualGL's [136]TurboVNC (an
+     * Experimental support for [150]VirtualGL's [151]TurboVNC (an
        enhanced TightVNC for fast LAN high framerate usage.)
      * The CUPS Terminal Services helper mode has been improved.
-     * Improvements to the [137]-ncache_cr that allows smooth opaque
+     * Improvements to the [152]-ncache_cr that allows smooth opaque
        window motions using the 'copyrect' encoding when using
-       [138]-ncache mode.
-     * The [139]-rmflag option enables a way to indicate to other
+       [153]-ncache mode.
+     * The [154]-rmflag option enables a way to indicate to other
        processes x11vnc has exited.
      * Reverse connections using anonymous Diffie Hellman SSL encryption
        now work.
 
 
    Here are some features that appeared in the 0.9.6 release:
-     * Support for [140]VeNCrypt SSL/TLS encrypted connections. It is
-       enabled by default in the [141]-ssl mode. VNC Viewers like
+     * Support for [155]VeNCrypt SSL/TLS encrypted connections. It is
+       enabled by default in the [156]-ssl mode. VNC Viewers like
        vinagre, gvncviewer/gtk-vnc, the vencrypt package, and others
        support this encryption mode. It can also be used with the
-       [142]-unixpw option to enable Unix username and password
+       [157]-unixpw option to enable Unix username and password
        authentication (VeNCrypt's "*Plain" modes.) A similar but older
        VNC security type "ANONTLS" (used by vino) is supported as well.
-       See the [143]-vencrypt and [144]-anontls options for additional
+       See the [158]-vencrypt and [159]-anontls options for additional
        control. The difference between x11vnc's normal -ssl mode and
        VeNCrypt is that the former wraps the entire VNC connection in SSL
        (like HTTPS does for HTTP, i.e. "vncs://") while VeNCrypt switches
        on the SSL/TLS at a certain point during the VNC handshake. Use
-       [145]-sslonly to disable both VeNCrypt and ANONTLS (vino.)
-     * The "[146]-ssl ANON" option enables Anonymous Diffie-Hellman (ADH)
+       [160]-sslonly to disable both VeNCrypt and ANONTLS (vino.)
+     * The "[161]-ssl ANON" option enables Anonymous Diffie-Hellman (ADH)
        key exchange for x11vnc's normal SSL/TLS operation. Note that
        Anonymous Diffie-Hellman uses encryption for privacy, but provides
        no authentication and so is susceptible to Man-In-The-Middle
@@ -985,17 +1018,17 @@ make
        SAVE", etc. and have the VNC viewer verify the cert.) The ANONTLS
        mode (vino) only supports ADH. VeNCrypt mode supports both ADH and
        regular X509 SSL certificates modes. For these ADH is enabled by
-       default. See [147]-vencrypt and [148]-anontls for how to disable
+       default. See [162]-vencrypt and [163]-anontls for how to disable
        ADH.
      * For x11vnc's SSL/TLS modes, one can now specify a Certificate
-       Revocation List (CRL) with the [149]-sslCRL option. This will only
+       Revocation List (CRL) with the [164]-sslCRL option. This will only
        be useful for wide deployments: say a company-wide x11vnc SSL
        access deployment using a central Certificate Authority (CA) via
-       [150]-sslGenCA and [151]-sslGenCert. This way if a user has his
+       [165]-sslGenCA and [166]-sslGenCert. This way if a user has his
        laptop lost or stolen, you only have to revoke his key instead of
        creating a new Certificate Authority and redeploying new keys to
        all users.
-     * The default SSL/TLS mode, "[152]-ssl" (no pem file parameter
+     * The default SSL/TLS mode, "[167]-ssl" (no pem file parameter
        supplied), is now the same as "-ssl SAVE" and will save the
        generated self-signed cert in "~/.vnc/certs/server.pem".
        Previously "-ssl" would create a temporary self-signed cert that
@@ -1005,45 +1038,45 @@ make
        same x11vnc server. Use "-ssl TMP" to regain the previous
        behavior. Use "-ssl SAVE_NOPROMPT" to avoid being prompted about
        using passphrase when the certificate is created.
-     * The option [153]-http_oneport enables single-port HTTP connections
+     * The option [168]-http_oneport enables single-port HTTP connections
        via the Java VNC Viewer. So, for example, the web browser URL
        "http://myhost.org:5900" works the same as
        "http://myhost.org:5800", but with the convenience of only
        involving one port instead of two. This works for both unencrypted
-       connections and for SSH tunnels (see [154]-httpsredir if the
+       connections and for SSH tunnels (see [169]-httpsredir if the
        tunnel port differs.) Note that HTTPS single-port operation in
-       [155]-ssl SSL encrypted mode has been available since x11vnc
+       [170]-ssl SSL encrypted mode has been available since x11vnc
        version 0.8.3.
-     * For the [156]-avahi/[157]-zeroconf Service Advertizing mode, if
+     * For the [171]-avahi/[172]-zeroconf Service Advertizing mode, if
        x11vnc was not compiled with the avahi-client library, then an
        external helper program, either avahi-publish(1) (on Unix) or
        dns-sd(1) (on Mac OS X), is used instead.
-     * The "[158]-rfbport PROMPT" option will prompt the user via the GUI
+     * The "[173]-rfbport PROMPT" option will prompt the user via the GUI
        to select the VNC port (e.g. 5901) to listen on, and a few other
        basic settings. This enables a handy GUI mode for naive users:
    x11vnc -gui tray=setpass -rfbport PROMPT -logfile $HOME/.x11vnc.log.%VNCDISP
 LAY
        suitable for putting in a launcher or menu, e.g.
-       [159]x11vnc.desktop. The [160]-logfile expansion is new too. In
+       [174]x11vnc.desktop. The [175]-logfile expansion is new too. In
        the GUI, the tray=setpass Properties panel has been improved.
-     * The [161]-solid solid background color option now works for the
+     * The [176]-solid solid background color option now works for the
        Mac OS X console.
-     * The [162]-reopen option instructs x11vnc to try to reopen the X
+     * The [177]-reopen option instructs x11vnc to try to reopen the X
        display if it is prematurely closed by, say, the display manager
-       (e.g. [163]GDM.)
+       (e.g. [178]GDM.)
 
 
    Here are some features that appeared in the 0.9.5 release:
-     * Symmetric key [164]encryption ciphers. ARC4, AES-128, AES-256,
+     * Symmetric key [179]encryption ciphers. ARC4, AES-128, AES-256,
        blowfish, and 3des are supported. Salt and initialization vector
        seeding is provided. These compliment the more widely used SSL and
-       SSH encryption access methods. [165]SSVNC also supports these
+       SSH encryption access methods. [180]SSVNC also supports these
        encryption modes.
      * Scaling differently along the X- and Y-directions. E.g.
-       "[166]-scale 1280x1024" or "-scale 0.8x0.75"    Also,
-       "[167]-geometry WxH" is an alias for "-scale WxH"
+       "[181]-scale 1280x1024" or "-scale 0.8x0.75"    Also,
+       "[182]-geometry WxH" is an alias for "-scale WxH"
      * By having SSVNC version 1.0.21 or later available in your $PATH,
-       the [168]-chatwindow option allows a UltraVNC Text Chat window to
+       the [183]-chatwindow option allows a UltraVNC Text Chat window to
        appear on the local X11 console/display (this way the remote
        viewer can chat with the person at the physical display; e.g.
        helpdesk mode.) This also works on the Mac OS X console if the
@@ -1055,46 +1088,46 @@ LAY
 
 
    Here are some features that appeared in the 0.9.4 release:
-     * Improvements to the [169]-find and [170]-create X session finding
+     * Improvements to the [184]-find and [185]-create X session finding
        or creating modes: new desktop types and service redirection
        options. Personal cupsd daemon and SSH port redirection helper for
-       use with [171]SSVNC's Terminal Services feature.
-     * Reverse VNC connections via [172]-connect work in the [173]-find,
-       [174]-create and related [175]-display WAIT:... modes.
+       use with [186]SSVNC's Terminal Services feature.
+     * Reverse VNC connections via [187]-connect work in the [188]-find,
+       [189]-create and related [190]-display WAIT:... modes.
      * Reverse VNC connections (either normal or SSL) can use a Web Proxy
        or a SOCKS proxy, or a SSH connection, or even a CGI URL to make
-       the outgoing connection. See: [176]-proxy. Forward connections can
-       also use: [177]-ssh.
-     * Reverse VNC connections via the [178]UltraVNC repeater proxy
+       the outgoing connection. See: [191]-proxy. Forward connections can
+       also use: [192]-ssh.
+     * Reverse VNC connections via the [193]UltraVNC repeater proxy
        (either normal or SSL) are supported. Use either the
-       "[179]-connect repeater=ID:NNNN+host:port" or "[180]-connect
-       repeater://host:port+ID:NNNN" notation. The [181]SSVNC VNC viewer
+       "[194]-connect repeater=ID:NNNN+host:port" or "[195]-connect
+       repeater://host:port+ID:NNNN" notation. The [196]SSVNC VNC viewer
        also supports the UltraVNC repeater.
      * Support for indexed colormaps (PseudoColor) with depths other than
        8 (from 1 to 16 now work) for non-standard hardware. Option
-       "[182]-advertise_truecolor" to handle some workaround in this
+       "[197]-advertise_truecolor" to handle some workaround in this
        mode.
      * Support for the ZYWRLE encoding, this is the RealVNC ZRLE encoding
        extended to do motion video and photo regions more efficiently by
        way of a Wavelet based transformation.
-     * The [183]-finddpy and [184]-listdpy utilities help to debug and
-       configure the [185]-find, [186]-create, and [187]-display WAIT:...
+     * The [198]-finddpy and [199]-listdpy utilities help to debug and
+       configure the [200]-find, [201]-create, and [202]-display WAIT:...
        modes.
      * Some automatic detection of screen resizes are handled even if the
-       [188]-xrandr option is not supplied.
-     * The [189]-autoport options gives more control over the VNC port
+       [203]-xrandr option is not supplied.
+     * The [204]-autoport options gives more control over the VNC port
        x11vnc chooses.
-     * The [190]-ping secs can be used to help keep idle connections
+     * The [205]-ping secs can be used to help keep idle connections
        alive.
      * Pasting of the selection/clipboard into remote applications (e.g.
        Java) has been improved.
      * Fixed a bug if a client disconnects during the 'speed-estimation'
        phase.
      * To unset Caps_Lock, Num_Lock and raise all keys in the X server
-       use [191]-clear_all.
+       use [206]-clear_all.
      * Usage with dvorak keyboards has been improved. See also:
-       [192]-xkb.
-     * The [193]Java Viewer applet source code is now included in the
+       [207]-xkb.
+     * The [208]Java Viewer applet source code is now included in the
        x11vnc-0.9.*.tar.gz tarball. This means you can now build the Java
        viewer applet jar files from source. If you stopped shipping the
        Java viewer applet jar files due to lack of source code, you can
@@ -1102,7 +1135,7 @@ LAY
 
 
    Here are some features that appeared in the 0.9.3 release:
-     * [194]Viewer-side pixmap caching. A large area of pixels (at least
+     * [209]Viewer-side pixmap caching. A large area of pixels (at least
        2-3 times as big as the framebuffer itself; the bigger the
        better... default is 10X) is placed below the framebuffer to act
        as a buffer/cache area for pixel data. The VNC CopyRect encoding
@@ -1110,7 +1143,7 @@ LAY
        Until we start modifying viewers you will be able to see the cache
        area if you scroll down (this makes it easier to debug!) For
        testing the default is "-ncache 10". The unix Enhanced TightVNC
-       Viewer [195]ssvnc has a nice [196]-ycrop option to help hide the
+       Viewer [210]ssvnc has a nice [211]-ycrop option to help hide the
        pixel cache area from view.
 
 
@@ -1123,14 +1156,14 @@ LAY
      * If UltraVNC file transfer or chat is detected, then VNC clients
        are "pinged" more often to prevent these side channels from
        becoming serviced too infrequently.
-     * In [197]-unixpw mode in the username and password dialog no text
+     * In [212]-unixpw mode in the username and password dialog no text
        will be echoed if the first character sent is "Escape". This
        enables a convenience feature in SSVNC to send the username and
        password automatically.
 
 
    Here are some features that appeared in the 0.9.1 release:
-     * The [198]UltraVNC Java viewer has been enhanced to support SSL (as
+     * The [213]UltraVNC Java viewer has been enhanced to support SSL (as
        the TightVNC viewer had been previously.) The UltraVNC Java
        supports ultravnc filetransfer, and so can be used as a VNC viewer
        on Unix that supports ultravnc filetransfer. It is in the
@@ -1141,12 +1174,12 @@ LAY
        Some other bugs in the UltraVNC Java viewer were fixed and a few
        improvements to the UI made.
      * A new Unix username login mode for VNC Viewers authenticated via a
-       Client SSL Certificate: "[199]-users sslpeer=". The emailAddress
+       Client SSL Certificate: "[214]-users sslpeer=". The emailAddress
        subject field is inspected for username@hostname and then acts as
        though "-users +username" has been supplied. This way the Unix
        username is identified by (i.e. simply extracted from) the Client
-       SSL Certificate. This could be useful with [200]-find,
-       [201]-create and [202]-svc modes if you are also have set up and
+       SSL Certificate. This could be useful with [215]-find,
+       [216]-create and [217]-svc modes if you are also have set up and
        use VNC Client SSL Certificate authentication.
      * For external display finding/creating programs (e.g. WAIT:cmd=...)
        if the VNC Viewer is authenticated via a Client SSL Certificate,
@@ -1155,41 +1188,41 @@ LAY
 
 
    Here are some features that appeared in the 0.9 release:
-     * [203]VNC Service advertising via mDNS / ZeroConf / BonJour with
-       the [204]Avahi client library. Enable via "[205]-avahi" or
-       "[206]-zeroconf".
+     * [218]VNC Service advertising via mDNS / ZeroConf / BonJour with
+       the [219]Avahi client library. Enable via "[220]-avahi" or
+       "[221]-zeroconf".
      * Implementations of UltraVNC's TextChat, SingleWindow, and
-       ServerInput extensions (requires ultravnc viewer or [207]ssvnc
+       ServerInput extensions (requires ultravnc viewer or [222]ssvnc
        Unix viewer.) They toggle the selection of a single window
-       ([208]-id), and disable (friendly) user input and viewing (monitor
+       ([223]-id), and disable (friendly) user input and viewing (monitor
        blank) at the VNC server.
-     * Short aliases "[209]-find", "[210]-create", "[211]-svc", and
-       "[212]-xdmsvc" for commonly used FINDCREATEDISPLAY usage modes.
+     * Short aliases "[224]-find", "[225]-create", "[226]-svc", and
+       "[227]-xdmsvc" for commonly used FINDCREATEDISPLAY usage modes.
      * Reverse VNC connections (viewer listening) now work in SSL
-       ([213]-ssl) mode.
+       ([228]-ssl) mode.
      * New options to control the Monitor power state and keyboard/mouse
-       grabbing: [214]-forcedpms, [215]-clientdpms, [216]-noserverdpms,
-       and [217]-grabalways.
+       grabbing: [229]-forcedpms, [230]-clientdpms, [231]-noserverdpms,
+       and [232]-grabalways.
      * A simple way to emulate inetd(8) to some degree via the
-       "[218]-loopbg" option.
-     * Monitor the accuracy of XDAMAGE and apply "[219]-noxdamage" if it
-       is not working well. OpenGL applications like like [220]beryl and
+       "[233]-loopbg" option.
+     * Monitor the accuracy of XDAMAGE and apply "[234]-noxdamage" if it
+       is not working well. OpenGL applications like like [235]beryl and
        MythTv have been shown to make XDAMAGE not work properly.
      * For Java SSL connections involving a router/firewall port
-       redirection, an option [221]-httpsredir to spare the user from
+       redirection, an option [236]-httpsredir to spare the user from
        needing to include &PORT=NNN in the browser URL.
 
 
    Here are some features that appeared in the 0.8.4 release:
-     * Native [222]Mac OS X Aqua/Quartz support. (i.e. OSXvnc
+     * Native [237]Mac OS X Aqua/Quartz support. (i.e. OSXvnc
        alternative; some activities are faster)
-     * A [223]new login mode: "-display WAIT:cmd=FINDCREATEDISPLAY
+     * A [238]new login mode: "-display WAIT:cmd=FINDCREATEDISPLAY
        -unixpw ..." that will Create a new X session (either virtual or
        real and with or without a display manager, e.g. kdm) for the user
        if it cannot find the user's X session display via the FINDDISPLAY
-       method. See the [224]-svc and the [225]-xdmsvc aliases.
-     * x11vnc can act as a VNC [226]reflector/repeater using the
-       "[227]-reflect host:N" option. Instead of polling an X display,
+       method. See the [239]-svc and the [240]-xdmsvc aliases.
+     * x11vnc can act as a VNC [241]reflector/repeater using the
+       "[242]-reflect host:N" option. Instead of polling an X display,
        the remote VNC Server host:N is connected to and re-exported via
        VNC. This is intended for use in broadcasting a display to many
        (e.g. > 16; classroom or large demo) VNC viewers where bandwidth
@@ -1197,16 +1230,16 @@ LAY
        number of repeaters.
      * Wireframe copyrect detection for local user activity (e.g. someone
        sitting at the physical display moving windows) Use
-       [228]-nowireframelocal to disable.
-     * The "[229]-N" option couples the VNC Display number to the X
+       [243]-nowireframelocal to disable.
+     * The "[244]-N" option couples the VNC Display number to the X
        Display number. E.g. if your X DISPLAY is :2 then the VNC display
        will be :2 (i.e. using port 5902.) If that port is taken x11vnc
        will exit.
-     * Option [230]-nodpms to avoid problems with programs like KDE's
+     * Option [245]-nodpms to avoid problems with programs like KDE's
        kdesktop_lock that keep restarting the screen saver every few
        seconds.
      * To automatically fix the common mouse motion problem on XINERAMA
-       (multi-headed) displays, the [231]-xwarppointer option is enabled
+       (multi-headed) displays, the [246]-xwarppointer option is enabled
        by default when XINERAMA is active.
 
    If you have a Mac please try out the native Mac OS X support, build
@@ -1216,62 +1249,62 @@ LAY
 
 
    Here are some features that appeared in the 0.8.3 release:
-     * The [232]-ssl option provides SSL encryption and authentication
-       natively via the [233]www.openssl.org library. One can use from a
+     * The [247]-ssl option provides SSL encryption and authentication
+       natively via the [248]www.openssl.org library. One can use from a
        simple self-signed certificate server certificate up to full CA
        and client certificate authentication schemes.
-     * Similar to -ssl, the [234]-stunnel option starts up a SSL tunnel
+     * Similar to -ssl, the [249]-stunnel option starts up a SSL tunnel
        server stunnel (that must be installed separately on the system:
-       [235]www.stunnel.org [236]stunnel.mirt.net ) to allow only
+       [250]www.stunnel.org [251]stunnel.mirt.net ) to allow only
        encrypted SSL connections from the network.
-     * The [237]-sslverify option allows for authenticating VNC clients
+     * The [252]-sslverify option allows for authenticating VNC clients
        via their certificates in either -ssl or -stunnel modes.
      * Certificate creation and management tools are provide in the
-       [238]-sslGenCert, [239]-sslGenCA, and [240]related options.
+       [253]-sslGenCert, [254]-sslGenCA, and [255]related options.
      * An SSL enabled Java applet VNC Viewer applet is provided by x11vnc
        in classes/ssl/VncViewer.jar. In addition to normal HTTP, the
        applet may be loaded into the web browser via HTTPS (HTTP over
        SSL.) (one can use the VNC port, e.g. https://host:5900/, or also
-       the separate [241]-https port option.) A wrapper shell script
-       [242]ss_vncviewer is also provided that sets up a stunnel
-       client-side tunnel on Unix systems. See [243]Enhanced TightVNC
+       the separate [256]-https port option.) A wrapper shell script
+       [257]ss_vncviewer is also provided that sets up a stunnel
+       client-side tunnel on Unix systems. See [258]Enhanced TightVNC
        Viewer (SSVNC) for other SSL/SSH viewer possibilities.
-     * The [244]-unixpw option supports Unix username and password
-       authentication (a simpler variant is the [245]-unixpw_nis option
+     * The [259]-unixpw option supports Unix username and password
+       authentication (a simpler variant is the [260]-unixpw_nis option
        that works in environments where the encrypted passwords are
-       readable, e.g. NIS.) The [246]-ssl or [247]-localhost +
-       [248]-stunnel options are enforced in this mode to prevent
+       readable, e.g. NIS.) The [261]-ssl or [262]-localhost +
+       [263]-stunnel options are enforced in this mode to prevent
        password sniffing. As a convenience, these requirements are lifted
        if a SSH tunnel can be deduced (but -localhost still applies.)
-     * Coupling [249]-unixpw with "[250]-display WAIT:cmd=FINDDISPLAY" or
+     * Coupling [264]-unixpw with "[265]-display WAIT:cmd=FINDDISPLAY" or
        "-display WAIT:cmd=FINDCREATEDISPLAY" provides a way to allow a
        user to login with their UNIX password and have their display
-       connected to [251]automatically. See the [252]-svc and the
-       [253]-xdmsvc aliases.
-     * Hooks are provided in the [254]-unixpw_cmd and "[255]-passwdfile
+       connected to [266]automatically. See the [267]-svc and the
+       [268]-xdmsvc aliases.
+     * Hooks are provided in the [269]-unixpw_cmd and "[270]-passwdfile
        cmd:,custom:..." options to allow you to supply your own
        authentication and password lookup programs.
      * x11vnc can be configured and built to not depend on X11 libraries
-       "./configure --without-x" for [256]-rawfb only operation (e.g.
+       "./configure --without-x" for [271]-rawfb only operation (e.g.
        embedded linux console devices.)
-     * The [257]-rotate option enables you to rotate or reflect the
+     * The [272]-rotate option enables you to rotate or reflect the
        screen before exporting via VNC. This is intended for use on
        handhelds and other devices where the rotation orientation is not
        "natural".
-     * The "[258]-ultrafilexfer" alias is provided and improved UltraVNC
+     * The "[273]-ultrafilexfer" alias is provided and improved UltraVNC
        filetransfer rates have been achieved.
-     * Under the "[259]-connect_or_exit host" option x11vnc will exit
+     * Under the "[274]-connect_or_exit host" option x11vnc will exit
        immediately unless the reverse connection to host succeeds. The
        "-rfbport 0" option disables TCP listening for connections (useful
        for this mode.)
-     * The "[260]-rawfb rand" and "-rawfb none" options are useful for
+     * The "[275]-rawfb rand" and "-rawfb none" options are useful for
        testing automation scripts, etc., without requiring a full
        desktop.
-     * Reduced spewing of information at startup, use "[261]-verbose"
+     * Reduced spewing of information at startup, use "[276]-verbose"
        (also "-v") to turn it back on for debugging or if you are going
        to send me a problem report.
 
-   Here are some [262]Previous Release Notes
+   Here are some [277]Previous Release Notes
      _________________________________________________________________
 
     Some Notes:
@@ -1298,13 +1331,13 @@ LAY
    protocol.) I suggest using xsetroot, dtstyle or similar utility to set
    a solid background while using x11vnc. You can turn the pretty
    background image back on when you are using the display directly.
-   Update: As of Feb/2005 x11vnc has the [263]-solid [color] option that
+   Update: As of Feb/2005 x11vnc has the [278]-solid [color] option that
    works on recent GNOME, KDE, and CDE and also on classic X (background
    image is on the root window.) Update: As of Oct/2007 x11vnc has the
-   [264]-ncache option that does a reasonable job caching the background
+   [279]-ncache option that does a reasonable job caching the background
    (and other) pixmap data on the viewer side.
 
-   I also find the [265]TightVNC encoding gives the best response for my
+   I also find the [280]TightVNC encoding gives the best response for my
    usage (Unix <-> Unix over cable modem.) One needs a tightvnc-aware
    vncviewer to take advantage of this encoding.
 
@@ -1316,17 +1349,17 @@ LAY
    is X11's default listening port.) Had port 5900 been taken by some
    other application, x11vnc would have next tried 5901. That would mean
    the viewer command above should be changed to vncviewer
-   far-away.east:1. You can force the port with the "[266]-rfbport NNNN"
+   far-away.east:1. You can force the port with the "[281]-rfbport NNNN"
    option where NNNN is the desired port number. If that port is already
-   taken, x11vnc will exit immediately. The "[267]-N" option will try to
+   taken, x11vnc will exit immediately. The "[282]-N" option will try to
    match the VNC display number to the X display.   (also see the "SunRay
    Gotcha" note below)
 
    Options:   x11vnc has (far too) many features that may be activated
-   via its [268]command line options. Useful options are, e.g., -scale to
+   via its [283]command line options. Useful options are, e.g., -scale to
    do server-side scaling, and -rfbauth passwd-file to use VNC password
    protection (the vncpasswd or storepasswd programs, or the x11vnc
-   [269]-storepasswd option can be used to create the password file.)
+   [284]-storepasswd option can be used to create the password file.)
 
    Algorithm:   How does x11vnc do it? Rather brute-forcedly: it
    continuously polls the X11 framebuffer for changes using
@@ -1354,7 +1387,7 @@ LAY
    first testing out the programs. You get an interesting
    recursive/feedback effect where vncviewer images keep popping up each
    one contained in the previous one and slightly shifted a bit by the
-   window manager decorations. There will be an [270]even more
+   window manager decorations. There will be an [285]even more
    interesting effect if -scale is used. Also, if the XKEYBOARD is
    supported and the XBell "beeps" once, you get an infinite loop of
    beeps going off. Although all of this is mildly exciting it is not
@@ -1364,8 +1397,8 @@ LAY
 
     Sun Ray Notes:
 
-   You can run x11vnc on your (connected or disconnected) [271]SunRay
-   session. Here are some [272]notes on SunRay usage with x11vnc.
+   You can run x11vnc on your (connected or disconnected) [286]SunRay
+   session. Here are some [287]notes on SunRay usage with x11vnc.
 
      _________________________________________________________________
 
@@ -1377,7 +1410,7 @@ LAY
        than you normally do to minimize the effects (e.g. do fullpage
        paging rather than line-by-line scrolling, and move windows in a
        single, quick motion.) Recent work has provided the
-       [273]-scrollcopyrect and [274]-wireframe speedups using the
+       [288]-scrollcopyrect and [289]-wireframe speedups using the
        CopyRect VNC encoding and other things, but they only speed up
        some activities, not all.
      * A rate limiting factor for x11vnc performance is that graphics
@@ -1436,18 +1469,18 @@ LAY
        but we mention it because it may be of use for special purpose
        applications. You may need to use the "-cc 4" option to force Xvfb
        to use a TrueColor visual instead of DirectColor. See also the
-       description of the [275]-create option that does all of this
+       description of the [290]-create option that does all of this
        automatically for you.
        Also, a faster and more accurate way is to use the "dummy"
        XFree86/Xorg device driver (or our Xdummy wrapper script.) See
-       [276]this FAQ for details.
+       [291]this FAQ for details.
      * Somewhat surprisingly, the X11 mouse (cursor) shape is write-only
        and cannot be queried from the X server. So traditionally in
        x11vnc the cursor shape stays fixed at an arrow. (see the "-cursor
-       X" and "-cursor some" [277]options, however, for a partial hack
+       X" and "-cursor some" [292]options, however, for a partial hack
        for the root window, etc.) However, on Solaris using the SUN_OVL
        overlay extension, x11vnc can show the correct mouse cursor when
-       the [278]-overlay option is also supplied. A similar thing is done
+       the [293]-overlay option is also supplied. A similar thing is done
        on IRIX as well when -overlay is supplied.
        More generally, as of Dec/2004 x11vnc supports the new XFIXES
        extension (in Xorg and Solaris 10) to query the X server for the
@@ -1455,18 +1488,18 @@ LAY
        with transparency (alpha channel) need to approximated to solid
        RGB values (some cursors look worse than others.)
      * Audio from applications is of course not redirected (separate
-       redirectors do exist, e.g. esd, see [279]the FAQ on this below.)
+       redirectors do exist, e.g. esd, see [294]the FAQ on this below.)
        The XBell() "beeps" will work if the X server supports the
        XKEYBOARD extension. (Note that on Solaris XKEYBOARD is disabled
        by default. Passing +kb to Xsun enables it.)
-     * The scroll detection algorithm for the [280]-scrollcopyrect option
+     * The scroll detection algorithm for the [295]-scrollcopyrect option
        can give choppy or bunched up transient output and occasionally
        painting errors.
      * Using -threads can expose some bugs/crashes in libvncserver.
 
-   Please feel free to [281]contact me if you have any questions,
+   Please feel free to [296]contact me if you have any questions,
    problems, or comments about x11vnc, etc.
-   Also, some people ask if they can make a donation, see [282]this link
+   Also, some people ask if they can make a donation, see [297]this link
    for that.
 
 References
@@ -1597,162 +1630,177 @@ References
  124. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
  125. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw_cmd
  126. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw_nis
- 127. http://ubuntuforums.org/showthread.php?t=1223490
- 128. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-threads
- 129. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-reflect
- 130. http://bugs.freedesktop.org/show_bug.cgi?id=21454
- 131. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-repeat
- 132. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-clip
- 133. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rawfb
- 134. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rawfb
- 135. http://www.virtualgl.org/
- 136. http://www.karlrunge.com/x11vnc/faq.html#faq-turbovnc
- 137. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ncache_cr
- 138. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ncache
- 139. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rmflag
- 140. http://sourceforge.net/projects/vencrypt/
- 141. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
- 142. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
- 143. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-vencrypt
- 144. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-anontls
- 145. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslonly
- 146. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
- 147. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-vencrypt
- 148. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-anontls
- 149. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslCRL
- 150. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCA
- 151. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCert
- 152. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
- 153. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-http_oneport
- 154. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-httpsredir
- 155. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
- 156. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-avahi
- 157. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-zeroconf
- 158. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rfbport
- 159. http://www.karlrunge.com/x11vnc/x11vnc.desktop
- 160. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-o
- 161. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-solid
- 162. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-reopen
- 163. http://www.karlrunge.com/x11vnc/faq.html#infaq_gdm
- 164. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-enc
- 165. http://www.karlrunge.com/x11vnc/ssvnc.html
- 166. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-scale
- 167. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-geometry
- 168. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-chatwindow
- 169. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-find
- 170. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
- 171. http://www.karlrunge.com/x11vnc/ssvnc.html
- 172. http://www.karlrunge.com/x11vnc/faq.html#faq-reverse-connect
- 173. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-find
- 174. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
- 175. http://www.karlrunge.com/x11vnc/faq.html#infaq_findcreatedisplay
- 176. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-proxy
- 177. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssh
- 178. http://www.uvnc.com/addons/repeater.html
- 179. http://www.karlrunge.com/x11vnc/faq.html#faq-reverse-connect
- 180. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-connect
- 181. http://www.karlrunge.com/x11vnc/ssvnc.html
- 182. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-advertise_truecolor
- 183. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-finddpy
- 184. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-listdpy
- 185. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-find
- 186. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
- 187. http://www.karlrunge.com/x11vnc/faq.html#infaq_findcreatedisplay
- 188. http://www.karlrunge.com/x11vnc/faq.html#faq-xrandr
- 189. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-autoport
- 190. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ping
- 191. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-clear_all
- 192. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xkb
- 193. http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-viewers
- 194. http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching
- 195. http://www.karlrunge.com/x11vnc/ssvnc.html
- 196. http://www.karlrunge.com/x11vnc/ssvnc.html#ycrop
- 197. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
- 198. http://www.ultravnc.com/
- 199. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-users
- 200. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
+ 127. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw_system_greeter
+ 128. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xdmsvc
+ 129. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-stunnel
+ 130. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
+ 131. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
+ 132. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
+ 133. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslCRL
+ 134. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-stunnel
+ 135. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-extra_fbur
+ 136. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-defer
+ 137. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-wait
+ 138. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nonap
+ 139. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-allinput
+ 140. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-gui
+ 141. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-remote
+ 142. http://ubuntuforums.org/showthread.php?t=1223490
+ 143. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-threads
+ 144. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-reflect
+ 145. http://bugs.freedesktop.org/show_bug.cgi?id=21454
+ 146. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-repeat
+ 147. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-clip
+ 148. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rawfb
+ 149. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rawfb
+ 150. http://www.virtualgl.org/
+ 151. http://www.karlrunge.com/x11vnc/faq.html#faq-turbovnc
+ 152. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ncache_cr
+ 153. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ncache
+ 154. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rmflag
+ 155. http://sourceforge.net/projects/vencrypt/
+ 156. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
+ 157. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
+ 158. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-vencrypt
+ 159. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-anontls
+ 160. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslonly
+ 161. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
+ 162. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-vencrypt
+ 163. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-anontls
+ 164. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslCRL
+ 165. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCA
+ 166. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCert
+ 167. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
+ 168. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-http_oneport
+ 169. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-httpsredir
+ 170. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
+ 171. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-avahi
+ 172. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-zeroconf
+ 173. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rfbport
+ 174. http://www.karlrunge.com/x11vnc/x11vnc.desktop
+ 175. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-o
+ 176. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-solid
+ 177. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-reopen
+ 178. http://www.karlrunge.com/x11vnc/faq.html#infaq_gdm
+ 179. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-enc
+ 180. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 181. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-scale
+ 182. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-geometry
+ 183. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-chatwindow
+ 184. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-find
+ 185. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
+ 186. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 187. http://www.karlrunge.com/x11vnc/faq.html#faq-reverse-connect
+ 188. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-find
+ 189. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
+ 190. http://www.karlrunge.com/x11vnc/faq.html#infaq_findcreatedisplay
+ 191. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-proxy
+ 192. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssh
+ 193. http://www.uvnc.com/addons/repeater.html
+ 194. http://www.karlrunge.com/x11vnc/faq.html#faq-reverse-connect
+ 195. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-connect
+ 196. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 197. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-advertise_truecolor
+ 198. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-finddpy
+ 199. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-listdpy
+ 200. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-find
  201. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
- 202. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
- 203. http://www.karlrunge.com/x11vnc/faq.html#faq-avahi
- 204. http://www.avahi.org/
- 205. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-avahi
- 206. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-zeroconf
- 207. http://www.karlrunge.com/x11vnc/ssvnc.html
- 208. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-id
- 209. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-find
- 210. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
- 211. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-svc
- 212. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xdmsvc
- 213. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
- 214. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-forcedpms
- 215. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-clientdpms
- 216. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noserverdpms
- 217. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-grabalways
- 218. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-loop
- 219. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noxdamage
- 220. http://www.karlrunge.com/x11vnc/faq.html#faq-beryl
- 221. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-httpsredir
- 222. http://www.karlrunge.com/x11vnc/faq.html#faq-macosx
- 223. http://www.karlrunge.com/x11vnc/faq.html#infaq_findcreatedisplay
- 224. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-svc
- 225. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xdmsvc
- 226. http://www.karlrunge.com/x11vnc/faq.html#faq-reflect
- 227. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-reflect
- 228. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nowireframelocal
- 229. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-N
- 230. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nodpms
- 231. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xwarppointer
- 232. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
- 233. http://www.openssl.org/
- 234. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-stunnel
- 235. http://www.stunnel.org/
- 236. http://stunnel.mirt.net/
- 237. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
- 238. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCert
- 239. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCA
- 240. http://www.karlrunge.com/x11vnc/ssl.html
- 241. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-https
- 242. http://www.karlrunge.com/x11vnc/faq.html#infaq_ss_vncviewer
- 243. http://www.karlrunge.com/x11vnc/ssvnc.html
- 244. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
- 245. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw_nis
- 246. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
- 247. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-localhost
- 248. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-stunnel
- 249. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
- 250. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-display_WAIT
- 251. http://www.karlrunge.com/x11vnc/faq.html#faq-userlogin
- 252. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-svc
- 253. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xdmsvc
- 254. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw_cmd
- 255. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-passwdfile
- 256. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rawfb
- 257. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rotate
- 258. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ultrafilexfer
- 259. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-connect_or_exit
- 260. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rawfb
- 261. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-v,
- 262. http://www.karlrunge.com/x11vnc/prevrels.html
- 263. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-solid
- 264. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ncache
- 265. http://www.tightvnc.com/
- 266. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rfbport
- 267. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-N
- 268. http://www.karlrunge.com/x11vnc/x11vnc_opts.html
- 269. http://www.karlrunge.com/x11vnc/faq.html#faq-passwd
- 270. http://www.karlrunge.com/x11vnc/recurse_x11vnc.jpg
- 271. http://www.sun.com/sunray/index.html
- 272. http://www.karlrunge.com/x11vnc/sunray.html
- 273. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-scrollcopyrect
- 274. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-wireframe
- 275. http://www.karlrunge.com/x11vnc/faq.html#infaq_findcreatedisplay
- 276. http://www.karlrunge.com/x11vnc/faq.html#faq-xvfb
- 277. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-cursor
- 278. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-overlay
- 279. http://www.karlrunge.com/x11vnc/faq.html#faq-sound
- 280. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-scrollcopyrect
- 281. mailto:xvml@karlrunge.com
- 282. http://www.karlrunge.com/x11vnc/faq.html#faq-thanks
+ 202. http://www.karlrunge.com/x11vnc/faq.html#infaq_findcreatedisplay
+ 203. http://www.karlrunge.com/x11vnc/faq.html#faq-xrandr
+ 204. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-autoport
+ 205. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ping
+ 206. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-clear_all
+ 207. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xkb
+ 208. http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-viewers
+ 209. http://www.karlrunge.com/x11vnc/faq.html#faq-client-caching
+ 210. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 211. http://www.karlrunge.com/x11vnc/ssvnc.html#ycrop
+ 212. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
+ 213. http://www.ultravnc.com/
+ 214. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-users
+ 215. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
+ 216. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
+ 217. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
+ 218. http://www.karlrunge.com/x11vnc/faq.html#faq-avahi
+ 219. http://www.avahi.org/
+ 220. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-avahi
+ 221. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-zeroconf
+ 222. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 223. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-id
+ 224. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-find
+ 225. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
+ 226. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-svc
+ 227. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xdmsvc
+ 228. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
+ 229. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-forcedpms
+ 230. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-clientdpms
+ 231. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noserverdpms
+ 232. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-grabalways
+ 233. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-loop
+ 234. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noxdamage
+ 235. http://www.karlrunge.com/x11vnc/faq.html#faq-beryl
+ 236. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-httpsredir
+ 237. http://www.karlrunge.com/x11vnc/faq.html#faq-macosx
+ 238. http://www.karlrunge.com/x11vnc/faq.html#infaq_findcreatedisplay
+ 239. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-svc
+ 240. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xdmsvc
+ 241. http://www.karlrunge.com/x11vnc/faq.html#faq-reflect
+ 242. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-reflect
+ 243. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nowireframelocal
+ 244. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-N
+ 245. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nodpms
+ 246. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xwarppointer
+ 247. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
+ 248. http://www.openssl.org/
+ 249. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-stunnel
+ 250. http://www.stunnel.org/
+ 251. http://stunnel.mirt.net/
+ 252. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
+ 253. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCert
+ 254. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCA
+ 255. http://www.karlrunge.com/x11vnc/ssl.html
+ 256. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-https
+ 257. http://www.karlrunge.com/x11vnc/faq.html#infaq_ss_vncviewer
+ 258. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 259. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
+ 260. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw_nis
+ 261. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
+ 262. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-localhost
+ 263. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-stunnel
+ 264. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
+ 265. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-display_WAIT
+ 266. http://www.karlrunge.com/x11vnc/faq.html#faq-userlogin
+ 267. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-svc
+ 268. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-xdmsvc
+ 269. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw_cmd
+ 270. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-passwdfile
+ 271. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rawfb
+ 272. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rotate
+ 273. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ultrafilexfer
+ 274. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-connect_or_exit
+ 275. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rawfb
+ 276. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-v,
+ 277. http://www.karlrunge.com/x11vnc/prevrels.html
+ 278. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-solid
+ 279. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ncache
+ 280. http://www.tightvnc.com/
+ 281. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-rfbport
+ 282. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-N
+ 283. http://www.karlrunge.com/x11vnc/x11vnc_opts.html
+ 284. http://www.karlrunge.com/x11vnc/faq.html#faq-passwd
+ 285. http://www.karlrunge.com/x11vnc/recurse_x11vnc.jpg
+ 286. http://www.sun.com/sunray/index.html
+ 287. http://www.karlrunge.com/x11vnc/sunray.html
+ 288. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-scrollcopyrect
+ 289. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-wireframe
+ 290. http://www.karlrunge.com/x11vnc/faq.html#infaq_findcreatedisplay
+ 291. http://www.karlrunge.com/x11vnc/faq.html#faq-xvfb
+ 292. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-cursor
+ 293. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-overlay
+ 294. http://www.karlrunge.com/x11vnc/faq.html#faq-sound
+ 295. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-scrollcopyrect
+ 296. mailto:xvml@karlrunge.com
+ 297. http://www.karlrunge.com/x11vnc/faq.html#faq-thanks
 	
 =======================================================================
 http://www.karlrunge.com/x11vnc/faq.html:
@@ -5141,10 +5189,10 @@ exec /usr/local/bin/x11vnc -inetd -o /var/log/x11vnc.log -find -env FD_XDM=1
    xauth data (the above example does the latter.) If applicable (-unixpw
    mode), the program is run as the Unix user name who logged in.
 
-   On Linux if the virtual terminal is known the program should append
-   ",VT=n" to the DISPLAY line; a chvt n will be attempted automatically.
-   Or if you only know the X server process ID and suspect a chvt will be
-   needed append ",XPID=n".
+   On Linux if the virtual terminal is known the program appends ",VT=n"
+   to the DISPLAY line; a chvt n will be attempted automatically. Or if
+   only X server process ID is known it appends ",XPID=n" (a chvt will be
+   attempted by x11vnc.)
 
    Tip: Note that the [427]-find option is an alias for "-display
    WAIT:cmd=FINDDISPLAY". Use it!
@@ -5205,8 +5253,8 @@ xpw=
 
    So an inetd(8) example might look like:
 5900 stream tcp nowait root /usr/sbin/tcpd /usr/local/bin/x11vnc -inetd \
-      -o /var/log/x11vnc.log -http -ssl SAVE -unixpw -users unixpw= \
-      -display WAIT:cmd=FINDCREATEDISPLAY -prog /usr/local/bin/x11vnc
+      -o /var/log/x11vnc.log -http -prog /usr/local/bin/x11vnc \
+      -ssl SAVE -unixpw -users unixpw= -display WAIT:cmd=FINDCREATEDISPLAY
 
    Where the very long lines have been split. This will allow direct SSL
    (e.g. [437]ss_vncviewer) access and also Java Web browers access via:
@@ -5218,7 +5266,9 @@ xpw=
    Tip: Note that [439]-svc is a short hand for the long "-ssl SAVE
    -unixpw -users unixpw= -display WAIT:cmd=FINDCREATEDISPLAY" part.
    Unlike -create, this alias also sets up SSL encryption and Unix
-   password login.
+   password login. The above example then simplifies to:
+5900 stream tcp nowait root /usr/sbin/tcpd /usr/local/bin/x11vnc -inetd \
+      -o /var/log/x11vnc.log -http -prog /usr/local/bin/x11vnc -svc
 
    Tip: In addition to the usual unixpw parameters, the user can specify
    after his username (following a ":" see [440]-display WAIT for
@@ -5247,10 +5297,14 @@ service x11vnc
         wait            = no
         user            = root
         server          = /usr/local/bin/x11vnc
-        server_args     = -inetd -o /var/log/x11vnc.log -http -ssl SAVE -unixpw
- -users unixpw= -display WAIT:cmd=FINDCREATEDISPLAY -prog /usr/local/bin/x11vnc
+        server_args     = -inetd -o /var/log/x11vnc.log -http -prog /usr/local/
+bin/x11vnc -ssl SAVE -unixpw -users unixpw= -display WAIT:cmd=FINDCREATEDISPLAY
         disable         = no
 }
+
+   Or more simply the server_args becomes:
+        server_args     = -inetd -o /var/log/x11vnc.log -http -prog /usr/local/
+bin/x11vnc -svc
 
    To print out the script in this case use "-display
    WAIT:cmd=FINDCREATEDISPLAY-print". To change the preference of
@@ -8343,14 +8397,51 @@ rm -f $tmp
    Q-119: Does the Clipboard/Selection get transferred between the
    vncviewer and the X display?
 
-   As of Jan/2004 x11vnc supports the "CutText" part of the rfb protocol.
-   Furthermore, x11vnc is able to hold the PRIMARY and CLIPBOARD
-   selection (Xvnc does not seem to do this.) If you don't want the
-   Clipboard/Selection exchanged use the [694]-nosel option. If you don't
-   want the PRIMARY selection to be polled for changes use the
-   [695]-noprimary option. (with a similar thing for CLIPBOARD.) You can
-   also fine-tune it a bit with the [696]-seldir dir option and also
-   [697]-input.
+   As of Jan/2004 x11vnc supports the "CutText" part of the RFB (aka VNC)
+   protocol. When text is selected/copied in the X session that x11vnc is
+   polling it will be sent to connected VNC viewers. And when CutText is
+   received from a VNC viewer then x11vnc will set the X11 selections
+   PRIMARY, CLIPBOARD, and CUTBUFFER0 to it. x11vnc is able to hold the
+   PRIMARY and CLIPBOARD selections (Xvnc does not seem to do this.)
+
+   The X11 selections can be confusing, especially to those coming from
+   Windows or MacOSX where there is just a single 'Clipboard'. The X11
+   CLIPBOARD selection is a lot like that of Windows and MacOSX, e.g.
+   highlighted text is sent to the clipboard when the user activates
+   "Edit -> Copy" or presses "Control+C" (and pasting it via "Edit ->
+   Paste" or "Control+V".) The X11 PRIMARY selection has been described
+   as 'for power users' or 'an Easter Egg'. As soon as text is
+   highlighted it is set to the PRIMARY selection and so it is
+   immediately ready for pasting, usually via the Middle Mouse Button or
+   "Shift+Insert". See [694]this jwz link for more information.
+
+   x11vnc's default behavior is to watch both CLIPBOARD and PRIMARY and
+   whenever one of them changes, it sends the new text to connected
+   viewers. Note that since the RFB protocol only has a single "CutText"
+   then both selections are "merged" to some degree (and this can lead to
+   confusing results.) One user was confused why x11vnc was "forgetting"
+   his CLIPBOARD selection and the reason was he also changed PRIMARY
+   some time after he copied text to the clipboard. Usually an app will
+   set PRIMARY as soon as any text is highlighted so it easy to see how
+   CLIPBOARD was forgotten. Use the -noprimary described below as a
+   workaround. Similarly, by default when x11vnc receives CutText it sets
+   both CLIPBOARD and PRIMARY to it (this is probably less confusing, but
+   could possibly lead to some failure modes as well.)
+
+   You may not like these defaults. Here are ways to change the behavior:
+     * If you don't want the Clipboard/Selection exchanged at all use the
+       [695]-nosel option.
+     * If you want changes in PRIMARY to be ignored use the
+       [696]-noprimary option.
+     * If you want changes in CLIPBOARD to be ignored use the
+       [697]-noclipboard option.
+     * If you don't want x11vnc to set PRIMARY to the "CutText" received
+       from viewers use the [698]-nosetprimary option.
+     * If you don't want x11vnc to set CLIPBOARD to the "CutText"
+       received from viewers use the [699]-nosetclipboard option.
+
+   You can also fine-tune it a bit with the [700]-seldir dir option and
+   also [701]-input.
 
    You may need to watch out for desktop utilities such as KDE's
    "Klipper" that do odd things with the selection, clipboard, and
@@ -8362,7 +8453,7 @@ rm -f $tmp
 
    Yes, it is possible with a number of tools that record VNC and
    transform it to swf format or others. One such popular tool is
-   [698]pyvnc2swf. There are a number of [699]tutorials (broken link?) on
+   [702]pyvnc2swf. There are a number of [703]tutorials (broken link?) on
    how to do this. Another option is to use the vnc2mpg that comes in the
    LibVNCServer package.
    An important thing to remember when doing this is that tuning
@@ -8377,11 +8468,11 @@ rm -f $tmp
    (and Windows viewers only support filetransfer it appears... but they
    do work to some degree under Wine on Linux.)
 
-   The [700]SSVNC Unix VNC viewer supports UltraVNC file transfer by use
+   The [704]SSVNC Unix VNC viewer supports UltraVNC file transfer by use
    of a Java helper program.
 
    TightVNC file transfer is off by default, if you want to enable it use
-   the [701]-tightfilexfer option.
+   the [705]-tightfilexfer option.
 
    UltraVNC file transfer is off by default, to enable it use something
    like "-rfbversion 3.6 -permitfiletransfer"
@@ -8404,7 +8495,7 @@ rm -f $tmp
    IMPORTANT: please understand if -ultrafilexfer or -tightfilexfer is
    specified and you run x11vnc as root for, say, inetd or display
    manager (gdm, kdm, ...) access and you do not have it switch users via
-   the [702]-users option, then VNC Viewers that connect are able to do
+   the [706]-users option, then VNC Viewers that connect are able to do
    filetransfer reads and writes as *root*.
 
    The UltraVNC and TightVNC settings can be toggled on and off inside
@@ -8423,7 +8514,7 @@ rm -f $tmp
    these extensions you will need to supply this option to x11vnc:
    -rfbversion 3.6
 
-   Or use [703]-ultrafilexfer which is an alias for the above option and
+   Or use [707]-ultrafilexfer which is an alias for the above option and
    "-permitfiletransfer". UltraVNC evidently treats any other RFB version
    number as non-UltraVNC.
 
@@ -8435,14 +8526,14 @@ rm -f $tmp
      * 1/n Server Scaling
      * rfbEncodingUltra compression encoding
 
-   The [704]SSVNC Unix VNC viewer supports these UltraVNC extensions.
+   The [708]SSVNC Unix VNC viewer supports these UltraVNC extensions.
 
-   To disable SingleWindow and ServerInput use [705]-noultraext (the
+   To disable SingleWindow and ServerInput use [709]-noultraext (the
    others are managed by LibVNCServer.) See this option too:
-   [706]-noserverdpms.
+   [710]-noserverdpms.
 
-   Also, the [707]UltraVNC repeater proxy is supported for use with
-   reverse connections: "[708]-connect repeater://host:port+ID:NNNN". Use
+   Also, the [711]UltraVNC repeater proxy is supported for use with
+   reverse connections: "[712]-connect repeater://host:port+ID:NNNN". Use
    it for both plaintext and SSL connections. This mode can send any
    string before switching to the VNC protocol, and so could be used with
    other proxy/gateway tools.
@@ -8453,12 +8544,12 @@ rm -f $tmp
    reverse vnc connection from their Unix desktop to a helpdesk
    operator's VNC Viewer.
 
-   Yes, UltraVNC's [709]Single Click (SC) mode can be emulated fairly
+   Yes, UltraVNC's [713]Single Click (SC) mode can be emulated fairly
    well on Unix.
 
    We use the term "helpdesk" below, but it could be any sort of remote
    assistance you want to set up, e.g. something for Unix-using friends
-   or family to use. This includes [710]Mac OS X.
+   or family to use. This includes [714]Mac OS X.
 
    Assume you create a helpdesk directory "hd" on your website:
    http://www.mysite.com/hd (any website that you can upload files to
@@ -8514,7 +8605,7 @@ chmod 755 ./x11vnc                  # platform, use $webhost/`uname`/x11vnc
    So I guess this is about 3-4 clicks (start a terminal and paste) and
    pressing "Enter" instead of "single click"...
 
-   See [711]this page for some variations on this method, e.g. how to add
+   See [715]this page for some variations on this method, e.g. how to add
    a password, SSL Certificates, etc.
 
 
@@ -8526,11 +8617,11 @@ chmod 755 ./x11vnc                  # platform, use $webhost/`uname`/x11vnc
 
    A bit of obscurity security could be put in with a -passwd, -rfbauth
    options, etc. (note that x11vnc will require a password even for
-   reverse connections.) More info [712]here.
+   reverse connections.) More info [716]here.
 
 
    Firewalls: If the helpdesk (you) with the vncviewer is behind a
-   NAT/Firewall/Router the [713]router will have to be configured to
+   NAT/Firewall/Router the [717]router will have to be configured to
    redirect a port (i.e. 5500 or maybe different one if you like) to the
    vncviewer machine. If the vncviewer machine also has its own
    host-level firewall, you will have to open up the port there as well.
@@ -8540,7 +8631,7 @@ chmod 755 ./x11vnc                  # platform, use $webhost/`uname`/x11vnc
    configuring a router to do a port redirection (i.e. on your side, the
    HelpDesk.) To avoid modifying either firewall/router, one would need
    some public (IP address reachable on the internet) redirection/proxy
-   service. Perhaps such a thing exists. [714]http://sc.uvnc.com provides
+   service. Perhaps such a thing exists. [718]http://sc.uvnc.com provides
    this service for their UltraVNC Single Click users.
 
 
@@ -8576,7 +8667,7 @@ chmod 755 ./x11vnc                  # platform, use $webhost/`uname`/x11vnc
 
    As of Apr/2007 x11vnc supports reverse connections in SSL and so we
    can do this. On the Helpdesk side (Viewer) you will need STUNNEL or
-   better use the [715]Enhanced TightVNC Viewer (SSVNC) package we
+   better use the [719]Enhanced TightVNC Viewer (SSVNC) package we
    provide that automates all of the SSL for you.
 
    To do this create a file named "vncs" in the website "hd" directory
@@ -8606,11 +8697,11 @@ chmod 755 ./x11vnc                  # platform, use $webhost/`uname`/x11vnc
 
    with the hostnames or IP addresses customized to your case.
 
-   The only change from the "vnc" above is the addition of the [716]-ssl
+   The only change from the "vnc" above is the addition of the [720]-ssl
    option to x11vnc. This will create a temporary SSL cert: openssl(1)
    will need to be installed on the user's end. A fixed SSL cert file
    could be used to avoid this (and provide some authentication; more
-   info [717]here.)
+   info [721]here.)
 
    The naive user will be doing this:
    wget -qO - http://www.mysite.com/hd/vncs | sh -
@@ -8619,7 +8710,7 @@ chmod 755 ./x11vnc                  # platform, use $webhost/`uname`/x11vnc
 
    But before that, the helpdesk operator needs to have "vncviewer
    -listen" running as before, however he needs an SSL tunnel at his end.
-   The easiest way to do this is use [718]Enhanced TightVNC Viewer
+   The easiest way to do this is use [722]Enhanced TightVNC Viewer
    (SSVNC). Start it, and select Options -> 'Reverse VNC Connection
    (-listen)'. Then UN-select 'Verify All Certs' (this can be enabled
    later if you want; you'll need the x11vnc SSL certificate), and click
@@ -8649,7 +8740,7 @@ connect = localhost:5501
 
    answer the prompts with whatever you want; you can take the default
    for all of them if you like. The openssl(1) package must be installed.
-   See [719]this link and [720]this one too for more info on SSL certs.
+   See [723]this link and [724]this one too for more info on SSL certs.
    This creates $HOME/.vnc/certs/server-self:mystunnel.pem, then you
    would change the "stunnel.cfg" to look something like:
 foreground = yes
@@ -8670,7 +8761,7 @@ connect = localhost:5501
    then all bets are off!.
 
    More SSL variations and info about certificates can be found
-   [721]here.
+   [725]here.
 
 
    OpenSSL libssl.so.0.9.7 problems:
@@ -8680,7 +8771,7 @@ connect = localhost:5501
    distros are currently a bit of a mess regarding which version of
    libssl is installed.
 
-   You will find the [722]details here.
+   You will find the [726]details here.
 
 
    Q-124: Can I (temporarily) mount my local (viewer-side) Windows/Samba
@@ -8689,7 +8780,7 @@ connect = localhost:5501
    You will have to use an external network redirection for this.
    Filesystem mounting is not part of the VNC protocol.
 
-   We show a simple [723]Samba example here.
+   We show a simple [727]Samba example here.
 
    First you will need a tunnel to redirect the SMB requests from the
    remote machine to the one you sitting at. We use an ssh tunnel:
@@ -8729,7 +8820,7 @@ d,ip=127.0.0.1,port=1139
   far-away> smbumount /home/fred/smb-haystack-pub
 
    At some point we hope to fold some automation for SMB ssh redir setup
-   into the [724]Enhanced TightVNC Viewer (SSVNC) package we provide (as
+   into the [728]Enhanced TightVNC Viewer (SSVNC) package we provide (as
    of Sep 2006 it is there for testing.)
 
 
@@ -8739,7 +8830,7 @@ d,ip=127.0.0.1,port=1139
    You will have to use an external network redirection for this.
    Printing is not part of the VNC protocol.
 
-   We show a simple Unix to Unix [725]CUPS example here. Non-CUPS port
+   We show a simple Unix to Unix [729]CUPS example here. Non-CUPS port
    redirections (e.g. LPD) should also be possible, but may be a bit more
    tricky. If you are viewing on Windows SMB and don't have a local cups
    server it may be trickier still (see below.)
@@ -8821,7 +8912,7 @@ d,ip=127.0.0.1,port=1139
    "localhost".
 
    At some point we hope to fold some automation for CUPS ssh redir setup
-   into the [726]Enhanced TightVNC Viewer (SSVNC) package we provide (as
+   into the [730]Enhanced TightVNC Viewer (SSVNC) package we provide (as
    of Sep 2006 it is there for testing.)
 
 
@@ -8922,7 +9013,7 @@ or:
        the applications will fail to run because LD_PRELOAD will point to
        libraries of the wrong wordsize.
      * At some point we hope to fold some automation for esd or artsd ssh
-       redir setup into the [727]Enhanced TightVNC Viewer (SSVNC) package
+       redir setup into the [731]Enhanced TightVNC Viewer (SSVNC) package
        we provide (as of Sep/2006 it is there for testing.)
 
 
@@ -8934,14 +9025,14 @@ or:
    in Solaris, see Xserver(1) for how to turn it on via +kb), and so you
    won't hear them if the extension is not present.
 
-   If you don't want to hear the beeps use the [728]-nobell option. If
+   If you don't want to hear the beeps use the [732]-nobell option. If
    you want to hear the audio from the remote applications, consider
-   trying a [729]redirector such as esd.
+   trying a [733]redirector such as esd.
 
 
    Q-128: Does x11vnc work with IPv6?
 
-   Currently the only way to do this is via [730]inetd. You configure
+   Currently the only way to do this is via [734]inetd. You configure
    x11vnc to be run from inetd or xinetd and instruct it to listen on an
    IPv6 address. For xinetd the setting "flags = IPv6" will be needed.
 
@@ -8950,7 +9041,7 @@ or:
    connection.) Some sort of ipv4-to-ipv6 redirector tool (perhaps even a
    perl script) could be useful to avoid this.
 
-   Also note that not all VNC Viewers are [731]IPv6 enabled, so a
+   Also note that not all VNC Viewers are [735]IPv6 enabled, so a
    redirector could even be needed on the client side.
 
 
@@ -9661,44 +9752,48 @@ References
  691. http://www.karlrunge.com/x11vnc/faq.html#faq-display-manager
  692. http://www.karlrunge.com/x11vnc/faq.html#faq-display-manager
  693. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-connect
- 694. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nosel
- 695. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noprimary
- 696. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-seldir
- 697. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-input
- 698. http://www.unixuser.org/~euske/vnc2swf/
- 699. http://wolphination.com/linux/2006/06/30/how-to-record-videos-of-your-desktop/
- 700. http://www.karlrunge.com/x11vnc/ssvnc.html
- 701. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-tightfilexfer
- 702. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-users
- 703. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ultrafilexfer
+ 694. http://www.jwz.org/doc/x-cut-and-paste.html
+ 695. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nosel
+ 696. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noprimary
+ 697. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noclipboard
+ 698. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nosetprimary
+ 699. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nosetclipboard
+ 700. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-seldir
+ 701. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-input
+ 702. http://www.unixuser.org/~euske/vnc2swf/
+ 703. http://wolphination.com/linux/2006/06/30/how-to-record-videos-of-your-desktop/
  704. http://www.karlrunge.com/x11vnc/ssvnc.html
- 705. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noultraext
- 706. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noserverdpms
- 707. http://www.uvnc.com/addons/repeater.html
- 708. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-connect
- 709. http://www.uvnc.com/addons/singleclick.html
- 710. http://www.karlrunge.com/x11vnc/faq.html#faq-macosx
- 711. http://www.karlrunge.com/x11vnc/single-click.html
- 712. http://www.karlrunge.com/x11vnc/single-click.html
- 713. http://www.karlrunge.com/x11vnc/index.html#firewalls
- 714. http://sc.uvnc.com/
- 715. http://www.karlrunge.com/x11vnc/ssvnc.html
- 716. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
- 717. http://www.karlrunge.com/x11vnc/single-click.html
- 718. http://www.karlrunge.com/x11vnc/ssvnc.html
- 719. http://www.karlrunge.com/x11vnc/single-click.html
- 720. http://www.karlrunge.com/x11vnc/ssl.html
+ 705. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-tightfilexfer
+ 706. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-users
+ 707. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ultrafilexfer
+ 708. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 709. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noultraext
+ 710. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-noserverdpms
+ 711. http://www.uvnc.com/addons/repeater.html
+ 712. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-connect
+ 713. http://www.uvnc.com/addons/singleclick.html
+ 714. http://www.karlrunge.com/x11vnc/faq.html#faq-macosx
+ 715. http://www.karlrunge.com/x11vnc/single-click.html
+ 716. http://www.karlrunge.com/x11vnc/single-click.html
+ 717. http://www.karlrunge.com/x11vnc/index.html#firewalls
+ 718. http://sc.uvnc.com/
+ 719. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 720. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
  721. http://www.karlrunge.com/x11vnc/single-click.html
- 722. http://www.karlrunge.com/x11vnc/single-click.html#libssl-problems
- 723. http://www.samba.org/
- 724. http://www.karlrunge.com/x11vnc/ssvnc.html
- 725. http://www.cups.org/
- 726. http://www.karlrunge.com/x11vnc/ssvnc.html
- 727. http://www.karlrunge.com/x11vnc/ssvnc.html
- 728. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nobell
- 729. http://www.karlrunge.com/x11vnc/faq.html#faq-sound
- 730. http://www.karlrunge.com/x11vnc/faq.html#faq-inetd
- 731. http://jungla.dit.upm.es/~acosta/paginas/vncIPv6.html
+ 722. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 723. http://www.karlrunge.com/x11vnc/single-click.html
+ 724. http://www.karlrunge.com/x11vnc/ssl.html
+ 725. http://www.karlrunge.com/x11vnc/single-click.html
+ 726. http://www.karlrunge.com/x11vnc/single-click.html#libssl-problems
+ 727. http://www.samba.org/
+ 728. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 729. http://www.cups.org/
+ 730. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 731. http://www.karlrunge.com/x11vnc/ssvnc.html
+ 732. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-nobell
+ 733. http://www.karlrunge.com/x11vnc/faq.html#faq-sound
+ 734. http://www.karlrunge.com/x11vnc/faq.html#faq-inetd
+ 735. http://jungla.dit.upm.es/~acosta/paginas/vncIPv6.html
 	
 =======================================================================
 http://www.karlrunge.com/x11vnc/chainingssh.html:
@@ -10255,6 +10350,11 @@ NTIwLjQxMTE2OTEPMA0GA1UEChMGeDExdm5jMS4wLAYDVQQDEyV4MTF2bmMtU0VM
    far-away.east:0" where ./x11vnc.crt is the copied certificate x11vnc
    printed out.
 
+   As fourth example, our [5]SSVNC enhanced tightvnc viewer can also use
+   these certificate files for server authentication. You can load them
+   via the SSVNC 'Certs...' dialog and set 'ServerCert' to the
+   certificate file you safely copied there.
+
    Note that in principle the copying of the certificate to the client
    machine(s) itself could be altered in a Man-In-The-Middle attack! You
    can't win. It is unlikely the attacker could predict how you were
@@ -10285,7 +10385,7 @@ NTIwLjQxMTE2OTEPMA0GA1UEChMGeDExdm5jMS4wLAYDVQQDEyV4MTF2bmMtU0VM
    server. The ".pem" file contains both the certificate and the private
    key and should be kept secret. (If you don't like the default location
    ~/.vnc/certs, e.g. it is on an NFS share and you are worried about
-   local network sniffing, use the [5]-ssldir dir option to point to a
+   local network sniffing, use the [6]-ssldir dir option to point to a
    different directory.)
 
    So the next time you run "x11vnc -ssl SAVE ..." it will read the
@@ -10350,7 +10450,7 @@ NTIwLjQxMTE2OTEPMA0GA1UEChMGeDExdm5jMS4wLAYDVQQDEyV4MTF2bmMtU0VM
        clients will run.
      * One or more x11vnc server certs and keys are generated.
      * The x11vnc server cert is signed with the CA private key.
-     * x11vnc is run using the server key. (e.g. "[6]-ssl SAVE")
+     * x11vnc is run using the server key. (e.g. "[7]-ssl SAVE")
      * VNC clients (viewers) can now authenticate the x11vnc server
        because they have the CA certificate.
 
@@ -10374,7 +10474,7 @@ NTIwLjQxMTE2OTEPMA0GA1UEChMGeDExdm5jMS4wLAYDVQQDEyV4MTF2bmMtU0VM
      * The VNC client certs+keys are safely distributed to the
        corresponding client machines.
      * x11vnc is told to verify clients by using the CA cert. (e.g.
-       "[7]-sslverify CA")
+       "[8]-sslverify CA")
      * When VNC clients (viewers) connect, they must authenticate
        themselves to x11vnc by using their client key.
 
@@ -10384,19 +10484,19 @@ NTIwLjQxMTE2OTEPMA0GA1UEChMGeDExdm5jMS4wLAYDVQQDEyV4MTF2bmMtU0VM
    no need to keep the client key on the CA machine that generated and
    signed it. You can keep the client certs if you like because they are
    public, and they could also be used let in only a subset of all the
-   clients. (see [8]-sslverify)
+   clients. (see [9]-sslverify)
 
      _________________________________________________________________
 
    How to do the above CA steps with x11vnc:
 
    Some utility commands are provided to ease the cert+key creation,
-   signing, and management: [9]-sslGenCA, [10]-sslGenCert,
-   [11]-sslDelCert, [12]-sslEncKey, [13]-sslCertInfo. They basically run
+   signing, and management: [10]-sslGenCA, [11]-sslGenCert,
+   [12]-sslDelCert, [13]-sslEncKey, [14]-sslCertInfo. They basically run
    the openssl(1) command for you to manage the certs/keys. It is
    required that openssl(1) is installed on the machine and available in
    PATH. All commands can be pointed to an alternate toplevel certificate
-   directory via the [14]-ssldir option if you don't want to use the
+   directory via the [15]-ssldir option if you don't want to use the
    default ~/.vnc/certs.
 
    1) To generate your Certificate Authority (CA) cert and key run this:
@@ -10408,7 +10508,7 @@ NTIwLjQxMTE2OTEPMA0GA1UEChMGeDExdm5jMS4wLAYDVQQDEyV4MTF2bmMtU0VM
   ~/.vnc/certs/CA/cacert.pem             (the CA public certificate)
   ~/.vnc/certs/CA/private/cakey.pem      (the CA private key)
 
-   If you want to use a different directory use [15]-ssldir It must
+   If you want to use a different directory use [16]-ssldir It must
    supplied with all subsequent SSL utility options to point them to the
    correct directory.
 
@@ -10427,7 +10527,7 @@ NTIwLjQxMTE2OTEPMA0GA1UEChMGeDExdm5jMS4wLAYDVQQDEyV4MTF2bmMtU0VM
    3) Start up x11vnc using this server key:
   x11vnc -ssl SAVE -display :0 ...
 
-   (SAVE corresponds to server.pem, see [16]-sslGenCert server somename
+   (SAVE corresponds to server.pem, see [17]-sslGenCert server somename
    info on creating additional server keys, server-somename.crt ...)
 
    4) Next, safely copy the CA certificate to the VNC viewer (client)
@@ -10466,8 +10566,13 @@ NTIwLjQxMTE2OTEPMA0GA1UEChMGeDExdm5jMS4wLAYDVQQDEyV4MTF2bmMtU0VM
    (then point the VNC viewer to localhost:1).
 
    Here is an example for the Unix stunnel wrapper script
-   [17]ss_vncviewer:
+   [18]ss_vncviewer:
   ss_vncviewer -verify ./cacert.pem far-away.east:0
+
+   Our [19]SSVNC enhanced tightvnc viewer can also use the certificate
+   file for server authentication. You can load it via the SSVNC
+   'Certs...' dialog and set 'ServerCert' to the cacert.pem file you
+   safely copied there.
 
      _________________________________________________________________
 
@@ -10498,7 +10603,8 @@ NTIwLjQxMTE2OTEPMA0GA1UEChMGeDExdm5jMS4wLAYDVQQDEyV4MTF2bmMtU0VM
    You don't have to use your own CA cert+key you can use a third
    party's. Perhaps you have a company-wide CA or you can even have your
    x11vnc certificate signed by a professional CA (e.g. www.thawte.com or
-   www.verisign.com).
+   www.verisign.com or perhaps the free certificate service
+   www.startcom.org or www.cacert.org).
 
    The advantage to doing this is that the VNC client machines will
    already have the CA certificates installed and you don't have to
@@ -10573,19 +10679,19 @@ pem
 
    Where client.crt would be an individual client certificate;
    client-hash-dir a directory of file names based on md5 hashes of the
-   certs (see [18]-sslverify); and certs.txt signifies a single file full
+   certs (see [20]-sslverify); and certs.txt signifies a single file full
    of client certificates.
 
    Finally, connect with your VNC viewer using the key. Here is an
-   example for the Unix stunnel wrapper script [19]ss_vncviewer: using
+   example for the Unix stunnel wrapper script [21]ss_vncviewer: using
    client authentication (and the standard server authentication with the
    CA cert):
   ss_vncviewer -mycert ./dilbert.pem -verify ./cacert.pem far-away.east:0
 
-   Our [20]SSVNC enhanced tightvnc viewer can also use these openssl .pem
+   Our [22]SSVNC enhanced tightvnc viewer can also use these openssl .pem
    files (you can load them via Certs... -> MyCert dialog).
 
-   It is also possible to use [21]-sslverify on a per-client key basis,
+   It is also possible to use [23]-sslverify on a per-client key basis,
    and also using self-signed client keys (x11vnc -sslGenCert client
    self:dilbert)
 
@@ -10607,9 +10713,9 @@ pem
    sufficient and can be read by Mozilla/Firefox and Java...
 
    If you have trouble getting your Java Runtime to import and use the
-   cert+key, there is a workaround for the [22]SSL-enabled Java applet.
+   cert+key, there is a workaround for the [24]SSL-enabled Java applet.
    On the Web browser URL that retrieves the VNC applet, simply add a
-   "/?oneTimeKey=..." applet parameter (see [23]ssl-portal for more
+   "/?oneTimeKey=..." applet parameter (see [25]ssl-portal for more
    details on applet parameters; you don't need to do the full portal
    setup though). The value of the oneTimeKey will be the very long
    string that is output of the onetimekey program found in the
@@ -10620,14 +10726,14 @@ pem
    HTTPS site via password. A cgi program then makes a one time key for
    the logged in user to use: it is passed back over HTTPS as the applet
    parameter in the URL and so cannot be sniffed. x11vnc is run to use
-   that key via [24]-sslverify.
+   that key via [26]-sslverify.
 
    Update: as of Apr 2007 in the 0.9.1 x11vnc tarball there is a new
-   option setting "[25]-users sslpeer=" that will do a switch user much
-   like [26]-unixpw does, but this time using the emailAddress field of
+   option setting "[27]-users sslpeer=" that will do a switch user much
+   like [28]-unixpw does, but this time using the emailAddress field of
    the Certificate subject of the verified Client. This mode requires
-   [27]-sslverify turned on to verify the clients via SSL. This mode can
-   be useful in situations using [28]-create or [29]-svc where a new X
+   [29]-sslverify turned on to verify the clients via SSL. This mode can
+   be useful in situations using [30]-create or [31]-svc where a new X
    server needs to be started up as the authenticated user (but unlike in
    -unixpw mode, the unix username is not obviously known).
 
@@ -10635,7 +10741,7 @@ pem
 
    Additional utlities:
 
-   You can get information about your keys via [30]-sslCertInfo. These
+   You can get information about your keys via [32]-sslCertInfo. These
    lists all your keys:
   x11vnc -sslCertInfo list
   x11vnc -sslCertInfo ll
@@ -10664,9 +10770,9 @@ pem
 
    More info:
 
-   See also this [31]article for some some general info and examples
+   See also this [33]article for some some general info and examples
    using stunnel and openssl on Windows with VNC. Also
-   [32]http://www.stunnel.org/faq/certs.html
+   [34]http://www.stunnel.org/faq/certs.html
 
 References
 
@@ -10674,34 +10780,36 @@ References
    2. http://stunnel.mirt.net/
    3. http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-ext
    4. http://www.karlrunge.com/x11vnc/ss_vncviewer
-   5. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssldir
-   6. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
-   7. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
+   5. http://www.karlrunge.com/x11vnc/ssvnc.html
+   6. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssldir
+   7. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssl
    8. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
-   9. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCA
-  10. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCert
-  11. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslDelCert
-  12. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslEncKey
-  13. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslCertInfo
-  14. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssldir
+   9. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
+  10. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCA
+  11. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslGenCert
+  12. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslDelCert
+  13. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslEncKey
+  14. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslCertInfo
   15. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssldir
   16. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssldir
-  17. http://www.karlrunge.com/x11vnc/ss_vncviewer
-  18. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
-  19. http://www.karlrunge.com/x11vnc/ss_vncviewer
-  20. http://www.karlrunge.com/x11vnc/ssvnc.html
-  21. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
-  22. http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-viewers
-  23. http://www.karlrunge.com/x11vnc/ssl-portal.html
-  24. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
-  25. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-users
-  26. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
-  27. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
-  28. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
-  29. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-svc
-  30. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslCertInfo
-  31. http://www.securityfocus.com/infocus/1677
-  32. http://www.stunnel.org/faq/certs.html
+  17. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-ssldir
+  18. http://www.karlrunge.com/x11vnc/ss_vncviewer
+  19. http://www.karlrunge.com/x11vnc/ssvnc.html
+  20. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
+  21. http://www.karlrunge.com/x11vnc/ss_vncviewer
+  22. http://www.karlrunge.com/x11vnc/ssvnc.html
+  23. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
+  24. http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-viewers
+  25. http://www.karlrunge.com/x11vnc/ssl-portal.html
+  26. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
+  27. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-users
+  28. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-unixpw
+  29. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslverify
+  30. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-create
+  31. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-svc
+  32. http://www.karlrunge.com/x11vnc/x11vnc_opts.html#opt-sslCertInfo
+  33. http://www.securityfocus.com/infocus/1677
+  34. http://www.stunnel.org/faq/certs.html
 	
 =======================================================================
 http://www.karlrunge.com/x11vnc/ssl-portal.html:
@@ -10709,7 +10817,8 @@ http://www.karlrunge.com/x11vnc/ssl-portal.html:
 
      _________________________________________________________________
 
-   Using Apache as an SSL Gateway to x11vnc servers inside a firewall:
+   Using Apache as an SSL Gateway to multiple x11vnc servers inside a
+   firewall:
 
    Background:
 
@@ -10750,10 +10859,10 @@ http://www.karlrunge.com/x11vnc/ssl-portal.html:
    with its -proxy option.
 
    Simpler Solutions: This apache solution may be too much for you. It is
-   mainly intended for automatically redirecting to multiple workstations
+   mainly intended for automatically redirecting to MULTIPLE workstations
    inside the firewall. If you only have one inside machine that you want
    to access, the method described here is overly complicated. See
-   [3]below for some simpler (non-SSH) encrypted setups.
+   [3]below for some simpler (and still non-SSH) encrypted setups.
 
    There are numerous ways to achieve this with Apache. We present one of
    the simplest ones here.
@@ -10965,7 +11074,7 @@ hostname2  15
    that is able to interact with the internal proxy for the VNC
    connection. See [10]this FAQ for more info on how this works. Note:
    sometimes with the Proxy case if you see 'Bad Gateway' error you will
-   have to wait 10 or so seconds and then his reload. This seems to be
+   have to wait 10 or so seconds and then hit reload. This seems to be
    due to having to wait for a Connection Keepalive to terminate...
 
    For completeness, the "trust" cases that skip a VNC certificate dialog
@@ -11690,8 +11799,8 @@ Enhanced TightVNC Viewer   (SSVNC:   SSL/SSH VNC viewer)
      * Support for UltraVNC [26]MS-Logon authentication (NOTE: the
        UltraVNC MS-Logon key exchange implementation is very weak; an
        eavesdropper on the network can recover your Windows password
-       easily; you need to use an additional encrypted tunnel with
-       MS-Logon.)
+       easily in a few seconds; you need to use an additional encrypted
+       tunnel with MS-Logon.)
      * Support for symmetric encryption (including blowfish and 3des
        ciphers) to Non-UltraVNC Servers. Any server using the same
        encryption method will work, [27]e.g.:  x11vnc -enc
@@ -12297,9 +12406,9 @@ r
 
                     IMPORTANT NOTE: The UltraVNC MS-Logon Diffie-Hellman
                     exchange is very weak and can be brute forced to recover
-                    your username and password in a few hours or seconds of CPU
-                    time.  To be safe, be sure to use an additional encrypted
-                    tunnel (e.g. SSL or SSH) for the entire VNC session.
+                    your username and password in a few seconds of CPU time.
+                    To be safe, be sure to use an additional encrypted tunnel
+                    (e.g. SSL or SSH) for the entire VNC session.
 
      -chatonly      Try to be a client that only does UltraVNC text chat. This
                     mode is used by x11vnc to present a chat window on the
@@ -12686,7 +12795,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-08-10
+x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-10-07
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -12711,73 +12820,74 @@ x11vnc options:
   -create                  -xdummy                  -xvnc                  
   -xvnc_redirect           -svc                     -svc_xdummy            
   -svc_xvnc                -xdmsvc                  -sshxdmsvc             
-  -redirect port           -display WAIT:...        -vencrypt mode         
-  -anontls mode            -sslonly                 -dhparams file         
-  -nossl                   -ssl [pem]               -ssltimeout n          
-  -sslnofail               -ssldir [dir]            -sslverify [path]      
-  -sslCRL path             -sslGenCA [dir]          -sslGenCert type name  
-  -sslEncKey [pem]         -sslCertInfo [pem]       -sslDelCert [pem]      
-  -stunnel [pem]           -stunnel3  [pem]         -enc cipher:keyfile    
-  -https [port]            -httpsredir [port]       -http_oneport          
-  -ssh user@host:disp      -usepw                   -storepasswd pass file 
-  -nopw                    -accept string           -afteraccept string    
-  -gone string             -users list              -noshm                 
-  -flipbyteorder           -onetile                 -solid [color]         
-  -blackout string         -xinerama                -noxinerama            
-  -xtrap                   -xrandr [mode]           -rotate string         
-  -padgeom WxH             -o logfile               -flag file             
-  -rmflag file             -rc filename             -norc                  
-  -env VAR=VALUE           -prog /path/to/x11vnc    -h, -help              
-  -?, -opts                -V, -version             -license               
-  -dbg                     -q, -quiet               -v, -verbose           
-  -bg                      -modtweak                -nomodtweak            
-  -xkb                     -noxkb                   -capslock              
-  -skip_lockkeys           -noskip_lockkeys         -skip_keycodes string  
-  -sloppy_keys             -skip_dups               -noskip_dups           
-  -add_keysyms             -noadd_keysyms           -clear_mods            
-  -clear_keys              -clear_all               -remap string          
-  -norepeat                -repeat                  -nofb                  
-  -nobell                  -nosel                   -noprimary             
-  -nosetprimary            -noclipboard             -nosetclipboard        
-  -seldir string           -cursor [mode]           -nocursor              
-  -cursor_drag             -arrow n                 -noxfixes              
-  -alphacut n              -alphafrac fraction      -alpharemove           
-  -noalphablend            -nocursorshape           -cursorpos             
-  -nocursorpos             -xwarppointer            -noxwarppointer        
-  -buttonmap string        -nodragging              -ncache n              
-  -ncache_cr               -ncache_no_moveraise     -ncache_no_dtchange    
-  -ncache_no_rootpixmap    -ncache_keep_anims       -ncache_old_wm         
-  -ncache_pad n            -debug_ncache            -wireframe [str]       
-  -nowireframe             -nowireframelocal        -wirecopyrect mode     
-  -nowirecopyrect          -debug_wireframe         -scrollcopyrect mode   
-  -noscrollcopyrect        -scr_area n              -scr_skip list         
-  -scr_inc list            -scr_keys list           -scr_term list         
-  -scr_keyrepeat lo-hi     -scr_parms string        -fixscreen string      
-  -debug_scroll            -noxrecord               -grab_buster           
-  -nograb_buster           -debug_grabs             -debug_sel             
-  -pointer_mode n          -input_skip n            -allinput              
-  -speeds rd,bw,lat        -wmdt string             -debug_pointer         
-  -debug_keyboard          -defer time              -wait time             
-  -wait_ui factor          -setdefer n              -nowait_bog            
-  -slow_fb time            -xrefresh time           -nap                   
-  -nonap                   -sb time                 -readtimeout n         
-  -ping n                  -nofbpm                  -fbpm                  
-  -nodpms                  -dpms                    -forcedpms             
-  -clientdpms              -noserverdpms            -noultraext            
-  -chatwindow              -noxdamage               -xd_area A             
-  -xd_mem f                -sigpipe string          -threads               
-  -nothreads               -fs f                    -gaps n                
-  -grow n                  -fuzz n                  -debug_tiles           
-  -snapfb                  -rawfb string            -freqtab file          
-  -pipeinput cmd           -macnodim                -macnosleep            
-  -macnosaver              -macnowait               -macwheel n            
-  -macnoswap               -macnoresize             -maciconanim n         
-  -macmenu                 -macuskbd                -gui [gui-opts]        
-  -remote command          -query variable          -QD variable           
-  -sync                    -noremote                -yesremote             
-  -unsafe                  -safer                   -privremote            
-  -nocmds                  -allowedcmds list        -deny_all              
-
+  -unixpw_system_greeter   -redirect port           -display WAIT:...      
+  -vencrypt mode           -anontls mode            -sslonly               
+  -dhparams file           -nossl                   -ssl [pem]             
+  -ssltimeout n            -sslnofail               -ssldir [dir]          
+  -sslverify [path]        -sslCRL path             -sslGenCA [dir]        
+  -sslGenCert type name    -sslEncKey [pem]         -sslCertInfo [pem]     
+  -sslDelCert [pem]        -stunnel [pem]           -stunnel3  [pem]       
+  -enc cipher:keyfile      -https [port]            -httpsredir [port]     
+  -http_oneport            -ssh user@host:disp      -usepw                 
+  -storepasswd pass file   -nopw                    -accept string         
+  -afteraccept string      -gone string             -users list            
+  -noshm                   -flipbyteorder           -onetile               
+  -solid [color]           -blackout string         -xinerama              
+  -noxinerama              -xtrap                   -xrandr [mode]         
+  -rotate string           -padgeom WxH             -o logfile             
+  -flag file               -rmflag file             -rc filename           
+  -norc                    -env VAR=VALUE           -prog /path/to/x11vnc  
+  -h, -help                -?, -opts                -V, -version           
+  -license                 -dbg                     -q, -quiet             
+  -v, -verbose             -bg                      -modtweak              
+  -nomodtweak              -xkb                     -noxkb                 
+  -capslock                -skip_lockkeys           -noskip_lockkeys       
+  -skip_keycodes string    -sloppy_keys             -skip_dups             
+  -noskip_dups             -add_keysyms             -noadd_keysyms         
+  -clear_mods              -clear_keys              -clear_all             
+  -remap string            -norepeat                -repeat                
+  -nofb                    -nobell                  -nosel                 
+  -noprimary               -nosetprimary            -noclipboard           
+  -nosetclipboard          -seldir string           -cursor [mode]         
+  -nocursor                -cursor_drag             -arrow n               
+  -noxfixes                -alphacut n              -alphafrac fraction    
+  -alpharemove             -noalphablend            -nocursorshape         
+  -cursorpos               -nocursorpos             -xwarppointer          
+  -noxwarppointer          -buttonmap string        -nodragging            
+  -ncache n                -ncache_cr               -ncache_no_moveraise   
+  -ncache_no_dtchange      -ncache_no_rootpixmap    -ncache_keep_anims     
+  -ncache_old_wm           -ncache_pad n            -debug_ncache          
+  -wireframe [str]         -nowireframe             -nowireframelocal      
+  -wirecopyrect mode       -nowirecopyrect          -debug_wireframe       
+  -scrollcopyrect mode     -noscrollcopyrect        -scr_area n            
+  -scr_skip list           -scr_inc list            -scr_keys list         
+  -scr_term list           -scr_keyrepeat lo-hi     -scr_parms string      
+  -fixscreen string        -debug_scroll            -noxrecord             
+  -grab_buster             -nograb_buster           -debug_grabs           
+  -debug_sel               -pointer_mode n          -input_skip n          
+  -allinput                -speeds rd,bw,lat        -wmdt string           
+  -debug_pointer           -debug_keyboard          -defer time            
+  -wait time               -extra_fbur n            -wait_ui factor        
+  -setdefer n              -nowait_bog              -slow_fb time          
+  -xrefresh time           -nap                     -nonap                 
+  -sb time                 -readtimeout n           -ping n                
+  -nofbpm                  -fbpm                    -nodpms                
+  -dpms                    -forcedpms               -clientdpms            
+  -noserverdpms            -noultraext              -chatwindow            
+  -noxdamage               -xd_area A               -xd_mem f              
+  -sigpipe string          -threads                 -nothreads             
+  -fs f                    -gaps n                  -grow n                
+  -fuzz n                  -debug_tiles             -snapfb                
+  -rawfb string            -freqtab file            -pipeinput cmd         
+  -macnodim                -macnosleep              -macnosaver            
+  -macnowait               -macwheel n              -macnoswap             
+  -macnoresize             -maciconanim n           -macmenu               
+  -macuskbd                -gui [gui-opts]          -remote command        
+  -query variable          -QD variable             -sync                  
+  -query_retries str       -remote_prefix str       -noremote              
+  -yesremote               -unsafe                  -safer                 
+  -privremote              -nocmds                  -allowedcmds list      
+  -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -12811,7 +12921,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-08-10
+x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-10-07
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -13544,7 +13654,7 @@ Options:
                        presented to the user on a black screen inside the
                        vncviewer.  The connection is dropped if the user fails
                        to supply the correct password in 3 tries or does not
-                       send one before a 25 second timeout.  Existing clients
+                       send one before a 45 second timeout.  Existing clients
                        are view-only during this period.
 
                        If the first character received is "Escape" then the
@@ -13803,6 +13913,10 @@ Options:
                        under -display WAIT:... for more details about XDM,
                        etc configuration.
 
+                       Remember to enable XDMCP in the xdm-config, gdm.conf,
+                       or kdmrc configuration file.  See -display WAIT: for
+                       more info.
+
 -sshxdmsvc             Display manager Terminal services mode based on SSH.
                        Alias for -display WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp
                        -localhost.
@@ -13814,6 +13928,48 @@ Options:
                        only only require the SSH login.  See the discussion
                        under -display WAIT:... for more details about XDM,
                        etc configuration.
+
+                       Remember to enable XDMCP in the xdm-config, gdm.conf,
+                       or kdmrc configuration file.  See -display WAIT: for
+                       more info.
+
+-unixpw_system_greeter Present a "Press 'Escape' for System Greeter" option
+                       to the connecting VNC client in combined -unixpw
+                       and xdmcp FINDCREATEDISPLAY modes (e.g. -xdmsvc).
+
+                       Normally in a -unixpw mode the VNC client must
+                       supply a valid username and password to gain access.
+                       However, if -unixpw_system_greeter is supplied AND
+                       the FINDCREATEDISPLAY command matches 'xdmcp', then
+                       the user has the option to press Escape and then get a
+                       XDM/GDM/KDM login/greeter panel instead. They will then
+                       supply a username and password directly to the greeter.
+
+                       Otherwise, in xdmcp FINDCREATEDISPLAY mode the user
+                       must supply his username and password TWICE.  First to
+                       the initial unixpw login dialog, and second to the
+                       subsequent XDM/GDM/KDM greeter.  Note that if the user
+                       re-connects and supplies his username and password in
+                       the unixpw dialog the xdmcp greeter is skipped and
+                       he is connected directly to his existing X session.
+                       So the -unixpw_system_greeter option avoids the extra
+                       password at X session creation time.
+
+                       Example:  x11vnc -xdmsvc -unixpw_system_greeter
+                       See -unixpw and -display WAIT:... for more info.
+
+                       The special options after a colon at the end of the
+                       username (e.g. user:solid) described under -display
+                       WAIT: are also applied in this mode if they are typed
+                       in before the user hits Escape.  The username is ignored
+                       but the colon options are not.
+
+                       If the user pressed Escape the FINDCREATEDISPLAY command
+                       will be run with the env. var. X11VNC_XDM_ONLY=1.
+
+                       Remember to enable XDMCP in the xdm-config, gdm.conf,
+                       or kdmrc configuration file.  See -display WAIT: for
+                       more info.
 
 -redirect port         As in FINDCREATEDISPLAY-Xvnc.redirect mode except
                        redirect immediately (i.e. without X session finding
@@ -13886,12 +14042,13 @@ Options:
                        Also in the case of -unixpw, the user logging in can
                        place a colon at the end of her username and supply
                        a few options: scale=, scale_cursor= (or sc=), solid
-                       (or so), id=, clear_mods (or cm), clear_keys (or ck),
-                       repeat, speeds= (or sp=), readtimeout= (or rd=),
-                       rotate= (or ro=), or noncache (or nc), all separated by
-                       commas if there is more than one.  After the user logs
-                       in successfully, these options will be applied to the
-                       VNC screen.  For example,
+                       (or so), id=, clear_mods (or cm), clear_keys (or
+                       ck), clear_all (or ca), repeat, speeds= (or sp=),
+                       readtimeout= (or rd=), viewonly (or vo), nodisplay=
+                       (or nd=), rotate= (or ro=), or noncache (or nc),
+                       all separated by commas if there is more than one.
+                       After the user logs in successfully, these options will
+                       be applied to the VNC screen.  For example,
 
                           login: fred:scale=3/4,sc=1,repeat
                           Password: ...
@@ -13902,6 +14059,9 @@ Options:
                        type and enter your password incorrectly, to retrieve
                        your long "login:" line press the Up arrow once
                        (before typing anything else).
+
+                       In the login panel, press F1 to get a list of the
+                       available options that you can add after the username.
 
                        Another option is "geom=WxH" or "geom=WxHxD" (or
                        ge=). This only has an effect in FINDCREATEDISPLAY
@@ -13978,7 +14138,9 @@ Options:
                        ignore in the finding process.  The ":" is optional.
                        Ranges n-m e.g. 0-20 can also be supplied. This string
                        can also be set by the connecting user via "nd="
-                       using "+" instead of ","
+                       using "+" instead of ","  If "nd=all" or you set
+                       X11VNC_SKIP_DISPLAY=all then all display finding fails
+                       as if you set X11VNC_FINDDISPLAY_ALWAYS_FAILS=1 (below.)
 
                        Automatic Creation of User X Sessions:
 
@@ -14034,6 +14196,8 @@ Options:
                        If for some reason you do not want x11vnc to ever
                        try to find an existing display set the env. var
                        X11VNC_FINDDISPLAY_ALWAYS_FAILS=1 (also -env ...)
+                       This is the same as setting X11VNC_SKIP_DISPLAY=all or
+                       supplying "nd=all" after "username:"
 
                        Use WAIT:cmd=FINDCREATEDISPLAY-print to print out the
                        script that is used for this.
@@ -14062,12 +14226,15 @@ Options:
                        be the full path to the session/windowmanager program.
 
                        More FD tricks:  FD_CUPS=port or FD_CUPS=host:port
-                       will set the cups printing environment.  Similarly
-                       for FD_ESD=port or FD_ESD=host:port for esddsp sound
-                       redirection.  FD_XDUMMY_NOROOT means the Xdummy server
-                       does not need to be started as root (e.g. it will sudo
-                       automatically).  Set FD_EXTRA to a command to be run
-                       a few seconds after the X server starts up.
+                       will set the cups printing environment.  Similarly for
+                       FD_ESD=port or FD_ESD=host:port for esddsp sound
+                       redirection.  FD_XDUMMY_NOROOT means the Xdummy
+                       server does not need to be started as root (e.g. it
+                       will sudo automatically).  Set FD_EXTRA to a command
+                       to be run a few seconds after the X server starts up.
+                       Set FD_TAG to be a unique name for the session, it is
+                       set as an X property, that makes FINDDISPLAY only find
+                       sessions with that tag value.
 
                        If you want the FINDCREATEDISPLAY session to contact an
                        XDMCP login manager (xdm/gdm/kdm) on the same machine,
@@ -14147,8 +14314,9 @@ Options:
                        Otherwise in -unixpw mode the normal login panel is
                        provided.
 
-                       You *MUST* supply the -ssl option for VeNCrypt to be
-                       active.  This option only fine-tunes its operation.
+                       You *MUST* supply the -ssl option for VeNCrypt to
+                       be active.  The -vencrypt option only fine-tunes its
+                       operation.
 
 -anontls mode          The ANONTLS extension to the VNC protocol allows
                        encrypted SSL/TLS connections.  If the -ssl mode is
@@ -14183,8 +14351,9 @@ Options:
 
                        Long example: -anontls newdh:plain:support
 
-                       You *MUST* supply the -ssl option for ANONTLS to be
-                       active.  This option only fine-tunes its operation.
+                       You *MUST* supply the -ssl option for ANONTLS to
+                       be active.  The -anontls option only fine-tunes its
+                       operation.
 
 -sslonly               Same as: "-vencrypt never -anontls never"  i.e. it
                        disables the VeNCrypt and ANONTLS encryption methods
@@ -14208,16 +14377,17 @@ Options:
 
 -ssl [pem]             Use the openssl library (www.openssl.org) to provide a
                        built-in encrypted SSL/TLS tunnel between VNC viewers
-                       and x11vnc.  This requires libssl support to be compiled
-                       into x11vnc at build time.  If x11vnc is not built
-                       with libssl support it will exit immediately when -ssl
-                       is prescribed.
+                       and x11vnc.  This requires libssl support to be
+                       compiled into x11vnc at build time.  If x11vnc is not
+                       built with libssl support it will exit immediately when
+                       -ssl is prescribed.  See the -stunnel option below for
+                       an alternative.
 
                        The VNC Viewer-side needs to support SSL/TLS as well.
                        See this URL and also the discussion below for
                        ideas on how to enable SSL support for the viewer:
                        http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tun
-                       nel-viewers x11vnc provides an SSL enabled Java
+                       nel-viewers .  x11vnc provides an SSL enabled Java
                        viewer applet in the classes/ssl directory (-http or
                        -httpdir options.)  The SSVNC viewer package supports
                        SSL tunnels too.
@@ -14306,6 +14476,11 @@ Options:
 
                        See -ssldir below to use a directory besides the
                        default ~/.vnc/certs
+
+                       If your x11vnc binary was not compiled with OpenSSL
+                       library support, use of the -ssl option will induce an
+                       immediate failure and exit.  For such binaries, consider
+                       using the -stunnel option for SSL encrypted connections.
 
                        Misc Info: In temporary cert creation mode "TMP", set
                        the env. var. X11VNC_SHOW_TMP_PEM=1 to have x11vnc print
@@ -14409,7 +14584,7 @@ Options:
 
 
                        NOTE: the following utilities, -sslGenCA, -sslGenCert,
-                       -sslEncKey, and -sslCertInfo are provided for
+                       -sslEncKey, -sslCertInfo, and -sslCRL are provided for
                        completeness, but for casual usage they are overkill.
 
                        They provide VNC Certificate Authority (CA) key creation
@@ -14460,8 +14635,9 @@ Options:
                        the ss_vncviewer example script in the FAQ and SSVNC.)
 
 -sslCRL path           Set the Certificate Revocation Lists (CRL) to "path".
+                       This setting applies for both -ssl and -stunnel modes.
 
-                       If path is a file, the file contains one more more CRLs
+                       If path is a file, the file contains one or more CRLs
                        in PEM format.  If path is a directory, it contains
                        hash named files of CRLs in the usual OpenSSL manner.
                        See the OpenSSL and stunnel(8) documentation for
@@ -14472,6 +14648,10 @@ Options:
                        certificate chain used to verify the VNC client.
                        The -sslCRL setting will be ignored when -sslverify is
                        not specified.
+
+                       Note that if a CRL's expiration date has passed, all
+                       SSL connections will fail regardless of if they are
+                       related to the subject of the CRL or not.
 
                        Only rarely will one's x11vnc -ssl infrastructure be so
                        large that this option would be useful (since normally
@@ -14584,11 +14764,13 @@ Options:
 
                        Similar to -sslGenCA, you will be prompted to fill
                        in some information that will be recorded in the
-                       certificate when it is created.  Tip: if you know
-                       the fully-qualified hostname other people will be
-                       connecting to you can use that as the CommonName "CN"
-                       to avoid some applications (e.g. web browsers and java
-                       plugin) complaining it does not match the hostname.
+                       certificate when it is created.
+
+                       Tip: if you know the fully-qualified hostname other
+                       people will be connecting to, you can use that as the
+                       CommonName "CN" to avoid some applications (e.g. web
+                       browsers and java plugin) complaining that it does not
+                       match the hostname.
 
                        You will also need to supply the CA private key
                        passphrase to unlock the private key created from
@@ -14612,14 +14794,14 @@ Options:
                        the cert and private key.  The <name>.crt contains the
                        certificate only.
 
-                       NOTE: It is very important to know one should always
+                       NOTE: It is very important to know one should
                        generate new keys with a passphrase.  Otherwise if an
                        untrusted user steals the key file he could use it to
                        masquerade as the x11vnc server (or VNC viewer client).
                        You will be prompted whether to encrypt the key with
                        a passphrase or not.  It is recommended that you do.
                        One inconvenience to a passphrase is that it must
-                       be suppled every time x11vnc or the client app is
+                       be typed in EVERY time x11vnc or the client app is
                        started up.
 
                        Examples:
@@ -14715,16 +14897,30 @@ Options:
 
                        This external tunnel method was implemented prior to the
                        integrated -ssl encryption described above.  It still
-                       works well.  This requires stunnel to be installed
-                       on the system and available via PATH (n.b. stunnel is
-                       often installed in sbin directories).  Version 4.x of
-                       stunnel is assumed (but see -stunnel3 below.)
+                       works well and avoids the requirement of linking with
+                       the OpenSSL libraries.  This mode requires stunnel
+                       to be installed on the system and available via PATH
+                       (n.b. stunnel is often installed in sbin directories).
+                       Version 4.x of stunnel is assumed (but see -stunnel3
+                       below.)
 
                        [pem] is optional, use "-stunnel /path/to/stunnel.pem"
                        to specify a PEM certificate file to pass to stunnel.
-                       Whether one is needed or not depends on your stunnel
-                       configuration.  stunnel often generates one at install
-                       time.  See the stunnel documentation for details.
+                       See the -ssl option for more info on certificate files.
+
+                       Whether or not your stunnel has its own certificate
+                       depends on your stunnel configuration; stunnel often
+                       generates one at install time.  See your stunnel
+                       documentation for details.  In any event, if you want to
+                       use this certificate you must supply the full path to it
+                       as [pem].  Note: the file may only be readable by root.
+
+                       [pem] may also be the special strings "TMP", "SAVE",
+                       and "SAVE..." as described in the -ssl option.
+                       If [pem] is not supplied, "SAVE" is assumed.
+
+                       Note that the VeNCrypt, ANONTLS, and "ANON" modes
+                       are not supported in -stunnel mode.
 
                        stunnel is started up as a child process of x11vnc and
                        any SSL connections stunnel receives are decrypted and
@@ -14732,22 +14928,37 @@ Options:
                        "The SSL VNC desktop is ..." and "SSLPORT=..."
                        are printed out at startup to indicate this.
 
-                       The -localhost option is enforced by default
-                       to avoid people routing around the SSL channel.
-                       Set STUNNEL_DISABLE_LOCALHOST=1 before starting x11vnc
-                       to disable the requirement.
+                       The -localhost option is enforced by default to avoid
+                       people routing around the SSL channel.  Use -env
+                       STUNNEL_DISABLE_LOCALHOST=1 to disable this security
+                       requirement.
 
-                       Your VNC viewer will also need to be able to connect via
-                       SSL.  Unfortunately not too many do this.  UltraVNC has
-                       an encryption plugin but it does not seem to be SSL.
+                       Set -env STUNNEL_DEBUG=1 for more debugging printout.
 
-                       Also, in the x11vnc distribution, a patched TightVNC
-                       Java applet is provided in classes/ssl that does SSL
-                       connections (only).
+                       Your VNC viewer will also need to be able to connect
+                       via SSL.  Unfortunately not too many do this.  See the
+                       information about SSL viewers under the -ssl option.
 
-                       It is also not too difficult to set up an stunnel or
-                       other SSL tunnel on the viewer side.  A simple example
-                       on Unix using stunnel 3.x is:
+                       Also, in the x11vnc distribution, patched TightVNC
+                       and UltraVNC Java applet jar files are provided in
+                       the classes/ssl directory that do SSL connections.
+                       Enable serving them with the -http, -http_ssl, -https,
+                       or -httpdir (see the option descriptions for more info.)
+
+                       Note that for the Java viewer applet usage the
+                       "?PORT=xxxx" in the various URLs printed at startup
+                       will need to be supplied to the web browser to connect
+                       properly.
+
+                       Currently the automatic "single port" HTTPS mode of
+                       -ssl is not fully supported in -stunnel mode.  However,
+                       it can be emulated via:
+
+                         % x11vnc -stunnel -http_ssl -http_oneport ...
+
+                       In general, it is also not too difficult to set up
+                       an stunnel or other SSL tunnel on the viewer side.
+                       A simple example on Unix using stunnel 3.x is:
 
                          % stunnel -c -d localhost:5901 -r remotehost:5900
                          % vncviewer localhost:1
@@ -14757,7 +14968,8 @@ Options:
                        and SSVNC for more examples.
 
 -stunnel3  [pem]       Use version 3.x stunnel command line syntax instead of
-                       version 4.x
+                       version 4.x.  The -http/-httpdir Java applet serving
+                       is currently not available in this mode.
 
 -enc cipher:keyfile    Use symmetric encryption with cipher "cipher"
                        and secret key data in "keyfile".  If keyfile is
@@ -14776,7 +14988,7 @@ Options:
                        Note that this mode will NOT work with the UltraVNC DSM
                        plugins because they alter the RFB protocol in addition
                        to tunnelling with the symmetric cipher (an unfortunate
-                       choice of implementation).
+                       choice of implementation...)
 
                        cipher can be one of:  arc4, aesv2, aes-cfb, blowfish,
                        aes256, or 3des.  See the OpenSSL documentation for
@@ -14849,9 +15061,9 @@ Options:
                        For both ways of using the viewer, you can specify the
                        salt,ivec sizes (in GUI or, e.g. arc4@8,16).
 
--https [port]          Use a special, separate HTTPS port (-ssl mode only)
-                       for HTTPS Java viewer applet downloading. I.e. not 5900
-                       and not 5800 (the defaults.)
+-https [port]          Use a special, separate HTTPS port (-ssl and
+                       -stunnel modes only) for HTTPS Java viewer applet
+                       downloading. I.e. not 5900 and not 5800 (the defaults.)
 
                        BACKGROUND: In -ssl mode, it turns out you can use the
                        single VNC port (e.g. 5900) for both VNC and HTTPS
@@ -14870,6 +15082,8 @@ Options:
                        ponder the Certificate dialogs in his browser, Java VM,
                        or VNC Viewer applet.  That's right 3 separate "Are
                        you sure you want to connect?" dialogs!)
+
+                       END OF BACKGROUND.
 
                        USAGE: So use the -https option to provide a separate,
                        more reliable HTTPS port that x11vnc will listen on.  If
@@ -14904,7 +15118,9 @@ Options:
                        to include the PORT= in the browser URL, simply supply
                        "-httpsredir" to x11vnc.
 
--http_oneport          For un-encrypted connections mode (i.e. no -ssl,
+                       This options does not work in -stunnel mode.
+
+-http_oneport          For UN-encrypted connections mode (i.e. no -ssl,
                        -stunnel, or -enc options), allow the Java VNC Viewer
                        applet to be downloaded thru the VNC port via HTTP.
 
@@ -16288,10 +16504,21 @@ t
                        Same as -dp and -dk, respectively.  Use multiple
                        times for more output.
 
--defer time            Time in ms to wait for updates before sending to client
+-defer time            Time in ms to delay sending updates to connected clients
                        (deferUpdateTime)  Default: 20
+
 -wait time             Time in ms to pause between screen polls.  Used to cut
                        down on load.  Default: 20
+
+-extra_fbur n          Perform extra FrameBufferUpdateRequests checks to
+                       try to be in better sync with the client's requests.
+                       What this does is perform extra polls of the client
+                       socket at critical times (before '-defer' and '-wait'
+                       calls.)  The default is n=1.  Set to a larger number to
+                       insert more checks or set to n=0 to disable.  A downside
+                       of these extra calls is that more mouse input may be
+                       processed than desired.
+
 -wait_ui factor        Factor by which to cut the -wait time if there
                        has been recent user input (pointer or keyboard).
                        Improves response, but increases the load whenever you
@@ -16325,12 +16552,12 @@ t
                        Default: take naps
 -sb time               Time in seconds after NO activity (e.g. screen blank)
                        to really throttle down the screen polls (i.e. sleep
-                       for about 1.5 secs). Use 0 to disable.  Default: 20
+                       for about 1.5 secs). Use 0 to disable.  Default: 60
 
 -readtimeout n         Set libvncserver rfbMaxClientWait to n seconds. On
                        slow links that take a long time to paint the first
                        screen libvncserver may hit the timeout and drop the
-                       connection.  Default: 60 seconds.
+                       connection.  Default: 20 seconds.
 -ping n                Send a 1x1 framebuffer update to all clients every n
                        seconds (e.g. to try to keep a network connection alive)
 
@@ -17103,6 +17330,28 @@ n
                        x11vnc server as long as X permissions, etc. permit
                        communication between the two.
 
+                       FONTS: On some systems the tk fonts can be too small,
+                       jagged, or otherwise unreadable.  There are 4 env vars
+                       you can set to be the tk font you prefer:
+
+                       X11VNC_FONT_BOLD   main font for menus and buttons.
+                       X11VNC_FONT_FIXED  font for fixed width text.
+
+                       X11VNC_FONT_BOLD_SMALL  tray icon font.
+                       X11VNC_FONT_REG_SMALL   tray icon menu font.
+
+                       The last two only apply for the tray icon mode.
+
+                       Here are some examples:
+
+                       -env X11VNC_FONT_BOLD='Helvetica -16 bold'
+                       -env X11VNC_FONT_FIXED='Courier -14'
+                       -env X11VNC_FONT_REG_SMALL='Helvetica -12'
+
+                       You can put the lines like the above (without the
+                       quotes) in your ~/.x11vncrc file to avoid having to
+                       specify them on the x11vnc command line.
+
 -remote command        Remotely control some aspects of an already running
                        x11vnc server.  "-R" and "-r" are aliases for
                        "-remote".  After the remote control command is
@@ -17126,12 +17375,27 @@ n
                        'x11vnc -R shared' will enable shared connections, and
                        'x11vnc -R scale:3/4' will rescale the desktop.
 
+                       To run a bunch of commands in a sequence use something
+                       like: x11vnc -R 'script:firstcmd;secondcmd;...'
+
+                       Use x11vnc -R script:file=/path/to/file to read commands
+                       from a file (can be multi-line and use the comment '#'
+                       character in the normal way.  The ';' separator must
+                       still be used to separate each command.)
+
+                       To not try to contact another x11vnc process and instead
+                       just run the command (or query) directly, prefix the
+                       command with the string "DIRECT:"
+
                        The following -remote/-R commands are supported:
 
                        stop            terminate the server, same as "quit"
                                        "exit" or "shutdown".
                        ping            see if the x11vnc server responds.
-                                       Return is: ans=ping:<xdisplay>
+                                       return is: ans=ping:<display>
+                       ping:mystring   as above, but use your own unique string
+.
+                                       return is: ans=ping:mystring:<xdisplay>
                        blacken         try to push a black fb update to all
                                        clients (due to timings a client
                                        could miss it). Same as "zero", also
@@ -17220,6 +17484,7 @@ n
                        nograbptr       disable -grabptr mode.
                        grabalways      enable  -grabalways mode.
                        nograbalways    disable -grabalways mode.
+                       grablocal:n     set -grablocal to n.
                        client_input:str set the K, M, B -input on a per-client
                                        basis.  select which client as for
                                        disconnect, e.g. client_input:host:MB
@@ -17302,6 +17567,9 @@ n
                        nosetclipboard  enable  -nosetclipboard mode.
                        setclipboard    disable -nosetclipboard mode.
                        seldir:str      set -seldir to "str"
+                       resend_cutbuffer resend the most recent CUTBUFFER0 copy
+                       resend_clipboard resend the most recent CLIPBOARD copy
+                       resend_primary   resend the most recent PRIMARY copy
                        cursor:mode     enable  -cursor "mode".
                        show_cursor     enable  showing a cursor.
                        noshow_cursor   disable showing a cursor. (same as
@@ -17376,8 +17644,25 @@ n
                        nodebug_pointer disable -debug_pointer, same as "nodp"
                        debug_keyboard   enable  -debug_keyboard, same as "dk"
                        nodebug_keyboard disable -debug_keyboard, same as "nodk"
+                       keycode:n       inject keystroke 'keycode' (xmodmap -pk)
+                       keycode:n,down  inject 'keycode' (down=0,1)
+                       keysym:str      inject keystroke 'keysym' (number/name)
+                       keysym:str,down inject 'keysym' (down=0,1)
+                       ptr:x,y,mask    inject pointer event x, y, button-mask
+                       sleep:t         sleep floating point time t.
+                       get_xprop:p     get X property named 'p'.
+                       set_xprop:p:val set X property named 'p' to 'val'.
+                                       p -> id=NNN:p for hex/dec window id.
+                       wininfo:id      get info about X window id.  use 'root'
+                                       for root window, use +id for children.
+                       grab_state      get state of pointer and keyboard grab.
+                       pointer_pos     print XQueryPointer x,y cursor position.
+                       mouse_x         print x11vnc's idea of cursor position.
+                       mouse_y         print x11vnc's idea of cursor position.
+                       noop            do nothing.
                        defer:n         set -defer to n ms,same as deferupdate:n
                        wait:n          set -wait to n ms.
+                       extra_fbur:n    set -extra_fbur to n.
                        wait_ui:f       set -wait_ui factor to f.
                        setdefer:n      set -setdefer to -2,-1,0,1, or 2.
                        wait_bog        disable -nowait_bog mode.
@@ -17416,6 +17701,7 @@ n
                        nosnapfb        disable -snapfb mode.
                        rawfb:str       set -rawfb mode to "str".
                        uinput_accel:f  set uinput_accel to f.
+                       uinput_thresh:n set uinput_thresh to n.
                        uinput_reset:n  set uinput_reset to n ms.
                        uinput_always:n set uinput_always to 1/0.
                        progressive:n   set libvncserver -progressive slice
@@ -17434,7 +17720,9 @@ n
                        macresize       disable -macnoresize mode.
                        maciconanim:n   set -maciconanim to n.
                        macmenu         enable  -macmenu  mode.
-                       macnomenu       disable -macnmenu mode.
+                       macnomenu       disable -macmenu  mode.
+                       macuskbd        enable  -macuskbd mode.
+                       macnouskbd      disable -macuskbd mode.
                        httpport:n      set -httpport to n.
                        httpdir:dir     set -httpdir to dir (and enable http).
                        enablehttpproxy   enable  -enablehttpproxy mode.
@@ -17470,6 +17758,100 @@ n
                        noremote        disable the -remote command processing,
                                        it cannot be turned back on.
 
+                       bcx_xattach:str  This remote control command is for
+                       use with the BARCO xattach program or the x2x program.
+                       Both of these programs are for 'pointer and keyboard'
+                       sharing between separate X displays.  In general the
+                       two displays are usually nearby, e.g. on the same desk,
+                       and this allows the user to share a single pointer and
+                       keyboard between them.  The user moves the mouse to
+                       an edge and then the mouse pointer appears to 'jump'
+                       to the other display screen.  Thus it emulates what a
+                       single X server would do for two screens (e.g. :0.0 and
+                       :0.1) The illusion of a single Xserver with multiple
+                       screens is achieved by forwarding events to the 2nd
+                       one via the XTEST extension.
+
+                       What the x11vnc bcx_xattach command does is to perform
+                       some pointer movements to try to INDUCE xattach/x2x
+                       to 'jump' to the other display.  In what follows the
+                       'master' display refers to the one that when it has
+                       'focus' it is basically doing nothing besides watching
+                       for the mouse to go over an edge.  The 'slave'
+                       display refers to the one to which the mouse and
+                       keyboard is redirected to once an edge in the master
+                       has been crossed.  Note that the x11vnc executing the
+                       bcx_xattach command MUST be the one connected to the
+                       *master* display.
+
+                       Also note that when input is being redirected (via
+                       XTEST) from the master display to the slave display,
+                       the master display's pointer and keyboard are *grabbed*
+                       by xattach/x2x.  x11vnc can use this info to verify that
+                       the master/slave mode change has taken place correctly.
+                       If you specify the "ifneeded" option (see below)
+                       and the initial grab state is that of the desired
+                       final state, then no pointer movements are injected
+                       and "DONE,GRAB_OK" is returned.
+
+                       "str" must contain one of "up", "down", "left",
+                       or "right" to indicate the direction of the 'jump'.
+                       "str" must also contain one of "master_to_slave"
+                       or "slave_to_master" to indicate the type of mode
+                       change induced by the jump.  Use "M2S" and "S2M"
+                       as shorter aliases.
+
+                       "str" may be a "+" separated list of additional
+                       tuning options.  The "shift=n" option indicates an
+                       offset shift position away from (0,0) (default 20).
+                       "final=x+y" specifies the final position of the cursor
+                       at the end of the normal move sequence; default 30+30.
+                       "extra_move=x+y" means to do one more pointer move
+                       after "final" to x+y.  "dt=n" sets the sleep time
+                       in milliseconds between pointer moves (default: 40ms)
+                       "retry=n" specifies the maximum number of retries if
+                       the grab state change fails. "ifneeded" means to not
+                       apply the pointer movements if the initial grab state is
+                       that of the desired final state. "nograbcheck" means
+                       to not check if the grab state changed as expected and
+                       only apply the pointer movements (default is to check
+                       the grab states.)
+
+                       If you do not specify "up", etc., to bcx_xattach
+                       nothing will be attempted and the command returns
+                       the string FAIL,NO_DIRECTION_SPECIFIED.  If you do
+                       not specify "master_to_slave" or "M2S", etc., to
+                       bcx_xattach nothing will be attempted and the command
+                       returns the string FAIL,NO_MODE_CHANGE_SPECIFIED.
+
+                       Otherwise, the returned string will contain "DONE".
+                       It will be "DONE,GRAB_OK" if the grab state changed
+                       as expected (or if "ifneeded" was supplied and
+                       the initial grab state was already the desired
+                       one.)  If the initial grab state was incorrect,
+                       but the final grab state was correct then it is
+                       "DONE,GRAB_FAIL_INIT".  If the initial grab state
+                       was correct, but the final grab state was incorrect
+                       then it is "DONE,GRAB_FAIL_FINAL".  If both are
+                       incorrect it will be "DONE,GRAB_FAIL".  Under grab
+                       failure the string will be followed by ":p1,k1-p2,k2"
+                       where  p1,k1 indicates the initial pointer and keyboard
+                       grab states and p2,k2 the final ones. If GRAB_FAIL or
+                       GRAB_FAIL_FINAL occurs, the action will be retried up
+                       to 3 times; trying to reset the state and sleeping a
+                       bit between each try.  Set retry=n to adjust the number
+                       of retries, zero to disable retries.
+
+                       Examples:
+                           -R bcx_xattach:down+M2S
+                           -R bcx_xattach:up+S2M
+                           -R bcx_xattach:up+S2M+nograbcheck+dt=30
+                           -R bcx_xattach:down+M2S+extra_move=100+100
+
+                       or use -Q instead of -R to retrieve the result text.
+
+                       End of the bcx_xattach:str description.
+
                        The vncconnect(1) command from standard VNC
                        distributions may also be used if string is prefixed
                        with "cmd=" E.g. 'vncconnect cmd=stop'.  Under some
@@ -17498,7 +17880,8 @@ n
                        query straight to the X11VNC_REMOTE property or connect
                        file use "qry=..." instead of "cmd=..."
 
-                       ans= stop quit exit shutdown ping blacken zero
+                       ans= stop quit exit shutdown ping resend_cutbuffer
+                       resend_clipboard resend_primary blacken zero
                        refresh reset close disconnect id sid waitmapped
                        nowaitmapped clip flashcmap noflashcmap shiftcmap
                        truecolor notruecolor overlay nooverlay overlay_cursor
@@ -17509,7 +17892,7 @@ n
                        once timeout tightfilexfer notightfilexfer ultrafilexfer
                        noultrafilexfer rfbversion deny lock nodeny unlock
                        avahi mdns zeroconf noavahi nomdns nozeroconf connect
-                       proxy  allowonce allow localhost nolocalhost listen
+                       proxy allowonce allow localhost nolocalhost listen
                        lookup nolookup accept afteraccept gone shm noshm
                        flipbyteorder noflipbyteorder onetile noonetile
                        solid_color solid nosolid blackout xinerama noxinerama
@@ -17519,10 +17902,10 @@ n
                        sloppy_keys nosloppy_keys skip_dups noskip_dups
                        add_keysyms noadd_keysyms clear_mods noclear_mods
                        clear_keys noclear_keys clear_all clear_locks keystate
-                       remap repeat norepeat fb nofb bell nobell sel nosel
-                       primary noprimary setprimary nosetprimary clipboard
-                       noclipboard setclipboard nosetclipboard seldir
-                       cursorshape nocursorshape cursorpos nocursorpos
+                       remap repeat norepeat fb nofb bell nobell sendbell
+                       sel nosel primary noprimary setprimary nosetprimary
+                       clipboard noclipboard setclipboard nosetclipboard
+                       seldir cursorshape nocursorshape cursorpos nocursorpos
                        cursor_drag nocursor_drag cursor show_cursor
                        noshow_cursor nocursor arrow xfixes noxfixes xdamage
                        noxdamage xd_area xd_mem alphacut alphafrac alpharemove
@@ -17538,16 +17921,18 @@ n
                        nowireframe nowf wireframelocal wfl nowireframelocal
                        nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
                        scr_skip scr_inc scr_keys scr_term scr_keyrepeat
-                       scr_parms scrollcopyrect scr noscrollcopyrect noscr
-                       fixscreen noxrecord xrecord reset_record pointer_mode pm
-                       input_skip allinput noallinput input grabkbd nograbkbd
-                       grabptr nograbptr grabalways nograbalways grablocal
-                       client_input ssltimeout speeds wmdt debug_pointer dp
-                       nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
-                       nodk keycode deferupdate defer setdefer wait_ui
-                       wait_bog nowait_bog slow_fb xrefresh wait readtimeout
-                       nap nonap sb screen_blank fbpm nofbpm dpms nodpms
-                       clientdpms noclientdpms forcedpms noforcedpms
+                       scr_parms scrollcopyrect scr noscrollcopyrect
+                       noscr fixscreen noxrecord xrecord reset_record
+                       pointer_mode pm input_skip allinput noallinput input
+                       grabkbd nograbkbd grabptr nograbptr grabalways
+                       nograbalways grablocal client_input ssltimeout
+                       speeds wmdt debug_pointer dp nodebug_pointer nodp
+                       debug_keyboard dk nodebug_keyboard nodk keycode
+                       keysym ptr sleep get_xprop set_xprop wininfo
+                       bcx_xattach deferupdate defer setdefer extra_fbur
+                       wait_ui wait_bog nowait_bog slow_fb xrefresh wait
+                       readtimeout nap nonap sb screen_blank fbpm nofbpm dpms
+                       nodpms clientdpms noclientdpms forcedpms noforcedpms
                        noserverdpms serverdpms noultraext ultraext chatwindow
                        nochatwindow chaton chatoff fs gaps grow fuzz snapfb
                        nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
@@ -17565,21 +17950,23 @@ n
                        macnoresize macresize nomacnoresize maciconanim macmenu
                        macnomenu nomacmenu macuskbd nomacuskbd noremote
 
-                       aro=  noop display vncdisplay desktopname guess_desktop
-                       http_url auth xauth users rootshift clipshift scale_str
-                       scaled_x scaled_y scale_numer scale_denom scale_fac_x
+                       aro=  noop display vncdisplay autoport loop loopbg
+                       desktopname guess_desktop http_url auth xauth
+                       users rootshift clipshift scale_str scaled_x
+                       scaled_y scale_numer scale_denom scale_fac_x
                        scale_fac_y scaling_blend scaling_nomult4 scaling_pad
                        scaling_interpolate inetd privremote unsafe safer
                        nocmds passwdfile unixpw unixpw_nis unixpw_list ssl
                        ssl_pem sslverify stunnel stunnel_pem https httpsredir
-                       usepw using_shm logfile o flag rc norc h help V version
-                       lastmod bg sigpipe threads readrate netrate netlatency
-                       pipeinput clients client_count pid ext_xtest ext_xtrap
-                       ext_xrecord ext_xkb ext_xshm ext_xinerama ext_overlay
-                       ext_xfixes ext_xdamage ext_xrandr rootwin num_buttons
-                       button_mask mouse_x mouse_y bpp depth indexed_color
-                       dpy_x dpy_y wdpy_x wdpy_y off_x off_y cdpy_x cdpy_y
-                       coff_x coff_y rfbauth passwd viewpasswd
+                       usepw using_shm logfile o flag rmflag rc norc h help
+                       V version lastmod bg sigpipe threads readrate netrate
+                       netlatency pipeinput clients client_count pid ext_xtest
+                       ext_xtrap ext_xrecord ext_xkb ext_xshm ext_xinerama
+                       ext_overlay ext_xfixes ext_xdamage ext_xrandr rootwin
+                       num_buttons button_mask mouse_x mouse_y grab_state
+                       pointer_pos bpp depth indexed_color dpy_x dpy_y wdpy_x
+                       wdpy_y off_x off_y cdpy_x cdpy_y coff_x coff_y rfbauth
+                       passwd viewpasswd
 
 -QD variable           Just like -query variable, but returns the default
                        value for that parameter (no running x11vnc server
@@ -17599,10 +17986,43 @@ n
                        the -query request is processed in the normal way.
                        This allows for a reliable way to see if the -remote
                        command was processed by querying for any new settings.
-                       Note however that there is timeout of a few seconds so
-                       if the x11vnc takes longer than that to process the
-                       requests the requester will think that a failure has
-                       taken place.
+                       Note however that there is timeout of a few seconds
+                       (see the next paragraph) so if the x11vnc takes longer
+                       than that to process the requests the requester will
+                       think that a failure has taken place.
+
+                       The default is to wait 3.5 seconds.  Or if cmd=stop
+                       only 1.0 seconds.  If cmd matches 'script:' then it
+                       will wait up to 10.0 seconds.  Set X11VNC_SYNC_TIMEOUT
+                       to the number of seconds you want it to wait.
+
+-query_retries str     If a query fails to get a response from an x11vnc
+                       server, retry up to n times.  "str" is specified as
+                       n[:t][/match]  Optionally the delay between tries may
+                       be specified by "t" a floating point time (default
+                       0.5 seconds.)  Note: the response is not checked for
+                       validity or whether it corresponds to the query sent.
+                       The query "ping:mystring" may be used to help uniquely
+                       identify the query.  Optionally, a matching string after
+                       a "/" will be used to check the result text.  Up to
+                       n retries will take place until the matching string is
+                       found in the output text.  If the match string is never
+                       found the program's exit code is 1; if the match is
+                       found it exits with 0.  Note that there may be stdout
+                       printed for each retry (i.e. multiple lines printed
+                       out to stdout.)
+                       Example: -query_retries 4:1.5/grab_state
+
+-remote_prefix str     Enable a remote-control communication channel for
+                       connected VNC clients.  str is a non-empty string. If a
+                       VNC client sends rfbCutText having the prefix "str"
+                       then the part after it is processed as though it were
+                       sent via 'x11vnc -remote ...'.  If it begins with
+                       neither 'cmd=' nor 'qry=' then 'qry=' is assumed.
+                       Any corresponding output text for that remote control
+                       command is sent back to all client as rfbCutText.
+                       The returned output is also prefixed with "str".
+                       Example: -remote_prefix DO_THIS:
 
 -noremote              Do not process any remote control commands or queries.
 -yesremote             Do process remote control commands or queries.

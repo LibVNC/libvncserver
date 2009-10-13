@@ -62,6 +62,8 @@ extern void ssl_helper_pid(pid_t pid, int sock);
 extern void accept_openssl(int mode, int presock);
 extern char *find_openssl_bin(void);
 extern char *get_saved_pem(char *string, int create);
+extern char *get_ssl_verify_file(char *str_in);
+extern char *create_tmp_pem(char *path, int prompt);
 
 
 #endif /* _X11VNC_SSLHELPER_H */
