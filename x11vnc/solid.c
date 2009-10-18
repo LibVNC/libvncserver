@@ -735,6 +735,100 @@ static void solid_gnome(char *color) {
 #endif	/* NO_X11 */
 }
 
+static void solid_xfce(char *color) {
+#if NO_X11
+	RAWFB_RET_VOID
+	if (!color) {}
+	return;
+#else
+	char get_image_show[]  = "%s xfconf-query -v -c xfce4-desktop -p /backdrop/screen0/monitor0/image-show";
+	char set_image_show[]  = "%s xfconf-query -v -c xfce4-desktop -p /backdrop/screen0/monitor0/image-show -s '%s'";
+	char get_color_style[] = "%s xfconf-query -v -c xfce4-desktop -p /backdrop/screen0/monitor0/color-style";
+	char set_color_style[] = "%s xfconf-query -v -c xfce4-desktop -p /backdrop/screen0/monitor0/color-style -s '%s'";
+
+	static char *orig_image_show = NULL;
+	static char *orig_color_style = NULL;
+	char *cmd, *dbus = "";
+
+	RAWFB_RET_VOID
+
+	dbus = dbus_session();
+	rfbLog("guessed dbus: %s\n", dbus);
+	
+	if (! color) {
+		if (! orig_image_show) {
+			orig_image_show = strdup("true");
+		}
+		if (! orig_color_style) {
+			orig_color_style = strdup("0");
+		}
+		if (strstr(orig_image_show, "'") != NULL)  {
+			rfbLog("invalid image show: %s\n", orig_image_show);
+			return;
+		}
+		if (strstr(orig_color_style, "'") != NULL)  {
+			rfbLog("invalid color style: %s\n", orig_color_style);
+			return;
+		}
+		cmd = (char *) malloc(strlen(set_image_show) - 2 + strlen(orig_image_show) + strlen(dbus) + 1);
+		sprintf(cmd, set_image_show, dbus, orig_image_show);
+		dt_cmd(cmd);
+		free(cmd);
+		cmd = (char *) malloc(strlen(set_color_style) - 2 + strlen(orig_color_style) + strlen(dbus) + 1);
+		sprintf(cmd, set_color_style, dbus, orig_color_style);
+		dt_cmd(cmd);
+		free(cmd);
+		return;
+	}
+
+	if (! orig_image_show) {
+		char *q;
+		if (cmd_ok("dt")) {
+			cmd = (char *) malloc(strlen(get_image_show) + strlen(dbus) + 1);
+			sprintf(cmd, get_image_show, dbus);
+			orig_image_show = strdup(cmd_output(cmd));
+			free(cmd);
+		}
+		if (*orig_image_show == '\0') {
+			orig_image_show = strdup("true");
+		}
+		if ((q = strchr(orig_image_show, '\n')) != NULL) {
+			*q = '\0';
+		}
+	}
+	if (! orig_color_style) {
+		char *q;
+		if (cmd_ok("dt")) {
+			cmd = (char *) malloc(strlen(get_color_style) + strlen(dbus) + 1);
+			sprintf(cmd, get_color_style, dbus);
+			orig_color_style = strdup(cmd_output(cmd));
+			free(cmd);
+		}
+		if (*orig_color_style == '\0') {
+			orig_color_style = strdup("0");
+		}
+		if ((q = strchr(orig_color_style, '\n')) != NULL) {
+			*q = '\0';
+		}
+	}
+	if (strstr(color, "'") != NULL)  {
+		rfbLog("invalid color: %s\n", color);
+		return;
+	}
+	cmd = (char *) malloc(strlen(set_color_style) + strlen("0") + strlen(dbus) + 1);
+	sprintf(cmd, set_color_style, dbus, "0");
+	dt_cmd(cmd);
+	free(cmd);
+
+	cmd = (char *) malloc(strlen(set_image_show) + strlen("false") + strlen(dbus) + 1);
+	sprintf(cmd, set_image_show, dbus, "false");
+	dt_cmd(cmd);
+	free(cmd);
+
+#endif	/* NO_X11 */
+}
+
+
 static char *dcop_session(void) {
 	char *empty = strdup("");
 #if NO_X11
@@ -1219,6 +1313,8 @@ void solid_bg(int restore) {
 			solid_kde(NULL);
 		} else if (desktop == 3) {
 			solid_cde(NULL);
+		} else if (desktop == 4) {
+			solid_xfce(NULL);
 		}
 		solid_on = 0;
 		return;
@@ -1240,6 +1336,8 @@ void solid_bg(int restore) {
 			dtname = "kde";
 		} else if (strstr(solid_str, "cde:") == solid_str) {
 			dtname = "cde";
+		} else if (strstr(solid_str, "xfce:") == solid_str) {
+			dtname = "xfce";
 		} else {
 			dtname = "root";
 		}
@@ -1268,6 +1366,9 @@ void solid_bg(int restore) {
 	} else if (!strcmp(dtname, "cde")) {
 		desktop = 3;
 		solid_cde(color);
+	} else if (!strcmp(dtname, "xfce")) {
+		desktop = 4;
+		solid_xfce(color);
 	} else {
 		desktop = 0;
 		solid_root(color);

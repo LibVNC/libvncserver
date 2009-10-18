@@ -276,6 +276,13 @@ int trap_getimage_xerror(Display *d, XErrorEvent *error) {
 	return 0;
 }
 
+/* Are silly Xorg people removing X_ShmAttach from XShm.h? */
+/* INDEED!  What stupid, myopic morons...  */
+/* Maintenance Monkeys busy typing at their keyboards... */
+#ifndef X_ShmAttach
+#define X_ShmAttach 1
+#endif
+
 static int Xerror(Display *d, XErrorEvent *error) {
 	X_UNLOCK;
 

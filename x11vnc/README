@@ -2,7 +2,7 @@
 Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
 
-x11vnc README file                         Date: Wed Oct  7 23:29:05 EDT 2009
+x11vnc README file                         Date: Sat Oct 17 22:21:49 EDT 2009
 
 The following information is taken from these URLs:
 
@@ -48,8 +48,8 @@ x11vnc: a VNC server for real X displays
    impossible to build on Solaris and had poor performance. The primary
    x0rfbserver build problems centered around esoteric C++ toolkits.
    x11vnc is written in plain C and needs only standard libraries and so
-   should work on nearly all Unixes. I also added some enhancements to
-   improve the interactive response, add many features, and etc.
+   should work on nearly all Unixes. I also created some enhancements to
+   improve the interactive response, added many features, etc.
 
    This page including the [22]FAQ contains much information [23][*];
    solutions to many problems; and interesting applications, but
@@ -11689,8 +11689,11 @@ Enhanced TightVNC Viewer   (SSVNC:   SSL/SSH VNC viewer)
    GUI as an enhanced replacement for the xvncviewer, xtightvncviewer,
    etc., viewers.
 
-   SSVNC also supports the [6]VeNCrypt SSL/TLS extension to VNC (Unix and
-   Mac OS X only.)
+   SSVNC also supports the [6]VeNCrypt SSL/TLS and Vino/ANONTLS
+   extensions to VNC on Unix, Mac OS X, and Windows. Via the provided
+   SSVNC VeNCrypt bridge, VeNCrypt and ANONTLS encryption also works with
+   any third party VNC Viewer (e.g. RealVNC, TightVNC, UltraVNC, etc...)
+   you select via 'Change VNC Viewer'.
 
    The short name for this project is "ssvnc" for SSL/SSH VNC Viewer.
    This is the name of the command to start it.
@@ -11736,14 +11739,21 @@ Enhanced TightVNC Viewer   (SSVNC:   SSL/SSH VNC viewer)
      * Automatic SSH connections from the GUI (system ssh is used on Unix
        and MacOS X; bundled plink is used on Windows)
      * Ability to Save and Load VNC profiles for different hosts.
+     * You can also use your own VNC Viewer, e.g. UltraVNC or RealVNC,
+       with the SSVNC encryption GUI front-end if you like.
      * Create or Import SSL Certificates and Private Keys.
      * Reverse (viewer listening) VNC connections via SSL and SSH.
-     * Support for Web [13]Proxies, SOCKS Proxies, and the [14]UltraVNC
+     * VeNCrypt SSL/TLS VNC encryption support (used by [13]VeNCrypt,
+       QEMU, ggi, libvirt/virt-manager/xen, vinagre/gvncviewer/gtk-vnc)
+     * ANONTLS SSL/TLS VNC encryption support (used by Vino)
+     * VeNCrypt and ANONTLS are also enabled for any 3rd party VNC Viewer
+       (e.g. RealVNC, TightVNC, UltraVNC ...) on Unix, MacOSX, and
+       Windows via the provided SSVNC VeNCrypt Viewer Bridge tool (use
+       'Change VNC Viewer' to select the one you want.)
+     * Support for Web [14]Proxies, SOCKS Proxies, and the [15]UltraVNC
        repeater proxy (e.g. repeater://host:port+ID:1234). Multiple
        proxies may be chained together (3 max).
      * Support for SSH Gateway connections and non-standard SSH ports.
-     * You can also use your own VNC Viewer, e.g. UltraVNC or RealVNC,
-       with the SSVNC encryption GUI front-end if you like.
      * Automatic Service tunnelling via SSH for CUPS and SMB Printing,
        ESD/ARTSD Audio, and SMB (Windows/Samba) filesystem mounting.
      * Sets up any additional SSH port redirections that you want.
@@ -11757,33 +11767,30 @@ Enhanced TightVNC Viewer   (SSVNC:   SSL/SSH VNC viewer)
      * Support for native MacOS X usage with bundled Chicken of the VNC
        viewer (the Unix X11 viewer is also provided for MacOS X, and is
        better IMHO. It is now the default on MacOS X.)
-     * [15]Dynamic VNC Server Port determination and redirection (using
+     * [16]Dynamic VNC Server Port determination and redirection (using
        ssh's builtin SOCKS proxy, ssh -D) for servers like x11vnc that
        print out PORT= at startup.
      * Unix Username and Password entry for use with "x11vnc -unixpw"
        type login dialogs.
-     * Simplified mode launched by command "[16]sshvnc" that is SSH Only.
-     * Simplified mode launched by command "[17]tsvnc" that provides a
+     * Simplified mode launched by command "[17]sshvnc" that is SSH Only.
+     * Simplified mode launched by command "[18]tsvnc" that provides a
        VNC "Terminal Services" mode (uses x11vnc on the remote side).
 
-   [18]Unix TightVNC Viewer improvements (these only apply to the Unix
+   [19]Unix TightVNC Viewer improvements (these only apply to the Unix
    VNC viewer, including Mac OS X):
      * rfbNewFBSize VNC support (dynamic screen resizing)
      * Client-side Scaling of the Desktop in the viewer.
      * ZRLE VNC encoding support (RealVNC's encoding)
      * Support for the ZYWRLE encoding, a wavelet based extension to ZRLE
        to improve compression of motion video and photo regions.
-     * [19]TurboVNC support ([20]VirtualGL's modified TightVNC encoding;
+     * [20]TurboVNC support ([21]VirtualGL's modified TightVNC encoding;
        requires TurboJPEG library)
      * Pipelined Updates of the framebuffer as in TurboVNC (asks for the
        next update before the current one has finished downloading; this
        gives some speedup on high latency connections.)
-     * Cursor [21]alphablending with x11vnc at 32bpp (-alpha option)
+     * Cursor [22]alphablending with x11vnc at 32bpp (-alpha option)
      * Option "-unixpw ..." for use with "x11vnc -unixpw" type login
        dialogs.
-     * VeNCrypt SSL/TLS VNC encryption support (used by [22]VeNCrypt,
-       QEMU, ggi, libvirt/virt-manager/xen, vinagre/gvncviewer/gtk-vnc)
-     * ANONTLS SSL/TLS VNC encryption support (used by vino)
      * Support for UltraVNC extensions: 1/n Server side scaling, Text
        Chat, Single Window, Disable Server-side Input. Both UltraVNC and
        x11vnc servers support these extensions.
@@ -12717,16 +12724,16 @@ References
   10. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#source
   11. http://www.debian.org/security/2008/dsa-1571
   12. http://www.karlrunge.com/x11vnc/ssvnc_untrusted_local_users.html
-  13. http://www.karlrunge.com/x11vnc/ssvnc-proxies.html
-  14. http://www.uvnc.com/addons/repeater.html
-  15. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#dynamic-port
-  16. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#sshvnc
-  17. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#tsvnc
-  18. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#unix-patches
-  19. http://www.karlrunge.com/x11vnc/faq.html#faq-turbovnc
-  20. http://www.virtualgl.org/
-  21. http://www.karlrunge.com/x11vnc/faq.html#faq-xfixes-alpha-hacks
-  22. http://sourceforge.net/projects/vencrypt/
+  13. http://sourceforge.net/projects/vencrypt/
+  14. http://www.karlrunge.com/x11vnc/ssvnc-proxies.html
+  15. http://www.uvnc.com/addons/repeater.html
+  16. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#dynamic-port
+  17. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#sshvnc
+  18. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#tsvnc
+  19. http://www.karlrunge.com/x11vnc/enhanced_tightvnc_viewer.html#unix-patches
+  20. http://www.karlrunge.com/x11vnc/faq.html#faq-turbovnc
+  21. http://www.virtualgl.org/
+  22. http://www.karlrunge.com/x11vnc/faq.html#faq-xfixes-alpha-hacks
   23. http://www.uvnc.com/addons/repeater.html
   24. http://www.uvnc.com/addons/singleclick.html
   25. http://www.uvnc.com/features/encryption.html
@@ -12795,7 +12802,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-10-07
+x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-10-15
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -12815,79 +12822,79 @@ x11vnc options:
   -allow host1[,host2..]   -localhost               -nolookup              
   -input string            -grabkbd                 -grabptr               
   -grabalways              -viewpasswd string       -passwdfile filename   
-  -unixpw [list]           -unixpw_nis [list]       -unixpw_cmd cmd        
-  -find                    -finddpy                 -listdpy               
-  -create                  -xdummy                  -xvnc                  
-  -xvnc_redirect           -svc                     -svc_xdummy            
-  -svc_xvnc                -xdmsvc                  -sshxdmsvc             
-  -unixpw_system_greeter   -redirect port           -display WAIT:...      
-  -vencrypt mode           -anontls mode            -sslonly               
-  -dhparams file           -nossl                   -ssl [pem]             
-  -ssltimeout n            -sslnofail               -ssldir [dir]          
-  -sslverify [path]        -sslCRL path             -sslGenCA [dir]        
-  -sslGenCert type name    -sslEncKey [pem]         -sslCertInfo [pem]     
-  -sslDelCert [pem]        -stunnel [pem]           -stunnel3  [pem]       
-  -enc cipher:keyfile      -https [port]            -httpsredir [port]     
-  -http_oneport            -ssh user@host:disp      -usepw                 
-  -storepasswd pass file   -nopw                    -accept string         
-  -afteraccept string      -gone string             -users list            
-  -noshm                   -flipbyteorder           -onetile               
-  -solid [color]           -blackout string         -xinerama              
-  -noxinerama              -xtrap                   -xrandr [mode]         
-  -rotate string           -padgeom WxH             -o logfile             
-  -flag file               -rmflag file             -rc filename           
-  -norc                    -env VAR=VALUE           -prog /path/to/x11vnc  
-  -h, -help                -?, -opts                -V, -version           
-  -license                 -dbg                     -q, -quiet             
-  -v, -verbose             -bg                      -modtweak              
-  -nomodtweak              -xkb                     -noxkb                 
-  -capslock                -skip_lockkeys           -noskip_lockkeys       
-  -skip_keycodes string    -sloppy_keys             -skip_dups             
-  -noskip_dups             -add_keysyms             -noadd_keysyms         
-  -clear_mods              -clear_keys              -clear_all             
-  -remap string            -norepeat                -repeat                
-  -nofb                    -nobell                  -nosel                 
-  -noprimary               -nosetprimary            -noclipboard           
-  -nosetclipboard          -seldir string           -cursor [mode]         
-  -nocursor                -cursor_drag             -arrow n               
-  -noxfixes                -alphacut n              -alphafrac fraction    
-  -alpharemove             -noalphablend            -nocursorshape         
-  -cursorpos               -nocursorpos             -xwarppointer          
-  -noxwarppointer          -buttonmap string        -nodragging            
-  -ncache n                -ncache_cr               -ncache_no_moveraise   
-  -ncache_no_dtchange      -ncache_no_rootpixmap    -ncache_keep_anims     
-  -ncache_old_wm           -ncache_pad n            -debug_ncache          
-  -wireframe [str]         -nowireframe             -nowireframelocal      
-  -wirecopyrect mode       -nowirecopyrect          -debug_wireframe       
-  -scrollcopyrect mode     -noscrollcopyrect        -scr_area n            
-  -scr_skip list           -scr_inc list            -scr_keys list         
-  -scr_term list           -scr_keyrepeat lo-hi     -scr_parms string      
-  -fixscreen string        -debug_scroll            -noxrecord             
-  -grab_buster             -nograb_buster           -debug_grabs           
-  -debug_sel               -pointer_mode n          -input_skip n          
-  -allinput                -speeds rd,bw,lat        -wmdt string           
-  -debug_pointer           -debug_keyboard          -defer time            
-  -wait time               -extra_fbur n            -wait_ui factor        
-  -setdefer n              -nowait_bog              -slow_fb time          
-  -xrefresh time           -nap                     -nonap                 
-  -sb time                 -readtimeout n           -ping n                
-  -nofbpm                  -fbpm                    -nodpms                
-  -dpms                    -forcedpms               -clientdpms            
-  -noserverdpms            -noultraext              -chatwindow            
-  -noxdamage               -xd_area A               -xd_mem f              
-  -sigpipe string          -threads                 -nothreads             
-  -fs f                    -gaps n                  -grow n                
-  -fuzz n                  -debug_tiles             -snapfb                
-  -rawfb string            -freqtab file            -pipeinput cmd         
-  -macnodim                -macnosleep              -macnosaver            
-  -macnowait               -macwheel n              -macnoswap             
-  -macnoresize             -maciconanim n           -macmenu               
-  -macuskbd                -gui [gui-opts]          -remote command        
-  -query variable          -QD variable             -sync                  
-  -query_retries str       -remote_prefix str       -noremote              
-  -yesremote               -unsafe                  -safer                 
-  -privremote              -nocmds                  -allowedcmds list      
-  -deny_all              
+  -showrfbauth filename    -unixpw [list]           -unixpw_nis [list]     
+  -unixpw_cmd cmd          -find                    -finddpy               
+  -listdpy                 -create                  -xdummy                
+  -xvnc                    -xvnc_redirect           -svc                   
+  -svc_xdummy              -svc_xvnc                -xdmsvc                
+  -sshxdmsvc               -unixpw_system_greeter   -redirect port         
+  -display WAIT:...        -vencrypt mode           -anontls mode          
+  -sslonly                 -dhparams file           -nossl                 
+  -ssl [pem]               -ssltimeout n            -sslnofail             
+  -ssldir [dir]            -sslverify [path]        -sslCRL path           
+  -sslGenCA [dir]          -sslGenCert type name    -sslEncKey [pem]       
+  -sslCertInfo [pem]       -sslDelCert [pem]        -stunnel [pem]         
+  -stunnel3  [pem]         -enc cipher:keyfile      -https [port]          
+  -httpsredir [port]       -http_oneport            -ssh user@host:disp    
+  -usepw                   -storepasswd pass file   -nopw                  
+  -accept string           -afteraccept string      -gone string           
+  -users list              -noshm                   -flipbyteorder         
+  -onetile                 -solid [color]           -blackout string       
+  -xinerama                -noxinerama              -xtrap                 
+  -xrandr [mode]           -rotate string           -padgeom WxH           
+  -o logfile               -flag file               -rmflag file           
+  -rc filename             -norc                    -env VAR=VALUE         
+  -prog /path/to/x11vnc    -h, -help                -?, -opts              
+  -V, -version             -license                 -dbg                   
+  -q, -quiet               -v, -verbose             -bg                    
+  -modtweak                -nomodtweak              -xkb                   
+  -noxkb                   -capslock                -skip_lockkeys         
+  -noskip_lockkeys         -skip_keycodes string    -sloppy_keys           
+  -skip_dups               -noskip_dups             -add_keysyms           
+  -noadd_keysyms           -clear_mods              -clear_keys            
+  -clear_all               -remap string            -norepeat              
+  -repeat                  -nofb                    -nobell                
+  -nosel                   -noprimary               -nosetprimary          
+  -noclipboard             -nosetclipboard          -seldir string         
+  -cursor [mode]           -nocursor                -cursor_drag           
+  -arrow n                 -noxfixes                -alphacut n            
+  -alphafrac fraction      -alpharemove             -noalphablend          
+  -nocursorshape           -cursorpos               -nocursorpos           
+  -xwarppointer            -noxwarppointer          -buttonmap string      
+  -nodragging              -ncache n                -ncache_cr             
+  -ncache_no_moveraise     -ncache_no_dtchange      -ncache_no_rootpixmap  
+  -ncache_keep_anims       -ncache_old_wm           -ncache_pad n          
+  -debug_ncache            -wireframe [str]         -nowireframe           
+  -nowireframelocal        -wirecopyrect mode       -nowirecopyrect        
+  -debug_wireframe         -scrollcopyrect mode     -noscrollcopyrect      
+  -scr_area n              -scr_skip list           -scr_inc list          
+  -scr_keys list           -scr_term list           -scr_keyrepeat lo-hi   
+  -scr_parms string        -fixscreen string        -debug_scroll          
+  -noxrecord               -grab_buster             -nograb_buster         
+  -debug_grabs             -debug_sel               -pointer_mode n        
+  -input_skip n            -allinput                -speeds rd,bw,lat      
+  -wmdt string             -debug_pointer           -debug_keyboard        
+  -defer time              -wait time               -extra_fbur n          
+  -wait_ui factor          -setdefer n              -nowait_bog            
+  -slow_fb time            -xrefresh time           -nap                   
+  -nonap                   -sb time                 -readtimeout n         
+  -ping n                  -nofbpm                  -fbpm                  
+  -nodpms                  -dpms                    -forcedpms             
+  -clientdpms              -noserverdpms            -noultraext            
+  -chatwindow              -noxdamage               -xd_area A             
+  -xd_mem f                -sigpipe string          -threads               
+  -nothreads               -fs f                    -gaps n                
+  -grow n                  -fuzz n                  -debug_tiles           
+  -snapfb                  -rawfb string            -freqtab file          
+  -pipeinput cmd           -macnodim                -macnosleep            
+  -macnosaver              -macnowait               -macwheel n            
+  -macnoswap               -macnoresize             -maciconanim n         
+  -macmenu                 -macuskbd                -gui [gui-opts]        
+  -remote command          -query variable          -QD variable           
+  -sync                    -query_retries str       -remote_prefix str     
+  -noremote                -yesremote               -unsafe                
+  -safer                   -privremote              -nocmds                
+  -allowedcmds list        -deny_all              
 
 libvncserver options:
 -rfbport port          TCP port for RFB protocol
@@ -12921,7 +12928,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-10-07
+x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-10-15
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -13641,6 +13648,9 @@ Options:
                        used to have viewonly passwords.  (tip: make the 3rd
                        and last line be "__BEGIN_VIEWONLY__" to have 2
                        full-access passwords)
+
+-showrfbauth filename  Print to the screen the obscured VNC password kept in
+                       the rfbauth file "filename" and then exit.
 
 -unixpw [list]         Use Unix username and password authentication.  x11vnc
                        will use the su(1) program to verify the user's
@@ -15438,15 +15448,18 @@ t
                        e.g. "darkblue" or numerical "#RRGGBB").
 
                        Currently this option only works on GNOME, KDE, CDE,
-                       and classic X (i.e. with the background image on the
-                       root window).  The "gconftool-2" and "dcop" external
-                       commands are run for GNOME and KDE respectively.
-                       Other desktops won't work, e.g. Xfce (send us the
-                       corresponding commands if you find them).  If x11vnc is
-                       running as root (inetd(8) or gdm(1)), the -users option
-                       may be needed for GNOME and KDE.  If x11vnc guesses
-                       your desktop incorrectly, you can force it by prefixing
-                       color with "gnome:", "kde:", "cde:" or "root:".
+                       XFCE, and classic X (i.e. with the background image
+                       on the root window).  The "gconftool-2", "dcop"
+                       and "xfconf-query" external commands are run for
+                       GNOME, KDE, and XFCE respectively.  This also works
+                       on native MacOSX.  (There is no color selection for
+                       MacOSX or XFCE.)  Other desktops won't work, (send
+                       us the corresponding commands if you find them).
+                       If x11vnc is running as root (inetd(8) or gdm(1)),
+                       the -users option may be needed for GNOME, KDE, XFCE.
+                       If x11vnc guesses your desktop incorrectly, you can
+                       force it by prefixing color with "gnome:", "kde:",
+                       "cde:", "xfce:", or "root:".
 
                        This mode works in a limited way on the Mac OS X Console
                        with one color ('kelp') using the screensaver writing
@@ -17951,9 +17964,9 @@ n
                        macnomenu nomacmenu macuskbd nomacuskbd noremote
 
                        aro=  noop display vncdisplay autoport loop loopbg
-                       desktopname guess_desktop http_url auth xauth
-                       users rootshift clipshift scale_str scaled_x
-                       scaled_y scale_numer scale_denom scale_fac_x
+                       desktopname guess_desktop guess_dbus http_url
+                       auth xauth users rootshift clipshift scale_str
+                       scaled_x scaled_y scale_numer scale_denom scale_fac_x
                        scale_fac_y scaling_blend scaling_nomult4 scaling_pad
                        scaling_interpolate inetd privremote unsafe safer
                        nocmds passwdfile unixpw unixpw_nis unixpw_list ssl

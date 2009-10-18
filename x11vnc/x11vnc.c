@@ -2791,6 +2791,19 @@ int main(int argc, char* argv[]) {
 			}
 			continue;
 		}
+		if (!strcmp(arg, "-showrfbauth")) {
+			if (argc >= i+2) {
+				char *f = argv[i+1];
+				char *s = rfbDecryptPasswdFromFile(f);
+				if (!s) {
+					fprintf(stderr, "rfbDecryptPasswdFromFile failed: %s\n", f);
+					exit(1);
+				}
+				fprintf(stdout, "rfbDecryptPasswdFromFile file: %s\n", f);
+				fprintf(stdout, "rfbDecryptPasswdFromFile pass: %s\n", s);
+			}
+			exit(0);
+		}
 		if (!strcmp(arg, "-accept")) {
 			CHECK_ARGC
 			accept_cmd = strdup(argv[++i]);
