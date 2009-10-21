@@ -471,6 +471,7 @@ int main(int argc,char** argv) {
 	SDL_EnableUNICODE(1);
 	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY,
 			SDL_DEFAULT_REPEAT_INTERVAL);
+	atexit(SDL_Quit);
 
 	/* 16-bit: cl=rfbGetClient(5,3,2); */
 	cl=rfbGetClient(8,3,4);
@@ -480,6 +481,7 @@ int main(int argc,char** argv) {
 	cl->HandleKeyboardLedState=kbd_leds;
 	cl->HandleTextChat=text_chat;
 	cl->GotXCutText = got_selection;
+	cl->listenPort = LISTEN_PORT_OFFSET;
 	if(!rfbInitClient(cl,&argc,argv))
 		return 1;
 
