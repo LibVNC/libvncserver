@@ -29,7 +29,7 @@ endif
 SDLvncviewer_LDADD=$(LDADD) $(SDL_LIBS) $(X11_LIB)
 endif
 
-noinst_PROGRAMS=ppmtest $(SDLVIEWER) $(FFMPEG_CLIENT) backchannel
+noinst_PROGRAMS=ppmtest $(SDLVIEWER) $(FFMPEG_CLIENT) backchannel multicast
 
 
 
