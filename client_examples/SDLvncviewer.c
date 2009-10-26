@@ -11,7 +11,7 @@ struct { int sdl; int rfb; } buttonMapping[]={
 	{0,0}
 };
 
-static int enableResizable, viewOnly, buttonMask;
+static int enableResizable, viewOnly, listenLoop, buttonMask;
 #ifdef SDL_ASYNCBLIT
 	int sdlFlags = SDL_HWSURFACE | SDL_ASYNCBLIT | SDL_HWACCEL;
 #else
@@ -23,7 +23,6 @@ static char *sdlPixels;
 static int rightAltKeyDown, leftAltKeyDown;
 
 static rfbBool resize(rfbClient* client) {
-	static char first=TRUE;
 	int width=client->width,height=client->height,
 		depth=client->format.bitsPerPixel;
 
@@ -45,17 +44,16 @@ static rfbBool resize(rfbClient* client) {
 			sdlPixels = NULL;
 		}
 		client->frameBuffer=sdl->pixels;
-		if(first || depth!=client->format.bitsPerPixel) {
-			first=FALSE;
-			client->format.bitsPerPixel=depth;
-			client->format.redShift=sdl->format->Rshift;
-			client->format.greenShift=sdl->format->Gshift;
-			client->format.blueShift=sdl->format->Bshift;
-			client->format.redMax=sdl->format->Rmask>>client->format.redShift;
-			client->format.greenMax=sdl->format->Gmask>>client->format.greenShift;
-			client->format.blueMax=sdl->format->Bmask>>client->format.blueShift;
-			SetFormatAndEncodings(client);
-		}
+
+		client->format.bitsPerPixel=depth;
+		client->format.redShift=sdl->format->Rshift;
+		client->format.greenShift=sdl->format->Gshift;
+		client->format.blueShift=sdl->format->Bshift;
+		client->format.redMax=sdl->format->Rmask>>client->format.redShift;
+		client->format.greenMax=sdl->format->Gmask>>client->format.greenShift;
+		client->format.blueMax=sdl->format->Bmask>>client->format.blueShift;
+		SetFormatAndEncodings(client);
+
 	} else {
 		SDL_Surface* sdl=rfbClientGetClientData(client, SDL_Init);
 		rfbClientLog("Could not set resolution %dx%d!\n",
@@ -348,7 +346,20 @@ log_to_file(const char *format, ...)
 }
 #endif
 
-static void handleSDLEvent(rfbClient *cl, SDL_Event *e)
+
+static void cleanup(rfbClient* cl)
+{
+  /*
+    just in case we're running in listenLoop:
+    close viewer window by restarting SDL video subsystem
+  */
+  SDL_QuitSubSystem(SDL_INIT_VIDEO);
+  SDL_InitSubSystem(SDL_INIT_VIDEO);
+  rfbClientCleanup(cl);
+}
+
+
+static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 {
 	switch(e->type) {
 #if SDL_MAJOR_VERSION > 1 || SDL_MINOR_VERSION >= 2
@@ -404,8 +415,16 @@ static void handleSDLEvent(rfbClient *cl, SDL_Event *e)
 			leftAltKeyDown = e->type == SDL_KEYDOWN;
 		break;
 	case SDL_QUIT:
-		rfbClientCleanup(cl);
-		exit(0);
+                if(listenLoop)
+		  {
+		    cleanup(cl);
+		    return FALSE;
+		  }
+		else
+		  {
+		    rfbClientCleanup(cl);
+		    exit(0);
+		  }
 	case SDL_ACTIVEEVENT:
 		if (!e->active.gain && rightAltKeyDown) {
 			SendKeyEvent(cl, XK_Alt_R, FALSE);
@@ -435,12 +454,14 @@ static void handleSDLEvent(rfbClient *cl, SDL_Event *e)
 	default:
 		rfbClientLog("ignore SDL event: 0x%x\n", e->type);
 	}
+	return TRUE;
 }
 
 static void got_selection(rfbClient *cl, const char *text, int len)
 {
 	put_scrap(T('T', 'E', 'X', 'T'), len, text);
 }
+
 
 #ifdef mac
 #define main SDLmain
@@ -460,6 +481,11 @@ int main(int argc,char** argv) {
 			viewOnly = 1;
 		else if (!strcmp(argv[i], "-resizable"))
 			enableResizable = 1;
+		else if (!strcmp(argv[i], "-listen")) {
+		        listenLoop = 1;
+			argv[i] = "-listennofork";
+                        ++j;
+		}
 		else {
 			if (i != j)
 				argv[j] = argv[i];
@@ -473,32 +499,50 @@ int main(int argc,char** argv) {
 			SDL_DEFAULT_REPEAT_INTERVAL);
 	atexit(SDL_Quit);
 
-	/* 16-bit: cl=rfbGetClient(5,3,2); */
-	cl=rfbGetClient(8,3,4);
-	cl->MallocFrameBuffer=resize;
-	cl->canHandleNewFBSize = TRUE;
-	cl->GotFrameBufferUpdate=update;
-	cl->HandleKeyboardLedState=kbd_leds;
-	cl->HandleTextChat=text_chat;
-	cl->GotXCutText = got_selection;
-	cl->listenPort = LISTEN_PORT_OFFSET;
-	if(!rfbInitClient(cl,&argc,argv))
-		return 1;
+	do {
+	  /* 16-bit: cl=rfbGetClient(5,3,2); */
+	  cl=rfbGetClient(8,3,4);
+	  cl->MallocFrameBuffer=resize;
+	  cl->canHandleNewFBSize = TRUE;
+	  cl->GotFrameBufferUpdate=update;
+	  cl->HandleKeyboardLedState=kbd_leds;
+	  cl->HandleTextChat=text_chat;
+	  cl->GotXCutText = got_selection;
+	  cl->listenPort = LISTEN_PORT_OFFSET;
+	  if(!rfbInitClient(cl,&argc,argv))
+	    {
+	      cleanup(cl);
+	      break;
+	    }
 
-	init_scrap();
+	  init_scrap();
 
-	while(1) {
-		if(SDL_PollEvent(&e))
-			handleSDLEvent(cl, &e);
-		else {
-			i=WaitForMessage(cl,500);
-			if(i<0)
-				return 0;
-			if(i)
-		    		if(!HandleRFBServerMessage(cl))
-					return 0;
+	  while(1) {
+	    if(SDL_PollEvent(&e)) {
+	      /*
+		handleSDLEvent() return 0 if user requested window close.
+		In this case, handleSDLEvent() will have called cleanup().
+	      */
+	      if(!handleSDLEvent(cl, &e))
+		break;
+	    }
+	    else {
+	      i=WaitForMessage(cl,500);
+	      if(i<0)
+		{
+		  cleanup(cl);
+		  break;
 		}
+	      if(i)
+		if(!HandleRFBServerMessage(cl))
+		  {
+		    cleanup(cl);
+		    break;
+		  }
+	    }
+	  }
 	}
+	while(listenLoop);
 
 	return 0;
 }
