@@ -151,6 +151,9 @@ typedef struct _rfbClient {
 	rfbPixelFormat format;
 	rfbServerInitMsg si;
 
+	/* listen.c */
+        int listenSock;
+
 	/* sockets.c */
 #define RFB_BUF_SIZE 8192
 	char buf[RFB_BUF_SIZE];
@@ -260,6 +263,7 @@ extern rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width
 /* listen.c */
 
 extern void listenForIncomingConnections(rfbClient* viewer);
+extern rfbBool listenForIncomingConnectionsNoFork(rfbClient* viewer, int usec_timeout);
 
 /* rfbproto.c */
 

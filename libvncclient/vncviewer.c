@@ -43,6 +43,7 @@ static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 static char* NoPassword(rfbClient* client) {
   return strdup("");
 }
+#define close closesocket
 #else
 #include <stdio.h>
 #include <termios.h>
@@ -246,6 +247,9 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
       j = i;
       if (strcmp(argv[i], "-listen") == 0) {
 	listenForIncomingConnections(client);
+	break;
+      } else if (strcmp(argv[i], "-listennofork") == 0) {
+	listenForIncomingConnectionsNoFork(client, -1);
 	break;
       } else if (strcmp(argv[i], "-play") == 0) {
 	client->serverPort = -1;
