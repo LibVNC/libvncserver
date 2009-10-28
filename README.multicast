@@ -1,0 +1,58 @@
+
+
+		     MulticastVNC Extension
+	  	          Version 1.0
+
+	 	        Christian Beier
+ 	            <dontmind@freeshell.org>
+
+
+
+ 1. Introduction
+ 
+ A basic criterion for perceived speed of VNC sessions is the rate of
+ framebuffer updates on the client side. But as more clients connect
+ to a VNC server, the slower this rate becomes. This is because the
+ server's framebuffer content is sent to each client individually. The
+ more clients are connected, the higher the load on the underlying
+ network, although the data sent to each client is the same.
+
+ It's obvious to optimise here and to send this data just once to all
+ connected clients - via multicast. This way the load on the network
+ becomes independent from the number of connected clients - it
+ essentially stays the same, be there one client connected or a
+ hundred.
+
+ Note that only the server's framebuffer update messages are sent via
+ multicast, as these make up the bulk of transmitted data and
+ represent the same data (the server's framebuffer) for each client.
+ Handshaking messages, client to server messages and all other server
+ to client messages excluding framebuffer updates are sent via the
+ traditional unicast way.
+
+
+
+ 2. The way it works
+
+ A multicast VNC session is setup in the same way as a traditional
+ one: After the handshaking phase is completed and the client is
+ authenticated, the usual initialisation messages occur. The client
+ now tells the server its preferred pixel format and encodings.
+ 
+ A client that understands multicast framebuffer updates tells the
+ server so by adding the MulticastVNC pseudo encoding (-831) to it's
+ SetEncodings message. As usual with pseudo encodings, the server
+ simply ignores the request if it doesn't support MulticastVNC. 
+
+ Otherwise, the server tells the client about the multicast address to
+ listen on for framebuffer updates: it sends back a 'FramebufferUpdate'
+ message consisting of one rectangle with:
+
+    * 'encoding-type' set to MulticastVNC
+    * 'width' set to either 4 (IPv4) or 16 (IPv6)
+    * the pixel data set to an IPv4 or IPv6 address in network byte
+      order of 'width' length
+    * 'y-position' set to the UDP port to listen on
+
+ 
+
