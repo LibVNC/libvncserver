@@ -31,7 +31,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <arpa/inet.h>
 #else
+#include <winsock2.h>
 #define strncasecmp _strnicmp
 #endif
 #include <errno.h>
@@ -881,6 +883,9 @@ SetFormatAndEncodings(rfbClient* client)
   if (se->nEncodings < MAX_ENCODINGS)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingServerIdentity);
 
+  /* Multicast framebuffer updates */
+  if (se->nEncodings < MAX_ENCODINGS && client->canHandleMulticastVNC)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingMulticastVNC);
 
   /* client extensions */
   for(e = rfbClientExtensions; e; e = e->next)
@@ -1270,6 +1275,32 @@ HandleRFBServerMessage(rfbClient* client)
           free(buffer);
           continue;
       }
+
+      /* 
+         rect.r.w=address length (4 or 16 bytes)
+         rect.r.y=port
+       */
+      if (rect.encoding == rfbEncodingMulticastVNC) {
+	if(rect.r.w != 4 && rect.r.w != 16)
+	  {
+	    rfbClientErr("MulticastVNC: neither IPv4 nor IPv6 address received\n");
+	    return FALSE;
+	  }
+	
+	char *buffer = malloc(rect.r.w);
+	if (!ReadFromRFBServer(client, buffer, rect.r.w))
+          {
+	    free(buffer);
+	    return FALSE;
+          }
+	
+	struct in_addr addr;
+	addr.s_addr = rfbClientSwap32IfLE(*(in_addr_t*)buffer);
+	rfbClientLog("MulticastVNC: got multicast address %s:%d\n", inet_ntoa(addr), rect.r.y);
+	free(buffer);
+	continue;
+      }
+
 
       /* rfbEncodingUltraZip is a collection of subrects.   x = # of subrects, and h is always 0 */
       if (rect.encoding != rfbEncodingUltraZip)

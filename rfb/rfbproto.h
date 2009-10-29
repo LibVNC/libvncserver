@@ -70,6 +70,7 @@
 
 
 #if !defined(WIN32) || defined(__MINGW32__)
+#undef max
 #define max(a,b) (((a)>(b))?(a):(b))
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -462,6 +463,9 @@ typedef struct {
 #define rfbEncodingSupportedMessages  0xFFFE0001
 #define rfbEncodingSupportedEncodings 0xFFFE0002
 #define rfbEncodingServerIdentity     0xFFFE0003
+
+/* MulticastVNC pseudo encoding */
+#define rfbEncodingMulticastVNC       0xFFFFFCC1
 
 
 /*****************************************************************************

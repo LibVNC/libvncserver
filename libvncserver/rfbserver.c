@@ -391,6 +391,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->enableSupportedMessages = FALSE;
       cl->enableSupportedEncodings = FALSE;
       cl->enableServerIdentity = FALSE;
+      cl->enableMulticastVNC = FALSE;
       cl->lastKeyboardLedState = -1;
       cl->cursorX = rfbScreen->cursorX;
       cl->cursorY = rfbScreen->cursorY;
@@ -945,6 +946,7 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 	rfbEncodingSupportedMessages,
 	rfbEncodingSupportedEncodings,
 	rfbEncodingServerIdentity,
+	rfbEncodingMulticastVNC,
     };
     uint32_t nEncodings = sizeof(supported) / sizeof(supported[0]), i;
 
@@ -997,6 +999,7 @@ rfbSetServerVersionIdentity(rfbScreenInfoPtr screen, char *fmt, ...)
     screen->versionString = strdup(buffer);
 }
 
+
 /*
  * Send rfbEncodingServerIdentity.
  */
@@ -1041,6 +1044,56 @@ rfbSendServerIdentity(rfbClientPtr cl)
 
     return TRUE;
 }
+
+
+/*
+ * Send address where to listen for multicast FramebufferUpdates.
+ * By now only supports IPv4.
+ */
+
+rfbBool
+rfbSendMulticastVNCAddress(rfbClientPtr cl)
+{
+   rfbFramebufferUpdateRectHeader rect;
+  
+   const uint8_t addrbytes = 4; /* could also be 16 if we supported IPv6 */
+   struct in_addr addr;
+   addr.s_addr = inet_addr("192.168.42.123");
+   uint16_t port = 666;
+
+   /* flush the buffer if messages wouldn't fit */
+   if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + addrbytes > UPDATE_BUF_SIZE) {
+     if (!rfbSendUpdateBuf(cl))
+       return FALSE;
+   }
+
+   rect.encoding = Swap32IfLE(rfbEncodingMulticastVNC);
+   rect.r.x = 0;
+   rect.r.y = Swap16IfLE(port);
+   rect.r.w = Swap16IfLE(addrbytes);
+   rect.r.h = 0;
+
+   memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+	  sz_rfbFramebufferUpdateRectHeader);
+   cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+
+   in_addr_t addr_nbo = Swap32IfLE(addr.s_addr);
+   memcpy(&cl->updateBuf[cl->ublen], (char *)&addr_nbo, addrbytes);
+   cl->ublen += addrbytes;
+
+
+   rfbStatRecordEncodingSent(cl, rfbEncodingMulticastVNC,
+			     sz_rfbFramebufferUpdateRectHeader + addrbytes,
+			     sz_rfbFramebufferUpdateRectHeader + addrbytes);
+
+   if (!rfbSendUpdateBuf(cl))
+      return FALSE;
+   
+   return TRUE;
+}
+
+
 
 rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *buffer)
 {
@@ -1888,6 +1941,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->enableSupportedMessages  = FALSE;
         cl->enableSupportedEncodings = FALSE;
         cl->enableServerIdentity     = FALSE;
+        cl->enableMulticastVNC       = FALSE;
 
 
         for (i = 0; i < msg.se.nEncodings; i++) {
@@ -1994,6 +2048,13 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                   rfbLog("Enabling ServerIdentity protocol extension for client "
                           "%s\n", cl->host);
                   cl->enableServerIdentity = TRUE;
+                }
+                break;           
+            case rfbEncodingMulticastVNC:
+                if (!cl->enableMulticastVNC) {
+                  rfbLog("Enabling MulticastVNC protocol extension for client "
+                          "%s\n", cl->host);
+                  cl->enableMulticastVNC = TRUE;
                 }
                 break;           
             default:
@@ -2427,6 +2488,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     rfbBool sendSupportedMessages = FALSE;
     rfbBool sendSupportedEncodings = FALSE;
     rfbBool sendServerIdentity = FALSE;
+    rfbBool sendMulticastVNC = FALSE;
     rfbBool result = TRUE;
     
 
@@ -2516,6 +2578,17 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
          */
         cl->enableServerIdentity = FALSE;
     }
+    /*
+     * Do we plan to send a MulticastVNC message?
+     */
+    if (cl->enableMulticastVNC)
+    {
+        sendMulticastVNC = TRUE;
+        /* We only send this message ONCE <per setEncodings message received>
+         * (We disable it here)
+         */
+        cl->enableMulticastVNC = FALSE;
+    }
 
     LOCK(cl->updateMutex);
 
@@ -2561,7 +2634,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
        (cl->enableCursorShapeUpdates ||
 	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY)) &&
        !sendCursorShape && !sendCursorPos && !sendKeyboardLedState &&
-       !sendSupportedMessages && !sendSupportedEncodings && !sendServerIdentity) {
+       !sendSupportedMessages && !sendSupportedEncodings && !sendServerIdentity && !sendMulticastVNC) {
       sraRgnDestroy(updateRegion);
       UNLOCK(cl->updateMutex);
       return TRUE;
@@ -2725,7 +2798,8 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	fu->nRects = Swap16IfLE((uint16_t)(sraRgnCountRects(updateCopyRegion) +
 					   nUpdateRegionRects +
 					   !!sendCursorShape + !!sendCursorPos + !!sendKeyboardLedState +
-					   !!sendSupportedMessages + !!sendSupportedEncodings + !!sendServerIdentity));
+					   !!sendSupportedMessages + !!sendSupportedEncodings + !!sendServerIdentity +
+					   !!sendMulticastVNC));
     } else {
 	fu->nRects = 0xFFFF;
     }
@@ -2758,6 +2832,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
    }
    if (sendServerIdentity) {
        if (!rfbSendServerIdentity(cl))
+           goto updateFailed;
+   }
+   if (sendMulticastVNC) {
+       if (!rfbSendMulticastVNCAddress(cl))
            goto updateFailed;
    }
    

@@ -125,6 +125,7 @@ char *encodingName(uint32_t type, char *buf, int len) {
     case rfbEncodingSupportedMessages:  snprintf(buf, len, "SupportedMessage");  break;
     case rfbEncodingSupportedEncodings: snprintf(buf, len, "SupportedEncoding"); break;
     case rfbEncodingServerIdentity:     snprintf(buf, len, "ServerIdentify");    break;
+    case rfbEncodingMulticastVNC:       snprintf(buf, len, "MulticastVNC");    break;
 
     /* The following lookups do not report in stats */
     case rfbEncodingCompressLevel0: snprintf(buf, len, "CompressLevel0");  break;

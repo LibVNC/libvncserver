@@ -221,6 +221,9 @@ typedef struct _rfbClient {
 
 	int canHandleNewFBSize;
 
+	/* Multicast framebuffer updates */
+	int canHandleMulticastVNC;
+
 	/* hooks */
 	HandleTextChatProc         HandleTextChat;
 	HandleKeyboardLedStateProc HandleKeyboardLedState;
