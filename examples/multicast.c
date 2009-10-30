@@ -1,5 +1,3 @@
-#include <rfb/rfb.h>
-
 
 /*
  * a simple MulticastVNC server
@@ -7,6 +5,8 @@
  *
  */
 
+
+#include <rfb/rfb.h>
 
 
 int main(int argc,char** argv)

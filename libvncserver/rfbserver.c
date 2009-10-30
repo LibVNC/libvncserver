@@ -1056,10 +1056,15 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
 {
    rfbFramebufferUpdateRectHeader rect;
   
-   const uint8_t addrbytes = 4; /* could also be 16 if we supported IPv6 */
-   struct in_addr addr;
-   addr.s_addr = inet_addr("192.168.42.123");
-   uint16_t port = 666;
+   const uint8_t addrbytes = sizeof(cl->screen->multicastSockAddr);
+   
+   rfbLog("--> sending %d bytes\n", addrbytes);
+   
+   //FIXME
+   struct sockaddr_in* ipv4addr = (struct sockaddr_in*) &cl->screen->multicastSockAddr;
+   ipv4addr->sin_family = AF_INET;
+   ipv4addr->sin_addr.s_addr = inet_addr("192.168.42.123");
+   ipv4addr->sin_port = 666;
 
    /* flush the buffer if messages wouldn't fit */
    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + addrbytes > UPDATE_BUF_SIZE) {
@@ -1069,7 +1074,7 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
 
    rect.encoding = Swap32IfLE(rfbEncodingMulticastVNC);
    rect.r.x = 0;
-   rect.r.y = Swap16IfLE(port);
+   rect.r.y = 0;
    rect.r.w = Swap16IfLE(addrbytes);
    rect.r.h = 0;
 
@@ -1078,8 +1083,8 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
 
-   in_addr_t addr_nbo = Swap32IfLE(addr.s_addr);
-   memcpy(&cl->updateBuf[cl->ublen], (char *)&addr_nbo, addrbytes);
+   //in_addr_t addr_nbo = Swap32IfLE(addr.s_addr);
+   memcpy(&cl->updateBuf[cl->ublen], (char *) &cl->screen->multicastSockAddr, addrbytes);
    cl->ublen += addrbytes;
 
 

@@ -1,4 +1,7 @@
-/* A simple example of a multicast RFB client */
+/*
+ * The client part of the multicast vnc extension example.
+ *
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,12 +13,6 @@
 static void HandleRect(rfbClient* client, int x, int y, int w, int h) 
 {
 }
-
-/*
- * The client part of the multicast vnc extension example.
- *
- */
-
 
 
 

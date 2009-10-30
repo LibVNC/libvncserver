@@ -1281,11 +1281,14 @@ HandleRFBServerMessage(rfbClient* client)
          rect.r.y=port
        */
       if (rect.encoding == rfbEncodingMulticastVNC) {
-	if(rect.r.w != 4 && rect.r.w != 16)
+	/*if(rect.r.w != 4 && rect.r.w != 16)
 	  {
 	    rfbClientErr("MulticastVNC: neither IPv4 nor IPv6 address received\n");
 	    return FALSE;
 	  }
+	*/
+	rfbClientLog("--> receiving %d bytes\n", rect.r.w);
+
 	
 	char *buffer = malloc(rect.r.w);
 	if (!ReadFromRFBServer(client, buffer, rect.r.w))
@@ -1294,9 +1297,15 @@ HandleRFBServerMessage(rfbClient* client)
 	    return FALSE;
           }
 	
-	struct in_addr addr;
-	addr.s_addr = rfbClientSwap32IfLE(*(in_addr_t*)buffer);
-	rfbClientLog("MulticastVNC: got multicast address %s:%d\n", inet_ntoa(addr), rect.r.y);
+
+	struct sockaddr_in* ipv4addr = (struct sockaddr_in*) buffer;
+
+
+
+	//	addr.s_addr = rfbClientSwap32IfLE(*(in_addr_t*)buffer);
+	rfbClientLog("MulticastVNC: got multicast address %s:%d\n", 
+		     inet_ntoa(ipv4addr->sin_addr),
+		     ipv4addr->sin_port);
 	free(buffer);
 	continue;
       }
