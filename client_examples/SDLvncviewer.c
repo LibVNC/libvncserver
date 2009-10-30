@@ -1,4 +1,5 @@
 #include <SDL.h>
+#include <signal.h>
 #include <rfb/rfbclient.h>
 #include "scrap.h"
 
@@ -498,6 +499,7 @@ int main(int argc,char** argv) {
 	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY,
 			SDL_DEFAULT_REPEAT_INTERVAL);
 	atexit(SDL_Quit);
+	signal(SIGINT, exit);
 
 	do {
 	  /* 16-bit: cl=rfbGetClient(5,3,2); */
