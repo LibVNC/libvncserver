@@ -246,25 +246,26 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
 }
 
 
-/*
- * ConnectToTcpAddr connects to the given TCP port.
- */
 
 static int initSockets() {
 #ifdef WIN32
   WSADATA trash;
   static rfbBool WSAinitted=FALSE;
   if(!WSAinitted) {
-    WSAinitted=TRUE;
     int i=WSAStartup(MAKEWORD(2,0),&trash);
     if(i!=0) {
       rfbClientErr("Couldn't init Windows Sockets\n");
-      return -1;
+      return 0;
     }
+    WSAinitted=TRUE;
   }
 #endif
   return 1;
 }
+
+/*
+ * ConnectToTcpAddr connects to the given TCP port.
+ */
 
 int
 ConnectClientToTcpAddr(unsigned int host, int port)
@@ -349,6 +350,9 @@ FindFreeTcpPort(void)
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
+  if (!initSockets())
+    return -1;
+
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     rfbClientErr(": FindFreeTcpPort: socket\n");
@@ -382,6 +386,9 @@ ListenAtTcpPort(int port)
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+  if (!initSockets())
+    return -1;
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
