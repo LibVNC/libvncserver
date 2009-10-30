@@ -178,6 +178,19 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	FD_SET(rfbScreen->udpSock, &(rfbScreen->allFds));
 	rfbScreen->maxFd = max((int)rfbScreen->udpSock,rfbScreen->maxFd);
     }
+
+    if (rfbScreen->multicastVNC) {
+        rfbLog("Enabling MulticastVNC on %s:%d\n", rfbScreen->multicastAddr, rfbScreen->multicastPort);
+	if ((rfbScreen->multicastSock = rfbCreateMulticastSocket(rfbScreen->multicastAddr, 
+								 rfbScreen->multicastPort,
+								 rfbScreen->multicastTTL,
+								 iface)) < 0) 
+	  {
+	    rfbLogPerror("CreateMulticastSocket");
+	    return;
+	  }
+    }
+
 }
 
 void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
@@ -203,6 +216,11 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
 	closesocket(rfbScreen->udpSock);
 	FD_CLR(rfbScreen->udpSock,&rfbScreen->allFds);
 	rfbScreen->udpSock=-1;
+    }
+
+    if(rfbScreen->multicastSock>-1) {
+	closesocket(rfbScreen->multicastSock);
+	rfbScreen->multicastSock=-1;
     }
 }
 
@@ -704,4 +722,67 @@ rfbListenOnUDPPort(int port,
     }
 
     return sock;
+}
+
+
+int 
+rfbCreateMulticastSocket(char* addr, 	
+			 int port,
+			 uint8_t ttl,
+			 in_addr_t iface)
+{
+  int sock;
+  int flag = 1;
+
+  struct sockaddr_in addrLocal;
+  memset(&addrLocal, 0, sizeof(addrLocal));
+  addrLocal.sin_family = AF_INET;
+  addrLocal.sin_port = htons(port);
+  addrLocal.sin_addr.s_addr = iface;	
+
+  /* this the multicast destination */
+  struct ip_mreq	ipmr;
+  ipmr.imr_multiaddr.s_addr = inet_addr("224.0.1.251");
+  ipmr.imr_interface.s_addr = iface;
+
+
+  if((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+    return -1;
+	
+  if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&flag, sizeof(flag)) < 0)
+    {
+      closesocket(sock);
+      return -1;
+    }
+    
+  if(bind(sock, (struct sockaddr*) &addrLocal, sizeof(addrLocal))) 
+    { 
+      closesocket(sock);
+      return -1;
+    }
+
+  /* Set the multicast ttl */
+  if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
+    { 
+      closesocket(sock);
+      return -1;
+    }
+  /* Add socket to be a member of the multicast group */
+  if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&ipmr, sizeof(ipmr)) < 0)
+    { 
+      closesocket(sock);
+      return -1;
+    }	
+
+  /* set to nonblock */
+#ifdef WIN32
+  unsigned long block=1;
+  ioctlsocket(sock, FIONBIO, &block);
+#else
+  flag =  fcntl(sock, F_GETFL, 0);
+  flag |= O_NONBLOCK;
+  fcntl(sock, F_SETFL, flag);
+#endif
+	
+  return sock;
 }

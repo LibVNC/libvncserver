@@ -814,6 +814,12 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->udpPort=0;
    screen->udpClient=NULL;
 
+   screen->multicastVNC=FALSE;
+   screen->multicastSock=-1;
+   screen->multicastAddr=NULL;
+   screen->multicastPort=5900;
+   screen->multicastTTL=1;
+
    screen->maxFd=0;
    screen->listenSock=-1;
 
