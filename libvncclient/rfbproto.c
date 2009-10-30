@@ -1553,6 +1553,9 @@ HandleRFBServerMessage(rfbClient* client)
     if (!SendIncrementalFramebufferUpdateRequest(client))
       return FALSE;
 
+    if (client->FinishedFrameBufferUpdate)
+      client->FinishedFrameBufferUpdate(client);
+
     break;
   }
 

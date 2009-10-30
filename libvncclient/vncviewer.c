@@ -173,6 +173,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->SoftCursorLockArea = DummyRect;
   client->SoftCursorUnlockScreen = Dummy;
   client->GotFrameBufferUpdate = DummyRect;
+  client->FinishedFrameBufferUpdate = NULL;
   client->GetPassword = ReadPassword;
   client->MallocFrameBuffer = MallocFrameBuffer;
   client->Bell = Dummy;
