@@ -250,13 +250,7 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
  * ConnectToTcpAddr connects to the given TCP port.
  */
 
-int
-ConnectClientToTcpAddr(unsigned int host, int port)
-{
-  int sock;
-  struct sockaddr_in addr;
-  int one = 1;
-
+static int initSockets() {
 #ifdef WIN32
   WSADATA trash;
   static rfbBool WSAinitted=FALSE;
@@ -269,6 +263,18 @@ ConnectClientToTcpAddr(unsigned int host, int port)
     }
   }
 #endif
+  return 1;
+}
+
+int
+ConnectClientToTcpAddr(unsigned int host, int port)
+{
+  int sock;
+  struct sockaddr_in addr;
+  int one = 1;
+
+  if (!initSockets())
+	  return -1;
 
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
@@ -464,7 +470,7 @@ StringToIPAddr(const char *str, unsigned int *addr)
   struct hostent *hp;
 
   if (strcmp(str,"") == 0) {
-    *addr = 0; /* local */
+    *addr = htonl(INADDR_LOOPBACK); /* local */
     return TRUE;
   }
 
@@ -472,6 +478,9 @@ StringToIPAddr(const char *str, unsigned int *addr)
 
   if (*addr != -1)
     return TRUE;
+
+  if (!initSockets())
+	  return -1;
 
   hp = gethostbyname(str);
 

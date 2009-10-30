@@ -107,6 +107,7 @@ typedef rfbBool (*HandleCursorPosProc)(struct _rfbClient* client, int x, int y);
 typedef void (*SoftCursorLockAreaProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef void (*SoftCursorUnlockScreenProc)(struct _rfbClient* client);
 typedef void (*GotFrameBufferUpdateProc)(struct _rfbClient* client, int x, int y, int w, int h);
+typedef void (*FinishedFrameBufferUpdateProc)(struct _rfbClient* client);
 typedef char* (*GetPasswordProc)(struct _rfbClient* client);
 typedef rfbBool (*MallocFrameBufferProc)(struct _rfbClient* client);
 typedef void (*GotXCutTextProc)(struct _rfbClient* client, const char *text, int textlen);
@@ -231,6 +232,7 @@ typedef struct _rfbClient {
 	SoftCursorLockAreaProc SoftCursorLockArea;
 	SoftCursorUnlockScreenProc SoftCursorUnlockScreen;
 	GotFrameBufferUpdateProc GotFrameBufferUpdate;
+	FinishedFrameBufferUpdateProc FinishedFrameBufferUpdate;
 	/* the pointer returned by GetPassword will be freed after use! */
 	GetPasswordProc GetPassword;
 	MallocFrameBufferProc MallocFrameBuffer;
