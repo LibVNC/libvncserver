@@ -44,6 +44,8 @@ static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 static char* NoPassword(rfbClient* client) {
   return strdup("");
 }
+#undef SOCKET
+#include <winsock2.h>
 #define close closesocket
 #else
 #include <stdio.h>
