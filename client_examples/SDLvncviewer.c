@@ -356,7 +356,8 @@ static void cleanup(rfbClient* cl)
   */
   SDL_QuitSubSystem(SDL_INIT_VIDEO);
   SDL_InitSubSystem(SDL_INIT_VIDEO);
-  rfbClientCleanup(cl);
+  if(cl)
+    rfbClientCleanup(cl);
 }
 
 
@@ -513,6 +514,7 @@ int main(int argc,char** argv) {
 	  cl->listenPort = LISTEN_PORT_OFFSET;
 	  if(!rfbInitClient(cl,&argc,argv))
 	    {
+	      cl = NULL; /* rfbInitClient has already freed the client struct */
 	      cleanup(cl);
 	      break;
 	    }
