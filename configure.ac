@@ -681,6 +681,22 @@ if test ! -z "$MINGW"; then
 fi
 AC_SUBST(WSOCKLIB)
 
+# Checks for GnuTLS
+AH_TEMPLATE(WITH_CLIENT_TLS, [Enable support for gnutls in libvncclient])
+AC_ARG_WITH(gnutls,
+[  --without-gnutls        disable support for gnutls],,)
+AC_ARG_WITH(client-tls,
+[  --without-client-tls    disable support for gnutls in libvncclient],,)
+
+if test "x$with_gnutls" != "xno"; then
+	PKG_CHECK_MODULES(GNUTLS, gnutls >= 2.8.0, , with_client_tls=no)
+	CFLAGS="$CFLAGS $GNUTLS_CFLAGS"
+	LIBS="$LIBS $GNUTLS_LIBS"
+	if test "x$with_client_tls" != "xno"; then
+		AC_DEFINE(WITH_CLIENT_TLS)
+	fi
+fi
+
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h])
