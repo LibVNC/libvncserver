@@ -180,9 +180,30 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
     }
 
     if (rfbScreen->multicastVNC) {
-        rfbLog("Enabling MulticastVNC on %s:%d\n", rfbScreen->multicastAddr, rfbScreen->multicastPort);
-	if ((rfbScreen->multicastSock = rfbCreateMulticastSocket(rfbScreen->multicastAddr, 
-								 rfbScreen->multicastPort,
+        rfbLog("Enabling MulticastVNC on %s:%d with a TTL of %d\n", 
+	       rfbScreen->multicastAddr, rfbScreen->multicastPort, rfbScreen->multicastTTL);
+
+	/* convert to sockaddr_storage */
+	struct addrinfo *result;
+	struct addrinfo hints;        
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+	hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+	hints.ai_flags = AI_NUMERICHOST;
+
+	char serv[8];
+	snprintf(serv, sizeof(serv), "%d", rfbScreen->multicastPort);
+
+	if(getaddrinfo(rfbScreen->multicastAddr, serv, &hints, &result) != 0)
+	  {
+	    rfbLogPerror("MulticastSocket Lookup");
+	    return;
+	  }
+
+	rfbScreen->multicastSockAddr = *(struct sockaddr_storage*)result->ai_addr;
+	freeaddrinfo(result);  
+          
+	if ((rfbScreen->multicastSock = rfbCreateMulticastSocket(&rfbScreen->multicastSockAddr, 
 								 rfbScreen->multicastTTL,
 								 iface)) < 0) 
 	  {
@@ -190,7 +211,6 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	    return;
 	  }
     }
-
 }
 
 void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
@@ -726,18 +746,20 @@ rfbListenOnUDPPort(int port,
 
 
 int 
-rfbCreateMulticastSocket(char* addr, 	
-			 int port,
+rfbCreateMulticastSocket(struct sockaddr_storage* sockaddr, 	
 			 uint8_t ttl,
 			 in_addr_t iface)
 {
   int sock;
   int flag = 1;
 
+  return 123;
+
+
   struct sockaddr_in addrLocal;
   memset(&addrLocal, 0, sizeof(addrLocal));
   addrLocal.sin_family = AF_INET;
-  addrLocal.sin_port = htons(port);
+  addrLocal.sin_port = htons(666);
   addrLocal.sin_addr.s_addr = iface;	
 
   /* this the multicast destination */

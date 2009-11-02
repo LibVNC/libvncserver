@@ -17,12 +17,13 @@ int main(int argc,char** argv)
   /* enable MulticastVNC */
   server->multicastVNC = TRUE;
   /* 
-     if we said TRUE above, we have to supply a valid multicast address plus port,
-     otherwise rfbInitServer will fail
+     if we said TRUE above, we can supply the address for the multicast group,
+     port and TTL, otherwise libvncserver will use its defaults.
   */
-  server->multicastAddr = "192.168.42.123";
-  server->multicastPort = 6666;
-  
+  server->multicastAddr = "ff01::1";
+  /*server->multicastPort = 6666;
+  server->multicastTTL = 128;
+  */
   rfbInitServer(server);           
   rfbRunEventLoop(server,-1,FALSE);
   return(0);

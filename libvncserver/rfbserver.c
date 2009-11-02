@@ -1048,49 +1048,63 @@ rfbSendServerIdentity(rfbClientPtr cl)
 
 /*
  * Send address where to listen for multicast FramebufferUpdates.
- * By now only supports IPv4.
  */
 
 rfbBool
 rfbSendMulticastVNCAddress(rfbClientPtr cl)
 {
    rfbFramebufferUpdateRectHeader rect;
-  
-   const uint8_t addrbytes = sizeof(cl->screen->multicastSockAddr);
+   uint8_t addr_len;
+   char* addr_ptr;
+   uint16_t port;
+
+   switch(cl->screen->multicastSockAddr.ss_family)
+     {
+       /* port and addr already in network byte order */
+     case AF_INET:
+       addr_len = 4;
+       struct sockaddr_in* ipv4sock = (struct sockaddr_in*) &cl->screen->multicastSockAddr;
+       port = ipv4sock->sin_port;
+       addr_ptr = (char*) &ipv4sock->sin_addr.s_addr;
+       break;
+     case AF_INET6:
+       addr_len = 16;
+       struct sockaddr_in6* ipv6sock = (struct sockaddr_in6*) &cl->screen->multicastSockAddr;
+       port = ipv6sock->sin6_port; 
+       addr_ptr = (char*) &ipv6sock->sin6_addr.s6_addr;
+       break;
+     default: 
+       return FALSE;
+     }
    
-   rfbLog("--> sending %d bytes\n", addrbytes);
-   
-   //FIXME
-   struct sockaddr_in* ipv4addr = (struct sockaddr_in*) &cl->screen->multicastSockAddr;
-   ipv4addr->sin_family = AF_INET;
-   ipv4addr->sin_addr.s_addr = inet_addr("192.168.42.123");
-   ipv4addr->sin_port = 666;
+   // FIXME debug
+   rfbLog("--> sending %d bytes\n", addr_len);
+   rfbLog("--> port %d\n", Swap16IfLE(port));
+   rfbLog("--> addr %s\n", inet_ntoa( *(struct in_addr*) addr_ptr ));
 
    /* flush the buffer if messages wouldn't fit */
-   if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + addrbytes > UPDATE_BUF_SIZE) {
+   if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + addr_len > UPDATE_BUF_SIZE) {
      if (!rfbSendUpdateBuf(cl))
        return FALSE;
    }
 
    rect.encoding = Swap32IfLE(rfbEncodingMulticastVNC);
    rect.r.x = 0;
-   rect.r.y = 0;
-   rect.r.w = Swap16IfLE(addrbytes);
+   rect.r.y = port;
+   rect.r.w = Swap16IfLE(addr_len);
    rect.r.h = 0;
 
    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
 	  sz_rfbFramebufferUpdateRectHeader);
    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-
-   //in_addr_t addr_nbo = Swap32IfLE(addr.s_addr);
-   memcpy(&cl->updateBuf[cl->ublen], (char *) &cl->screen->multicastSockAddr, addrbytes);
-   cl->ublen += addrbytes;
+   memcpy(&cl->updateBuf[cl->ublen], addr_ptr, addr_len);
+   cl->ublen += addr_len;
 
 
    rfbStatRecordEncodingSent(cl, rfbEncodingMulticastVNC,
-			     sz_rfbFramebufferUpdateRectHeader + addrbytes,
-			     sz_rfbFramebufferUpdateRectHeader + addrbytes);
+			     sz_rfbFramebufferUpdateRectHeader + addr_len,
+			     sz_rfbFramebufferUpdateRectHeader + addr_len);
 
    if (!rfbSendUpdateBuf(cl))
       return FALSE;

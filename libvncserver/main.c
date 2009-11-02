@@ -816,7 +816,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    screen->multicastVNC=FALSE;
    screen->multicastSock=-1;
-   screen->multicastAddr=NULL;
+   /* next one is some random default out of the AD-HOC Block (224.0.2.0/24 - 224.0.255.0/24) see RFC 3171 */
+   screen->multicastAddr="224.0.42.138";
    screen->multicastPort=5900;
    screen->multicastTTL=1;
 

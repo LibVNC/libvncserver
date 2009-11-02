@@ -667,7 +667,7 @@ extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern int rfbConnectToTcpAddr(char* host, int port);
 extern int rfbListenOnTCPPort(int port, in_addr_t iface);
 extern int rfbListenOnUDPPort(int port, in_addr_t iface);
-extern int rfbCreateMulticastSocket(char* addr, int port, uint8_t ttl, in_addr_t iface);
+extern int rfbCreateMulticastSocket(struct sockaddr_storage* sockaddr, uint8_t ttl, in_addr_t iface);
 extern int rfbStringToAddr(char* string,in_addr_t* addr);
 
 /* rfbserver.c */

@@ -49,10 +49,13 @@
  message consisting of one rectangle with:
 
     * 'encoding-type' set to MulticastVNC
-    * 'width' set to either 4 (IPv4) or 16 (IPv6)
-    * the pixel data set to an IPv4 or IPv6 address in network byte
-      order of 'width' length
-    * 'y-position' set to the UDP port to listen on
+    * 'x-position' is set to MulticastVNC protocol version. 
+      For a value of 0, these fields have the following meaning:
+
+          * 'width' set to either 4 (IPv4) or 16 (IPv6)
+ 	  * the pixel data set to an IPv4 or IPv6 address in network
+            byte order of 'width' length
+          * 'y-position' set to the UDP port to listen on
 
  
 
