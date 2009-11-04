@@ -263,7 +263,7 @@ static void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
   c=rfbScreen->cursor = rfbMakeXCursor(w,h,bitmap,bitmap);
   c->xhot = 16; c->yhot = 24;
 
-  c->richSource = (char*)malloc(w*h*bpp);
+  c->richSource = (unsigned char*)malloc(w*h*bpp);
   c->cleanupRichSource = TRUE;
   for(j=0;j<h;j++) {
     for(i=0;i<w;i++) {
