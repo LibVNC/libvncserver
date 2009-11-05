@@ -183,27 +183,8 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
         rfbLog("Enabling MulticastVNC on %s:%d with a TTL of %d\n", 
 	       rfbScreen->multicastAddr, rfbScreen->multicastPort, rfbScreen->multicastTTL);
 
-	/* convert to sockaddr_storage */
-	struct addrinfo *result;
-	struct addrinfo hints;        
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-	hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-	hints.ai_flags = AI_NUMERICHOST;
-
-	char serv[8];
-	snprintf(serv, sizeof(serv), "%d", rfbScreen->multicastPort);
-
-	if(getaddrinfo(rfbScreen->multicastAddr, serv, &hints, &result) != 0)
-	  {
-	    rfbLogPerror("MulticastSocket Lookup");
-	    return;
-	  }
-
-	rfbScreen->multicastSockAddr = *(struct sockaddr_storage*)result->ai_addr;
-	freeaddrinfo(result);  
-          
-	if ((rfbScreen->multicastSock = rfbCreateMulticastSocket(&rfbScreen->multicastSockAddr, 
+	if ((rfbScreen->multicastSock = rfbCreateMulticastSocket(rfbScreen->multicastAddr,
+								 rfbScreen->multicastPort,
 								 rfbScreen->multicastTTL,
 								 iface)) < 0) 
 	  {
@@ -746,65 +727,66 @@ rfbListenOnUDPPort(int port,
 
 
 int 
-rfbCreateMulticastSocket(struct sockaddr_storage* sockaddr, 	
+rfbCreateMulticastSocket(char * addr,
+			 int port,
 			 uint8_t ttl,
 			 in_addr_t iface)
 {
+  //FIXME waht about iface?
+
   int sock;
-  int flag = 1;
+  int r;
+  char serv[8];
+  snprintf(serv, sizeof(serv), "%d", port);
 
-  return 123;
-
-
-  struct sockaddr_in addrLocal;
-  memset(&addrLocal, 0, sizeof(addrLocal));
-  addrLocal.sin_family = AF_INET;
-  addrLocal.sin_port = htons(666);
-  addrLocal.sin_addr.s_addr = iface;	
-
-  /* this the multicast destination */
-  struct ip_mreq	ipmr;
-  ipmr.imr_multiaddr.s_addr = inet_addr("224.0.1.251");
-  ipmr.imr_interface.s_addr = iface;
-
-
-  if((sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
-    return -1;
-	
-  if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&flag, sizeof(flag)) < 0)
+  /* resolve parameters into a addrinfo struct */
+  struct addrinfo *multicastAddrInfo;
+  struct addrinfo hints;        
+  memset(&hints, 0, sizeof(struct addrinfo));
+  hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+  hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+  hints.ai_flags = AI_NUMERICHOST;
+  
+  r = getaddrinfo(addr, serv, &hints, &multicastAddrInfo); 
+  if(r != 0)
     {
-      closesocket(sock);
+      rfbLog("rfbCreateMulticastSocket: %s", gai_strerror(r));
       return -1;
     }
-    
-  if(bind(sock, (struct sockaddr*) &addrLocal, sizeof(addrLocal))) 
-    { 
+  
+
+  /* Create socket for sending multicast datagrams */
+  if((sock = socket(multicastAddrInfo->ai_family, multicastAddrInfo->ai_socktype, 0)) < 0)
+    {
+      rfbLogPerror("rfbCreateMulticastSocket");
+      freeaddrinfo(multicastAddrInfo);  
+      return -1;
+    }
+
+  /* Set TTL of multicast packet */
+  if(setsockopt(sock,
+		multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
+		multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_HOPS : IP_MULTICAST_TTL,
+		(char*) &ttl, sizeof(ttl)) < 0 )
+    {
+      rfbLogPerror("rfbCreateMulticastSocket");
+      freeaddrinfo(multicastAddrInfo);  
       closesocket(sock);
       return -1;
     }
 
-  /* Set the multicast ttl */
-  if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl)) < 0)
-    { 
+  /* set the sending interface */
+  if(setsockopt (sock, 
+		 multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
+		 multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_IF : IP_MULTICAST_IF,
+		 (char*) &iface, sizeof(iface)) < 0)  
+    {
+      rfbLogPerror("rfbCreateMulticastSocket");
+      freeaddrinfo(multicastAddrInfo);  
       closesocket(sock);
       return -1;
     }
-  /* Add socket to be a member of the multicast group */
-  if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&ipmr, sizeof(ipmr)) < 0)
-    { 
-      closesocket(sock);
-      return -1;
-    }	
 
-  /* set to nonblock */
-#ifdef WIN32
-  unsigned long block=1;
-  ioctlsocket(sock, FIONBIO, &block);
-#else
-  flag =  fcntl(sock, F_GETFL, 0);
-  flag |= O_NONBLOCK;
-  fcntl(sock, F_SETFL, flag);
-#endif
-	
+  freeaddrinfo(multicastAddrInfo);  
   return sock;
 }

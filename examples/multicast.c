@@ -20,8 +20,9 @@ int main(int argc,char** argv)
      if we said TRUE above, we can supply the address for the multicast group,
      port and TTL, otherwise libvncserver will use its defaults.
   */
+  /*
   server->multicastAddr = "ff01::1";
-  /*server->multicastPort = 6666;
+  server->multicastPort = 6666;
   server->multicastTTL = 128;
   */
   rfbInitServer(server);           
