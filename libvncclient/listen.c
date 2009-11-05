@@ -127,7 +127,7 @@ listenForIncomingConnectionsNoFork(rfbClient* client, int timeout)
 
   client->listenSpecified = TRUE;
 
-  if (! client->listenSock)
+  if (client->listenSock < 0)
     {
       client->listenSock = ListenAtTcpPort(client->listenPort);
 
