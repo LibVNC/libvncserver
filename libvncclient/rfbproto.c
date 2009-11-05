@@ -34,7 +34,8 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #else
-#include <winsock2.h>
+#define WINVER 0x0501
+#include <ws2tcpip.h>
 #define strncasecmp _strnicmp
 #endif
 #include <errno.h>
