@@ -44,6 +44,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #endif
+#include "tls.h"
 
 void PrintInHex(char *buf, int len);
 
@@ -128,7 +129,16 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
   if (n <= RFB_BUF_SIZE) {
 
     while (client->buffered < n) {
-      int i = read(client->sock, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
+      int i;
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
+      if (client->tlsSession) {
+        i = ReadFromTLS(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
+      } else {
+#endif
+        i = read(client->sock, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
+      }
+#endif
       if (i <= 0) {
 	if (i < 0) {
 #ifdef WIN32
@@ -160,7 +170,16 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
   } else {
 
     while (n > 0) {
-      int i = read(client->sock, out, n);
+      int i;
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
+      if (client->tlsSession) {
+        i = ReadFromTLS(client, out, n);
+      } else {
+#endif
+        i = read(client->sock, out, n);
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
+      }
+#endif
       if (i <= 0) {
 	if (i < 0) {
 #ifdef WIN32
@@ -214,6 +233,16 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
   if (client->serverPort==-1)
     return TRUE; /* vncrec playing */
 
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
+  if (client->tlsSession) {
+    /* WriteToTLS() will guarantee either everything is written, or error/eof returns */
+    i = WriteToTLS(client, buf, n);
+    if (i <= 0) return FALSE;
+
+    return TRUE;
+  }
+#endif
+
   while (i < n) {
     j = write(client->sock, buf + i, (n - i));
     if (j <= 0) {
@@ -246,25 +275,26 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
 }
 
 
-/*
- * ConnectToTcpAddr connects to the given TCP port.
- */
 
 static int initSockets() {
 #ifdef WIN32
   WSADATA trash;
   static rfbBool WSAinitted=FALSE;
   if(!WSAinitted) {
-    WSAinitted=TRUE;
     int i=WSAStartup(MAKEWORD(2,0),&trash);
     if(i!=0) {
       rfbClientErr("Couldn't init Windows Sockets\n");
-      return -1;
+      return 0;
     }
+    WSAinitted=TRUE;
   }
 #endif
   return 1;
 }
+
+/*
+ * ConnectToTcpAddr connects to the given TCP port.
+ */
 
 int
 ConnectClientToTcpAddr(unsigned int host, int port)
@@ -349,6 +379,9 @@ FindFreeTcpPort(void)
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
+  if (!initSockets())
+    return -1;
+
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     rfbClientErr(": FindFreeTcpPort: socket\n");
@@ -382,6 +415,9 @@ ListenAtTcpPort(int port)
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+  if (!initSockets())
+    return -1;
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
