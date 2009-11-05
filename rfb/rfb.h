@@ -271,7 +271,6 @@ typedef struct _rfbScreenInfo
     int multicastPort;
     char multicastTTL;
     SOCKET multicastSock;
-    struct sockaddr_storage multicastSockAddr;
 
     int maxClientWait;
 

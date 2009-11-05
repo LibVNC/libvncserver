@@ -732,8 +732,6 @@ rfbCreateMulticastSocket(char * addr,
 			 uint8_t ttl,
 			 in_addr_t iface)
 {
-  //FIXME waht about iface?
-
   int sock;
   int r;
   char serv[8];
@@ -776,6 +774,7 @@ rfbCreateMulticastSocket(char * addr,
     }
 
   /* set the sending interface */
+  //FIXME does it have to be a ipv6 iface in case we're doing ipv6?
   if(setsockopt (sock, 
 		 multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
 		 multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_IF : IP_MULTICAST_IF,

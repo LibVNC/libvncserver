@@ -50,6 +50,7 @@
 #ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 #endif
 #endif
@@ -1054,32 +1055,42 @@ rfbBool
 rfbSendMulticastVNCAddress(rfbClientPtr cl)
 {
    rfbFramebufferUpdateRectHeader rect;
-   uint8_t addr_len;
-   char* addr_ptr;
-   uint16_t port;
+   uint8_t addr_len = 0;
+   char* addr_ptr = NULL;
+   int r;
+   char serv[8];
+   snprintf(serv, sizeof(serv), "%d", cl->screen->multicastPort);
 
-   switch(cl->screen->multicastSockAddr.ss_family)
+   /* resolve parameters into a addrinfo struct */
+   struct addrinfo *multicastAddrInfo;
+   struct addrinfo hints;        
+   memset(&hints, 0, sizeof(struct addrinfo));
+   hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+   hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+   hints.ai_flags = AI_NUMERICHOST;
+   
+   r = getaddrinfo(cl->screen->multicastAddr, serv, &hints, &multicastAddrInfo); 
+   if(r != 0)
      {
-       /* port and addr already in network byte order */
-     case AF_INET:
+       rfbLog("rfbSendMulticastAddress: %s", gai_strerror(r));
+       return -1;
+     }
+  
+   /* addr is already in network byte order */
+   if(multicastAddrInfo->ai_family == AF_INET)
+     {
        addr_len = 4;
-       struct sockaddr_in* ipv4sock = (struct sockaddr_in*) &cl->screen->multicastSockAddr;
-       port = ipv4sock->sin_port;
-       addr_ptr = (char*) &ipv4sock->sin_addr.s_addr;
-       break;
-     case AF_INET6:
+       addr_ptr = (char*) &((struct sockaddr_in*)multicastAddrInfo->ai_addr)->sin_addr.s_addr;
+     }
+   if(multicastAddrInfo->ai_family == AF_INET6)
+     {
        addr_len = 16;
-       struct sockaddr_in6* ipv6sock = (struct sockaddr_in6*) &cl->screen->multicastSockAddr;
-       port = ipv6sock->sin6_port; 
-       addr_ptr = (char*) &ipv6sock->sin6_addr.s6_addr;
-       break;
-     default: 
-       return FALSE;
+       addr_ptr = (char*) &((struct sockaddr_in6*)multicastAddrInfo->ai_addr)->sin6_addr.s6_addr;
      }
    
    // FIXME debug
    rfbLog("--> sending %d bytes\n", addr_len);
-   rfbLog("--> port %d\n", Swap16IfLE(port));
+   rfbLog("--> port %d\n", cl->screen->multicastPort);
    rfbLog("--> addr %s\n", inet_ntoa( *(struct in_addr*) addr_ptr ));
 
    /* flush the buffer if messages wouldn't fit */
@@ -1090,7 +1101,7 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
 
    rect.encoding = Swap32IfLE(rfbEncodingMulticastVNC);
    rect.r.x = 0;
-   rect.r.y = port;
+   rect.r.y = Swap16IfLE(cl->screen->multicastPort);
    rect.r.w = Swap16IfLE(addr_len);
    rect.r.h = 0;
 
