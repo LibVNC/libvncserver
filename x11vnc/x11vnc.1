@@ -2,7 +2,7 @@
 .TH X11VNC "1" "October 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.9, lastmod: 2009-10-07
+         version: 0.9.9, lastmod: 2009-10-15
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -867,6 +867,11 @@ Otherwise the "__BEGIN_VIEWONLY__" token must be
 used to have viewonly passwords.  (tip: make the 3rd
 and last line be "__BEGIN_VIEWONLY__" to have 2
 full-access passwords)
+.PP
+\fB-showrfbauth\fR \fIfilename\fR
+.IP
+Print to the screen the obscured VNC password kept in
+the rfbauth file \fIfilename\fR and then exit.
 .PP
 \fB-unixpw\fR \fI[list]\fR
 .IP
@@ -2856,19 +2861,22 @@ For a different one specify the X color (rgb.txt name,
 e.g. "darkblue" or numerical "#RRGGBB").
 .IP
 Currently this option only works on GNOME, KDE, CDE,
-and classic X (i.e. with the background image on the
-root window).  The "gconftool-2" and "dcop" external
-commands are run for GNOME and KDE respectively.
-Other desktops won't work, e.g. Xfce (send us the
-corresponding commands if you find them).  If x11vnc is
-running as root (
+XFCE, and classic X (i.e. with the background image
+on the root window).  The "gconftool-2", "dcop"
+and "xfconf-query" external commands are run for
+GNOME, KDE, and XFCE respectively.  This also works
+on native MacOSX.  (There is no color selection for
+MacOSX or XFCE.)  Other desktops won't work, (send
+us the corresponding commands if you find them).
+If x11vnc is running as root (
 .IR inetd (8)
 or 
 .IR gdm (1)
-), the \fB-users\fR option
-may be needed for GNOME and KDE.  If x11vnc guesses
-your desktop incorrectly, you can force it by prefixing
-color with "gnome:", "kde:", "cde:" or "root:".
+),
+the \fB-users\fR option may be needed for GNOME, KDE, XFCE.
+If x11vnc guesses your desktop incorrectly, you can
+force it by prefixing color with "gnome:", "kde:",
+"cde:", "xfce:", or "root:".
 .IP
 This mode works in a limited way on the Mac OS X Console
 with one color ('kelp') using the screensaver writing
@@ -6045,9 +6053,9 @@ macnoresize macresize nomacnoresize maciconanim macmenu
 macnomenu nomacmenu macuskbd nomacuskbd noremote
 .IP
 aro=  noop display vncdisplay autoport loop loopbg
-desktopname guess_desktop http_url auth xauth
-users rootshift clipshift scale_str scaled_x
-scaled_y scale_numer scale_denom scale_fac_x
+desktopname guess_desktop guess_dbus http_url
+auth xauth users rootshift clipshift scale_str
+scaled_x scaled_y scale_numer scale_denom scale_fac_x
 scale_fac_y scaling_blend scaling_nomult4 scaling_pad
 scaling_interpolate inetd privremote unsafe safer
 nocmds passwdfile unixpw unixpw_nis unixpw_list ssl

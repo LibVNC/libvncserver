@@ -1,3 +1,8 @@
+2009-10-17  Karl Runge <runge@karlrunge.com>
+	* x11vnc: support for -solid option in xfce desktop.  
+	  List -Q guess_dbus query. Implement -showrfbauth option.
+	  Workaround for inane X_ShmAttach incompatibility in Xorg.
+
 2009-10-08  Karl Runge <runge@karlrunge.com>
 	* x11vnc: bcx_xattach/x2x desktop switching facility.
 	  More remote control features: grab_state, ping:mystring,

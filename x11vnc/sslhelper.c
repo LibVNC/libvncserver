@@ -3639,8 +3639,8 @@ void accept_openssl(int mode, int presock) {
 
 		wrote_cookie:
 		ssl_xfer(vncsock, s_in, s_out, 0);
-
 		rfbLog("SSL: ssl_helper[%d]: exit case 7 (ssl_xfer done)\n", getpid());
+		if (0) usleep(50 * 1000);
 		exit(0);
 	}
 	/* parent here */

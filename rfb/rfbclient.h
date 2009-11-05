@@ -33,6 +33,9 @@
 #include <unistd.h>
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
+#include <gnutls/gnutls.h>
+#endif
 
 #define rfbClientSwap16IfLE(s) \
     (*(char *)&client->endianTest ? ((((s) & 0xff) << 8) | (((s) >> 8) & 0xff)) : (s))
@@ -42,6 +45,16 @@
 			     (((l) & 0x00ff0000) >> 8)  | \
 			     (((l) & 0x0000ff00) << 8)  | \
 			     (((l) & 0x000000ff) << 24))  : (l))
+
+#define rfbClientSwap64IfLE(l) \
+    (*(char *)&client->endianTest ? ((((l) & 0xff00000000000000ULL) >> 56) | \
+			     (((l) & 0x00ff000000000000ULL) >> 40)  | \
+			     (((l) & 0x0000ff0000000000ULL) >> 24)  | \
+			     (((l) & 0x000000ff00000000ULL) >> 8)  | \
+			     (((l) & 0x00000000ff000000ULL) << 8)  | \
+			     (((l) & 0x0000000000ff0000ULL) << 24)  | \
+			     (((l) & 0x000000000000ff00ULL) << 40)  | \
+			     (((l) & 0x00000000000000ffULL) << 56))  : (l))
 
 #define FLASH_PORT_OFFSET 5400
 #define LISTEN_PORT_OFFSET 5500
@@ -98,6 +111,27 @@ typedef struct {
   int scaleSetting; /* 0 means no scale set, else 1/scaleSetting */
 } AppData;
 
+/* For GetCredentialProc callback function to return */
+typedef union _rfbCredential
+{
+  /* X509 (VeNCrypt) */
+  struct
+  {
+    char *x509CACertFile;
+    char *x509CACrlFile;
+    char *x509ClientCertFile;
+    char *x509ClientKeyFile;
+  } x509Credential;
+  /* Plain (VeNCrypt), MSLogon (UltraVNC) */
+  struct
+  {
+    char *username;
+    char *password;
+  } userCredential;
+} rfbCredential;
+
+#define rfbCredentialTypeX509 1
+#define rfbCredentialTypeUser 2
 
 struct _rfbClient;
 
@@ -107,7 +141,9 @@ typedef rfbBool (*HandleCursorPosProc)(struct _rfbClient* client, int x, int y);
 typedef void (*SoftCursorLockAreaProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef void (*SoftCursorUnlockScreenProc)(struct _rfbClient* client);
 typedef void (*GotFrameBufferUpdateProc)(struct _rfbClient* client, int x, int y, int w, int h);
+typedef void (*FinishedFrameBufferUpdateProc)(struct _rfbClient* client);
 typedef char* (*GetPasswordProc)(struct _rfbClient* client);
+typedef rfbCredential* (*GetCredentialProc)(struct _rfbClient* client, int credentialType);
 typedef rfbBool (*MallocFrameBufferProc)(struct _rfbClient* client);
 typedef void (*GotXCutTextProc)(struct _rfbClient* client, const char *text, int textlen);
 typedef void (*BellProc)(struct _rfbClient* client);
@@ -149,6 +185,9 @@ typedef struct _rfbClient {
 	char *desktopName;
 	rfbPixelFormat format;
 	rfbServerInitMsg si;
+
+	/* listen.c */
+        int listenSock;
 
 	/* sockets.c */
 #define RFB_BUF_SIZE 8192
@@ -228,6 +267,7 @@ typedef struct _rfbClient {
 	SoftCursorLockAreaProc SoftCursorLockArea;
 	SoftCursorUnlockScreenProc SoftCursorUnlockScreen;
 	GotFrameBufferUpdateProc GotFrameBufferUpdate;
+	FinishedFrameBufferUpdateProc FinishedFrameBufferUpdate;
 	/* the pointer returned by GetPassword will be freed after use! */
 	GetPasswordProc GetPassword;
 	MallocFrameBufferProc MallocFrameBuffer;
@@ -249,6 +289,22 @@ typedef struct _rfbClient {
 
 	/* negotiated protocol version */
 	int major, minor;
+
+	/* The selected security types */
+	uint32_t authScheme, subAuthScheme;
+
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
+	/* The TLS session for Anonymous TLS and VeNCrypt */
+	gnutls_session_t tlsSession;
+#endif
+
+	/* To support security types that requires user input (except VNC password
+	 * authentication), for example VeNCrypt and MSLogon, this callback function
+	 * must be set before the authentication. Otherwise, it implicates that the
+	 * caller application does not support it and related security types should
+	 * be bypassed.
+	 */
+	GetCredentialProc GetCredential;
 } rfbClient;
 
 /* cursor.c */
@@ -258,6 +314,7 @@ extern rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width
 /* listen.c */
 
 extern void listenForIncomingConnections(rfbClient* viewer);
+extern rfbBool listenForIncomingConnectionsNoFork(rfbClient* viewer, int usec_timeout);
 
 /* rfbproto.c */
 
