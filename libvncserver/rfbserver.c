@@ -1057,13 +1057,13 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
    rfbFramebufferUpdateRectHeader rect;
    uint8_t addr_len = 0;
    char* addr_ptr = NULL;
+   struct addrinfo *multicastAddrInfo;
+   struct addrinfo hints;        
    int r;
    char serv[8];
    snprintf(serv, sizeof(serv), "%d", cl->screen->multicastPort);
 
-   /* resolve parameters into a addrinfo struct */
-   struct addrinfo *multicastAddrInfo;
-   struct addrinfo hints;        
+   /* resolve parameters into multicastAddrInfo struct */
    memset(&hints, 0, sizeof(struct addrinfo));
    hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
    hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
@@ -1088,11 +1088,7 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
        addr_ptr = (char*) &((struct sockaddr_in6*)multicastAddrInfo->ai_addr)->sin6_addr.s6_addr;
      }
    
-   // FIXME debug
-   rfbLog("--> sending %d bytes\n", addr_len);
-   rfbLog("--> port %d\n", cl->screen->multicastPort);
-   rfbLog("--> addr %s\n", inet_ntoa( *(struct in_addr*) addr_ptr ));
-
+ 
    /* flush the buffer if messages wouldn't fit */
    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + addr_len > UPDATE_BUF_SIZE) {
      if (!rfbSendUpdateBuf(cl))

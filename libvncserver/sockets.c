@@ -734,12 +734,12 @@ rfbCreateMulticastSocket(char * addr,
 {
   int sock;
   int r;
+  struct addrinfo *multicastAddrInfo;
+  struct addrinfo hints;        
   char serv[8];
   snprintf(serv, sizeof(serv), "%d", port);
 
-  /* resolve parameters into a addrinfo struct */
-  struct addrinfo *multicastAddrInfo;
-  struct addrinfo hints;        
+  /* resolve parameters into multicastAddrInfo struct */
   memset(&hints, 0, sizeof(struct addrinfo));
   hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
   hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
