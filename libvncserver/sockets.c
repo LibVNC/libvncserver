@@ -727,7 +727,7 @@ rfbListenOnUDPPort(int port,
 
 
 int 
-rfbCreateMulticastSocket(char * addr,
+rfbCreateMulticastSocket(char *addr,
 			 int port,
 			 int ttl,
 			 in_addr_t iface)
@@ -752,8 +752,7 @@ rfbCreateMulticastSocket(char * addr,
       return -1;
     }
   
-
-  /* Create socket for sending multicast datagrams */
+  /* create socket for sending multicast datagrams */
   if((sock = socket(multicastAddrInfo->ai_family, multicastAddrInfo->ai_socktype, 0)) < 0)
     {
       rfbLogPerror("rfbCreateMulticastSocket socket()");
@@ -761,11 +760,21 @@ rfbCreateMulticastSocket(char * addr,
       return -1;
     }
 
+  /* set to reuse address */
+  r = 1;
+  if(setsockopt(sock,SOL_SOCKET,SO_REUSEADDR, (char*)&r,sizeof(r)) <0)
+    {
+      rfbLogPerror("rfbCreateMulticastSocket reuseaddr setsockopt()");
+      freeaddrinfo(multicastAddrInfo);  
+      return -1;
+    } 
+
+
   /* Set TTL of multicast packet */
   if(setsockopt(sock,
 		multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
 		multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_HOPS : IP_MULTICAST_TTL,
-		(char*) &ttl, sizeof(ttl)) < 0 )
+		(char*)&ttl, sizeof(ttl)) < 0 )
     {
       rfbLogPerror("rfbCreateMulticastSocket ttl setsockopt()");
       freeaddrinfo(multicastAddrInfo);  
@@ -778,7 +787,7 @@ rfbCreateMulticastSocket(char * addr,
   if(setsockopt (sock, 
 		 multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
 		 multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_IF : IP_MULTICAST_IF,
-		 (char*) &iface, sizeof(iface)) < 0)  
+		 (char*)&iface, sizeof(iface)) < 0)  
     {
       rfbLogPerror("rfbCreateMulticastSocket interface setsockopt()");
       freeaddrinfo(multicastAddrInfo);  
@@ -786,6 +795,7 @@ rfbCreateMulticastSocket(char * addr,
       return -1;
     }
 
+ 
   freeaddrinfo(multicastAddrInfo);  
   return sock;
 }
