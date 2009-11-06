@@ -21,9 +21,9 @@ int main(int argc,char** argv)
      port and TTL, otherwise libvncserver will use its defaults.
   */
   /*
-  server->multicastAddr = "ff01::1";
-  server->multicastPort = 6666;
-  server->multicastTTL = 128;
+  server->multicastAddr = "ff00::e000:2a8a"; 
+  server->multicastPort = 5901;
+  server->multicastTTL = 32;
   */
   rfbInitServer(server);           
   rfbRunEventLoop(server,-1,FALSE);

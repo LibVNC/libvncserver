@@ -729,7 +729,7 @@ rfbListenOnUDPPort(int port,
 int 
 rfbCreateMulticastSocket(char * addr,
 			 int port,
-			 uint8_t ttl,
+			 int ttl,
 			 in_addr_t iface)
 {
   int sock;
@@ -756,7 +756,7 @@ rfbCreateMulticastSocket(char * addr,
   /* Create socket for sending multicast datagrams */
   if((sock = socket(multicastAddrInfo->ai_family, multicastAddrInfo->ai_socktype, 0)) < 0)
     {
-      rfbLogPerror("rfbCreateMulticastSocket");
+      rfbLogPerror("rfbCreateMulticastSocket socket()");
       freeaddrinfo(multicastAddrInfo);  
       return -1;
     }
@@ -767,12 +767,12 @@ rfbCreateMulticastSocket(char * addr,
 		multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_HOPS : IP_MULTICAST_TTL,
 		(char*) &ttl, sizeof(ttl)) < 0 )
     {
-      rfbLogPerror("rfbCreateMulticastSocket");
+      rfbLogPerror("rfbCreateMulticastSocket ttl setsockopt()");
       freeaddrinfo(multicastAddrInfo);  
       closesocket(sock);
       return -1;
     }
-
+   
   /* set the sending interface */
   //FIXME does it have to be a ipv6 iface in case we're doing ipv6?
   if(setsockopt (sock, 
@@ -780,7 +780,7 @@ rfbCreateMulticastSocket(char * addr,
 		 multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_IF : IP_MULTICAST_IF,
 		 (char*) &iface, sizeof(iface)) < 0)  
     {
-      rfbLogPerror("rfbCreateMulticastSocket");
+      rfbLogPerror("rfbCreateMulticastSocket interface setsockopt()");
       freeaddrinfo(multicastAddrInfo);  
       closesocket(sock);
       return -1;
