@@ -1516,32 +1516,26 @@ HandleRFBServerMessage(rfbClient* client)
          rect.r.y = port
        */
       if (rect.encoding == rfbEncodingMulticastVNC) {
+	char* buffer;
+	struct sockaddr_storage multicastSockAddr;
+	char host[512], serv[128];
+	int r;
+
 	if(rect.r.x != 0)
 	  {
 	    rfbClientErr("MulticastVNC: received protocol version %d, we only support 0\n", rect.r.x);
 	    return FALSE;
 	  }
-	if(rect.r.w != 4 && rect.r.w != 16)
-	  {
-	    rfbClientErr("MulticastVNC: neither IPv4 nor IPv6 address received\n");
-	    return FALSE;
-	  }
-	
-	//FIXME
-	rfbClientLog("--> receiving %d bytes\n", rect.r.w);
 
-	//FIXME das is im client
-	struct sockaddr_storage multicastSockAddr;
-
-	char *buffer = malloc(rect.r.w);
+	buffer = malloc(rect.r.w);
 	if (!ReadFromRFBServer(client, buffer, rect.r.w))
           {
 	    free(buffer);
 	    return FALSE;
           }
 
-	/* IPv4 */
-	if(rect.r.w == 4)
+	/* fill multicastSockAddr with approriate values */
+	if(rect.r.w == 4) /* IPv4 */
 	  {
 	    struct sockaddr_in* ipv4sock = (struct sockaddr_in*) &multicastSockAddr;
 	    ipv4sock->sin_family = AF_INET;
@@ -1549,30 +1543,35 @@ HandleRFBServerMessage(rfbClient* client)
 	    /* port has to be in NBO, but was swapped before, so swap again */
 	    ipv4sock->sin_port = rfbClientSwap16IfLE(rect.r.y); 
 	  }
-
-	/* IPv4 */
-	if(rect.r.w == 16)
-	  {
-	    struct sockaddr_in6* ipv6sock = (struct sockaddr_in6*) &multicastSockAddr;
-	    ipv6sock->sin6_family = AF_INET6;
-	    ipv6sock->sin6_addr = *(struct in6_addr*)buffer;
-	    /* port has to be in NBO, but was swapped before, so swap again */
-	    ipv6sock->sin6_port = rfbClientSwap16IfLE(rect.r.y); 
-	  }
-
-	char host[512], serv[128];
-	int r;
+	else
+	  if(rect.r.w == 16) /* IPv6 */
+	    {
+	      struct sockaddr_in6* ipv6sock = (struct sockaddr_in6*) &multicastSockAddr;
+	      ipv6sock->sin6_family = AF_INET6;
+	      ipv6sock->sin6_addr = *(struct in6_addr*)buffer;
+	      /* port has to be in NBO, but was swapped before, so swap again */
+	      ipv6sock->sin6_port = rfbClientSwap16IfLE(rect.r.y); 
+	    }
+	  else
+	    {
+	      rfbClientErr("MulticastVNC: neither IPv4 nor IPv6 address received\n");
+	      free(buffer);
+	      return FALSE;
+	    }
+	
 	r = getnameinfo((struct sockaddr*) &multicastSockAddr, sizeof(multicastSockAddr), 
 			host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
 	if (r != 0)
 	  {
-	    rfbClientLog("MulticastVNC: error with received address: %s\n", gai_strerror(r));
+	    rfbClientErr("MulticastVNC: received malformed address: %s\n", gai_strerror(r));
 	    free(buffer);
 	    return FALSE;
 	  }
 
 	rfbClientLog("MulticastVNC: received multicast address %s:%s\n", host, serv);
 
+	client->multicastSock = CreateMulticastSocket(multicastSockAddr);
+	
 	free(buffer);
 	continue;
       }

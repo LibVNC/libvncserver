@@ -180,6 +180,7 @@ typedef struct _rfbClient {
 	/* rfbproto.c */
 
 	int sock;
+        int multicastSock;
 	rfbBool canUseCoRRE;
 	rfbBool canUseHextile;
 	char *desktopName;
@@ -380,6 +381,7 @@ extern int ConnectClientToTcpAddr(unsigned int host, int port);
 extern int ConnectClientToUnixSock(const char *sockFile);
 extern int AcceptTcpConnection(int listenSock);
 extern rfbBool SetNonBlocking(int sock);
+extern int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr);
 
 extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
 extern rfbBool SameMachine(int sock);

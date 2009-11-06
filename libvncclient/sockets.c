@@ -613,3 +613,91 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 }
 
 
+
+
+
+
+
+int 
+CreateMulticastSocket(struct sockaddr_storage multicastSockAddr)
+{
+  int sock; 
+  struct sockaddr_storage localAddr;
+
+  if (!initSockets())
+    return -1;
+
+  localAddr = multicastSockAddr;
+  /* set source addr of localAddr to ANY, 
+     the rest is the same as in multicastSockAddr */
+  if(localAddr.ss_family == AF_INET) 
+    ((struct sockaddr_in*) &localAddr)->sin_addr.s_addr = htonl(INADDR_ANY);
+  else
+    if(localAddr.ss_family == AF_INET6)
+       ((struct sockaddr_in6*) &localAddr)->sin6_addr = in6addr_any;
+    else
+      {
+	rfbClientErr("CreateMulticastSocket: neither IPv4 nor IPv6 address received\n");
+	return -1;
+      }
+
+ 
+  if((sock = socket(localAddr.ss_family, SOCK_DGRAM, 0)) < 0)
+    {
+      rfbClientErr("CreateMulticastSocket socket(): %s\n", strerror(errno));
+      return -1;
+    }
+
+  if(bind(sock, (struct sockaddr*)&localAddr, sizeof(localAddr)) < 0)
+    {
+      rfbClientErr("CreateMulticastSocket bind(): %s\n", strerror(errno));
+      close(sock);
+      return -1;
+    }
+
+  
+  /* Join the multicast group. We do this seperately for IPv4 and IPv6. */
+  if(multicastSockAddr.ss_family == AF_INET)
+    {
+      struct ip_mreq multicastRequest;  
+ 
+      memcpy(&multicastRequest.imr_multiaddr,
+	     &((struct sockaddr_in*) &multicastSockAddr)->sin_addr,
+	     sizeof(multicastRequest.imr_multiaddr));
+
+      multicastRequest.imr_interface.s_addr = htonl(INADDR_ANY);
+
+      if(setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) < 0)
+        {
+	  rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
+	  close(sock);
+	  return -1;
+        }
+    }
+  else 
+    if(multicastSockAddr.ss_family == AF_INET6)
+      {
+	struct ipv6_mreq multicastRequest;  
+
+	memcpy(&multicastRequest.ipv6mr_multiaddr,
+	       &((struct sockaddr_in6*) &multicastSockAddr)->sin6_addr,
+	       sizeof(multicastRequest.ipv6mr_multiaddr));
+
+	multicastRequest.ipv6mr_interface = 0;
+
+	if(setsockopt(sock, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) < 0)
+	  {
+	    rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
+	    close(sock);
+	    return -1;
+	  }
+      }
+    else
+      {
+	rfbClientErr("CreateMulticastSocket: neither IPv6 nor IPv6 specified");
+	close(sock);
+	return -1;
+      }
+
+  return sock;
+}
