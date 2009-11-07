@@ -623,6 +623,7 @@ CreateMulticastSocket(struct sockaddr_storage multicastSockAddr)
 {
   int sock; 
   struct sockaddr_storage localAddr;
+  int yes = 1;
 
   if (!initSockets())
     return -1;
@@ -647,6 +648,14 @@ CreateMulticastSocket(struct sockaddr_storage multicastSockAddr)
       rfbClientErr("CreateMulticastSocket socket(): %s\n", strerror(errno));
       return -1;
     }
+
+  
+  if(setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(yes)) < 0) 
+    {
+      rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
+      close(sock);
+      return -1;
+    } 
 
   if(bind(sock, (struct sockaddr*)&localAddr, sizeof(localAddr)) < 0)
     {
