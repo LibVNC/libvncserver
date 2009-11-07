@@ -2527,6 +2527,59 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
       }
       return rfbSendUpdateBuf(cl);
     }
+
+    //FIXME test
+    if (cl->useMulticastVNC)
+      {
+	// flush
+	//rfbSendUpdateBuf(cl);
+
+	rfbFramebufferUpdateRectHeader rect;
+	rfbLog("--> buffer at start %d\n", cl->ublen);
+     	fu->type = rfbFramebufferUpdate;
+	fu->nRects = Swap16IfLE(1);
+	cl->ublen = sz_rfbFramebufferUpdateMsg;
+	rfbLog("--> buffer with msg header %d\n", cl->ublen);
+
+	char buffer[512];
+
+	/* tack on our library version */
+	snprintf(buffer,sizeof(buffer)-1, "%s (%s)", 
+	     (cl->screen->versionString==NULL ? "MULTICAST!!" : cl->screen->versionString),
+	     LIBVNCSERVER_PACKAGE_STRING);
+
+	if (cl->ublen + sz_rfbFramebufferUpdateRectHeader
+                  + (strlen(buffer)+1) > UPDATE_BUF_SIZE) 
+	  {
+	    rfbLog("--> have to flush!");
+	    if (!rfbSendUpdateBufMulticast(cl))
+	      return FALSE;
+	  }
+
+	rect.encoding = Swap32IfLE(rfbEncodingServerIdentity);
+	rect.r.x = 0;
+	rect.r.y = 0;
+	rect.r.w = Swap16IfLE(strlen(buffer)+1);
+	rect.r.h = 0;
+
+	memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+	       sz_rfbFramebufferUpdateRectHeader);
+	cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+	rfbLog("--> buffer with rect header %d\n", cl->ublen);
+
+	memcpy(&cl->updateBuf[cl->ublen], buffer, strlen(buffer)+1);
+	cl->ublen += strlen(buffer)+1;
+
+    	rfbLog("--> buffer with content %d\n", cl->ublen);
+    
+
+    	if(rfbSendUpdateBufMulticast(cl))
+	  rfbLog("--> Sending multicast test ok\n");
+	else
+	  rfbLog("--> Sending multicast test fail\n");
+      }
+    
+    
     
     /*
      * If this client understands cursor shape updates, cursor should be

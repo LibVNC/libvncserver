@@ -507,6 +507,7 @@ int main(int argc,char** argv) {
 	  cl=rfbGetClient(8,3,4);
 	  cl->MallocFrameBuffer=resize;
 	  cl->canHandleNewFBSize = TRUE;
+	  cl->canHandleMulticastVNC = TRUE;
 	  cl->GotFrameBufferUpdate=update;
 	  cl->HandleKeyboardLedState=kbd_leds;
 	  cl->HandleTextChat=text_chat;
