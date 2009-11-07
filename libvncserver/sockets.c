@@ -186,7 +186,8 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	if ((rfbScreen->multicastSock = rfbCreateMulticastSocket(rfbScreen->multicastAddr,
 								 rfbScreen->multicastPort,
 								 rfbScreen->multicastTTL,
-								 iface)) < 0) 
+								 iface,
+								 &rfbScreen->multicastSockAddr)) < 0) 
 	  {
 	    rfbLogPerror("CreateMulticastSocket");
 	    return;
@@ -613,6 +614,75 @@ rfbWriteExact(rfbClientPtr cl,
     return 1;
 }
 
+
+
+/*
+ * WriteExactMulticast writes an exact number of bytes to the 
+ * screen's multicast socket.
+ * Returns 1 if  * those bytes have been written, or -1 if an error occurred (errno is set to
+ * ETIMEDOUT if it timed out).
+ */
+
+int
+rfbWriteExactMulticast(rfbClientPtr cl,
+		       const char *buf,
+		       int len)
+{
+  int sock = cl->screen->multicastSock;
+  int n;
+
+  if(sock < 0)
+    return FALSE;
+
+#undef DEBUG_WRITE_EXACT
+#ifdef DEBUG_WRITE_EXACT
+  rfbLog("WriteExactMulticast %d bytes\n",len);
+  for(n=0;n<len;n++)
+    fprintf(stderr,"%02x ",(unsigned char)buf[n]);
+  fprintf(stderr,"\n");
+#endif
+
+  LOCK(cl->outputMutex);
+  while(len > 0) 
+    {
+      n = sendto(sock, buf, len, 0, 
+		 (struct sockaddr*)&cl->screen->multicastSockAddr,
+		 sizeof(cl->screen->multicastSockAddr));
+
+      if(n > 0) 
+	{
+	  buf += n;
+	  len -= n;
+	} 
+      else 
+	if(n == 0)
+	  {
+	    rfbErr("WriteExactMulticast: sendto returned 0?\n");
+	    UNLOCK(cl->outputMutex);
+	    return 0;
+	  }
+	else 
+	  {
+#ifdef WIN32
+	    errno = WSAGetLastError();
+#endif
+	    if (errno == EINTR)
+	      continue;
+
+	    if (errno != EWOULDBLOCK && errno != EAGAIN) 
+	      {
+		UNLOCK(cl->outputMutex);
+		return n;
+	      }
+	  }
+    }
+  
+  UNLOCK(cl->outputMutex);
+  return 1;
+}
+
+
+
 /* currently private, called by rfbProcessArguments() */
 int
 rfbStringToAddr(char *str, in_addr_t *addr)  {
@@ -726,11 +796,17 @@ rfbListenOnUDPPort(int port,
 }
 
 
+/*
+  Create a multicast socket and saves addr and port in sockAddr.
+  Returns socket fd on success, -1 on failure.
+ */
+
 int 
 rfbCreateMulticastSocket(char *addr,
 			 int port,
 			 int ttl,
-			 in_addr_t iface)
+			 in_addr_t iface,
+			 struct sockaddr_storage* sockAddr)
 {
   int sock;
   int r;
@@ -742,7 +818,7 @@ rfbCreateMulticastSocket(char *addr,
   /* resolve parameters into multicastAddrInfo struct */
   memset(&hints, 0, sizeof(struct addrinfo));
   hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-  hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+  hints.ai_socktype = SOCK_DGRAM;
   hints.ai_flags = AI_NUMERICHOST;
   
   r = getaddrinfo(addr, serv, &hints, &multicastAddrInfo); 
@@ -751,6 +827,9 @@ rfbCreateMulticastSocket(char *addr,
       rfbLog("rfbCreateMulticastSocket: %s", gai_strerror(r));
       return -1;
     }
+
+  /* save multicast address and port */
+  *sockAddr = *(struct sockaddr_storage*)multicastAddrInfo->ai_addr;
   
   /* create socket for sending multicast datagrams */
   if((sock = socket(multicastAddrInfo->ai_family, multicastAddrInfo->ai_socktype, 0)) < 0)
@@ -759,16 +838,6 @@ rfbCreateMulticastSocket(char *addr,
       freeaddrinfo(multicastAddrInfo);  
       return -1;
     }
-
-  /* set to reuse address */
-  r = 1;
-  if(setsockopt(sock,SOL_SOCKET,SO_REUSEADDR, (char*)&r,sizeof(r)) <0)
-    {
-      rfbLogPerror("rfbCreateMulticastSocket reuseaddr setsockopt()");
-      freeaddrinfo(multicastAddrInfo);  
-      return -1;
-    } 
-
 
   /* Set TTL of multicast packet */
   if(setsockopt(sock,

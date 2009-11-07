@@ -1058,36 +1058,24 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
    rfbFramebufferUpdateRectHeader rect;
    uint8_t addr_len = 0;
    char* addr_ptr = NULL;
-   struct addrinfo *multicastAddrInfo;
-   struct addrinfo hints;        
-   int r;
-   char serv[8];
-   snprintf(serv, sizeof(serv), "%d", cl->screen->multicastPort);
-
-   /* resolve parameters into multicastAddrInfo struct */
-   memset(&hints, 0, sizeof(struct addrinfo));
-   hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-   hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
-   hints.ai_flags = AI_NUMERICHOST;
-   
-   r = getaddrinfo(cl->screen->multicastAddr, serv, &hints, &multicastAddrInfo); 
-   if(r != 0)
-     {
-       rfbLog("rfbSendMulticastAddress: %s", gai_strerror(r));
-       return -1;
-     }
-  
+ 
    /* addr is already in network byte order */
-   if(multicastAddrInfo->ai_family == AF_INET)
+   if(cl->screen->multicastSockAddr.ss_family == AF_INET)
      {
        addr_len = 4;
-       addr_ptr = (char*) &((struct sockaddr_in*)multicastAddrInfo->ai_addr)->sin_addr.s_addr;
+       addr_ptr = (char*) &((struct sockaddr_in*)&cl->screen->multicastSockAddr)->sin_addr.s_addr;
      }
-   if(multicastAddrInfo->ai_family == AF_INET6)
-     {
-       addr_len = 16;
-       addr_ptr = (char*) &((struct sockaddr_in6*)multicastAddrInfo->ai_addr)->sin6_addr.s6_addr;
-     }
+   else
+     if(cl->screen->multicastSockAddr.ss_family == AF_INET6)
+       {
+	 addr_len = 16;
+	 addr_ptr = (char*) &((struct sockaddr_in6*)&cl->screen->multicastSockAddr)->sin6_addr.s6_addr;
+       }
+     else
+       {
+	 rfbLog("rfbSendMulticastVNCAddress: invalid address family\n");
+	 return FALSE;
+       }
    
  
    /* flush the buffer if messages wouldn't fit */
@@ -3180,6 +3168,30 @@ rfbSendUpdateBuf(rfbClientPtr cl)
     cl->ublen = 0;
     return TRUE;
 }
+
+
+
+/*
+ * Send the contents of cl->updateBuf via Multicast.
+ * Returns 1 if successful, -1 if not (errno should be set).
+ */
+
+rfbBool
+rfbSendUpdateBufMulticast(rfbClientPtr cl)
+{
+  if (rfbWriteExactMulticast(cl, cl->updateBuf, cl->ublen) < 0) {
+    rfbLogPerror("rfbSendUpdateBufMulticast: write");
+    rfbCloseClient(cl);
+    return FALSE;
+  }
+
+  cl->ublen = 0;
+  return TRUE;
+}
+
+
+
+
 
 /*
  * rfbSendSetColourMapEntries sends a SetColourMapEntries message to the

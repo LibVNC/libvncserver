@@ -271,6 +271,7 @@ typedef struct _rfbScreenInfo
     int multicastPort;
     char multicastTTL;
     SOCKET multicastSock;
+    struct sockaddr_storage multicastSockAddr;
 
     int maxClientWait;
 
@@ -664,12 +665,13 @@ extern void rfbCloseClient(rfbClientPtr cl);
 extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
 extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
+extern int rfbWriteExactMulticast(rfbClientPtr cl, const char *buf, int len);
 extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern int rfbConnectToTcpAddr(char* host, int port);
 extern int rfbListenOnTCPPort(int port, in_addr_t iface);
 extern int rfbListenOnUDPPort(int port, in_addr_t iface);
-  extern int rfbCreateMulticastSocket(char* addr, int port, int ttl, in_addr_t iface);
+extern int rfbCreateMulticastSocket(char* addr, int port, int ttl, in_addr_t iface, struct sockaddr_storage* sockAddrSave);
 extern int rfbStringToAddr(char* string,in_addr_t* addr);
 
 /* rfbserver.c */
@@ -697,6 +699,7 @@ extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
 extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
 extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);
+extern rfbBool rfbSendUpdateBufMulticast(rfbClientPtr cl);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
 extern rfbBool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
 extern rfbBool rfbSendLastRectMarker(rfbClientPtr cl);

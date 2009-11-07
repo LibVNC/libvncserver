@@ -57,5 +57,15 @@
             byte order of 'width' length
           * 'y-position' set to the UDP port to listen on
 
- 
+ The client now knows about address and port to listen on for
+ multicast framebuffer updates and sets itself up accordingly.
+
+ This way it is possible to use arbitrary user-defined ports and
+ multicast addresses (think Multicast Administrative Scoping).
+
+
+
+ 3. How to use it with libvncserver
+
+ 224.0.42.138:5900 ttl 1
 
