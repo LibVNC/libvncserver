@@ -393,6 +393,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->enableSupportedEncodings = FALSE;
       cl->enableServerIdentity = FALSE;
       cl->enableMulticastVNC = FALSE;
+      cl->useMulticastVNC = FALSE;
       cl->lastKeyboardLedState = -1;
       cl->cursorX = rfbScreen->cursorX;
       cl->cursorY = rfbScreen->cursorY;
@@ -1968,7 +1969,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->enableSupportedEncodings = FALSE;
         cl->enableServerIdentity     = FALSE;
         cl->enableMulticastVNC       = FALSE;
-
+        cl->useMulticastVNC          = FALSE;
 
         for (i = 0; i < msg.se.nEncodings; i++) {
             if ((n = rfbReadExact(cl, (char *)&enc, 4)) <= 0) {
@@ -2514,7 +2515,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     rfbBool sendSupportedMessages = FALSE;
     rfbBool sendSupportedEncodings = FALSE;
     rfbBool sendServerIdentity = FALSE;
-    rfbBool sendMulticastVNC = FALSE;
+    rfbBool sendMulticastVNCAddr = FALSE;
     rfbBool result = TRUE;
     
 
@@ -2605,11 +2606,13 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         cl->enableServerIdentity = FALSE;
     }
     /*
-     * Do we plan to send a MulticastVNC message?
+     * Do we plan to send MulticastVNC address?
      */
     if (cl->enableMulticastVNC)
     {
-        sendMulticastVNC = TRUE;
+        sendMulticastVNCAddr = TRUE;
+        /* set multicast use flag for this client */
+        cl->useMulticastVNC = TRUE;
         /* We only send this message ONCE <per setEncodings message received>
          * (We disable it here)
          */
@@ -2660,7 +2663,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
        (cl->enableCursorShapeUpdates ||
 	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY)) &&
        !sendCursorShape && !sendCursorPos && !sendKeyboardLedState &&
-       !sendSupportedMessages && !sendSupportedEncodings && !sendServerIdentity && !sendMulticastVNC) {
+       !sendSupportedMessages && !sendSupportedEncodings && !sendServerIdentity && !sendMulticastVNCAddr) {
       sraRgnDestroy(updateRegion);
       UNLOCK(cl->updateMutex);
       return TRUE;
@@ -2825,11 +2828,14 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 					   nUpdateRegionRects +
 					   !!sendCursorShape + !!sendCursorPos + !!sendKeyboardLedState +
 					   !!sendSupportedMessages + !!sendSupportedEncodings + !!sendServerIdentity +
-					   !!sendMulticastVNC));
+					   !!sendMulticastVNCAddr));
     } else {
 	fu->nRects = 0xFFFF;
     }
     cl->ublen = sz_rfbFramebufferUpdateMsg;
+
+    //FIXME bis hier header mit kalkulation anzahl rects
+    // alle nächsten funktionen blasen was raus...
 
    if (sendCursorShape) {
 	cl->cursorWasChanged = FALSE;
@@ -2860,7 +2866,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
        if (!rfbSendServerIdentity(cl))
            goto updateFailed;
    }
-   if (sendMulticastVNC) {
+   if (sendMulticastVNCAddr) {
        if (!rfbSendMulticastVNCAddress(cl))
            goto updateFailed;
    }
@@ -2869,6 +2875,9 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	if (!rfbSendCopyRegion(cl,updateCopyRegion,dx,dy))
 	        goto updateFailed;
     }
+
+     //FIXME bis hier misc stuff
+    // ab hier werden rects rausgesendet
 
     for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
         int x = rect.x1;
