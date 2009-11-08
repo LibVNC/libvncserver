@@ -189,6 +189,8 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->tlsSession = NULL;
 #endif
 
+  client->multicastSock = -1;
+
   return client;
 }
 

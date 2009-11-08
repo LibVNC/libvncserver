@@ -1354,6 +1354,64 @@ HandleRFBServerMessage(rfbClient* client)
 
   if (client->serverPort==-1)
     client->vncRec->readTimestamp = TRUE;
+  
+  //FIXME
+  if(client->multicastSock >= 0)
+    {
+      if (!ReadFromRFBServerMulticast(client, (char *)&msg, 1))
+	{
+	  rfbClientErr("--->err recv multicast\n");
+	  return FALSE;
+	}
+      else
+	{
+	  if(msg.type == rfbFramebufferUpdate)
+	    {
+	      rfbClientLog("--->got fb update\n");
+	      rfbFramebufferUpdateRectHeader rect;
+	     
+	      int i;
+
+	      if (!ReadFromRFBServerMulticast(client, ((char *)&msg.fu) + 1,
+					      sz_rfbFramebufferUpdateMsg - 1))
+		return FALSE;
+
+	      msg.fu.nRects = rfbClientSwap16IfLE(msg.fu.nRects);
+
+	      for (i = 0; i < msg.fu.nRects; i++) 
+		{
+		if (!ReadFromRFBServerMulticast(client, (char *)&rect, sz_rfbFramebufferUpdateRectHeader))
+		  return FALSE;
+
+		rect.encoding = rfbClientSwap32IfLE(rect.encoding);
+	
+
+		rect.r.x = rfbClientSwap16IfLE(rect.r.x);
+		rect.r.y = rfbClientSwap16IfLE(rect.r.y);
+		rect.r.w = rfbClientSwap16IfLE(rect.r.w);
+		rect.r.h = rfbClientSwap16IfLE(rect.r.h);
+
+  /* rect.r.w=byte count */
+      if (rect.encoding == rfbEncodingServerIdentity) {
+          char *buffer;
+          buffer = malloc(rect.r.w+1);
+          if (!ReadFromRFBServer(client, buffer, rect.r.w))
+          {
+              free(buffer);
+              return FALSE;
+          }
+          buffer[rect.r.w]=0; /* null terminate, just in case */
+          rfbClientLog("Connected to Server \"%s\"\n", buffer);
+          free(buffer);
+          continue;
+      }
+
+		}
+	    }
+	}
+    }
+
+
   if (!ReadFromRFBServer(client, (char *)&msg, 1))
     return FALSE;
 

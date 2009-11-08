@@ -219,6 +219,119 @@ hexdump:
 }
 
 
+
+
+/*
+ * ReadFromRFBServerMulticast
+ */
+
+rfbBool
+ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
+{
+  if(client->multicastSock < 0)
+    return FALSE;
+
+  if (n <= client->buffered) {
+    memcpy(out, client->bufoutptr, n);
+    client->bufoutptr += n;
+    client->buffered -= n;
+    return TRUE;
+  }
+
+  memcpy(out, client->bufoutptr, client->buffered);
+
+  out += client->buffered;
+  n -= client->buffered;
+
+  client->bufoutptr = client->buf;
+  client->buffered = 0;
+
+  if (n <= RFB_BUF_SIZE) 
+    {
+      while (client->buffered < n) 
+	{
+	  int i;
+	  i = recvfrom(client->multicastSock, 
+		       client->buf + client->buffered, RFB_BUF_SIZE - client->buffered, 
+		       0, NULL, NULL);
+	  if (i <= 0) 
+	    {
+	      if (i < 0) 
+		{
+#ifdef WIN32
+		  errno=WSAGetLastError();
+#endif
+		  if (errno == EWOULDBLOCK || errno == EAGAIN) 
+		    {
+		      i = 0;
+		    } 
+		  else 
+		    {
+		      rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
+		      return FALSE;
+		    }
+		} 
+	      else 
+		{
+		  if (errorMessageOnReadFailure) 
+		    {
+		      rfbClientLog("VNC server closed connection\n");
+		    }
+		  return FALSE;
+		}
+	    }
+	  client->buffered += i;
+	}
+
+      memcpy(out, client->bufoutptr, n);
+      client->bufoutptr += n;
+      client->buffered -= n;
+
+    } 
+  else 
+    {
+      while (n > 0) 
+	{
+	  int i;
+	  i = recvfrom(client->multicastSock, 
+		       out, n,
+		       0, NULL, NULL);
+	  if (i <= 0) 
+	    {
+	      if (i < 0) 
+		{
+#ifdef WIN32
+		  errno=WSAGetLastError();
+#endif
+		  if (errno == EWOULDBLOCK || errno == EAGAIN) 
+		    {
+		      i = 0;
+		    } 
+		  else 
+		    {
+		      rfbClientErr("read (%s)\n",strerror(errno));
+		      return FALSE;
+		    }
+		} 
+	      else 
+		{
+		  if (errorMessageOnReadFailure) 
+		    {
+		      rfbClientLog("VNC server closed connection\n");
+		    }
+		  return FALSE;
+		}
+	    }
+	  out += i;
+	  n -= i;
+	}
+    }
+
+  return TRUE;
+}
+
+
+
 /*
  * Write an exact number of bytes, and don't return until you've sent them.
  */
