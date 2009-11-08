@@ -1401,7 +1401,7 @@ HandleRFBServerMessage(rfbClient* client)
               return FALSE;
           }
           buffer[rect.r.w]=0; /* null terminate, just in case */
-          rfbClientLog("Connected to Server \"%s\"\n", buffer);
+          rfbClientLog("got multicast msg \"%s\"\n", buffer);
           free(buffer);
           continue;
       }
