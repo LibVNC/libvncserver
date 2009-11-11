@@ -488,7 +488,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
     if (cl->next)
         cl->next->prev = cl->prev;
 
-    if(cl->sock>0)
+    if(cl->sock>=0)
 	close(cl->sock);
 
     if (cl->scaledScreen!=NULL)

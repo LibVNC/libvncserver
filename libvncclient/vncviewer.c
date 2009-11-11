@@ -44,6 +44,8 @@ static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 static char* NoPassword(rfbClient* client) {
   return strdup("");
 }
+#undef SOCKET
+#include <winsock2.h>
 #define close closesocket
 #else
 #include <stdio.h>
@@ -189,6 +191,8 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->tlsSession = NULL;
 #endif
 
+  client->sock = -1;
+  client->listenSock = -1;
   client->multicastSock = -1;
 
   return client;
@@ -334,8 +338,10 @@ void rfbClientCleanup(rfbClient* client) {
 #endif
 
   FreeTLS(client);
-  if (client->sock > 0)
+  if (client->sock >= 0)
     close(client->sock);
+  if (client->listenSock >= 0)
+    close(client->listenSock);
   free(client->desktopName);
   free(client->serverHost);
   free(client);

@@ -40,7 +40,7 @@ static void SaveFramebufferAsPPM(rfbClient* client, int x, int y, int w, int h) 
 	fprintf(f,"P6\n# %s\n%d %d\n255\n",client->desktopName,client->width,client->height);
 	for(j=0;j<client->height*row_stride;j+=row_stride)
 		for(i=0;i<client->width*bpp;i+=bpp) {
-			const char* p=client->frameBuffer+j+i;
+			unsigned char* p=client->frameBuffer+j+i;
 			unsigned int v;
 			if(bpp==4)
 				v=*(unsigned int*)p;

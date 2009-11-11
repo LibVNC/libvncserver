@@ -299,7 +299,7 @@ void vcPrintF(vncConsolePtr c,char* format,...)
   char buf[4096];
   va_start(args, format);
   vsprintf(buf, format, args);
-  vcPrint(c,buf);
+  vcPrint(c,(unsigned char*)buf);
   va_end(args);
 }
 
@@ -309,7 +309,7 @@ void vcPrintFColour(vncConsolePtr c,unsigned char foreColour,unsigned char backC
   char buf[4096];
   va_start(args, format);
   vsprintf(buf, format, args);
-  vcPrintColour(c,buf,foreColour,backColour);
+  vcPrintColour(c,(unsigned char*)buf,foreColour,backColour);
   va_end(args);
 }
 
