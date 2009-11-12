@@ -734,7 +734,7 @@ AC_ARG_WITH(client-tls,
 [  --without-client-tls    disable support for gnutls in libvncclient],,)
 
 if test "x$with_gnutls" != "xno"; then
-	PKG_CHECK_MODULES(GNUTLS, gnutls >= 2.8.0, , with_client_tls=no)
+	PKG_CHECK_MODULES(GNUTLS, gnutls >= 2.4.0, , with_client_tls=no)
 	CFLAGS="$CFLAGS $GNUTLS_CFLAGS"
 	LIBS="$LIBS $GNUTLS_LIBS"
 	if test "x$with_client_tls" != "xno"; then

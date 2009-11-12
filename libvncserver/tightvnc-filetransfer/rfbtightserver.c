@@ -355,7 +355,7 @@ rfbSendInteractionCaps(rfbClientPtr cl)
 
 
 rfbBool
-rfbTightExtensionInit(rfbClientPtr cl, void** data)
+rfbTightExtensionInit(rfbClientPtr cl, void* data)
 {
 
    rfbSendInteractionCaps(cl);
