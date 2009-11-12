@@ -745,6 +745,8 @@ fi
 
 # XI2 present?
 AM_CONDITIONAL(HAVE_XI2, [ test "$HAVE_XI2" = "yes" ])
+# cairo?
+AM_CONDITIONAL(HAVE_CAIRO, [ test "$with_cairo" = "yes" ])
 
 # Checks for header files.
 AC_HEADER_STDC
