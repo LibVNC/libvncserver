@@ -47,7 +47,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.9.9 lastmod: 2009-10-15";
+char lastmod[] = "0.9.9 lastmod: 2009-11-18";
 
 /* X display info */
 
@@ -157,7 +157,7 @@ unsigned char *tile_has_diff = NULL, *tile_tried = NULL, *tile_copied = NULL;
 unsigned char *tile_has_xdamage_diff = NULL, *tile_row_has_xdamage_diff = NULL;
 
 /* times of recent events */
-time_t last_event = 0, last_input = 0, last_client = 0;
+time_t last_event = 0, last_input = 0, last_client = 0, last_open_xdisplay = 0;
 time_t last_local_input = 0;
 time_t last_keyboard_input = 0, last_pointer_input = 0; 
 time_t last_fb_bytes_sent = 0;
@@ -195,6 +195,7 @@ char *terminal_services_daemon = NULL;
 
 int client_count = 0;
 int clients_served = 0;
+int client_normal_count = 0;
 
 /* more transient kludge variables: */
 int cursor_x = 0, cursor_y = 0;		/* x and y from the viewer(s) */

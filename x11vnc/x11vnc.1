@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "October 2009" "x11vnc " "User Commands"
+.TH X11VNC "1" "November 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.9, lastmod: 2009-10-15
+         version: 0.9.9, lastmod: 2009-11-18
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -76,6 +76,10 @@ before startup.  Same as \fB-xauth\fR file.  See
 ,
 .IR xauth (1)
 man pages for more info.
+.IP
+Use '-auth guess' to have x11vnc use its \fB-findauth\fR
+mechanism (described below) to try to guess the
+XAUTHORITY filename and use it.
 .PP
 \fB-N\fR
 .IP
@@ -107,6 +111,14 @@ for display managers like GDM (KillInitClients option)
 that kill x11vnc just after the user logs into the
 X session.  Note: the reopened state may be unstable.
 Set X11VNC_REOPEN_DISPLAY=n to reopen n times.
+.IP
+Update: as of 0.9.9, x11vnc tries to automatically avoid
+being killed by the display manager by delaying creating
+windows or using XFIXES.  So you shouldn't need to use
+KillInitClients=false as long as you log in quickly
+enough (within 45 seconds of connecting.)  You can
+disable this by setting X11VNC_AVOID_WINDOWS=never.
+You can also set it to the number of seconds to delay.
 .PP
 \fB-reflect\fR \fIhost:N\fR
 .IP
@@ -444,6 +456,18 @@ mode.  This usage could use useful:  \fB-svc\fR \fB-bg\fR \fB-loopbg\fR
 .IP
 Exit unless a client connects within the first n seconds
 after startup.
+.IP
+If there have been no connection attempts after n
+seconds x11vnc exits immediately.  If a client is
+trying to connect but has not progressed to the normal
+operating state, x11vnc gives it a few more seconds
+to finish and exits if it does not make it to the
+normal state.
+.IP
+For reverse connections via \fB-connect\fR or \fB-connect_or_exit\fR
+a timeout of n seconds will be set for all reverse
+connects.  If the connect timeout alarm goes off,
+x11vnc will exit immediately.
 .PP
 \fB-sleepin\fR \fIn\fR
 .IP
@@ -1149,6 +1173,20 @@ Have the FINDDISPLAY program list all of your displays
 (i.e. all the X displays on the local machine that you
 have access rights to).
 .PP
+\fB-findauth\fR \fI[disp]\fR
+.IP
+Apply the \fB-find/-finddpy\fR heuristics to try to guess the
+XAUTHORITY file for DISPLAY 'disp'.  If 'disp' is not
+supplied, then the value in the \fB-display\fR earlier in
+the cmdline is used; failing that $DISPLAY is used;
+and failing that ":0" is used.
+.IP
+If nothing is printed out, that means no XAUTHORITY was
+found for 'disp'.  If "XAUTHORITY=" is printed out,
+that means use the default (i.e. do not set XAUTHORITY).
+If "XAUTHORITY=/path/to/file" is printed out, then
+use that file.
+.PP
 \fB-create\fR
 .IP
 First try to find the user's display using FINDDISPLAY,
@@ -1252,6 +1290,10 @@ username (e.g. user:solid) described under \fB-display\fR
 WAIT: are also applied in this mode if they are typed
 in before the user hits Escape.  The username is ignored
 but the colon options are not.
+.IP
+The default message is 2 lines in a small font, set
+the env. var. X11VNC_SYSTEM_GREETER1=true for a 1 line
+message in a larger font.
 .IP
 If the user pressed Escape the FINDCREATEDISPLAY command
 will be run with the env. var. X11VNC_XDM_ONLY=1.
@@ -2878,6 +2920,8 @@ If x11vnc guesses your desktop incorrectly, you can
 force it by prefixing color with "gnome:", "kde:",
 "cde:", "xfce:", or "root:".
 .IP
+Update: \fB-solid\fR no longer works on KDE4.
+.IP
 This mode works in a limited way on the Mac OS X Console
 with one color ('kelp') using the screensaver writing
 to the background.  Look in "~/Library/Screen Savers"
@@ -3447,6 +3491,14 @@ Ignored when in XFIXES cursor-grabbing mode.
 .IP
 Do not use the XFIXES extension to draw the exact cursor
 shape even if it is available.
+.IP
+Note: To work around a crash in Xorg 1.5 and later
+some people needed to use \fB-noxfixes.\fR  The Xorg crash
+occurred right after a Display Manager (e.g. GDM) login.
+Starting with x11vnc 0.9.9 it tries to automatically
+avoid using XFIXES until it is sure a window manager
+is running.  See the \fB-reopen\fR option for more info and
+how to use X11VNC_AVOID_WINDOWS=never to disable it.
 .PP
 \fB-alphacut\fR \fIn\fR
 .IP
@@ -6052,9 +6104,9 @@ nomacnowait macwheel macnoswap macswap nomacnoswap
 macnoresize macresize nomacnoresize maciconanim macmenu
 macnomenu nomacmenu macuskbd nomacuskbd noremote
 .IP
-aro=  noop display vncdisplay autoport loop loopbg
-desktopname guess_desktop guess_dbus http_url
-auth xauth users rootshift clipshift scale_str
+aro=  noop display vncdisplay icon_mode autoport
+loop loopbg desktopname guess_desktop guess_dbus
+http_url auth xauth users rootshift clipshift scale_str
 scaled_x scaled_y scale_numer scale_denom scale_fac_x
 scale_fac_y scaling_blend scaling_nomult4 scaling_pad
 scaling_interpolate inetd privremote unsafe safer
@@ -6201,7 +6253,7 @@ associated options is:
 stunnel, ssl, unixpw, WAIT, zeroconf, id, accept,
 afteraccept, gone, pipeinput, v4l-info, rawfb-setup,
 dt, gui, ssh, storepasswd, passwdfile, custom_passwd,
-crash.
+findauth, crash.
 .IP
 See each option's help to learn the associated external
 command.  Note that the \fB-nocmds\fR option takes precedence

@@ -49,7 +49,7 @@ int own_clipboard = 0;	/* whether we currently own CLIPBOARD or not */
 int set_clipboard = 1;
 int set_cutbuffer = 0;	/* to avoid bouncing the CutText right back */
 int sel_waittime = 15;	/* some seconds to skip before first send */
-Window selwin;		/* special window for our selection */
+Window selwin = None;	/* special window for our selection */
 Atom clipboard_atom = None;
 
 /*

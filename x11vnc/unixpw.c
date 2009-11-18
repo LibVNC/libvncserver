@@ -468,10 +468,17 @@ void unixpw_screen(int init) {
 		if (unixpw_system_greeter) {
 			unixpw_system_greeter_active = 0;
 			if (use_dpy && strstr(use_dpy, "xdmcp")) {
-				char moo[] = "Press 'Escape' for System Greeter";
+				if (getenv("X11VNC_SYSTEM_GREETER1")) {
+					char moo[] = "Press 'Escape' for System Greeter";
+					rfbDrawString(pscreen, &default8x16Font, x-90, y-30, moo, white_pixel());
+				} else {
+					char moo1[] = "Press 'Escape' for New Session via System Greeter,";
+					char moo2[] = "or otherwise login here for Existing Session:     ";
+					rfbDrawString(pscreen, &default6x13Font, x-110, y-38, moo1, white_pixel());
+					rfbDrawString(pscreen, &default6x13Font, x-110, y-25, moo2, white_pixel());
+				}
 				set_env("X11VNC_XDM_ONLY", "0");
 				unixpw_system_greeter_active = 1;
-				rfbDrawString(pscreen, &default8x16Font, x-90, y-30, moo, white_pixel());
 			}
 		}
 
