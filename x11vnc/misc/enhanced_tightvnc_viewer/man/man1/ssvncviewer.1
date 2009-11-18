@@ -119,13 +119,13 @@ authentication.
 TightVNC supports several different compression methods to encode
 screen updates; this option specifies a set of them to use in order of
 preference. Encodings are specified separated with spaces, and must
-thus be enclosed in quotes if more than one is specified. Available
-encodings, in default order for a remote connection, are "copyrect
-tight hextile zlib corre rre raw". For a local connection (to the same
-machine), the default order to try is "raw copyrect tight hextile zlib
-corre rre". Raw encoding is always assumed as a last option if no
-other encoding can be used for some reason. For more information on
-encodings, see the section ENCODINGS below.
+thus be enclosed in quotes if more than one is specified.  Commas may be used to avoid spaces.
+Available encodings, in default order for a remote connection, are
+"copyrect tight hextile zlib corre rre raw". For a local connection
+(to the same machine), the default order to try is "raw copyrect tight
+hextile zlib corre rre". Raw encoding is always assumed as a last option
+if no other encoding can be used for some reason. For more information
+on encodings, see the section ENCODINGS below.
 .TP
 \fB\-bgr233\fR
 Always use the BGR233 format to encode pixel data. This reduces
@@ -311,6 +311,11 @@ Disable bell.
 \fB\-rawlocal\fR
 Prefer raw encoding for localhost, default is
 no, i.e. assumes you have a SSH tunnel instead.
+.TP
+\fB\-notty\fR
+Try to avoid using the terminal for interactive
+responses: use windows for messages and prompting
+instead.  Messages will also be printed to terminal.
 .TP
 \fB\-sendclipboard\fR
 Send the X CLIPBOARD selection (i.e. Ctrl+C,
@@ -530,7 +535,8 @@ Meta_R Super_L Super_R Hyper_L Hyper_R or Mode_switch.
  Cursor Shape:            ~ -nocursorshape
  X11 Cursor:              ~ -x11cursor
  Cursor Alphablend:       ~ -alpha
- Toggle Tight/ZRLE:       ~ -encodings ...
+ Toggle Tight/Hextile:    ~ -encodings hextile...
+ Toggle Tight/ZRLE:       ~ -encodings zrle...
  Toggle ZRLE/ZYWRLE:      ~ -encodings zywrle...
  Quality Level            ~ -quality (both Tight and ZYWRLE)
  Compress Level           ~ -compresslevel
