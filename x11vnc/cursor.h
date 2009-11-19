@@ -36,6 +36,7 @@ so, delete this exception statement from your version.
 /* -- cursor.h -- */
 
 extern int xfixes_present;
+extern int xfixes_first_initialized;
 extern int use_xfixes;
 extern int got_xfixes_cursor_notify;
 extern int cursor_changes;

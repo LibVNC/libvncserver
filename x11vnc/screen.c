@@ -649,6 +649,7 @@ void set_raw_fb_params(int restore) {
 
 		if (! dpy && raw_fb_orig_dpy) {
 			dpy = XOpenDisplay_wr(raw_fb_orig_dpy);
+			last_open_xdisplay = time(NULL);
 			if (dpy) {
 				if (! quiet) rfbLog("reopened DISPLAY: %s\n",
 				    raw_fb_orig_dpy);
@@ -1366,7 +1367,7 @@ void linux_dev_fb_msg(char* q) {
 #define RAWFB_SHM  3
 
 XImage *initialize_raw_fb(int reset) {
-	char *str, *q;
+	char *str, *rstr, *q;
 	int w, h, b, shmid = 0;
 	unsigned long rm = 0, gm = 0, bm = 0, tm;
 	static XImage ximage_struct;	/* n.b.: not (XImage *) */
@@ -1453,22 +1454,32 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		return NULL;
 	}
 
+	if (raw_fb_str[0] == '+') {
+		rstr = strdup(raw_fb_str+1);
+		closedpy = 0;
+		if (! window) {
+			window = rootwin;
+		}
+	} else {
+		rstr = strdup(raw_fb_str);
+	}
+
 	/* testing aliases */
-	if (!strcasecmp(raw_fb_str, "NULL") || !strcasecmp(raw_fb_str, "ZERO")
-	    || !strcasecmp(raw_fb_str, "NONE")) {
-		raw_fb_str = strdup("map:/dev/zero@640x480x32");
-	} else if (!strcasecmp(raw_fb_str, "NULLBIG") || !strcasecmp(raw_fb_str, "NONEBIG")) {
-		raw_fb_str = strdup("map:/dev/zero@1024x768x32");
+	if (!strcasecmp(rstr, "NULL") || !strcasecmp(rstr, "ZERO")
+	    || !strcasecmp(rstr, "NONE")) {
+		rstr = strdup("map:/dev/zero@640x480x32");
+	} else if (!strcasecmp(rstr, "NULLBIG") || !strcasecmp(rstr, "NONEBIG")) {
+		rstr = strdup("map:/dev/zero@1024x768x32");
 	}
-	if (!strcasecmp(raw_fb_str, "RAND")) {
-		raw_fb_str = strdup("file:/dev/urandom@128x128x16");
-	} else if (!strcasecmp(raw_fb_str, "RANDBIG")) {
-		raw_fb_str = strdup("file:/dev/urandom@640x480x16");
-	} else if (!strcasecmp(raw_fb_str, "RANDHUGE")) {
-		raw_fb_str = strdup("file:/dev/urandom@1024x768x16");
+	if (!strcasecmp(rstr, "RAND")) {
+		rstr = strdup("file:/dev/urandom@128x128x16");
+	} else if (!strcasecmp(rstr, "RANDBIG")) {
+		rstr = strdup("file:/dev/urandom@640x480x16");
+	} else if (!strcasecmp(rstr, "RANDHUGE")) {
+		rstr = strdup("file:/dev/urandom@1024x768x16");
 	}
-	if (strstr(raw_fb_str, "solid=") == raw_fb_str) {
-		char *n = raw_fb_str + strlen("solid=");
+	if (strstr(rstr, "solid=") == rstr) {
+		char *n = rstr + strlen("solid=");
 		char tmp[] = "/tmp/solid.XXXXXX";
 		char str[100];
 		unsigned int vals[1024], val;
@@ -1495,8 +1506,8 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		fd = open(tmp, O_WRONLY);
 		unlink_me = strdup(tmp);
 		sprintf(str, "map:%s@%dx%dx32", tmp, w, h);
-		raw_fb_str = strdup(str);
-	} else if (strstr(raw_fb_str, "swirl") == raw_fb_str) {
+		rstr = strdup(str);
+	} else if (strstr(rstr, "swirl") == rstr) {
 		char tmp[] = "/tmp/solid.XXXXXX";
 		char str[100];
 		unsigned int val[1024];
@@ -1517,11 +1528,11 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		fd = open(tmp, O_WRONLY);
 		unlink_me = strdup(tmp);
 		sprintf(str, "map:%s@%dx%dx32", tmp, w, h);
-		raw_fb_str = strdup(str);
+		rstr = strdup(str);
 	}
 
 
-	if ( (q = strstr(raw_fb_str, "setup:")) == raw_fb_str) {
+	if ( (q = strstr(rstr, "setup:")) == rstr) {
 		FILE *pipe;
 		char line[1024], *t;
 
@@ -1563,16 +1574,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		rfbLog("setup command returned: %s\n", str);
 
 	} else {
-		str = strdup(raw_fb_str);
-	}
-	if (str[0] == '+') {
-		char *t = strdup(str+1);
-		free(str);
-		str = t;
-		closedpy = 0;
-		if (! window) {
-			window = rootwin;
-		}
+		str = strdup(rstr);
 	}
 
 	raw_fb_shm = 0;
@@ -2368,24 +2370,28 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 
 	again:
 	if (subwin) {
+<<<<<<< HEAD:x11vnc/screen.c
 	        int shift = 0, fit = 0;
+=======
+		int shift = 0, resize = 0;
+>>>>>>> master:x11vnc/screen.c
 		int subwin_x, subwin_y;
 		int disp_x = DisplayWidth(dpy, scr);
 		int disp_y = DisplayHeight(dpy, scr);
 		Window twin;
 		/* subwins can be a dicey if they are changing size... */
 		trapped_xerror = 0;
-		old_handler = XSetErrorHandler(trap_xerror);
+		old_handler = XSetErrorHandler(trap_xerror);	/* reset in if(subwin) block below */
 		XTranslateCoordinates(dpy, window, rootwin, 0, 0, &subwin_x,
 		    &subwin_y, &twin);
 
-		if (wdpy_x > disp_x ) {
-		        fit = 1;
-			dpy_x = wdpy_x = disp_x - 3;
+		if (wdpy_x > disp_x) {
+			resize = 1;
+			dpy_x = wdpy_x = disp_x - 4;
 		}
 		if (wdpy_y > disp_y) {
-		        fit = 1;
-			dpy_y = wdpy_y = disp_y - 3;
+			resize = 1;
+			dpy_y = wdpy_y = disp_y - 4;
 		}
 
 		if (subwin_x + wdpy_x > disp_x) {
@@ -2405,15 +2411,18 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 			subwin_y = off_y = 1;
 		}
 
-		if (fit) {
+
+		if (resize) {
 			XResizeWindow(dpy, window, wdpy_x, wdpy_y);
 		}
 		if (shift) {
 			XMoveWindow(dpy, window, subwin_x, subwin_y);
+			off_x = subwin_x;
+			off_y = subwin_y;
 		}
 		XMapRaised(dpy, window);
 		XRaiseWindow(dpy, window);
-		XFlush_wr(dpy);
+		XSync(dpy, False);
 	}
 	try++;
 
@@ -4143,15 +4152,25 @@ void watch_loop(void) {
 			}
 		}
 
-		if (! screen || ! screen->clientHead) {
-			/* waiting for a client */
-			if (first_conn_timeout) {
+		if (first_conn_timeout) {
+			int t = first_conn_timeout;
+			if (!clients_served) {
 				if (time(NULL) - start > first_conn_timeout) {
-					rfbLog("No client after %d secs.\n",
-					    first_conn_timeout);
+					rfbLog("No client after %d secs.\n", t);
 					shut_down = 1;
 				}
+			} else {
+				if (!client_normal_count) {
+					if (time(NULL) - start > t + 3) {
+						rfbLog("No valid client after %d secs.\n", t + 3);
+						shut_down = 1;
+					}
+				}
 			}
+		}
+
+		if (! screen || ! screen->clientHead) {
+			/* waiting for a client */
 			usleep(200 * 1000);
 			continue;
 		}

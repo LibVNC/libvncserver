@@ -1590,7 +1590,7 @@ static void loop_for_connect(int did_client_connect) {
 			if (screen && screen->clientHead) {
 				int i;
 				if (unixpw) {
-					if (! unixpw_in_progress) {
+					if (! unixpw_in_progress && !vencrypt_enable_plain_login) {
 						rfbLog("unixpw but no unixpw_in_progress\n");
 						clean_up_exit(1);
 					}
@@ -1648,7 +1648,7 @@ static void loop_for_connect(int did_client_connect) {
 
 static void do_unixpw_loop(void) {
 	if (unixpw) {
-		if (! unixpw_in_progress) {
+		if (! unixpw_in_progress && !vencrypt_enable_plain_login) {
 			rfbLog("unixpw but no unixpw_in_progress\n");
 			clean_up_exit(1);
 		}
@@ -2785,7 +2785,9 @@ int wait_for_client(int *argc, char** argv, int http) {
 		if (db) fprintf(stderr, "args %d %s\n", i, argv[i]);
 	}
 	if (!quiet && !strstr(use_dpy, "FINDDISPLAY-run")) {
+		rfbLog("\n");
 		rfbLog("wait_for_client: %s\n", use_dpy);
+		rfbLog("\n");
 	}
 
 	str = strdup(use_dpy);

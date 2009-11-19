@@ -525,7 +525,7 @@ extern unsigned char *tile_has_diff, *tile_tried, *tile_copied;
 extern unsigned char *tile_has_xdamage_diff, *tile_row_has_xdamage_diff;
 
 /* times of recent events */
-extern time_t last_event, last_input, last_client;
+extern time_t last_event, last_input, last_client, last_open_xdisplay;
 extern time_t last_keyboard_input, last_pointer_input; 
 extern time_t last_local_input;	/* macosx */
 extern time_t last_fb_bytes_sent;
@@ -563,6 +563,7 @@ extern char *terminal_services_daemon;
 
 extern int client_count;
 extern int clients_served;
+extern int client_normal_count;
 
 /* more transient kludge variables: */
 extern int cursor_x, cursor_y;		/* x and y from the viewer(s) */
