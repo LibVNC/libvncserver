@@ -127,7 +127,8 @@ int all_clients_initialized(void) {
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		if (cl->state != RFB_NORMAL) {
 			ok = 0;
-			break;
+		} else {
+			client_normal_count++;
 		}
 	}
 	rfbReleaseClientIterator(iter);
@@ -2352,6 +2353,20 @@ char *get_repeater_string(char *str, int *len) {
 	return prestring;
 }
 
+#ifndef USE_TIMEOUT_INTERRUPT
+#define USE_TIMEOUT_INTERRUPT 0
+#endif
+
+static void reverse_connect_timeout (int sig) {
+	rfbLog("sig: %d, reverse_connect_timeout.\n", sig);
+#if USE_TIMEOUT_INTERRUPT
+	rfbLog("reverse_connect_timeout proceeding assuming connect(2) interrupt.\n");
+#else
+	clean_up_exit(0);
+#endif
+}
+
+
 /*
  * Do a reverse connect for a single "host" or "host:port"
  */
@@ -2362,6 +2377,7 @@ static int do_reverse_connect(char *str_in) {
 	char *prestring = NULL;
 	int prestring_len = 0;
 	int rport = 5500, len = strlen(str);
+	int set_alarm = 0;
 
 	if (len < 1) {
 		return 0;
@@ -2432,7 +2448,19 @@ static int do_reverse_connect(char *str_in) {
 /* XXX use header */
 #define OPENSSL_REVERSE 4
 		openssl_init(1);
+
+		if (first_conn_timeout > 0) {
+			set_alarm = 1;
+			signal(SIGALRM, reverse_connect_timeout);
+#if USE_TIMEOUT_INTERRUPT
+			siginterrupt(SIGALRM, 1);
+#endif
+			rfbLog("reverse_connect: using alarm() timeout of %d seconds.\n", first_conn_timeout);
+			alarm(first_conn_timeout);
+		}
 		accept_openssl(OPENSSL_REVERSE, vncsock);
+		if (set_alarm) {alarm(0); signal(SIGALRM, SIG_DFL);}
+
 		openssl_init(0);
 		free(host);
 		return 1;
@@ -2467,8 +2495,19 @@ static int do_reverse_connect(char *str_in) {
 		}
 	}
 
+	if (first_conn_timeout > 0) {
+		set_alarm = 1;
+		signal(SIGALRM, reverse_connect_timeout);
+#if USE_TIMEOUT_INTERRUPT
+		siginterrupt(SIGALRM, 1);
+#endif
+		rfbLog("reverse_connect: using alarm() timeout of %d seconds.\n", first_conn_timeout);
+		alarm(first_conn_timeout);
+	}
+
 	if (connect_proxy != NULL) {
 		int sock = proxy_connect(host, rport);
+		if (set_alarm) {alarm(0); signal(SIGALRM, SIG_DFL);}
 		if (sock >= 0) {
 			if (prestring != NULL) {
 				write(sock, prestring, prestring_len);
@@ -2480,6 +2519,7 @@ static int do_reverse_connect(char *str_in) {
 		}
 	} else if (prestring != NULL) {
 		int sock = rfbConnectToTcpAddr(host, rport);
+		if (set_alarm) {alarm(0); signal(SIGALRM, SIG_DFL);}
 		if (sock >= 0) {
 			write(sock, prestring, prestring_len);
 			free(prestring);
@@ -2489,6 +2529,7 @@ static int do_reverse_connect(char *str_in) {
 		}
 	} else {
 		cl = rfbReverseConnection(screen, host, rport);
+		if (set_alarm) {alarm(0); signal(SIGALRM, SIG_DFL);}
 		if (cl != NULL && use_threads) {
 			cl->onHold = FALSE;
 			rfbStartOnHoldClient(cl);
@@ -3227,7 +3268,7 @@ char *wininfo(Window win, int show_children) {
 		children = (Window *) calloc(2 * sizeof(Window), 1);
 		children[0] = win;
 	}
-	for (n=0; n < nchildren; n++) {
+	for (n=0; n < (int) nchildren; n++) {
 		char tmp[32];
 		char *str = "Invalid";
 		Window w = children[n];
@@ -3239,7 +3280,7 @@ char *wininfo(Window win, int show_children) {
 				str = tmp;
 			}
 		}
-		if (strlen(get_str) + 1 + strlen(str) >= size) {
+		if ((int) (strlen(get_str) + 1 + strlen(str)) >= size) {
 			break;
 		}
 		if (n > 0) {
@@ -3522,7 +3563,6 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	}
 
 	clients_served++;
-
 
 	if (use_openssl || use_stunnel) {
 		if (! ssl_initialized) {

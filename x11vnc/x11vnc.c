@@ -1907,6 +1907,62 @@ static void do_sleepin(char *sleep) {
 	}
 }
 
+static void check_guess_auth_file(void)  {
+	if (!strcasecmp(auth_file, "guess")) {
+		char line[4096], *cmd, *q, *disp = use_dpy ? use_dpy: "";
+		FILE *p;
+		int n;
+		if (!program_name) {
+			rfbLog("-auth guess: no program_name found.\n");
+			clean_up_exit(1);
+		}
+		if (strpbrk(program_name, " \t\r\n")) {
+			rfbLog("-auth guess: whitespace in program_name '%s'\n", program_name);
+			clean_up_exit(1);
+		}
+		if (no_external_cmds || !cmd_ok("findauth")) {
+			rfbLog("-auth guess: cannot run external commands in -nocmds mode:\n");
+			clean_up_exit(1);
+		}
+
+		cmd = (char *)malloc(100 + strlen(program_name) + strlen(disp));
+		sprintf(cmd, "%s -findauth %s", program_name, disp);
+		p = popen(cmd, "r");
+		if (!p) {
+			rfbLog("-auth guess: could not run cmd '%s'\n", cmd);
+			clean_up_exit(1);
+		}
+		memset(line, 0, sizeof(line));
+		n = fread(line, 1, sizeof(line), p);
+		pclose(p);
+		q = strrchr(line, '\n');
+		if (q) *q = '\0';
+		if (!strcmp(disp, "")) {
+			disp = getenv("DISPLAY");
+			if (!disp) {
+				disp = "unset";
+			}
+		}
+		if (!strcmp(line, "")) {
+			rfbLog("-auth guess: failed for display='%s'\n", disp);
+			clean_up_exit(1);
+		} else if (strstr(line, "XAUTHORITY=") != line) {
+			rfbLog("-auth guess: failed. '%s' for display='%s'\n", line, disp);
+			clean_up_exit(1);
+		} else if (!strcmp(line, "XAUTHORITY=")) {
+			rfbLog("-auth guess: using default XAUTHORITY for display='%s'\n", disp);
+			q = getenv("XAUTHORITY");
+			if (q) {
+				*(q-2) = '_';	/* yow */
+			}
+			auth_file = NULL;
+		} else {
+			rfbLog("-auth guess: using '%s' for disp='%s'\n", line, disp);
+			auth_file = strdup(line + strlen("XAUTHORITY="));
+		}
+	}
+}
+
 extern int dragum(void);
 extern int is_decimal(char *);
 
@@ -1947,8 +2003,10 @@ int main(int argc, char* argv[]) {
 
 	dtime0(&x11vnc_start);
 
+
 	if (!getuid() || !geteuid()) {
 		started_as_root = 1;
+		rfbLog("getuid: %d  geteuid: %d\n", getuid(), geteuid());
 
 		/* check for '-users =bob' */
 		immediate_switch_user(argc, argv);
@@ -2087,6 +2145,27 @@ int main(int argc, char* argv[]) {
 			if (strstr(arg, "-listdpy") == arg) {
 				set_env("FIND_DISPLAY_ALL", "1");
 			}
+			wait_for_client(&ic, NULL, 0);
+			exit(0);
+			continue;
+		}
+		if (!strcmp(arg, "-findauth")) {
+			int ic = 0;
+			if (use_dpy != NULL) {
+				set_env("DISPLAY", use_dpy);
+			}
+			use_dpy = strdup("WAIT:cmd=FINDDISPLAY-run");
+			if (argc > i+1) {
+				set_env("X11VNC_SKIP_DISPLAY", argv[i+1]);
+			} else if (getenv("DISPLAY")) {
+				set_env("X11VNC_SKIP_DISPLAY", getenv("DISPLAY"));
+			} else {
+				set_env("X11VNC_SKIP_DISPLAY", ":0");
+			}
+			set_env("X11VNC_SKIP_DISPLAY_NEGATE", "1");
+			set_env("FIND_DISPLAY_XAUTHORITY_PATH", "1");
+			set_env("FIND_DISPLAY_NO_SHOW_XAUTH", "1");
+			set_env("FIND_DISPLAY_NO_SHOW_DISPLAY", "1");
 			wait_for_client(&ic, NULL, 0);
 			exit(0);
 			continue;
@@ -4635,10 +4714,14 @@ int main(int argc, char* argv[]) {
 	CLIENT_INIT;
 	
 	/* open the X display: */
+
 	if (auth_file) {
-		set_env("XAUTHORITY", auth_file);
-if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
+		check_guess_auth_file();
+		if (auth_file != NULL) {
+			set_env("XAUTHORITY", auth_file);
+		}
 	}
+
 #if LIBVNCSERVER_HAVE_XKEYBOARD
 	/*
 	 * Disable XKEYBOARD before calling XOpenDisplay()
@@ -4724,7 +4807,7 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 		;
 	} else
 #endif
-	if (use_dpy) {
+	if (use_dpy && strcmp(use_dpy, "")) {
 		dpy = XOpenDisplay_wr(use_dpy);
 #ifdef MACOSX
 	} else if (!subwin && getenv("DISPLAY")
@@ -4733,11 +4816,36 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 		rfbLog("MacOSX: Ignoring $DISPLAY '%s'\n", getenv("DISPLAY"));
 		rfbLog("MacOSX: Use -display $DISPLAY to force it.\n");
 #endif
+	} else if (raw_fb_str != NULL && raw_fb_str[0] != '+' && !got_noviewonly) {
+		rfbLog("Not opening DISPLAY in -rawfb mode (force via -rawfb +str)\n");
+		dpy = NULL; /* don't open it. */
 	} else if ( (use_dpy = getenv("DISPLAY")) ) {
+		if (strstr(use_dpy, "localhost") == use_dpy) {
+			rfbLog("\n");
+			rfbLog("WARNING: DISPLAY starts with localhost: '%s'\n", use_dpy);
+			rfbLog("WARNING: Is this an SSH X11 port forwarding?  You most\n");
+			rfbLog("WARNING: likely don't want x11vnc to use that DISPLAY.\n");
+			rfbLog("WARNING: You probably should supply something\n");
+			rfbLog("WARNING: like: -display :0  to access the physical\n");
+			rfbLog("WARNING: X display on the machine where x11vnc is running.\n");
+			rfbLog("\n");
+			usleep(500 * 1000);
+		} else if (using_shm && use_dpy[0] != ':') {
+			rfbLog("\n");
+			rfbLog("WARNING: DISPLAY might not be local: '%s'\n", use_dpy);
+			rfbLog("WARNING: Is this the DISPLAY of another machine?  Usually,\n");
+			rfbLog("WARNING: x11vnc is run on the same machine with the\n");
+			rfbLog("WARNING: physical X display to be exported by VNC.  If\n");
+			rfbLog("WARNING: that is what you really meant, supply something\n");
+			rfbLog("WARNING: like: -display :0  on the x11vnc command line.\n");
+			rfbLog("\n");
+			usleep(250 * 1000);
+		}
 		dpy = XOpenDisplay_wr(use_dpy);
 	} else {
 		dpy = XOpenDisplay_wr("");
 	}
+	last_open_xdisplay = time(NULL);
 
 	if (terminal_services_daemon != NULL) {
 		terminal_services(terminal_services_daemon);
@@ -4751,8 +4859,7 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 #endif
 
 	if (! dpy && raw_fb_str) {
-		rfbLog("continuing without X display in -rawfb mode, "
-		    "hold on tight..\n");
+		rfbLog("Continuing without X display in -rawfb mode.\n");
 		goto raw_fb_pass_go_and_collect_200_dollars;
 	}
 
@@ -4771,6 +4878,7 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 		fprintf(stderr, "\n");
 		use_dpy = ":0";
 		dpy = XOpenDisplay_wr(use_dpy);
+		last_open_xdisplay = time(NULL);
 		if (dpy) {
 			rfbLog("*** XOpenDisplay of \":0\" successful.\n");
 		}
@@ -4805,6 +4913,10 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 	if (dpy) {
 		Window w = XCreateSimpleWindow(dpy, rootwin, 0, 0, 1, 1, 0, 0, 0);
 		if (! quiet) rfbLog("rootwin: 0x%lx reswin: 0x%lx dpy: 0x%x\n", rootwin, w, dpy);
+		if (w != None) {
+			XDestroyWindow(dpy, w);
+		}
+		XSync(dpy, False);
 	}
 #endif
 
@@ -5403,6 +5515,10 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 
 	if (speeds_read_rate_measured > 80) {
 		/* framebuffer read is fast at > 80 MB/sec */
+		int same = 0;
+		if (waitms == defer_update) {
+			same = 1;
+		}
 		if (! got_waitms) {
 			waitms /= 2;
 			if (waitms < 5) {
@@ -5414,7 +5530,11 @@ if (0) fprintf(stderr, "XA: %s\n", getenv("XAUTHORITY"));
 		}
 		if (! got_deferupdate && ! got_defer) {
 			if (defer_update > 10) {
-				defer_update = 10;
+				if (same) {
+					defer_update = waitms;
+				} else {
+					defer_update = 10;
+				}
 				if (screen) {
 					screen->deferUpdateTime = defer_update;
 				}

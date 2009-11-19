@@ -60,6 +60,7 @@ extern void set_text_chat(rfbClientPtr cl, int l, char *t);
 extern int get_keyboard_led_state_hook(rfbScreenInfoPtr s);
 extern int get_file_transfer_permitted(rfbClientPtr cl);
 extern void get_prop(char *str, int len, Atom prop, Window w);
+extern int guess_dm_gone(int t1, int t2);
 
 
 #endif /* _X11VNC_XEVENTS_H */

@@ -332,6 +332,7 @@ static int XIOerr(Display *d) {
 		rfbLog("*** XIO error: Note the reopened state may be unstable.\n");
 		usleep (3000 * 1000);
 		dpy = XOpenDisplay_wr(dstr);
+		last_open_xdisplay = time(NULL);
 		if (dpy) {
 			rfbLog("*** XIO error: Reopened display '%s' successfully.\n", dstr);
 			if (db) rfbLog("*** XIO error: '%s' 0x%x\n", dstr, dpy);

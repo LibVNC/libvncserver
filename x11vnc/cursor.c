@@ -41,6 +41,7 @@ so, delete this exception statement from your version.
 #include "macosx.h"
 
 int xfixes_present = 0;
+int xfixes_first_initialized = 0;
 int use_xfixes = 1;
 int got_xfixes_cursor_notify = 0;
 int cursor_changes = 0;
@@ -984,6 +985,7 @@ static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 void initialize_xfixes(void) {
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 	if (xfixes_present) {
+		xfixes_first_initialized = 1;
 		X_LOCK;
 		if (use_xfixes) {
 			XFixesSelectCursorInput(dpy, rootwin,
@@ -1318,6 +1320,9 @@ static int get_exact_cursor(int init) {
 
 		if (last_idx) {
 			which = last_idx;
+		}
+		if (! xfixes_first_initialized) {
+			return which;
 		}
 
 		if (! got_xfixes_cursor_notify && xfixes_base_event_type) {

@@ -1,3 +1,21 @@
+2009-11-18  Karl Runge <runge@karlrunge.com>
+	* x11vnc: use -timeout setting for reverse connections too.
+	  Delay calling xfixes at the beginning of 1st connection to avoid
+	  display manager Xorg server crash.  Delay selwin creation at the
+	  begin 1st connection to avoid being killed by display manager.
+	  Options -findauth and '-auth guess'.	Export icon_mode query.
+	  Do not open X display in -rawfb mode unless asked. Bugfix for
+	  -sid/-id handling window offscreen or bigger than display.
+	  Search for windows with _DBUS_SESSION_BUS_PID to decide which
+	  dbus_launch is ours.	Fix missing displays in FIND_DISPLAY
+	  script.  Add X11VNC_SKIP_DISPLAY_NEGATE.  Improvements to
+	  'x11vnc Properties' gui dialog and connecting with x11vnc via
+	  socket (client list.) X11VNC_SYSTEM_GREETER1 for previous text
+	  font size.  Fix bug with unixpw and vencrypt plain login.
+	  Have fast fb read rate keep waitms and defer the same.
+	  More heuristics to check try if GDM is still running (window
+	  names gdm-*)
+
 2009-10-17  Karl Runge <runge@karlrunge.com>
 	* x11vnc: support for -solid option in xfce desktop.  
 	  List -Q guess_dbus query. Implement -showrfbauth option.

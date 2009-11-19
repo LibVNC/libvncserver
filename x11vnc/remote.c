@@ -787,7 +787,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 				while (fgets(tmp, 1024, f) != NULL) {
 					char *c = strchr(tmp, '#');
 					if (c) *c = '\0';
-					if (strlen(p) + strlen(tmp) > sbuf.st_size) {
+					if (strlen(p) + strlen(tmp) > (size_t) sbuf.st_size) {
 						break;
 					}
 					strcat(p, tmp);
@@ -5546,6 +5546,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (!strcmp(p, "vncdisplay")) {
 			snprintf(buf, bufn, "aro=%s:%s", p,
 			    NONUL(vnc_desktop_name));
+			goto qry;
+		}
+		if (!strcmp(p, "icon_mode")) {
+			snprintf(buf, bufn, "aro=%s:%d", p, icon_mode);
 			goto qry;
 		}
 		if (!strcmp(p, "autoport")) {
