@@ -41,24 +41,23 @@
  
  A client that understands multicast framebuffer updates tells the
  server so by adding the MulticastVNC pseudo encoding (-831) to it's
- SetEncodings message. As usual with pseudo encodings, the server
- simply ignores the request if it doesn't support MulticastVNC. 
+ SetEncodings message. In case the client wants to use multicast via
+ IPV6, it add the IPv6MulticastVNC pseudo encoding (-832). As usual
+ with pseudo encodings, the server simply ignores the request if it
+ doesn't support the requested feature.
 
  Otherwise, the server tells the client about the multicast address to
  listen on for framebuffer updates: it sends back a 'FramebufferUpdate'
  message consisting of one rectangle with:
 
-    * 'encoding-type' set to MulticastVNC
-    * 'x-position' is set to MulticastVNC protocol version. 
-      For a value of 0, these fields have the following meaning:
+    * 'encoding-type' set to MulticastVNC (or IPv6MulticastVNC)
+    * 'y-position' set to the UDP port to listen on 
+    * the pixel data set to an IPv4 address (or IPv6 address) in
+      network byte order, 4 (or 16) bytes long.
 
-          * 'width' set to either 4 (IPv4) or 16 (IPv6)
- 	  * the pixel data set to an IPv4 or IPv6 address in network
-            byte order of 'width' length
-          * 'y-position' set to the UDP port to listen on
 
- The client now knows about address and port to listen on for
- multicast framebuffer updates and sets itself up accordingly.
+ The client now knows about address (IPv4 or IPv6) and port to listen
+ on for multicast framebuffer updates and sets itself up accordingly.
 
  This way it is possible to use arbitrary user-defined ports and
  multicast addresses (think Multicast Administrative Scoping).

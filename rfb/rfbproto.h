@@ -476,8 +476,9 @@ typedef struct {
 #define rfbEncodingSupportedEncodings 0xFFFE0002
 #define rfbEncodingServerIdentity     0xFFFE0003
 
-/* MulticastVNC pseudo encoding */
+/* MulticastVNC pseudo encodings */
 #define rfbEncodingMulticastVNC       0xFFFFFCC1
+#define rfbEncodingIPv6MulticastVNC   0xFFFFFCC0
 
 
 /*****************************************************************************

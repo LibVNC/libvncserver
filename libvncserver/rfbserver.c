@@ -949,6 +949,7 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 	rfbEncodingSupportedEncodings,
 	rfbEncodingServerIdentity,
 	rfbEncodingMulticastVNC,
+	rfbEncodingIPv6MulticastVNC,
     };
     uint32_t nEncodings = sizeof(supported) / sizeof(supported[0]), i;
 
@@ -1050,6 +1051,8 @@ rfbSendServerIdentity(rfbClientPtr cl)
 
 /*
  * Send address where to listen for multicast FramebufferUpdates.
+ * This only gets called if the client requested the multicast
+ * pseudo encoding we actually support.
  */
 
 rfbBool
@@ -1057,18 +1060,21 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
 {
    rfbFramebufferUpdateRectHeader rect;
    uint8_t addr_len = 0;
+   uint32_t encoding;
    char* addr_ptr = NULL;
  
    /* addr is already in network byte order */
    if(cl->screen->multicastSockAddr.ss_family == AF_INET)
      {
        addr_len = 4;
+       encoding = rfbEncodingMulticastVNC;
        addr_ptr = (char*) &((struct sockaddr_in*)&cl->screen->multicastSockAddr)->sin_addr.s_addr;
      }
    else
      if(cl->screen->multicastSockAddr.ss_family == AF_INET6)
        {
 	 addr_len = 16;
+	 encoding = rfbEncodingIPv6MulticastVNC;
 	 addr_ptr = (char*) &((struct sockaddr_in6*)&cl->screen->multicastSockAddr)->sin6_addr.s6_addr;
        }
      else
@@ -1084,10 +1090,10 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
        return FALSE;
    }
 
-   rect.encoding = Swap32IfLE(rfbEncodingMulticastVNC);
+   rect.encoding = Swap32IfLE(encoding);
    rect.r.x = 0;
    rect.r.y = Swap16IfLE(cl->screen->multicastPort);
-   rect.r.w = Swap16IfLE(addr_len);
+   rect.r.w = 0;
    rect.r.h = 0;
 
    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
@@ -1098,12 +1104,12 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
    cl->ublen += addr_len;
 
 
-   rfbStatRecordEncodingSent(cl, rfbEncodingMulticastVNC,
+   rfbStatRecordEncodingSent(cl, encoding,
 			     sz_rfbFramebufferUpdateRectHeader + addr_len,
 			     sz_rfbFramebufferUpdateRectHeader + addr_len);
 
    if (!rfbSendUpdateBuf(cl))
-      return FALSE;
+     return FALSE;
    
    return TRUE;
 }
@@ -2066,11 +2072,26 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                 }
                 break;           
             case rfbEncodingMulticastVNC:
-                if (!cl->enableMulticastVNC) {
-                  rfbLog("Enabling MulticastVNC protocol extension for client "
+     	       /* do we have the right type of multicast socket? */
+	       if(cl->screen->multicastSockAddr.ss_family == AF_INET)
+		 {
+		   if (!cl->enableMulticastVNC) {
+		     rfbLog("Enabling MulticastVNC protocol extension for client "
+			    "%s\n", cl->host);
+		     cl->enableMulticastVNC = TRUE;
+		   }
+		 }
+                break; 
+	    case rfbEncodingIPv6MulticastVNC:
+	       /* do we have the right type of multicast socket? */
+	       if(cl->screen->multicastSockAddr.ss_family == AF_INET6)
+		 {
+		   if (!cl->enableMulticastVNC) {
+		     rfbLog("Enabling IPv6MulticastVNC protocol extension for client "
                           "%s\n", cl->host);
-                  cl->enableMulticastVNC = TRUE;
-                }
+		     cl->enableMulticastVNC = TRUE;
+		   }
+		 }
                 break;           
             default:
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -2652,13 +2673,15 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     if (cl->enableMulticastVNC)
     {
         sendMulticastVNCAddr = TRUE;
-        /* set multicast use flag for this client */
-        cl->useMulticastVNC = TRUE;
+	/* set multicast use flag for this client */
+	cl->useMulticastVNC = TRUE;
+	  
         /* We only send this message ONCE <per setEncodings message received>
-         * (We disable it here)
-         */
-        cl->enableMulticastVNC = FALSE;
+	 * (We disable it here)
+	 */
+	cl->enableMulticastVNC = FALSE;
     }
+    
 
     LOCK(cl->updateMutex);
 
@@ -2908,9 +2931,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
            goto updateFailed;
    }
    if (sendMulticastVNCAddr) {
-       if (!rfbSendMulticastVNCAddress(cl))
+     if (!rfbSendMulticastVNCAddress(cl))
            goto updateFailed;
    }
+
    
     if (!sraRgnEmpty(updateCopyRegion)) {
 	if (!rfbSendCopyRegion(cl,updateCopyRegion,dx,dy))
