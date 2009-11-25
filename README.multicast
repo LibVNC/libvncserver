@@ -1,6 +1,6 @@
 
 
-		     MulticastVNC Extension
+	       MulticastVNC RFB Protocol Extension
 	  	          Version 1.0
 
 	 	        Christian Beier
@@ -60,11 +60,11 @@
  update as a whole and also the individual partial updates.
 
  Using these sequence numbers and the server's multicast update
- interval mentioned above, it is possible for clients to detect loss
- of parts of a multicast framebuffer update or of the update as a
- whole. They can then resort to whatever strategy they think is best,
- i.e. ignore the loss and wait for the next update or request a
- conventional framebuffer update via TCP.
+ interval mentioned above, it is possible for clients to reorder
+ incoming messages and detect loss of parts of a multicast framebuffer
+ update or of the update as a whole. They can then resort to whatever
+ strategy they think is best, i.e. ignore the loss and wait for the
+ next update or request a conventional framebuffer update via TCP.
 
  Note that 'MulticastFramebufferUpdate's are the the only messages
  sent via multicast. Handshaking messages, client to server messages
@@ -79,16 +79,16 @@
  SetEncodings message. In case the client wants to use multicast via
  IPV6, it adds the IPv6MulticastVNC pseudo encoding (-832). 
 
- If the supports the requested feature, it tells the client about the
- multicast address to listen on for framebuffer updates: it sends back
- a 'FramebufferUpdate' message consisting of one rectangle with:
+ If the server supports the requested feature, it tells the client
+ about the multicast address to listen on for framebuffer updates: it
+ sends back a 'FramebufferUpdate' message consisting of one rectangle
+ with:
 
     * 'encoding-type' set to MulticastVNC (or IPv6MulticastVNC)
     * 'x-position' set to the multicast update interval in milliseconds
     * 'y-position' set to the UDP port to listen on
     * the pixel data set to an IPv4 address (or IPv6 address) in
       network byte order, 4 (or 16) bytes long.
-
 
  The client now knows about address (IPv4 or IPv6) and port to listen
  on for multicast framebuffer updates and sets itself up accordingly.
@@ -104,8 +104,8 @@
  After successful session setup, the client(s) ask for a multicast
  framebuffer update by sending a 'MulticastFramebufferUpdateRequest'
  client to server message (message type 249). This exists so clients
- can explicitly ask for multicast framebuffer updates or for
- normal framebuffer updates via TCP using 'FramebufferUpdateRequest'.
+ can explicitly ask for multicast framebuffer updates or for normal
+ framebuffer updates via TCP using 'FramebufferUpdateRequest'.
 
  Additionally, semantics are different from 'FramebufferUpdate-
  Request': Because the purpose of sending framebuffer updates via
@@ -119,9 +119,9 @@
 
 
  +--------------------+--------------------+--------------------+
- |No. of bytes        |Type    [Value]     |Description         |
+ |No. of bytes        |Type        [Value] |Description         |
  +--------------------+--------------------+--------------------+
- |1                   |U8       249        |message-type        |
+ |1                   |U8            249   |message-type        |
  |1                   |U8                  |incremental         |
  +--------------------+--------------------+--------------------+
 
@@ -129,14 +129,61 @@
  2.3.2 MulticastFramebufferUpdate
 
  If the multicast update interval has expired and there were multicast
- framebuffer update requests, the server sends out a 'Multicast-
- FramebufferUpdate' server to client message (message type 248) via
- multicast.
+ framebuffer update requests, the server sends out the update via UDP
+ multicast to the multicast destination it has notified the client
+ about. 
 
- 
+ Like conventional framebuffer updates, a multicast framebuffer update
+ consists of a sequence of rectangles of pixel data.
+
+ To allow any kind of multicast client and to be as flexible as
+ possible, the server is required to keep track of which combinations
+ of pixelformat and encoding it has to provide. For each registered
+ combination, it sends out a whole multicast framebuffer update. 
+ Therefore, 'MulticastFramebufferUpdate' messages have a field
+ identifying the pixelformat of the pixel data sent. Note that the
+ encoding is specified in each of the update's rectangles.
+
+ Since multicast is based on UDP datagrams with a fixed maximum size,
+ the whole update may have to be packed into several UDP packets.
+ Therefore the framebuffer contents are sent using (maybe several)
+ 'MulticastFramebufferUpdate' server to client messages (message type
+ 248).  These contain consecutive sequence numbers identifying the
+ update as a whole (e.g. update no. 1138) and also the individual
+ partial updates of this whole update (e.g. partial update no. 3 of 11
+ in total).
+
+
+ +--------------------+--------------------+-------------------------+
+ |No. of bytes        |Type        [Value] |Description		     |
+ +--------------------+--------------------+-------------------------+
+ |1     	      |U8            248   |message-type             |
+ |1                   |                    |padding  		     |
+ |16                  |PIXEL_FORMAT        |pixel-format	     |
+ |2                   |U16                 |id-of-whole-update	     |
+ |2	              |U16 	           |number-of-partial-updates|
+ |2                   |U16                 |id-of-partial-update     | 
+ |2                   |U16                 |number-of-rectangles     |
+ +--------------------+--------------------+-------------------------+ 
+
+ where PIXEL_FORMAT is as described in the RFB protocol spec and
+ 'number-of-rectangles' is the number of rectangles per 'Multicast- 
+ FramebufferUpdate' message, not per whole update.
+
 
 
  3. How to use it with libvncserver
 
- 224.0.42.138:5900 ttl 1
+ You can enable MulticastVNC by setting the 'multicastVNC' member of
+ your rfbScreenInfoPtr to TRUE. That's all. If you want to, you can
+ specify multicast address and port and TTL via the 'multicastAddr',
+ 'multicastPort' and 'multicastTTL' members. The defaults are
+ 224.0.42.138, 5900 and 1.  
+
+ See examples/multicast.c for a sample MulticastVNC server.
+
+ To enable MulticastVNC for a client set the 'canHandleMulticastVNC'
+ member of your rfbClient* to TRUE. 
+
+
 
