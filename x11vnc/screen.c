@@ -2370,11 +2370,7 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 
 	again:
 	if (subwin) {
-<<<<<<< HEAD:x11vnc/screen.c
-	        int shift = 0, fit = 0;
-=======
 		int shift = 0, resize = 0;
->>>>>>> master:x11vnc/screen.c
 		int subwin_x, subwin_y;
 		int disp_x = DisplayWidth(dpy, scr);
 		int disp_y = DisplayHeight(dpy, scr);
@@ -2410,7 +2406,6 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 			shift = 1;
 			subwin_y = off_y = 1;
 		}
-
 
 		if (resize) {
 			XResizeWindow(dpy, window, wdpy_x, wdpy_y);
