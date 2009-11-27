@@ -1091,7 +1091,7 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
    }
 
    rect.encoding = Swap32IfLE(encoding);
-   rect.r.x = 0;
+   rect.r.x = Swap16IfLE(cl->screen->deferUpdateTime); //FIXME may introduce an extra multicast value?
    rect.r.y = Swap16IfLE(cl->screen->multicastPort);
    rect.r.w = 0;
    rect.r.h = 0;
