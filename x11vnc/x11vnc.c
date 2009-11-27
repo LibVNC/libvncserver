@@ -5031,6 +5031,9 @@ int main(int argc, char* argv[]) {
 	    /* XFixesGetCursorImage() gets confused with multiple pointers and crashes */
             use_xfixes = 0;  
             rfbLog("Disabled XFIXES while using multiple pointer support.\n");
+            /* disable these as most clients expect only a single cursor */
+            cursor_shape_updates = 0;
+            rfbLog("Drawing cursors into framebuffer while using multiple pointer support.\n");
           }      
 #endif
 

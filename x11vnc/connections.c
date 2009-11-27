@@ -3701,13 +3701,9 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
               rfbLog("setting pointer shape for client %s failed.\n", client->host); 
             else
               XcursorImageDestroy(ci); /* we dont use it for now, so clean up immediatly */
-         
 
             rfbLog("created XInput2 MD %i %i for client %s.\n", cd->ptr_id, cd->kbd_id, client->host);
             xi2_device_creation_in_progress = 0;
-
-            /* disable these as most clients expect only a single cursor */
-            cursor_shape_updates = 0;
 
             X_UNLOCK;
           }
