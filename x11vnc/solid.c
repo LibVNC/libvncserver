@@ -565,8 +565,9 @@ char *dbus_session(void) {
 	return "";
 #else
 	{
-		Atom dbus_prop;
+		Atom dbus_prop, dbus_pid;
 		Window r, w, *children;
+		int sbest = -1;
 		unsigned int ui;
 		int rc, i;
 
@@ -574,6 +575,7 @@ char *dbus_session(void) {
 
 		X_LOCK;
 		dbus_prop = XInternAtom(dpy, "_DBUS_SESSION_BUS_ADDRESS", True);
+		dbus_pid  = XInternAtom(dpy, "_DBUS_SESSION_BUS_PID", True);
 		X_UNLOCK;
 		if (dbus_prop == None) {
 			return "";
@@ -596,16 +598,43 @@ char *dbus_session(void) {
 		if (!rc || children == NULL || ui == 0) {
 			return "";
 		}
-		for (i=0; i < ui; i++) {
+		for (i=0; i < (int) ui; i++) {
+			int pid = -1;
+	
 			X_LOCK;
 			memset(tmp, 0, sizeof(tmp));
 			get_prop(tmp, sizeof(tmp)-1, dbus_prop, children[i]);
+			if (dbus_pid != None) {
+				Atom atype;
+				int aformat;
+				unsigned long nitems, bafter;
+				unsigned char *prop;
+				if (XGetWindowProperty(dpy, children[i], dbus_pid,
+				    0, 1, False, XA_CARDINAL, &atype, &aformat,
+				    &nitems, &bafter, &prop) == Success
+				    && atype == XA_CARDINAL) {
+					pid = *((int *) prop);
+					XFree_wr(prop);
+				}
+			}
 			X_UNLOCK;
 
-			if (strcmp(tmp, "")) {
-				if (!strchr(tmp, '\'')) {
+			if (strcmp(tmp, "")  && !strchr(tmp, '\'')) {
+				int score = 0;
+				if (1 < pid && pid < 10000000) {
+					struct stat sb;
+					char procfile[32];
+
+					sprintf(procfile, "/proc/%d", pid);
+					if (stat(procfile, &sb) == 0) {
+						score += 10000000;
+					}
+					score += pid;
+				}
+				if (getenv("X11VNC_DBUS_DEBUG")) fprintf(stderr, "win: 0x%lx  pid: %8d  score: %8d  str: %s\n", children[i], pid, score, tmp);
+				if (score > sbest) {
 					sprintf(_dbus_str, "env DBUS_SESSION_BUS_ADDRESS='%s'", tmp);
-					break;
+					sbest = score;
 				}
 			}
 		}
@@ -757,10 +786,10 @@ static void solid_xfce(char *color) {
 	
 	if (! color) {
 		if (! orig_image_show) {
-			orig_image_show = strdup("true");
+			orig_image_show = "true";
 		}
 		if (! orig_color_style) {
-			orig_color_style = strdup("0");
+			orig_color_style = "0";
 		}
 		if (strstr(orig_image_show, "'") != NULL)  {
 			rfbLog("invalid image show: %s\n", orig_image_show);
@@ -770,51 +799,65 @@ static void solid_xfce(char *color) {
 			rfbLog("invalid color style: %s\n", orig_color_style);
 			return;
 		}
-		cmd = (char *) malloc(strlen(set_image_show) - 2 + strlen(orig_image_show) + strlen(dbus) + 1);
-		sprintf(cmd, set_image_show, dbus, orig_image_show);
-		dt_cmd(cmd);
-		free(cmd);
-		cmd = (char *) malloc(strlen(set_color_style) - 2 + strlen(orig_color_style) + strlen(dbus) + 1);
-		sprintf(cmd, set_color_style, dbus, orig_color_style);
-		dt_cmd(cmd);
-		free(cmd);
+		if (orig_image_show[0] != '\0') {
+			cmd = (char *) malloc(strlen(set_image_show) - 2 + strlen(orig_image_show) + strlen(dbus) + 1);
+			sprintf(cmd, set_image_show, dbus, orig_image_show);
+			dt_cmd(cmd);
+			free(cmd);
+		}
+		if (orig_color_style[0] != '\0') {
+			cmd = (char *) malloc(strlen(set_color_style) - 2 + strlen(orig_color_style) + strlen(dbus) + 1);
+			sprintf(cmd, set_color_style, dbus, orig_color_style);
+			dt_cmd(cmd);
+			free(cmd);
+		}
 		return;
 	}
 
 	if (! orig_image_show) {
 		char *q;
+		orig_image_show = "";
 		if (cmd_ok("dt")) {
 			cmd = (char *) malloc(strlen(get_image_show) + strlen(dbus) + 1);
 			sprintf(cmd, get_image_show, dbus);
 			orig_image_show = strdup(cmd_output(cmd));
+			if ((q = strrchr(orig_image_show, '\n')) != NULL) {
+				*q = '\0';
+			}
+			fprintf(stderr, "get_image_show returned: '%s'\n\n", orig_image_show);
 			free(cmd);
-		}
-		if (*orig_image_show == '\0') {
-			orig_image_show = strdup("true");
-		}
-		if ((q = strchr(orig_image_show, '\n')) != NULL) {
-			*q = '\0';
+			if (strcasecmp(orig_image_show, "false") && strcasecmp(orig_image_show, "true")) {
+				fprintf(stderr, "unrecognized image_show, disabling.\n");
+				free(orig_image_show);
+				orig_image_show = "";
+			}
 		}
 	}
 	if (! orig_color_style) {
 		char *q;
+		orig_color_style = "";
 		if (cmd_ok("dt")) {
 			cmd = (char *) malloc(strlen(get_color_style) + strlen(dbus) + 1);
 			sprintf(cmd, get_color_style, dbus);
 			orig_color_style = strdup(cmd_output(cmd));
+			if ((q = strrchr(orig_color_style, '\n')) != NULL) {
+				*q = '\0';
+			}
+			fprintf(stderr, "get_color_style returned: '%s'\n\n", orig_color_style);
 			free(cmd);
-		}
-		if (*orig_color_style == '\0') {
-			orig_color_style = strdup("0");
-		}
-		if ((q = strchr(orig_color_style, '\n')) != NULL) {
-			*q = '\0';
+			if (strlen(orig_color_style) > 1 || !isdigit((unsigned char) (*orig_color_style))) {
+				fprintf(stderr, "unrecognized color_style, disabling.\n");
+				free(orig_color_style);
+				orig_color_style = "";
+			}
 		}
 	}
+
 	if (strstr(color, "'") != NULL)  {
 		rfbLog("invalid color: %s\n", color);
 		return;
 	}
+
 	cmd = (char *) malloc(strlen(set_color_style) + strlen("0") + strlen(dbus) + 1);
 	sprintf(cmd, set_color_style, dbus, "0");
 	dt_cmd(cmd);

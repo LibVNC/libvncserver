@@ -2721,6 +2721,7 @@ proc copy_default_vars {} {
 
 proc update_menu_vars {{query ""}} {
 	global all_settings menu_var query_result_list
+	global x11vnc_icon_mode
 
 	set debug [in_debug_mode]
 
@@ -2734,6 +2735,14 @@ proc update_menu_vars {{query ""}} {
 
 	foreach piece $query_result_list {
 #puts stderr "UMV: $piece"
+		if [regexp {icon_mode:0} $piece] {
+			set x11vnc_icon_mode 0
+			#puts stderr "x11vnc_icon_mode: $x11vnc_icon_mode"
+		}
+		if [regexp {icon_mode:1} $piece] {
+			set x11vnc_icon_mode 1
+			#puts stderr "x11vnc_icon_mode: $x11vnc_icon_mode"
+		}
 		if {[regexp {^([^:][^:]*):(.*)$} $piece m0 item val]} {
 			if {[info exists menu_var($item)]} {
 				set old $menu_var($item)
@@ -4319,7 +4328,7 @@ proc props_apply {} {
 }
 
 proc props_advanced {} {
-	global icon_mode icon_win props_win full_win
+	global icon_mode props_win full_win
 	global props_advanced_first
 
 	if ![info exists props_advanced_first] {
@@ -4337,6 +4346,7 @@ proc props_advanced {} {
 		set w $full_win
 		wm minsize $w [winfo width $w] [winfo height $w]
 	}
+	push_new_value "remote-cmd" "remote-cmd" "Q:clients" 1
 }
 
 proc do_props {} {
@@ -4475,17 +4485,20 @@ proc do_props {} {
 	}
 	set props_buttons [list]
 
-	set w .props
-	catch {destroy $w}
-	toplevel $w
-	wm title $w "x11vnc Properties"
+	set wp .props
+	set w $wp
+	catch {destroy $wp}
+	toplevel $wp
+	wm title $wp "x11vnc Properties"
+	frame $w.lf
+	set w $w.lf
 	set b1 "$w.buttons1"
 	frame $b1
-	button $b1.ok -text OK -command "if {\[props_apply\]} {destroy $w}" -font $bfont
-	button $b1.cancel -text Cancel -command "destroy $w" -font $bfont
+	button $b1.ok -text OK -command "if {\[props_apply\]} {destroy $wp}" -font $bfont
+	button $b1.cancel -text Cancel -command "destroy $wp" -font $bfont
 	button $b1.apply  -text Apply -command "props_apply" -font $bfont
 
-	bind $w <KeyPress-Escape> "destroy $w"
+	bind $w <KeyPress-Escape> "destroy $wp"
 
 	pack $b1.ok $b1.cancel $b1.apply -side left -expand 0
 	lappend props_buttons $b1.apply $b1.cancel $b1.ok
@@ -4494,7 +4507,7 @@ proc do_props {} {
 	frame $b2
 
 	button $b2.advanced -text " Advanced ... " \
-		-command "destroy $w; props_advanced" -font $bfont
+		-command "destroy $wp; props_advanced" -font $bfont
 	if {! $icon_noadvanced} {
 		lappend props_buttons $b2.advanced
 		pack $b2.advanced -side left -expand 0
@@ -4516,6 +4529,17 @@ proc do_props {} {
 	entry $pw.e -show "*" -textvariable props_passwd -font $bfont
 	pack $pw.e -fill x -expand 1 -padx 1m -pady $pady -side top
 
+	global x11vnc_icon_mode
+	if {! $x11vnc_icon_mode} {
+		catch { $pw.e configure -state disabled}
+		if {! $have_labelframes} {
+			catch { $pw.l configure -state disabled}
+		}
+	} else {
+		lappend props_buttons $pw.e
+	}
+
+
 	set vp "$w.viewpw"
 	if {$have_labelframes} {
 		labelframe $vp -text "ViewOnly Password" -font $bfont
@@ -4528,8 +4552,14 @@ proc do_props {} {
 	entry $vp.e -show "*" -textvariable props_viewpasswd -font $bfont
 	pack $vp.e -fill x -expand 1 -padx 1m -pady $pady -side top
 
-
-	lappend props_buttons $vp.e
+	if {! $x11vnc_icon_mode} {
+		catch { $vp.e configure -state disabled}
+		if {! $have_labelframes} {
+			catch { $vp.l configure -state disabled}
+		}
+	} else {
+		lappend props_buttons $vp.e
+	}
 
 	if {! $icon_mode_at_startup} {
 		$vp.e configure -state disabled
@@ -4541,8 +4571,6 @@ proc do_props {} {
 		catch {$pw configure -state disabled}
 		catch {$pw configure -foreground grey60}
 	}
-
-	lappend props_buttons $pw.e
 
 	set sb "$w.solid"
 	frame $sb
@@ -4604,17 +4632,21 @@ proc do_props {} {
 		set show_props_instructions 1
 	}
 
-	wm withdraw $w
+	wm withdraw .props
+
+	set wl $w
+
+	pack $wl -side left
 
 	if {$msg != ""} {
 		set tw [textwidth $msg]
 		set th [textheight $msg]
 		set th [expr $th - 1]
-		set ms "$w.msg"
+		set ms ".props.msg"
 		text $ms -font $ffont -relief ridge -width $tw -height $th
 		$ms insert 1.0 $msg
 
-		set si "$w.instructions"
+		set si "$wl.instructions"
 		frame $si
 		checkbutton $si.button -text "Show Instructions" \
 			-variable show_props_instructions -anchor w -font $bfont \
@@ -4624,15 +4656,17 @@ proc do_props {} {
 		pack $si -side bottom -fill x -pady 0m -padx $px
 
 		if {$show_props_instructions} {
-			pack $ms -side bottom -fill x -pady $pady -padx $px
+			pack $ms -side left -fill both
 		}
 
 		update
 	}
 
+
 	lappend props_buttons $ac.button $cf.button $vo.button $sh.button $zc.button $jv.button $sb.button
 
 	
+	set w .props
 	update
 	wm resizable $w 1 0
 	center_win $w
@@ -4647,7 +4681,7 @@ proc do_props {} {
 proc toggle_instructions {ms pady px} {
 	global show_props_instructions
 	if {$show_props_instructions} {
-		pack $ms -side bottom -fill x -pady $pady -padx $px
+		pack $ms -side left -fill both
 	} else {
 		pack forget $ms
 	}
@@ -4898,6 +4932,13 @@ proc show_client_balloon {} {
 	if {$client_balloon == ""} {
 		set client_balloon $noinfo
 	}
+	if {! [info exists icon_win]} {
+		return
+	} elseif {$icon_win == ""} {
+		return
+	} elseif {! [winfo exists $icon_win]} {
+		return
+	}
 
 	set x [expr [winfo rootx $icon_win] + ([winfo width $icon_win]/2)]
 	set y [expr [winfo rooty $icon_win] + [winfo height $icon_win] + 4]
@@ -4946,10 +4987,11 @@ proc kill_client_balloon {} {
 proc icon_win_cfg {clients} {
 	global icon_win client_tail client_sock client_info_read
 
-	if {![info exists icon_win]} {
+	if {! [info exists icon_win]} {
 		return
-	}
-	if {$icon_win == ""} {
+	} elseif {$icon_win == ""} {
+		return
+	} elseif {! [winfo exists $icon_win]} {
 		return
 	}
 	if {$clients > 0} {
@@ -5109,6 +5151,14 @@ proc set_icon_label {} {
 	global icon_win
 
 	set lab [get_icon_label]
+
+	if {! [info exists icon_win]} {
+		return
+	} elseif {$icon_win == ""} {
+		return
+	} elseif {! [winfo exists $icon_win]} {
+		return
+	}
 	
 	if {[info exists icon_win]} {
 		$icon_win configure -text $lab
@@ -6276,6 +6326,18 @@ proc run_remote_cmd_via_sock {opts} {
 		if {$db} {puts stderr "run_remote_cmd_via_sock: \"$res\""}
 		set res [string trim $res]
 
+		if [regexp {=clients:} $res] {
+			regsub {^.*=clients:} $res "" cres
+			regsub {,aro=.*$} $cres "" cres
+			regsub {,ans=.*$} $cres "" cres
+			if {$cres == "none"} {
+				set cres ""
+			}
+			update_clients_menu $cres
+			set client_str $cres
+			set_client_balloon $cres
+		}
+
 		if [regexp {^clients:} $res] {
 			regsub {^clients:} $res "" tmp
 			if {$tmp == "none"} {
@@ -6663,7 +6725,6 @@ proc setup_client_sock {{enable 1}} {
 }
 
 proc setup_tray_embed {} {
-	global icon_win
 	update
 	set w [winfo width .]
 	set h [winfo height .]
@@ -6754,7 +6815,6 @@ proc restart_everything {gui_mode} {
 }
 
 proc undo_tray_embed {} {
-	global icon_win
 	set wid [winfo id .]	
 	push_new_value "remote-cmd" "remote-cmd" "trayunembed:$wid" 0
 }
@@ -6782,7 +6842,7 @@ global bfont ffont sfont snfont old_labels have_labelframes
 global connected_to_x11vnc
 global cache_all_query_vars
 global last_query_all_time query_all_freq client_tail client_sock client_info_read
-global icon_mode icon_mode_at_startup
+global icon_mode icon_mode_at_startup x11vnc_icon_mode
 global tray_embed tray_running icon_setpasswd icon_embed_id
 global icon_noadvanced icon_minimal
 global make_gui_count text_area_str
@@ -7052,6 +7112,7 @@ if {[info exists env(X11VNC_SIMPLE_GUI)]} {
 }
 
 set icon_mode 0
+set x11vnc_icon_mode 0
 set tray_embed 0
 set tray_running 0
 
@@ -7159,11 +7220,11 @@ proc check_setpasswd {} {
 	set do_props_msg ""
 	if {$icon_setpasswd} {
 		set m "\n"
-		set m     " Note the x11vnc icon in the system tray \n" 
+		set m "${m} Note the x11vnc icon in the system tray.\n" 
 		set m "${m} This panel is its 'Properties' dialog.\n" 
 		set m "${m}\n" 
 		set m "${m} To specify a Session Password and to\n" 
-		set m "${m} allow VNC clients to connect, follow\n" 
+		set m "${m} allow VNC viewers to connect, follow\n" 
 		set m "${m} these steps:\n" 
 		set m "${m}\n" 
 		set m "${m} Enter a passwd in the Password field\n" 
@@ -7173,9 +7234,12 @@ proc check_setpasswd {} {
 		set m "${m} Set 'Accept Connections' and then Press \n" 
 		set m "${m} 'Apply' to allow incoming connections.\n" 
 		set m "${m}\n" 
+		set m "${m} No Viewer can connect until you do this.\n" 
+		set m "${m}\n" 
 		set m "${m} The passwords are only for this x11vnc\n" 
 		set m "${m} session and are not saved.  Run x11vnc\n" 
-		set m "${m} manually for more control.\n" 
+		set m "${m} manually for more control (e.g. -rfbauth \n" 
+		set m "${m} for a saved password.)\n" 
 		set m "${m}\n" 
 		set m "${m} See 'Help' for details on each option.\n" 
 
@@ -7237,6 +7301,7 @@ if {$icon_mode} {
 	dtime G
 	old_balloon
 	check_setpasswd
+	push_new_value "remote-cmd" "remote-cmd" "Q:clients" 1
 } else {
 	make_gui "full"
 	dtime G

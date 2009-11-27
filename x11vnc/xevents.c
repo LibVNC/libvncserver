@@ -77,6 +77,7 @@ void set_text_chat(rfbClientPtr cl, int l, char *t);
 int get_keyboard_led_state_hook(rfbScreenInfoPtr s);
 int get_file_transfer_permitted(rfbClientPtr cl);
 void get_prop(char *str, int len, Atom prop, Window w);
+int guess_dm_gone(int t1, int t2);
 
 static void initialize_xevents(int reset);
 static void print_xevent_bases(void);
@@ -117,6 +118,189 @@ void initialize_clipboard_atom(void) {
 		}
 	}
 #endif	/* NO_X11 */
+}
+
+/*
+      we observed these strings:
+
+      6 gdm_string: Gnome-power-manager
+      6 gdm_string: Gnome-session
+      6 gdm_string: Gnome-settings-daemon
+      6 gdm_string: Login Window
+      6 gdm_string: Notify-osd
+      6 gdm_string: Panel
+     12 gdm_string: Metacity
+     12 gdm_string: gnome-power-manager
+     12 gdm_string: gnome-session
+     12 gdm_string: gnome-settings-daemon
+     12 gdm_string: notify-osd
+     18 gdm_string: Gdm-simple-greeter
+     24 gdm_string: metacity
+     36 gdm_string: gdm-simple-greeter
+ */
+
+static int gdm_string(char *str) {
+	if (str == NULL) {
+		return 0;
+	}
+	if (str[0] == '\0') {
+		return 0;
+	}
+	if (0) fprintf(stderr, "gdm_string: %s\n", str);
+	if (strstr(str, "gdm-") == str || strstr(str, "Gdm-") == str) {
+		if (strstr(str, "-greeter") != NULL) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int gdm_still_running(void) {
+#if NO_X11
+	return 0;
+#else
+	Window r, parent;
+	Window *winlist;
+	unsigned int nc;
+	int rc, i;
+	static XClassHint *classhint = NULL;
+	XErrorHandler old_handler;
+	int saw_gdm_name = 0;
+
+	/* some times a window can go away before we get to it */
+	trapped_xerror = 0;
+	old_handler = XSetErrorHandler(trap_xerror);
+
+	if (! classhint) {
+		classhint = XAllocClassHint();
+	}
+
+	/* we are xlocked. */
+	rc = XQueryTree_wr(dpy, DefaultRootWindow(dpy), &r, &parent, &winlist, &nc);
+	if (!rc || winlist == NULL || nc == 0) {
+		nc = 0;
+	}
+	for (i=0; i < (int) nc; i++) {
+		char *name = NULL;
+		Window w = winlist[i];
+		if (XFetchName(dpy, w, &name) && name != NULL) {
+			saw_gdm_name += gdm_string(name);
+			XFree_wr(name);
+		}
+		classhint->res_name = NULL;
+		classhint->res_class = NULL;
+		if (XGetClassHint(dpy, w, classhint)) {
+			name = classhint->res_name;
+			if (name != NULL) {
+				saw_gdm_name += gdm_string(name);
+				XFree_wr(name);
+			}
+			name = classhint->res_class;
+			if (name != NULL) {
+				saw_gdm_name += gdm_string(name);
+				XFree_wr(name);
+			}
+		}
+		if (saw_gdm_name > 0) {
+			break;
+		}
+	}
+	if (winlist != NULL) {
+		XFree_wr(winlist);
+	}
+
+	XSync(dpy, False);
+	XSetErrorHandler(old_handler);
+	trapped_xerror = 0;
+
+	return saw_gdm_name;
+#endif
+}
+
+static int wm_running(void) {
+	char *s = getenv("DEBUG_WM_RUNNING");
+	RAWFB_RET(0)
+#if NO_X11
+	return 0;
+#else
+	/*
+	 * Unfortunately with recent GDM (v2.28), they run gnome-session,
+	 * dbus-launch, and metacity for the Login greeter!  So the simple
+	 * XInternAtom checks below no longer work.
+	 */
+	if (gdm_still_running()) {
+		return 0;
+	}
+
+	/* we are xlocked. */
+	if (XInternAtom(dpy, "_NET_SUPPORTED", True) != None) {
+		if (s) rfbLog("wm is running (_NET_SUPPORTED).\n");
+		return 1;
+	}
+	if (XInternAtom(dpy, "_WIN_PROTOCOLS", True) != None) {
+		if (s) rfbLog("wm is running (_WIN_PROTOCOLS).\n");
+		return 1;
+	}
+	if (XInternAtom(dpy, "_XROOTPMAP_ID", True) != None) {
+		if (s) rfbLog("wm is running (_XROOTPMAP_ID).\n");
+		return 1;
+	}
+	if (XInternAtom(dpy, "_MIT_PRIORITY_COLORS", True) != None) {
+		if (s) rfbLog("wm is running (_MIT_PRIORITY_COLORS).\n");
+		return 1;
+	}
+	if (s) rfbLog("wm is not running.\n");
+	return 0;
+#endif	/* NO_X11 */
+	
+}
+
+int guess_dm_gone(int t1, int t2) {
+	int wait = t2;
+	char *avoid = getenv("X11VNC_AVOID_WINDOWS");
+	time_t tcheck = last_client;
+
+	if (last_open_xdisplay > last_client) {
+		/* better time for -display WAIT:... */
+		tcheck = last_open_xdisplay;
+	}
+
+	if (avoid && !strcmp(avoid, "never")) {
+		return 1;
+	}
+	if (!screen || !screen->clientHead) {
+		return 0;
+	}
+	if (avoid) {
+		int n = atoi(avoid);
+		if (n > 1) {
+			wait = n;
+		} else {
+			wait = 90;
+		}
+	} else {
+		static time_t saw_wm = 0;
+
+		wait = t2;
+
+		X_LOCK;
+		if (wm_running()) {
+			if (saw_wm == 0) {
+				saw_wm = time(NULL);
+			} else if (time(NULL) <= saw_wm + 2) {
+				/* try to wait a few seconds after transition */
+				;
+			} else {
+				wait = t1;
+			}
+		}
+		X_UNLOCK;
+	}
+	/* we assume they've logged in OK after wait seconds... */
+	if (time(NULL) <= tcheck + wait)  {
+		return 0;
+	}
+	return 1;
 }
 
 static void initialize_xevents(int reset) {
@@ -162,11 +346,17 @@ static void initialize_xevents(int reset) {
 	if (watch_selection && !did_xcreate_simple_window) {
 		/* create fake window for our selection ownership, etc */
 
-		X_LOCK;
-		selwin = XCreateSimpleWindow(dpy, rootwin, 0, 0, 1, 1, 0, 0, 0);
-		X_UNLOCK;
-		did_xcreate_simple_window = 1;
-		if (0) rfbLog("selwin: 0x%lx\n", selwin);
+		/*
+		 * We try to delay creating selwin until we are past
+		 * any GDM, (or other KillInitClients=true) manager.
+		 */
+		if (guess_dm_gone(5, 45)) {
+			X_LOCK;
+			selwin = XCreateSimpleWindow(dpy, rootwin, 3, 2, 1, 1, 0, 0, 0);
+			X_UNLOCK;
+			did_xcreate_simple_window = 1;
+			if (! quiet) rfbLog("created selwin: 0x%lx\n", selwin);
+		}
 	}
 
 	if ((xrandr || xrandr_maybe) && !did_xrandr) {
@@ -190,8 +380,16 @@ static void initialize_xevents(int reset) {
 		did_clipboard_atom = 1;
 	}
 	if (xfixes_present && use_xfixes && !did_xfixes) {
-		initialize_xfixes();
-		did_xfixes = 1;
+		/*
+		 * We try to delay creating initializing xfixes until
+		 * we are past the display manager, due to Xorg bug:
+		 * http://bugs.freedesktop.org/show_bug.cgi?id=18451
+		 */
+		if (guess_dm_gone(5, 45)) {
+			initialize_xfixes();
+			did_xfixes = 1;
+			if (! quiet) rfbLog("called initialize_xfixes()\n");
+		}
 	}
 	if (xdamage_present && !did_xdamage) {
 		initialize_xdamage();
@@ -1182,7 +1380,7 @@ void check_xevents(int reset) {
 	}
 #endif
 #if LIBVNCSERVER_HAVE_LIBXFIXES
-	if (xfixes_present && use_xfixes && xfixes_base_event_type) {
+	if (xfixes_present && use_xfixes && xfixes_first_initialized && xfixes_base_event_type) {
 		if (XCheckTypedEvent(dpy, xfixes_base_event_type +
 		    XFixesCursorNotify, &xev)) {
 			got_xfixes_cursor_notify++;
@@ -1260,7 +1458,7 @@ void check_xevents(int reset) {
 			req = "CLIPBOARD";
 		}
 		if (which != 0 && ! own && have_clients &&
-		    XGetSelectionOwner(dpy, atom) != None) {
+		    XGetSelectionOwner(dpy, atom) != None && selwin != None) {
 			XConvertSelection(dpy, atom, XA_STRING, XA_STRING,
 			    selwin, CurrentTime);
 			if (debug_sel) {
@@ -1501,7 +1699,7 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	X_LOCK;
 
 	/* associate this text with PRIMARY (and SECONDARY...) */
-	if (set_primary && ! own_primary) {
+	if (set_primary && ! own_primary && selwin != None) {
 		own_primary = 1;
 		/* we need to grab the PRIMARY selection */
 		XSetSelectionOwner(dpy, XA_PRIMARY, selwin, CurrentTime);
@@ -1511,7 +1709,7 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 		}
 	}
 
-	if (set_clipboard && ! own_clipboard && clipboard_atom != None) {
+	if (set_clipboard && ! own_clipboard && clipboard_atom != None && selwin != None) {
 		own_clipboard = 1;
 		/* we need to grab the CLIPBOARD selection */
 		XSetSelectionOwner(dpy, clipboard_atom, selwin, CurrentTime);

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (c) 2006-2008 by Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2006-2009 by Karl J. Runge <runge@karlrunge.com>
 #
 # ssvnc_cmd:
 #
@@ -50,7 +50,7 @@
 #
 # See the TightVNC viewer documentation for on its cmdline arguments.
 #
-# For convenience, here is the current (7/2006) TightVNC viewer -help output:
+# For convenience, here is the TightVNC 1.3dev5 viewer -help output:
 #
 #       TightVNC viewer version 1.3dev5
 #       
@@ -98,9 +98,10 @@ PATH=$PATH:/usr/bin:/bin
 export PATH
 
 if [ "X$FULLNAME" = "XKarl J. Runge" ]; then
-	VNCVIEWER_POPUP_FIX=1
-	export VNCVIEWER_POPUP_FIX
-
+	if [ "X$NOPOPUFIX" = "X" ]; then
+		VNCVIEWER_POPUP_FIX=1
+		export VNCVIEWER_POPUP_FIX
+	fi
 	PATH=`echo "$PATH" | sed -e 's,runge/bin/override,-------------,'`
 fi
 

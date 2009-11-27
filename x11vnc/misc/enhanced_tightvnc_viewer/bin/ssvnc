@@ -97,6 +97,42 @@ OPTIONS
 END
 	exit 0
 fi
+if [ "X$1" = "X-ssh" ]; then
+	if [ "X$2" = "X-help" -o "X$2" = "X-h" ]; then
+		cat << END
+sshvnc - a GUI wrapper for SSH VNC connections.
+
+SYNOPSIS
+       sshvnc
+       sshvnc [host][:display]
+       sshvnc [saved-profile-name]
+       sshvnc [options] [host-or-profile]
+       sshvnc --help
+
+See 'ssvnc $2' and 'ssvnc --help' for more information.
+END
+		exit 0
+	fi
+fi
+
+if [ "X$1" = "X-ts" -o "X$1" = "X-tso" ]; then
+	if [ "X$2" = "X-help" -o "X$2" = "X-h" ]; then
+		cat << END
+tsvnc - a GUI wrapper for SSH VNC connections using x11vnc Terminal Services.
+
+SYNOPSIS
+       tsvnc
+       tsvnc [host][:display]
+       tsvnc [saved-profile-name]
+       tsvnc [options] [host-or-profile]
+       tsvnc --help
+
+See 'ssvnc $2' and 'tsvnc --help' for more information.
+END
+		exit 0
+	fi
+fi
+
 
 if [ "X$XTERM_PRINT" != "X" ]; then
 	XTERM_PRINT=""
@@ -113,9 +149,10 @@ PATH=$PATH:/usr/bin:/bin:/usr/bin/X11:/usr/X11R6/bin:/usr/openwin/bin:/usr/sfw/b
 export PATH
 
 if [ "X$FULLNAME" = "XKarl J. Runge" ]; then
-	VNCVIEWER_POPUP_FIX=1
-	export VNCVIEWER_POPUP_FIX
-
+	if [ "X$NOPOPUFIX" = "X" ]; then
+		VNCVIEWER_POPUP_FIX=1
+		export VNCVIEWER_POPUP_FIX
+	fi
 	PATH=`echo "$PATH" | sed -e 's,runge/bin/override,-------------,'`
 fi
 
@@ -123,11 +160,12 @@ if [ "X$WISH" = "X" ]; then
 	WISH=wish
 	for try in wish8.4 wish wish8.3 wish8.5 wish8.6
 	do
-		if type $try > /dev/null; then
+		if type $try > /dev/null 2>&1; then
 			WISH=$try
 			break
 		fi
 	done
+	export WISH
 fi
 
 
