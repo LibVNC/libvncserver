@@ -892,6 +892,7 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     /*rfbSetBit(msgs.client2server, rfbTextChat);        */
     /*rfbSetBit(msgs.client2server, rfbKeyFrameRequest); */
     rfbSetBit(msgs.client2server, rfbPalmVNCSetScaleFactor);
+    rfbSetBit(msgs.client2server, rfbMulticastFramebufferUpdateRequest);
 
     rfbSetBit(msgs.server2client, rfbFramebufferUpdate);
     rfbSetBit(msgs.server2client, rfbSetColourMapEntries);
@@ -2250,6 +2251,52 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
        return;
     }
 
+    case rfbMulticastFramebufferUpdateRequest:
+    {
+        sraRegionPtr tmpRegion;
+
+        if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
+			      sz_rfbMulticastFramebufferUpdateRequestMsg-1)) <= 0) {
+            if (n != 0)
+                rfbLogPerror("rfbProcessClientNormalMessage: read");
+            rfbCloseClient(cl);
+            return;
+        }
+
+        rfbStatRecordMessageRcvd(cl, msg.type, 
+				 sz_rfbMulticastFramebufferUpdateRequestMsg,
+				 sz_rfbMulticastFramebufferUpdateRequestMsg);
+
+	tmpRegion = sraRgnCreateRect(0, 0, cl->screen->width, cl->screen->height);
+
+        LOCK(cl->updateMutex);
+	sraRgnOr(cl->requestedRegion,tmpRegion);
+
+	if (!cl->readyForSetColourMapEntries) {
+	    /* client hasn't sent a SetPixelFormat so is using server's */
+	    cl->readyForSetColourMapEntries = TRUE;
+	    if (!cl->format.trueColour) {
+		if (!rfbSetClientColourMap(cl, 0, 0)) {
+		    sraRgnDestroy(tmpRegion);
+		    TSIGNAL(cl->updateCond);
+		    UNLOCK(cl->updateMutex);
+		    return;
+		}
+	    }
+	}
+
+       if (!msg.mfur.incremental) {
+	    sraRgnOr(cl->modifiedRegion,tmpRegion);
+	    sraRgnSubtract(cl->copyRegion,tmpRegion);
+       }
+       TSIGNAL(cl->updateCond);
+       UNLOCK(cl->updateMutex);
+
+       sraRgnDestroy(tmpRegion);
+
+       return;
+    }
+
     case rfbKeyEvent:
 
 	if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
@@ -2550,7 +2597,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     }
 
     //FIXME test
-    if (cl->useMulticastVNC)
+    if (0 && cl->useMulticastVNC)
       {
 	// flush
 	//rfbSendUpdateBuf(cl);

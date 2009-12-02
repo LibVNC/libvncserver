@@ -373,6 +373,7 @@ typedef struct {
 #define rfbKeyFrameUpdate 5
 #define rfbPalmVNCReSizeFrameBuffer 0xF
 
+
 /* client -> server */
 
 #define rfbSetPixelFormat 0
@@ -396,6 +397,7 @@ typedef struct {
 #define rfbKeyFrameRequest 12
 /* PalmVNC 1.4 & 2.0 SetScale Factor message */
 #define rfbPalmVNCSetScaleFactor 0xF
+#define rfbMulticastFramebufferUpdateRequest 249
 
 
 
@@ -1205,6 +1207,25 @@ typedef struct {
 
 #define sz_rfbFramebufferUpdateRequestMsg 10
 
+/*-----------------------------------------------------------------------------
+ * MulticastFramebufferUpdateRequest - request for a framebuffer update via 
+ * multicast. If incremental is true then the client just wants the changes 
+ * since the last update. If false then it wants the whole screen. Does not 
+ * contain rectangle specification: Because the purpose of sending framebuffer
+ * updates via multicast is to send them _once_ for _all_ connected multicast 
+ * clients, it is  not desirable to serve the needs of a single client. In case
+ * a client wants a particular subregion of the framebuffer, it can always 
+ * resort to a traditional 'FramebufferUpdateRequest'.
+ */
+
+typedef struct {
+    uint8_t type;			/* always rfbMulticastFramebufferUpdateRequest */
+    uint8_t incremental;
+} rfbMulticastFramebufferUpdateRequestMsg;
+
+#define sz_rfbMulticastFramebufferUpdateRequestMsg 2
+
+
 
 /*-----------------------------------------------------------------------------
  * KeyEvent - key press or release
@@ -1364,6 +1385,7 @@ typedef union {
 	rfbFileTransferMsg ft;
 	rfbSetSWMsg sw;
 	rfbTextChatMsg tc;
+        rfbMulticastFramebufferUpdateRequestMsg mfur;
 } rfbClientToServerMsg;
 
 /* 

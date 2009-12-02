@@ -78,6 +78,8 @@ char *messageNameClient2Server(uint32_t type, char *buf, int len) {
     case rfbTextChat:                 snprintf(buf, len, "TextChat"); break;
     case rfbKeyFrameRequest:          snprintf(buf, len, "KeyFrameRequest"); break;
     case rfbPalmVNCSetScaleFactor:    snprintf(buf, len, "PalmVNCSetScale"); break;
+    case rfbMulticastFramebufferUpdateRequest:
+                                      snprintf(buf, len, "MulticastFBUpd"); break;
     default:
         snprintf(buf, len, "cli2svr-0x%08X", type);
 

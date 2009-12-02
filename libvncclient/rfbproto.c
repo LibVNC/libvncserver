@@ -309,6 +309,8 @@ DefaultSupportedMessages(rfbClient* client)
     SetClient2Server(client, rfbKeyEvent);
     SetClient2Server(client, rfbPointerEvent);
     SetClient2Server(client, rfbClientCutText);
+    if(client->canHandleMulticastVNC) 
+      SetClient2Server(client, rfbMulticastFramebufferUpdateRequest);
     /* technically, we only care what we can *send* to the server
      * but, we set Server2Client Just in case it ever becomes useful
      */
@@ -1180,6 +1182,28 @@ SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, rfbB
 
 
 /*
+ * SendMulticastFramebufferUpdateRequest.
+ */
+
+rfbBool
+SendMulticastFramebufferUpdateRequest(rfbClient* client, rfbBool incremental)
+{
+  rfbMulticastFramebufferUpdateRequestMsg mfur;
+
+  if (!SupportsClient2Server(client, rfbMulticastFramebufferUpdateRequest)) return TRUE;
+
+  mfur.type = rfbMulticastFramebufferUpdateRequest;
+  mfur.incremental = incremental ? 1 : 0;
+
+  if (!WriteToRFBServer(client, (char *)&mfur, sz_rfbMulticastFramebufferUpdateRequestMsg))
+    return FALSE;
+
+  return TRUE;
+}
+
+
+
+/*
  * SendScaleSetting.
  */
 rfbBool
@@ -1358,7 +1382,7 @@ HandleRFBServerMessage(rfbClient* client)
     client->vncRec->readTimestamp = TRUE;
   
   //FIXME
-  if(client->multicastSock >= 0)
+  if(0 && client->multicastSock >= 0)
     {
       if (!ReadFromRFBServerMulticast(client, (char *)&msg, 1))
 	{
