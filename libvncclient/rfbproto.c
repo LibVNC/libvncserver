@@ -309,8 +309,6 @@ DefaultSupportedMessages(rfbClient* client)
     SetClient2Server(client, rfbKeyEvent);
     SetClient2Server(client, rfbPointerEvent);
     SetClient2Server(client, rfbClientCutText);
-    if(client->canHandleMulticastVNC) 
-      SetClient2Server(client, rfbMulticastFramebufferUpdateRequest);
     /* technically, we only care what we can *send* to the server
      * but, we set Server2Client Just in case it ever becomes useful
      */
@@ -350,6 +348,17 @@ DefaultSupportedMessagesTightVNC(rfbClient* client)
     SetServer2Client(client, rfbFileTransfer);
     SetServer2Client(client, rfbTextChat);
 }
+
+
+void
+DefaultSupportedMessagesMulticastVNC(rfbClient* client)
+{
+    DefaultSupportedMessages(client);
+    SetClient2Server(client, rfbMulticastFramebufferUpdateRequest);
+    /* technically, we only care what we can *send* to the server */
+    SetServer2Client(client, rfbMulticastFramebufferUpdate);
+}
+
 
 #ifndef WIN32
 static rfbBool
@@ -774,6 +783,11 @@ InitialiseRFBConnection(rfbClient* client)
   if (major==3 && minor==5) {
       rfbClientLog("TightVNC server detected, enabling TightVNC specific messages\n",pv);
       DefaultSupportedMessagesTightVNC(client);
+  }
+
+  if(client->canHandleMulticastVNC) {
+      rfbClientLog("Enabling MulticastVNC specific messages\n",pv);
+      DefaultSupportedMessagesMulticastVNC(client);
   }
 
   /* we do not support > RFB3.8 */
