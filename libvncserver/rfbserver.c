@@ -1057,7 +1057,7 @@ rfbSendServerIdentity(rfbClientPtr cl)
  */
 
 rfbBool
-rfbSendMulticastVNCAddress(rfbClientPtr cl)
+rfbSendMulticastVNCSessionInfo(rfbClientPtr cl)
 {
    rfbFramebufferUpdateRectHeader rect;
    uint8_t addr_len = 0;
@@ -1080,7 +1080,7 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
        }
      else
        {
-	 rfbLog("rfbSendMulticastVNCAddress: invalid address family\n");
+	 rfbLog("rfbSendMulticastVNCSessionInfo: invalid address family\n");
 	 return FALSE;
        }
 
@@ -2599,7 +2599,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     rfbBool sendSupportedMessages = FALSE;
     rfbBool sendSupportedEncodings = FALSE;
     rfbBool sendServerIdentity = FALSE;
-    rfbBool sendMulticastVNCAddr = FALSE;
+    rfbBool sendMulticastVNCSessionInfo = FALSE;
     rfbBool result = TRUE;
     
 
@@ -2747,7 +2747,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
      */
     if (cl->enableMulticastVNC)
     {
-        sendMulticastVNCAddr = TRUE;
+        sendMulticastVNCSessionInfo = TRUE;
 	/* set multicast use flag for this client */
 	cl->useMulticastVNC = TRUE;
 	  
@@ -2802,7 +2802,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
        (cl->enableCursorShapeUpdates ||
 	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY)) &&
        !sendCursorShape && !sendCursorPos && !sendKeyboardLedState &&
-       !sendSupportedMessages && !sendSupportedEncodings && !sendServerIdentity && !sendMulticastVNCAddr) {
+       !sendSupportedMessages && !sendSupportedEncodings && !sendServerIdentity && !sendMulticastVNCSessionInfo) {
       sraRgnDestroy(updateRegion);
       UNLOCK(cl->updateMutex);
       return TRUE;
@@ -2967,7 +2967,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 					   nUpdateRegionRects +
 					   !!sendCursorShape + !!sendCursorPos + !!sendKeyboardLedState +
 					   !!sendSupportedMessages + !!sendSupportedEncodings + !!sendServerIdentity +
-					   !!sendMulticastVNCAddr));
+					   !!sendMulticastVNCSessionInfo));
     } else {
 	fu->nRects = 0xFFFF;
     }
@@ -3005,8 +3005,8 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
        if (!rfbSendServerIdentity(cl))
            goto updateFailed;
    }
-   if (sendMulticastVNCAddr) {
-     if (!rfbSendMulticastVNCAddress(cl))
+   if (sendMulticastVNCSessionInfo) {
+     if (!rfbSendMulticastVNCSessionInfo(cl))
            goto updateFailed;
    }
 
