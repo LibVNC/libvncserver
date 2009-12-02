@@ -693,10 +693,13 @@ void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion)
 	if(sraClipRect2(&x,&y,&x2,&y2,0,0,s->width,s->height)) {
 	    sraRegionPtr rect;
 	    rect = sraRgnCreateRect(x,y,x2,y2);
-	    if(updateRegion)
+	    if(updateRegion) {
 	    	sraRgnOr(updateRegion,rect);
-	    else
+	    } else {
+		    LOCK(cl->updateMutex);
 		    sraRgnOr(cl->modifiedRegion,rect);
+		    UNLOCK(cl->updateMutex);
+	    }
 	    sraRgnDestroy(rect);
 	}
     }
