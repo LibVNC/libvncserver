@@ -562,7 +562,6 @@ typedef struct _rfbClientRec {
     rfbBool enableCursorShapeUpdates; /* client supports cursor shape updates */
     rfbBool enableCursorPosUpdates;   /* client supports cursor position updates */
     rfbBool enableMulticastVNC;       /* client supports multicast FramebufferUpdates messages */
-    rfbBool useMulticastVNC;          /* framebuffer updates should be sent via multicast socket*/
     rfbBool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */
     rfbBool cursorWasChanged;         /* cursor shape update should be sent */
     rfbBool cursorWasMoved;           /* cursor position update should be sent */
@@ -571,6 +570,9 @@ typedef struct _rfbClientRec {
 
     rfbBool useNewFBSize;             /* client supports NewFBSize encoding */
     rfbBool newFBSizePending;         /* framebuffer size was changed */
+
+    rfbBool  useMulticastVNC;         /* framebuffer updates should be sent via multicast socket*/
+    uint16_t multicastPixelformatId;  /* identifier assigned to client's pixelformat */
 
     struct _rfbClientRec *prev;
     struct _rfbClientRec *next;

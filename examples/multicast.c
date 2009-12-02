@@ -97,6 +97,8 @@ void UpdateFramebuffer(rfbScreenInfoPtr rfbScreen)
   it = rfbGetClientIterator(rfbScreen);
   while(rfbClientIteratorNext(it) != NULL) 
     ++clients;
+  
+  rfbReleaseClientIterator(it);
 
   snprintf(fps_string, 256, "Frame %04d of %04d (%03d fps on server side) - %d Clients \r", line, HEIGHT, fps, clients);
   rfbDrawString(rfbScreen, &radonFont, 20, 100, fps_string, 0xffffff);

@@ -1063,7 +1063,7 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
    uint8_t addr_len = 0;
    uint32_t encoding;
    char* addr_ptr = NULL;
- 
+    
    /* addr is already in network byte order */
    if(cl->screen->multicastSockAddr.ss_family == AF_INET)
      {
@@ -1083,7 +1083,35 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
 	 rfbLog("rfbSendMulticastVNCAddress: invalid address family\n");
 	 return FALSE;
        }
-   
+
+
+   /* assign a pixelformat id */
+   if(! memcmp(&cl->screen->serverFormat, &cl->format, sizeof(rfbPixelFormat))) /* same as server's */
+     cl->multicastPixelformatId = 0;
+   else
+     {
+       rfbLog("--> diffrent\n");
+       uint16_t highest_id = 0; 
+       rfbClientPtr someclient = NULL;
+       rfbClientIteratorPtr it=rfbGetClientIterator(cl->screen);
+       while((someclient=rfbClientIteratorNext(it)))
+	 {
+	   if(someclient->multicastPixelformatId > highest_id)
+	     highest_id = someclient->multicastPixelformatId;
+
+	   if(someclient != cl && !memcmp(&someclient->format, &cl->format, sizeof(rfbPixelFormat))) 
+	     {
+	       cl->multicastPixelformatId = someclient->multicastPixelformatId; /* same as some other client's */
+	       break;
+	     }
+	 }
+
+       if(someclient == NULL)  /* no other client has this */
+	 cl->multicastPixelformatId = highest_id + 1;
+       
+       rfbReleaseClientIterator(it);
+     }
+
  
    /* flush the buffer if messages wouldn't fit */
    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + addr_len > UPDATE_BUF_SIZE) {
@@ -1092,9 +1120,9 @@ rfbSendMulticastVNCAddress(rfbClientPtr cl)
    }
 
    rect.encoding = Swap32IfLE(encoding);
-   rect.r.x = Swap16IfLE(cl->screen->deferUpdateTime); //FIXME may introduce an extra multicast value?
+   rect.r.x = Swap16IfLE(cl->multicastPixelformatId);
    rect.r.y = Swap16IfLE(cl->screen->multicastPort);
-   rect.r.w = 0;
+   rect.r.w = Swap16IfLE(cl->screen->deferUpdateTime); //FIXME maybe introduce an extra multicast value?
    rect.r.h = 0;
 
    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,

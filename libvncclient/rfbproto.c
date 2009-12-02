@@ -1595,8 +1595,9 @@ HandleRFBServerMessage(rfbClient* client)
       }
 
       /* 
-	 rect.r.x = multicast update interval
+	 rect.r.x = our pixelformat's identifier 
          rect.r.y = port
+	 rect.r.w = multicast update interval
       */
       if (rect.encoding == rfbEncodingMulticastVNC || rect.encoding == rfbEncodingIPv6MulticastVNC) {
 	char buffer[16];
@@ -1637,7 +1638,8 @@ HandleRFBServerMessage(rfbClient* client)
 	  }
 
 	rfbClientLog("MulticastVNC: received multicast address %s:%s\n", host, serv);
-	rfbClientLog("MulticastVNC: received multicast update interval: %dms\n", rect.r.x);
+	rfbClientLog("MulticastVNC: received multicast update interval: %dms\n", rect.r.w);
+	rfbClientLog("MulticastVNC: received pixelformat identifier: %d\n", rect.r.x);
 
 	client->multicastSock = CreateMulticastSocket(multicastSockAddr);
 	
