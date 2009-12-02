@@ -15,7 +15,7 @@
  to a VNC server, the slower this rate becomes. This is because the
  server's framebuffer content is sent to each client individually. The
  more clients are connected, the higher the load on the underlying
- network, although the data sent to each client is the same.
+ network, although the data sent to each client mostly is the same.
 
  It is obvious to optimise here and to send this data just once to all
  connected clients - via multicast. This way the load on the network
@@ -37,7 +37,7 @@
  encoding (-832) are used by a client to indicate that it is able to
  receive multicast framebuffer updates. The server responds by sending
  multicast address plus port and also its multicast update interval
- (see below).
+ and an ID assigned to the client's pixelformat (see below).
  
  Clients then ask for multicast framebuffer updates by issuing
  'MulticastFramebufferUpdateRequest' client to server messages
@@ -52,12 +52,17 @@
 
  If the multicast update interval has expired and there were multicast
  framebuffer update requests, the server sends out the update via UDP
- multicast.  Since UDP is based on datagrams with a fixed maximum
- size, the whole update may have to be packed into several UDP
- packets. Therefore the framebuffer contents are sent using (maybe
- several) 'MulticastFramebufferUpdate' server to client messages
- (message type 248). These contain sequence numbers identifying the
- update as a whole and also the individual partial updates.
+ multicast. To keep the client implementation as simple as possible,
+ the server sends one such update for each combination of pixelformat
+ and encoding it has to provide. Thus, each multicast framebuffer
+ update carries a pixelformat ID of which the client was told when
+ sending the multicast address (see above). Furthermore, since UDP is
+ based on datagrams with a fixed maximum size, the whole update may
+ have to be packed into several UDP packets. Therefore the framebuffer
+ contents are sent using (maybe several) 'MulticastFramebufferUpdate'
+ server to client messages (message type 248). These contain sequence
+ numbers identifying the update as a whole and also the individual
+ partial updates.
 
  Using these sequence numbers and the server's multicast update
  interval mentioned above, it is possible for clients to reorder
@@ -80,13 +85,18 @@
  IPV6, it adds the IPv6MulticastVNC pseudo encoding (-832). 
 
  If the server supports the requested feature, it tells the client
- about the multicast address to listen on for framebuffer updates: it
- sends back a 'FramebufferUpdate' message consisting of one rectangle
- with:
+ about the multicast address and port to listen on for framebuffer
+ updates and also adds its multicast update interval and a unique ID
+ assigned to the pixelformat the client requested (if any) or 0 if the
+ client was content with the server's default pixelformat.
+
+ So, the server sends back a 'FramebufferUpdate' message consisting of
+ one rectangle with:
 
     * 'encoding-type' set to MulticastVNC (or IPv6MulticastVNC)
-    * 'x-position' set to the multicast update interval in milliseconds
+    * 'x-position' set to the pixelformat identifier
     * 'y-position' set to the UDP port to listen on
+    * 'width' set to the multicast update interval in milliseconds
     * the pixel data set to an IPv4 address (or IPv6 address) in
       network byte order, 4 (or 16) bytes long.
 
@@ -141,8 +151,10 @@
  of pixelformat and encoding it has to provide. For each registered
  combination, it sends out a whole multicast framebuffer update. 
  Therefore, 'MulticastFramebufferUpdate' messages have a field
- identifying the pixelformat of the pixel data sent. Note that the
- encoding is specified in each of the update's rectangles.
+ identifying the pixelformat of the pixel data sent. This id gets
+ assigned to the client's wanted pixelformat at multicast session
+ setup, see 2.2. Note that the encoding of the pixel data is specified
+ in each of the update's rectangles.
 
  Since multicast is based on UDP datagrams with a fixed maximum size,
  the whole update may have to be packed into several UDP packets.
@@ -153,22 +165,23 @@
  partial updates of this whole update (e.g. partial update no. 3 of 11
  in total).
 
+ The header is padded so that it is an exact multiple of 4 bytes (to
+ help with alignment of 32-bit pixels).
 
  +--------------------+--------------------+-------------------------+
  |No. of bytes        |Type        [Value] |Description		     |
  +--------------------+--------------------+-------------------------+
  |1     	      |U8            248   |message-type             |
  |1                   |                    |padding  		     |
- |16                  |PIXEL_FORMAT        |pixel-format	     |
+ |2                   |U16                 |id-of-pixel-format	     |
  |2                   |U16                 |id-of-whole-update	     |
  |2	              |U16 	           |number-of-partial-updates|
  |2                   |U16                 |id-of-partial-update     | 
  |2                   |U16                 |number-of-rectangles     |
  +--------------------+--------------------+-------------------------+ 
 
- where PIXEL_FORMAT is as described in the RFB protocol spec and
- 'number-of-rectangles' is the number of rectangles per 'Multicast- 
- FramebufferUpdate' message, not per whole update.
+ where  'number-of-rectangles' is the number of rectangles per
+ 'MulticastFramebufferUpdate' message, not per whole update.
 
 
 
