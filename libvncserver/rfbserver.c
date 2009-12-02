@@ -1090,7 +1090,6 @@ rfbSendMulticastVNCSessionInfo(rfbClientPtr cl)
      cl->multicastPixelformatId = 0;
    else
      {
-       rfbLog("--> diffrent\n");
        uint16_t highest_id = 0; 
        rfbClientPtr someclient = NULL;
        rfbClientIteratorPtr it=rfbGetClientIterator(cl->screen);
