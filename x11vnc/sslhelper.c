@@ -2666,8 +2666,8 @@ void check_https(void) {
 }
 
 void openssl_port(void) {
-	int sock, shutdown = 0;
-	static int port = 0;
+	int sock = -1, shutdown = 0;
+	static int port = -1;
 	static in_addr_t iface = INADDR_ANY;
 	int db = 0;
 
@@ -2683,6 +2683,8 @@ void openssl_port(void) {
 	if (screen->listenSock > -1 && screen->port > 0) {
 		port = screen->port;
 		shutdown = 1;
+	} else if (screen->port == 0) {
+		port = screen->port;
 	}
 	if (screen->listenInterface) {
 		iface = screen->listenInterface;
@@ -2696,14 +2698,18 @@ void openssl_port(void) {
 #endif
 	}
 
-	if (port <= 0) {
+	if (port < 0) {
 		rfbLog("openssl_port: could not obtain listening port %d\n", port);
 		clean_up_exit(1);
-	}
-	sock = rfbListenOnTCPPort(port, iface);
-	if (sock < 0) {
-		rfbLog("openssl_port: could not reopen port %d\n", port);
-		clean_up_exit(1);
+	} else if (port == 0) {
+		/* no listen case, i.e. -connect */
+		sock = -1;
+	} else {
+		sock = rfbListenOnTCPPort(port, iface);
+		if (sock < 0) {
+			rfbLog("openssl_port: could not reopen port %d\n", port);
+			clean_up_exit(1);
+		}
 	}
 	rfbLog("openssl_port: listen on port/sock %d/%d\n", port, sock);
 	if (!quiet) {
@@ -3852,6 +3858,7 @@ void accept_openssl(int mode, int presock) {
 				if (screen->port == 0) {
 					int fd = fileno(stdin);
 					if (getenv("X11VNC_INETD_PORT")) {
+						/* mutex */
 						screen->port = atoi(getenv(
 						    "X11VNC_INETD_PORT"));
 					} else {

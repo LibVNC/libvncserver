@@ -340,6 +340,10 @@ static void initialize_xevents(int reset) {
 		X_LOCK;
 		xselectinput_rootwin |= PropertyChangeMask;
 		XSelectInput_wr(dpy, rootwin, xselectinput_rootwin);
+
+		if (subwin && freeze_when_obscured) {
+			XSelectInput_wr(dpy, subwin, VisibilityChangeMask);
+		}
 		X_UNLOCK;
 		did_xselect_input = 1;
 	}
@@ -1284,6 +1288,22 @@ void check_xevents(int reset) {
 		last_call = now;
 	}
 
+	if (freeze_when_obscured) {
+		if (XCheckTypedEvent(dpy, VisibilityNotify, &xev)) {
+			if (xev.type == VisibilityNotify && xev.xany.window == subwin) {
+				int prev = subwin_obscured;
+				if (xev.xvisibility.state == VisibilityUnobscured) {
+					subwin_obscured = 0;
+				} else if (xev.xvisibility.state == VisibilityPartiallyObscured) {
+					subwin_obscured = 1;
+				} else {
+					subwin_obscured = 2;
+				}
+				rfbLog("subwin_obscured: %d -> %d\n", prev, subwin_obscured);
+			}
+		}
+	}
+
 	/* check for CUT_BUFFER0, VNC_CONNECT, X11VNC_REMOTE changes: */
 	if (XCheckTypedEvent(dpy, PropertyNotify, &xev)) {
 		int got_cutbuffer = 0;
@@ -1622,6 +1642,10 @@ extern int rawfb_vnc_reflect;
 void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	allowed_input_t input;
 
+	if (threads_drop_input) {
+		return;
+	}
+
 	if (unixpw_in_progress) {
 		rfbLog("xcut_receive: unixpw_in_progress, skipping.\n");
 		return;
@@ -1640,6 +1664,7 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	if (!input.clipboard) {
 		return;
 	}
+	INPUT_LOCK;
 
 	if (remote_prefix != NULL && strstr(text, remote_prefix) == text) {
 		char *result, *rcmd = text + strlen(remote_prefix);
@@ -1649,8 +1674,28 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 			strcat(tmp, "qry=");
 		}
 		strncat(tmp, rcmd, len - strlen(remote_prefix));
-
 		rfbLog("remote_prefix command: '%s'\n", tmp);
+
+		if (use_threads) {
+			if (client_connect_file) {
+				FILE *f = fopen(client_connect_file, "w");
+				if (f) {
+					fprintf(f, "%s\n", tmp);
+					fclose(f);
+					free(tmp);
+					INPUT_UNLOCK;
+					return;
+				}
+			}
+			if (vnc_connect) {
+				sprintf(x11vnc_remote_str, "%s", tmp);
+				free(tmp);
+				INPUT_UNLOCK;
+				return;
+			}
+		}
+		INPUT_UNLOCK;
+
 
 		result = process_remote_cmd(tmp, 1);
 		if (result == NULL ) {
@@ -1675,24 +1720,28 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	}
 
 	if (! check_sel_direction("recv", "xcut_receive", text, len)) {
+		INPUT_UNLOCK;
 		return;
 	}
 
 #ifdef MACOSX
 	if (macosx_console) {
 		macosx_set_sel(text, len);
+		INPUT_UNLOCK;
 		return;
 	}
 #endif
 
 	if (rawfb_vnc_reflect) {
 		vnc_reflect_send_cuttext(text, len);
+		INPUT_UNLOCK;
 		return;
 	}
 
 	RAWFB_RET_VOID
 
 #if NO_X11
+	INPUT_UNLOCK;
 	return;
 #else
 
@@ -1751,6 +1800,7 @@ void xcut_receive(char *text, int len, rfbClientPtr cl) {
 	XFlush_wr(dpy);
 
 	X_UNLOCK;
+	INPUT_UNLOCK;
 
 	set_cutbuffer = 1;
 #endif	/* NO_X11 */
@@ -1956,6 +2006,7 @@ static void try_local_chat_window(void) {
 			return;
 		}
 
+		/* mutex */
 		new_save = screen->newClientHook;
 		screen->newClientHook = new_client_chat_helper;
 

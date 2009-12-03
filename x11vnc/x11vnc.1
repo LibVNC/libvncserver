@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "November 2009" "x11vnc " "User Commands"
+.TH X11VNC "1" "December 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.9, lastmod: 2009-11-18
+         version: 0.9.9, lastmod: 2009-12-02
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -157,6 +157,15 @@ As \fB-id,\fR but instead of using the window directly it
 shifts a root view to it: this shows SaveUnders menus,
 etc, although they will be clipped if they extend beyond
 the window.
+.PP
+\fB-appshare\fR
+.IP
+Simple application sharing based on the \fB-id/-sid\fR
+mechanism.  Every new toplevel window that the
+application creates induces a new viewer window via
+a reverse connection.  The \fB-id/-sid\fR and \fB-connect\fR
+options are required.  Run 'x11vnc \fB-appshare\fR \fB-help'\fR
+for more info.
 .PP
 \fB-clip\fR \fIWxH+X+Y\fR
 .IP
@@ -3110,7 +3119,7 @@ Instead of exiting after cleaning up, run a simple
 \fB-q,\fR \fB-quiet\fR
 .IP
 Be quiet by printing less informational output to
-stderr.
+stderr. (use \fB-noquiet\fR to undo an earlier \fB-quiet.)\fR
 .PP
 \fB-v,\fR \fB-verbose\fR
 .IP
@@ -3611,7 +3620,7 @@ Client-side caching scheme.  Framebuffer memory \fIn\fR
 (an integer) times that of the full display is allocated
 below the actual framebuffer to cache screen contents
 for rapid retrieval.  So a W x H frambuffer is expanded
-to a W x (n+1)*H one.  Use 0 to disable.  Default: XXX.
+to a W x (n+1)*H one.  Use 0 to disable.
 .IP
 The \fIn\fR is actually optional, the default is 10.
 .IP
@@ -3619,12 +3628,16 @@ For this and the other \fB-ncache*\fR options below you can
 abbreviate "\fB-ncache\fR" with "\fB-nc\fR".  Also, "\fB-nonc\fR"
 is the same as "\fB-ncache\fR \fI0\fR"
 .IP
-This is an experimental option, currently implemented
-in an awkward way in that in the VNC Viewer you can
-see the cache contents if you scroll down, etc.  So you
+This is an experimental option, currently implemented in
+an awkward way in that in the VNC Viewer you can see the
+pixel cache contents if you scroll down, etc.  So you
 will have to set things up so you can't see that region.
 If this method is successful, the changes required for
 clients to do this less awkwardly will be investigated.
+.IP
+The SSVNC viewer does a good job at automatically hiding
+the pixel cache region.  Or use SSVNC's \fB-ycrop\fR option
+to explicitly hide the region.
 .IP
 Note that this mode consumes a huge amount of memory,
 both on the x11vnc server side and on the VNC Viewer
@@ -4465,10 +4478,7 @@ In this mode new threads (one for input and one
 for output) are created to handle each new client.
 Default: \fB-nothreads.\fR
 .IP
-NOTE:  The \fB-threads\fR mode may be disabled due to its
-unstable behavior.  If it is disabled, a warning is
-printed out.  Stability has been improved in version
-0.9.8 and so the feature has been re-enabled.
+Thread stability is much improved in version 0.9.8.
 .IP
 Multiple clients in threaded mode should be stable
 for the ZRLE encoding on all platforms.  The Tight and
@@ -4476,9 +4486,14 @@ Zlib encodings are currently only stable on Linux for
 multiple clients.  Compile with \fB-DTLS=__thread\fR if your
 OS and compiler and linker support it.
 .IP
+For resizes (randr, etc.) set this env. var. to the number
+of milliseconds to sleep: X11VNC_THREADS_NEW_FB_SLEEP
+at various places in the do_new_fb() action.  This is to
+let various activities settle.  Default is about 500ms.
+.IP
 Multiple clients in threaded mode could yield better
-performance for 'class-room' broadcasting usage.
-See also the \fB-reflect\fR option.
+performance for 'class-room' broadcasting usage; also in
+\fB-appshare\fR broadcast mode.  See also the \fB-reflect\fR option.
 .PP
 \fB-fs\fR \fIf\fR
 .IP
@@ -5251,6 +5266,13 @@ id:windowid     set \fB-id\fR window to "windowid". empty
 or "root" to go back to root window
 .IP
 sid:windowid    set \fB-sid\fR window to "windowid"
+.IP
+id_cmd:cmd      cmds: raise, lower, map, unmap, iconify,
+move:dXdY, resize:dWdH, geom:WxH+X+Y. dX
+dY, dW, and dH must have a leading "+"
+or "-" e.g.: move:-30+10 resize:+20+35
+also: wm_delete, wm_name:string and
+icon_name:string. Also id_cmd:win=N:cmd
 .IP
 waitmapped      wait until subwin is mapped.
 .IP
@@ -6035,8 +6057,8 @@ query straight to the X11VNC_REMOTE property or connect
 file use "qry=..." instead of "cmd=..."
 .IP
 ans= stop quit exit shutdown ping resend_cutbuffer
-resend_clipboard resend_primary blacken zero
-refresh reset close disconnect id sid waitmapped
+resend_clipboard resend_primary blacken zero refresh
+reset close disconnect id_cmd id sid waitmapped
 nowaitmapped clip flashcmap noflashcmap shiftcmap
 truecolor notruecolor overlay nooverlay overlay_cursor
 overlay_yescursor nooverlay_nocursor nooverlay_cursor
@@ -6185,6 +6207,10 @@ Any corresponding output text for that remote control
 command is sent back to all client as rfbCutText.
 The returned output is also prefixed with \fIstr\fR.
 Example: \fB-remote_prefix\fR DO_THIS:
+.IP
+Note that enabling \fB-remote_prefix\fR allows the remote
+VNC viewers to run x11vnc \fB-remote\fR commands.  Do not
+use this option if they are not to be trusted.
 .PP
 \fB-noremote,\fR \fB-yesremote\fR
 .IP

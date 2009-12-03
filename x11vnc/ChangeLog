@@ -1,3 +1,13 @@
+2009-12-02  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -appshare mode for sharing an application windows intead
+	  of the entire desktop. map port + 5500 in reverse connect.
+	  Add id_cmd remote control functions for id (and other) windows.
+	  Allow zero port in SSL reverse connections.  Adjust delays
+	  between multiple reverse connections; X11VNC_REVERSE_SLEEP_MAX
+	  env var.  Add some missing mutex locks; add INPUT_LOCK and
+	  threads_drop_input.  More safety in -threads mode for new
+	  framebuffer change.  Fix some stderr leaking in -inetd mode.
+
 2009-11-18  Karl Runge <runge@karlrunge.com>
 	* x11vnc: use -timeout setting for reverse connections too.
 	  Delay calling xfixes at the beginning of 1st connection to avoid

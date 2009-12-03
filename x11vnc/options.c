@@ -206,6 +206,8 @@ int macosx_icon_anim_time = 450;
 
 unsigned long subwin = 0x0;	/* -id, -sid */
 int subwin_wait_mapped = 0;
+int freeze_when_obscured = 0;
+int subwin_obscured = 0;
 
 int debug_xevents = 0;		/* -R debug_xevents:1 */
 int debug_xdamage = 0;		/* -R debug_xdamage:1 or 2 ... */
@@ -472,6 +474,7 @@ int verbose = 0;
 /* threaded vs. non-threaded (default) */
 int use_threads = 0;
 int started_rfbRunEventLoop = 0;
+int threads_drop_input = 0;
 
 /* info about command line opts */
 int got_noxwarppointer = 0;

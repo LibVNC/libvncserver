@@ -125,6 +125,7 @@ void set_greyscale_colormap(void) {
 	if (! screen) {
 		return;
 	}
+	/* mutex */
 	if (screen->colourMap.data.shorts) {
 		free(screen->colourMap.data.shorts);
 		screen->colourMap.data.shorts = NULL;
@@ -154,6 +155,7 @@ void set_hi240_colormap(void) {
 	if (! screen) {
 		return;
 	}
+	/* mutex */
 if (0) fprintf(stderr, "set_hi240_colormap: %s\n", raw_fb_pixfmt);
 	if (screen->colourMap.data.shorts) {
 		free(screen->colourMap.data.shorts);
@@ -211,6 +213,7 @@ void set_colormap(int reset) {
 	if (reset) {
 		init = 1;
 		ncolor = 0;
+		/* mutex */
 		if (screen->colourMap.data.shorts) {
 			free(screen->colourMap.data.shorts);
 			screen->colourMap.data.shorts = NULL;
@@ -233,6 +236,7 @@ void set_colormap(int reset) {
 		} else {
 			ncolor = NCOLOR;
 		}
+		/* mutex */
 		screen->colourMap.count = ncolor;
 		screen->serverFormat.trueColour = FALSE;
 		screen->colourMap.is16 = TRUE;
@@ -777,6 +781,7 @@ static void nofb_hook(rfbClientPtr cl) {
 	}
 	main_fb = fb->data;
 	rfb_fb = main_fb;
+	/* mutex */
 	screen->frameBuffer = rfb_fb;
 	screen->displayHook = NULL;
 }
@@ -813,13 +818,214 @@ void free_old_fb(void) {
 	}
 }
 
+static char _lcs_tmp[128];
+static int _bytes0_size = 128, _bytes0[128];
+
+static char *lcs(rfbClientPtr cl) {
+	sprintf(_lcs_tmp, "%d/%d/%d/%d/%d-%d/%d/%d",
+		!!(cl->newFBSizePending),
+		!!(cl->cursorWasChanged),
+		!!(cl->cursorWasMoved),
+		!!(cl->reverseConnection),
+		cl->state,
+		cl->modifiedRegion  ? !!(sraRgnEmpty(cl->modifiedRegion))  : 2,
+		cl->requestedRegion ? !!(sraRgnEmpty(cl->requestedRegion)) : 2,
+		cl->copyRegion      ? !!(sraRgnEmpty(cl->copyRegion))      : 2
+	);
+	return _lcs_tmp;
+}
+
+static int lock_client_sends(int lock) {
+	static rfbClientPtr *cls = NULL;
+	static int cls_len = 0;
+	static int blocked = 0;
+	static int state = 0;
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	char *s;
+
+	if (!use_threads || !screen) {
+		return 0;
+	}
+	if (lock < 0) {
+		return state;
+	}
+	state = lock;
+
+	if (lock) {
+		if (cls_len < client_count + 128) {
+			if (cls != NULL) {
+				free(cls);
+			}
+			cls_len = client_count + 256;
+			cls = (rfbClientPtr *) calloc(cls_len * sizeof(rfbClientPtr), 1);
+		}
+		
+		iter = rfbGetClientIterator(screen);
+		blocked = 0;
+		while ((cl = rfbClientIteratorNext(iter)) != NULL) {
+			s = lcs(cl);
+			SEND_LOCK(cl);
+			rfbLog("locked client:   %p  %.6f %s\n", cl, dnowx(), s);
+			cls[blocked++] = cl;
+		}
+		rfbReleaseClientIterator(iter);
+	} else {
+		int i;
+		for (i=0; i < blocked; i++) {
+			cl = cls[i];
+			if (cl != NULL) {
+				s = lcs(cl);
+				SEND_UNLOCK(cl)
+				rfbLog("unlocked client: %p  %.6f %s\n", cl, dnowx(), s);
+			}
+			cls[i] = NULL;
+		}
+		blocked = 0;
+	}
+	return state;
+}
+
+static void settle_clients(int init) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+	int fb_pend, i, ms = 1000;
+	char *s;
+
+	if (!use_threads || !screen) {
+		return;
+	}
+
+	if (init) {
+		iter = rfbGetClientIterator(screen);
+		i = 0;
+		while ((cl = rfbClientIteratorNext(iter)) != NULL) {
+			if (i < _bytes0_size) {
+				_bytes0[i] = rfbStatGetSentBytesIfRaw(cl);
+			}
+			i++;
+		}
+		rfbReleaseClientIterator(iter);
+
+		if (getenv("X11VNC_THREADS_NEW_FB_SLEEP")) {
+			ms = atoi(getenv("X11VNC_THREADS_NEW_FB_SLEEP"));
+		} else if (subwin) {
+			ms = 250;
+		} else {
+			ms = 500;
+		}
+		usleep(ms * 1000);
+		return;
+	}
+
+	if (getenv("X11VNC_THREADS_NEW_FB_SLEEP")) {
+		ms = atoi(getenv("X11VNC_THREADS_NEW_FB_SLEEP"));
+	} else if (subwin) {
+		ms = 500;
+	} else {
+		ms = 1000;
+	}
+	usleep(ms * 1000);
+
+	for (i=0; i < 5; i++) {
+		fb_pend = 0;
+		iter = rfbGetClientIterator(screen);
+		while ((cl = rfbClientIteratorNext(iter)) != NULL) {
+			s = lcs(cl);
+			if (cl->newFBSizePending) {
+				fb_pend++;
+				rfbLog("pending fb size: %p  %.6f %s\n", cl, dnowx(), s);
+			}
+		}
+		rfbReleaseClientIterator(iter);
+		if (fb_pend > 0) {
+			rfbLog("do_new_fb: newFBSizePending extra -threads sleep (%d)\n", i+1); 
+			usleep(ms * 1000);
+		} else {
+			break;
+		}
+	}
+	for (i=0; i < 5; i++) {
+		int stuck = 0, tot = 0, j = 0;
+		iter = rfbGetClientIterator(screen);
+		while ((cl = rfbClientIteratorNext(iter)) != NULL) {
+			if (j < _bytes0_size) {
+				int db = rfbStatGetSentBytesIfRaw(cl) - _bytes0[j];
+				int Bpp = cl->format.bitsPerPixel / 8;
+
+				s = lcs(cl);
+				rfbLog("addl bytes sent: %p  %.6f %s  %d  %d\n",
+				    cl, dnowx(), s, db, _bytes0[j]);
+
+				if (i==0) {
+					if (db < Bpp * dpy_x * dpy_y) {
+						stuck++;
+					}
+				} else if (i==1) {
+					if (db < 0.5 * Bpp * dpy_x * dpy_y) {
+						stuck++;
+					}
+				} else {
+					if (db <= 0) {
+						stuck++;
+					}
+				}
+			}
+			tot++;
+			j++;
+		}
+		rfbReleaseClientIterator(iter);
+		if (stuck > 0) {
+			rfbLog("clients stuck:  %d/%d  sleep(%d)\n", stuck, tot, i);
+			usleep(2 * ms * 1000);
+		} else {
+			break;
+		}
+	}
+}
+
+static void prep_clients_for_new_fb(void) {
+	rfbClientIteratorPtr iter;
+	rfbClientPtr cl;
+
+	if (!use_threads || !screen) {
+		return;
+	}
+	iter = rfbGetClientIterator(screen);
+	while ((cl = rfbClientIteratorNext(iter)) != NULL) {
+		if (!cl->newFBSizePending) {
+			rfbLog("** set_new_fb_size_pending client:   %p\n", cl);
+			cl->newFBSizePending = TRUE;
+		}
+		cl->cursorWasChanged = FALSE;
+		cl->cursorWasMoved = FALSE;
+	}
+	rfbReleaseClientIterator(iter);
+}
+
 void do_new_fb(int reset_mem) {
 	XImage *fb;
 
 	/* for threaded we really should lock libvncserver out. */
 	if (use_threads) {
-		rfbLog("warning: changing framebuffers while threaded may\n");
-		rfbLog(" not work, do not use -threads if problems arise.\n");
+		int ms = 1000;
+		if (getenv("X11VNC_THREADS_NEW_FB_SLEEP")) {
+			ms = atoi(getenv("X11VNC_THREADS_NEW_FB_SLEEP"));
+		} else if (subwin) {
+			ms = 500;
+		} else {
+			ms = 1000;
+		}
+		rfbLog("Warning: changing framebuffers in threaded mode may be unstable.\n");
+		threads_drop_input = 1;
+		usleep(ms * 1000);
+	}
+
+	INPUT_LOCK;
+	lock_client_sends(1);
+
+	if (use_threads) {
+		settle_clients(1);
 	}
 
 	if (reset_mem == 1) {
@@ -842,6 +1048,16 @@ void do_new_fb(int reset_mem) {
 	if (ncache) {
 		check_ncache(1, 0);
 	}
+
+	prep_clients_for_new_fb();
+	lock_client_sends(0);
+	INPUT_UNLOCK;
+
+	if (use_threads) {
+		/* need to let things settle... */
+		settle_clients(0);
+		threads_drop_input = 0;
+	}
 }
 
 static void remove_fake_fb(void) {
@@ -859,51 +1075,6 @@ static void remove_fake_fb(void) {
 	fake_fb = NULL;
 }
 
-static void lock_client_sends(int lock) {
-	static rfbClientPtr *cls = NULL;
-	static int cls_len = 0;
-	static int blocked = 0;
-	rfbClientIteratorPtr iter;
-	rfbClientPtr cl;
-
-	if (!use_threads) {
-		return;
-	}
-	if (!screen) {
-		return;
-	}
-
-	if (lock) {
-		if (cls_len < client_count + 128) {
-			if (cls != NULL) {
-				free(cls);
-			}
-			cls_len = client_count + 128;
-			cls = (rfbClientPtr *) calloc(cls_len * sizeof(rfbClientPtr), 1);
-		}
-		
-		iter = rfbGetClientIterator(screen);
-		blocked = 0;
-		while ((cl = rfbClientIteratorNext(iter)) != NULL) {
-			SEND_LOCK(cl);
-rfbLog("locked client:   %p\n", cl);
-			cls[blocked++] = cl;
-		}
-		rfbReleaseClientIterator(iter);
-	} else {
-		int i;
-		for (i=0; i < blocked; i++) {
-			cl = cls[i];
-			if (cl != NULL) {
-				SEND_UNLOCK(cl)
-rfbLog("unlocked client: %p\n", cl);
-			}
-			cls[i] = NULL;
-		}
-		blocked = 0;
-	}
-}
-
 static void rfb_new_framebuffer(rfbScreenInfoPtr rfbScreen, char *framebuffer,
     int width,int height, int bitsPerSample,int samplesPerPixel,
     int bytesPerPixel) {
@@ -918,12 +1089,14 @@ static void install_fake_fb(int w, int h, int bpp) {
 	if (! screen) {
 		return;
 	}
+	lock_client_sends(1);
 	if (fake_fb) {
 		free(fake_fb);
 	}
 	fake_fb = (char *) calloc(w*h*bpp/8, 1);
 	if (! fake_fb) {
 		rfbLog("could not create fake fb: %dx%d %d\n", w, h, bpp);
+		lock_client_sends(0);
 		return;
 	}
 	bpc = guess_bits_per_color(bpp);
@@ -931,7 +1104,6 @@ static void install_fake_fb(int w, int h, int bpp) {
 	rfbLog("rfbNewFramebuffer(0x%x, 0x%x, %d, %d, %d, %d, %d)\n",
 	    screen, fake_fb, w, h, bpc, 1, bpp/8);
 
-	lock_client_sends(1);
 	rfb_new_framebuffer(screen, fake_fb, w, h, bpc, 1, bpp/8);
 	lock_client_sends(0);
 }
@@ -2275,6 +2447,8 @@ if (0) fprintf(stderr, "vis_str %s\n", vis_str ? vis_str : "notset");
 
 	/* set up parameters for subwin or non-subwin cases: */
 
+	again:
+
 	if (! subwin) {
 		/* full screen */
 		window = rootwin;
@@ -2368,7 +2542,6 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 		    (int) XVisualIDFromVisual(default_visual));
 	}
 
-	again:
 	if (subwin) {
 		int shift = 0, resize = 0;
 		int subwin_x, subwin_y;
@@ -2435,7 +2608,9 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 		 */
 		fb = XCreateImage_wr(dpy, default_visual, depth, ZPixmap,
 		    0, NULL, dpy_x, dpy_y, BitmapPad(dpy), 0);
-		fb->data = (char *) malloc(fb->bytes_per_line * fb->height);
+		if (fb) {
+			fb->data = (char *) malloc(fb->bytes_per_line * fb->height);
+		}
 
 	} else {
 		fb = XGetImage_wr(dpy, window, 0, 0, dpy_x, dpy_y, AllPlanes,
@@ -2448,7 +2623,7 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 
 	if (subwin) {
 		XSetErrorHandler(old_handler);
-		if (trapped_xerror) {
+		if (trapped_xerror || fb == NULL) {
 		    rfbLog("trapped GetImage at SUBWIN creation.\n");
 		    if (try < subwin_tries) {
 			usleep(250 * 1000);
@@ -2464,10 +2639,51 @@ if (0) fprintf(stderr, "DefaultDepth: %d  visial_id: %d\n", depth, (int) visual_
 		}
 		trapped_xerror = 0;
 
-	} else if (! fb && try == 1) {
-		/* try once more */
-		usleep(250 * 1000);
-		goto again;
+	} else if (fb == NULL) {
+		XEvent xev;
+		rfbLog("initialize_xdisplay_fb: *** fb creation failed: 0x%x try: %d\n", fb, try);
+#if LIBVNCSERVER_HAVE_LIBXRANDR
+		if (xrandr_present && xrandr_base_event_type) {
+			int cnt = 0;
+			while (XCheckTypedEvent(dpy, xrandr_base_event_type + RRScreenChangeNotify, &xev)) {
+				XRRScreenChangeNotifyEvent *rev;
+				rev = (XRRScreenChangeNotifyEvent *) &xev;
+
+				rfbLog("initialize_xdisplay_fb: XRANDR event while redoing fb[%d]:\n", cnt++);
+				rfbLog("  serial:          %d\n", (int) rev->serial);
+				rfbLog("  timestamp:       %d\n", (int) rev->timestamp);
+				rfbLog("  cfg_timestamp:   %d\n", (int) rev->config_timestamp);
+				rfbLog("  size_id:         %d\n", (int) rev->size_index);
+				rfbLog("  sub_pixel:       %d\n", (int) rev->subpixel_order);
+				rfbLog("  rotation:        %d\n", (int) rev->rotation);
+				rfbLog("  width:           %d\n", (int) rev->width);
+				rfbLog("  height:          %d\n", (int) rev->height);
+				rfbLog("  mwidth:          %d mm\n", (int) rev->mwidth);
+				rfbLog("  mheight:         %d mm\n", (int) rev->mheight);
+				rfbLog("\n");
+				rfbLog("previous WxH: %dx%d\n", wdpy_x, wdpy_y);
+
+				xrandr_width  = rev->width;
+				xrandr_height = rev->height;
+				xrandr_timestamp = rev->timestamp;
+				xrandr_cfg_time  = rev->config_timestamp;
+				xrandr_rotation = (int) rev->rotation;
+
+				rfbLog("initialize_xdisplay_fb: updating XRANDR config...\n");
+				XRRUpdateConfiguration(&xev);
+			}
+		}
+#endif
+		if (try < 5)  {
+			XFlush_wr(dpy);
+			usleep(250 * 1000);
+			if (try < 3) {
+				XSync(dpy, False);
+			} else if (try >= 3) {
+				XSync(dpy, True);
+			}
+			goto again;
+		}
 	}
 	if (use_snapfb) {
 		initialize_snap_fb();
@@ -2734,9 +2950,11 @@ static rfbBool set_xlate_wrapper(rfbClientPtr cl) {
 	} else if (ncache) {
 		int save = ncache_xrootpmap;
 		rfbLog("set_xlate_wrapper: clearing -ncache for new pixel format.\n");
+		INPUT_LOCK;
 		ncache_xrootpmap = 0;
 		check_ncache(1, 0);
 		ncache_xrootpmap = save;
+		INPUT_UNLOCK;
 	}
 	return rfbSetTranslateFunction(cl);	
 }
@@ -2751,7 +2969,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	int create_screen = screen ? 0 : 1;
 	int bits_per_color;
 	int fb_bpp, fb_Bpl, fb_depth;
-	
+	int locked_sends = 0;
+
 	bpp = fb->bits_per_pixel;
 
 	fb_bpp   = (int) fb->bits_per_pixel;
@@ -2860,7 +3079,10 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	 */
 	bits_per_color = guess_bits_per_color(fb_bpp);
 
-	lock_client_sends(1);
+	if (lock_client_sends(-1) == 0) {
+		lock_client_sends(1);
+		locked_sends = 1;
+	}
 
 	/* n.b. samplesPerPixel (set = 1 here) seems to be unused. */
 	if (create_screen) {
@@ -3274,7 +3496,6 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	/* may need, bpp, main_red_max, etc. */
 	parse_wireframe();
 	parse_scroll_copyrect();
-
 	setup_cursors_and_push();
 
 	if (scaling || rotating || cmap8to24) {
@@ -3297,10 +3518,13 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		}
 		rfbReleaseClientIterator(iter);
 		if (!quiet) rfbLog("  done.\n");
-		do_copy_screen = 1;
 		
 		/* done for framebuffer change case */
-		lock_client_sends(0);
+		if (locked_sends) {
+			lock_client_sends(0);
+		}
+
+		do_copy_screen = 1;
 		return;
 	}
 
@@ -3376,7 +3600,10 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 
 	install_passwds();
 
-	lock_client_sends(0);
+	if (locked_sends) {
+		lock_client_sends(0);
+	}
+	return;
 }
 
 #define DO_AVAHI \
@@ -3981,6 +4208,7 @@ void watch_loop(void) {
 
 	while (1) {
 		char msg[] = "new client: %s taking unixpw client off hold.\n";
+		int skip_scan_for_updates = 0;
 
 		got_user_input = 0;
 		got_pointer_input = 0;
@@ -4187,8 +4415,20 @@ void watch_loop(void) {
 		if (x11vnc_current < last_new_client + 0.5 && !all_clients_initialized()) {
 			continue;
 		}
+		if (subwin && freeze_when_obscured) {
+			/* XXX not working */
+			X_LOCK;
+			XFlush_wr(dpy);
+			X_UNLOCK;
+			check_xevents(0);
+			if (subwin_obscured) {
+				skip_scan_for_updates = 1;
+			}
+		}
 
-		if (button_mask && (!show_dragging || pointer_mode == 0)) {
+		if (skip_scan_for_updates) {
+			;
+		} else if (button_mask && (!show_dragging || pointer_mode == 0)) {
 			/*
 			 * if any button is pressed in this mode do
 			 * not update rfb screen, but do flush the
@@ -4216,6 +4456,7 @@ void watch_loop(void) {
 			if (rawfb_vnc_reflect) {
 				vnc_reflect_process_client();
 			}
+
 			dtime0(&tm);
 
 #if !NO_X11
@@ -4235,7 +4476,9 @@ void watch_loop(void) {
 					}
 					X_UNLOCK;
 				}
+				X_LOCK;
 				check_xrandr_event("before-scan");
+				X_UNLOCK;
 			}
 #endif
 			if (use_snapfb) {

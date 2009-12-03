@@ -49,6 +49,16 @@ static void check_dpms(void);
 #endif
 
 void check_pm(void) {
+	static int skip = -1;
+	if (skip < 0) {
+		skip = 0;
+		if (getenv("X11VNC_NO_CHECK_PM")) {
+			skip = 1;
+		}
+	}
+	if (skip) {
+		return;
+	}
 	check_fbpm();
 	check_dpms();
 	/* someday dpms activities? */

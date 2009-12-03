@@ -45,7 +45,7 @@ extern Window parent_window(Window win, char **name);
 extern int valid_window(Window win, XWindowAttributes *attr_ret, int bequiet);
 extern Bool xtranslate(Window src, Window dst, int src_x, int src_y, int *dst_x,
     int *dst_y, Window *child, int bequiet);
-extern int get_window_size(Window win, int *x, int *y);
+extern int get_window_size(Window win, int *w, int *h);
 extern void snapshot_stack_list(int free_only, double allowed_age);
 extern int get_boff(void);
 extern int get_bwin(void);
@@ -54,5 +54,6 @@ extern Window query_pointer(Window start);
 extern unsigned int mask_state(void);
 extern int pick_windowid(unsigned long *num);
 extern Window descend_pointer(int depth, Window start, char *name_info, int len);
+extern void id_cmd(char *cmd);
 
 #endif /* _X11VNC_WIN_UTILS_H */

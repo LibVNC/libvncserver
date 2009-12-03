@@ -2033,6 +2033,7 @@ void unixpw_accept(char *user) {
 		unixpw_client->viewOnly = TRUE;
 	}
 	unixpw_in_progress = 0;
+	/* mutex */
 	screen->permitFileTransfer = unixpw_file_xfer_save;
 	if ((tightfilexfer = unixpw_tightvnc_xfer_save)) {
 		/* this doesn't work: the current client is never registered! */
@@ -2078,6 +2079,7 @@ void unixpw_deny(void) {
 	}
 
 	unixpw_in_progress = 0;
+	/* mutex */
 	screen->permitFileTransfer = unixpw_file_xfer_save;
 	if ((tightfilexfer = unixpw_tightvnc_xfer_save)) {
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER

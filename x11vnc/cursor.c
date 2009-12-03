@@ -576,7 +576,9 @@ void first_cursor(void) {
 		return;
 	}
 	if (! show_cursor) {
+		LOCK(screen->cursorMutex);
 		screen->cursor = NULL;
+		UNLOCK(screen->cursorMutex);
 	} else {
 		got_xfixes_cursor_notify++;
 		set_rfb_cursor(get_which_cursor());
@@ -591,7 +593,7 @@ static void setup_cursors(void) {
 	int w_in = 0, h_in = 0;
 	static int first = 1;
 
-	if (verbose) {
+	if (verbose || use_threads) {
 		rfbLog("setting up %d cursors...\n", CURS_MAX);
 	}
 
@@ -603,8 +605,8 @@ static void setup_cursors(void) {
 	first = 0;
 
 	if (screen) {
-		screen->cursor = NULL;
 		LOCK(screen->cursorMutex);
+		screen->cursor = NULL;
 	}
 
 	for (i=0; i<CURS_MAX; i++) {
@@ -985,7 +987,6 @@ static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 void initialize_xfixes(void) {
 #if LIBVNCSERVER_HAVE_LIBXFIXES
 	if (xfixes_present) {
-		xfixes_first_initialized = 1;
 		X_LOCK;
 		if (use_xfixes) {
 			XFixesSelectCursorInput(dpy, rootwin,
@@ -994,6 +995,7 @@ void initialize_xfixes(void) {
 			XFixesSelectCursorInput(dpy, rootwin, 0);
 		}
 		X_UNLOCK;
+		xfixes_first_initialized = 1;
 	}
 #endif
 }
@@ -1325,24 +1327,23 @@ static int get_exact_cursor(int init) {
 			return which;
 		}
 
+		X_LOCK;
 		if (! got_xfixes_cursor_notify && xfixes_base_event_type) {
 			/* try again for XFixesCursorNotify event */
 			XEvent xev;
-			X_LOCK;
 			if (XCheckTypedEvent(dpy, xfixes_base_event_type +
 			    XFixesCursorNotify, &xev)) {
 				got_xfixes_cursor_notify++;
 			}
-			X_UNLOCK;
 		}
 		if (! got_xfixes_cursor_notify) {
 			/* evidently no cursor change, just return last one */
+			X_UNLOCK;
 			return which;
 		}
 		got_xfixes_cursor_notify = 0;
 
 		/* retrieve the cursor info + pixels from server: */
-		X_LOCK;
 		xfc = XFixesGetCursorImage(dpy);
 		X_UNLOCK;
 		if (! xfc) {
@@ -1512,7 +1513,9 @@ void initialize_cursors_mode(void) {
 		}
 	} else {
 		if (screen) {
+			LOCK(screen->cursorMutex);
 			screen->cursor = NULL;
+			UNLOCK(screen->cursorMutex);
 			set_cursor_was_changed(screen);
 		}
 	}
@@ -1656,9 +1659,11 @@ static void set_cursor_was_changed(rfbScreenInfoPtr s) {
 		return;
 	}
 	iter = rfbGetClientIterator(s);
+	LOCK(screen->cursorMutex);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
 		cl->cursorWasChanged = TRUE;
 	}
+	UNLOCK(screen->cursorMutex);
 	rfbReleaseClientIterator(iter);
 }
 
