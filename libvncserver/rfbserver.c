@@ -901,6 +901,7 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     rfbSetBit(msgs.server2client, rfbResizeFrameBuffer);
     /*rfbSetBit(msgs.server2client, rfbKeyFrameUpdate);  */
     rfbSetBit(msgs.server2client, rfbPalmVNCReSizeFrameBuffer);
+    rfbSetBit(msgs.server2client, rfbMulticastFramebufferUpdate);
 
     memcpy(&cl->updateBuf[cl->ublen], (char *)&msgs, sz_rfbSupportedMessages);
     cl->ublen += sz_rfbSupportedMessages;
@@ -2314,7 +2315,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
        if (!msg.mfur.incremental) {
 	    sraRgnOr(cl->modifiedRegion,tmpRegion);
-	    sraRgnSubtract(cl->copyRegion,tmpRegion);
+	    sraRgnSubtract(cl->copyRegion,tmpRegion); //FIXME remove copyregion?
        }
        TSIGNAL(cl->updateCond);
        UNLOCK(cl->updateMutex);
@@ -2623,58 +2624,6 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
       return rfbSendUpdateBuf(cl);
     }
 
-    //FIXME test
-    if (0 && cl->useMulticastVNC)
-      {
-	// flush
-	//rfbSendUpdateBuf(cl);
-
-	rfbFramebufferUpdateRectHeader rect;
-	rfbLog("--> buffer at start %d\n", cl->ublen);
-     	fu->type = rfbFramebufferUpdate;
-	fu->nRects = Swap16IfLE(1);
-	cl->ublen = sz_rfbFramebufferUpdateMsg;
-	rfbLog("--> buffer with msg header %d\n", cl->ublen);
-
-	char buffer[512];
-
-	/* tack on our library version */
-	snprintf(buffer,sizeof(buffer)-1, "%s (%s)", 
-	     (cl->screen->versionString==NULL ? "MULTICAST!!" : cl->screen->versionString),
-	     LIBVNCSERVER_PACKAGE_STRING);
-
-	if (cl->ublen + sz_rfbFramebufferUpdateRectHeader
-                  + (strlen(buffer)+1) > UPDATE_BUF_SIZE) 
-	  {
-	    rfbLog("--> have to flush!");
-	    if (!rfbSendUpdateBufMulticast(cl))
-	      return FALSE;
-	  }
-
-	rect.encoding = Swap32IfLE(rfbEncodingServerIdentity);
-	rect.r.x = 0;
-	rect.r.y = 0;
-	rect.r.w = Swap16IfLE(strlen(buffer)+1);
-	rect.r.h = 0;
-
-	memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
-	       sz_rfbFramebufferUpdateRectHeader);
-	cl->ublen += sz_rfbFramebufferUpdateRectHeader;
-	rfbLog("--> buffer with rect header %d\n", cl->ublen);
-
-	memcpy(&cl->updateBuf[cl->ublen], buffer, strlen(buffer)+1);
-	cl->ublen += strlen(buffer)+1;
-
-    	rfbLog("--> buffer with content %d\n", cl->ublen);
-    
-
-    	if(rfbSendUpdateBufMulticast(cl))
-	  rfbLog("--> Sending multicast test ok\n");
-	else
-	  rfbLog("--> Sending multicast test fail\n");
-      }
-    
-    
     
     /*
      * If this client understands cursor shape updates, cursor should be
@@ -2972,8 +2921,6 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     }
     cl->ublen = sz_rfbFramebufferUpdateMsg;
 
-    //FIXME bis hier header mit kalkulation anzahl rects
-    // alle nächsten funktionen blasen was raus...
 
    if (sendCursorShape) {
 	cl->cursorWasChanged = FALSE;
@@ -3015,8 +2962,6 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	        goto updateFailed;
     }
 
-     //FIXME bis hier misc stuff
-    // ab hier werden rects rausgesendet
 
     for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
         int x = rect.x1;
@@ -3095,6 +3040,333 @@ updateFailed:
     sraRgnDestroy(updateCopyRegion);
     return result;
 }
+
+
+
+
+/*
+ * rfbSendMulticastFramebufferUpdate - send the currently pending framebuffer update to
+ * the RFB client via multicast.
+ * givenUpdateRegion is not changed.
+ */
+
+rfbBool
+rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
+				  sraRegionPtr givenUpdateRegion)
+{
+    sraRectangleIterator* i=NULL;
+    sraRect rect;
+    int nUpdateRegionRects;
+    //FIXME change to a buffer owned by server struct?
+    rfbMulticastFramebufferUpdateMsg *mfu = (rfbMulticastFramebufferUpdateMsg *)cl->updateBuf;
+    sraRegionPtr updateRegion,updateCopyRegion,tmpRegion;
+    int dx, dy;
+  
+    rfbBool result = TRUE;
+    
+    if(cl->screen->displayHook)
+      cl->screen->displayHook(cl);
+
+    LOCK(cl->updateMutex);
+
+    /*
+     * The modifiedRegion may overlap the destination copyRegion.  We remove
+     * any overlapping bits from the copyRegion (since they'd only be
+     * overwritten anyway).
+     */
+    
+    sraRgnSubtract(cl->copyRegion,cl->modifiedRegion);
+
+    /*
+     * The client is interested in the region requestedRegion.  The region
+     * which should be updated now is the intersection of requestedRegion
+     * and the union of modifiedRegion and copyRegion.  If it's empty then
+     * no update is needed.
+     */
+
+    updateRegion = sraRgnCreateRgn(givenUpdateRegion);
+    if(cl->screen->progressiveSliceHeight>0) {
+	    int height=cl->screen->progressiveSliceHeight,
+	    	y=cl->progressiveSliceY;
+	    sraRegionPtr bbox=sraRgnBBox(updateRegion);
+	    sraRect rect;
+	    if(sraRgnPopRect(bbox,&rect,0)) {
+		sraRegionPtr slice;
+		if(y<rect.y1 || y>=rect.y2)
+		    y=rect.y1;
+	    	slice=sraRgnCreateRect(0,y,cl->screen->width,y+height);
+		sraRgnAnd(updateRegion,slice);
+		sraRgnDestroy(slice);
+	    }
+	    sraRgnDestroy(bbox);
+	    y+=height;
+	    if(y>=cl->screen->height)
+		    y=0;
+	    cl->progressiveSliceY=y;
+    }
+
+    sraRgnOr(updateRegion,cl->copyRegion);
+    if(!sraRgnAnd(updateRegion,cl->requestedRegion) &&
+       sraRgnEmpty(updateRegion) &&
+       (cl->enableCursorShapeUpdates ||
+	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY))) {
+      sraRgnDestroy(updateRegion);
+      UNLOCK(cl->updateMutex);
+      return TRUE;
+    }
+
+    /*
+     * We assume that the client doesn't have any pixel data outside the
+     * requestedRegion.  In other words, both the source and destination of a
+     * copy must lie within requestedRegion.  So the region we can send as a
+     * copy is the intersection of the copyRegion with both the requestedRegion
+     * and the requestedRegion translated by the amount of the copy.  We set
+     * updateCopyRegion to this.
+     */
+
+    updateCopyRegion = sraRgnCreateRgn(cl->copyRegion);
+    sraRgnAnd(updateCopyRegion,cl->requestedRegion);
+    tmpRegion = sraRgnCreateRgn(cl->requestedRegion);
+    sraRgnOffset(tmpRegion,cl->copyDX,cl->copyDY);
+    sraRgnAnd(updateCopyRegion,tmpRegion);
+    sraRgnDestroy(tmpRegion);
+    dx = cl->copyDX;
+    dy = cl->copyDY;
+
+    /*
+     * Next we remove updateCopyRegion from updateRegion so that updateRegion
+     * is the part of this update which is sent as ordinary pixel data (i.e not
+     * a copy).
+     */
+
+    sraRgnSubtract(updateRegion,updateCopyRegion);
+
+    /*
+     * Finally we leave modifiedRegion to be the remainder (if any) of parts of
+     * the screen which are modified but outside the requestedRegion.  We also
+     * empty both the requestedRegion and the copyRegion - note that we never
+     * carry over a copyRegion for a future update.
+     */
+
+     sraRgnOr(cl->modifiedRegion,cl->copyRegion);
+     sraRgnSubtract(cl->modifiedRegion,updateRegion);
+     sraRgnSubtract(cl->modifiedRegion,updateCopyRegion);
+
+     sraRgnMakeEmpty(cl->requestedRegion);
+     sraRgnMakeEmpty(cl->copyRegion);
+     cl->copyDX = 0;
+     cl->copyDY = 0;
+   
+     UNLOCK(cl->updateMutex);
+   
+    if (!cl->enableCursorShapeUpdates) {
+      if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) {
+	rfbRedrawAfterHideCursor(cl,updateRegion);
+	LOCK(cl->screen->cursorMutex);
+	cl->cursorX = cl->screen->cursorX;
+	cl->cursorY = cl->screen->cursorY;
+	UNLOCK(cl->screen->cursorMutex);
+	rfbRedrawAfterHideCursor(cl,updateRegion);
+      }
+      rfbShowCursor(cl);
+    }
+
+    /*
+     * Now send the update.
+     */
+    
+    rfbStatRecordMessageSent(cl, rfbMulticastFramebufferUpdate, 0, 0);
+    if (cl->preferredEncoding == rfbEncodingCoRRE) {
+        nUpdateRegionRects = 0;
+
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+            int x = rect.x1;
+            int y = rect.y1;
+            int w = rect.x2 - x;
+            int h = rect.y2 - y;
+	    int rectsPerRow, rows;
+            /* We need to count the number of rects in the scaled screen */
+            if (cl->screen!=cl->scaledScreen)
+                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
+	    rectsPerRow = (w-1)/cl->correMaxWidth+1;
+	    rows = (h-1)/cl->correMaxHeight+1;
+	    nUpdateRegionRects += rectsPerRow*rows;
+        }
+	sraRgnReleaseIterator(i); i=NULL;
+    } else if (cl->preferredEncoding == rfbEncodingUltra) {
+        nUpdateRegionRects = 0;
+        
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+            int x = rect.x1;
+            int y = rect.y1;
+            int w = rect.x2 - x;
+            int h = rect.y2 - y;
+            /* We need to count the number of rects in the scaled screen */
+            if (cl->screen!=cl->scaledScreen)
+                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
+            nUpdateRegionRects += (((h-1) / (ULTRA_MAX_SIZE( w ) / w)) + 1);
+          }
+        sraRgnReleaseIterator(i); i=NULL;
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    } else if (cl->preferredEncoding == rfbEncodingZlib) {
+	nUpdateRegionRects = 0;
+
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+            int x = rect.x1;
+            int y = rect.y1;
+            int w = rect.x2 - x;
+            int h = rect.y2 - y;
+            /* We need to count the number of rects in the scaled screen */
+            if (cl->screen!=cl->scaledScreen)
+                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
+	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
+	}
+	sraRgnReleaseIterator(i); i=NULL;
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+    } else if (cl->preferredEncoding == rfbEncodingTight) {
+	nUpdateRegionRects = 0;
+
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+            int x = rect.x1;
+            int y = rect.y1;
+            int w = rect.x2 - x;
+            int h = rect.y2 - y;
+            int n;
+            /* We need to count the number of rects in the scaled screen */
+            if (cl->screen!=cl->scaledScreen)
+                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
+	    n = rfbNumCodedRectsTight(cl, x, y, w, h);
+	    if (n == 0) {
+		nUpdateRegionRects = 0xFFFF;
+		break;
+	    }
+	    nUpdateRegionRects += n;
+	}
+	sraRgnReleaseIterator(i); i=NULL;
+#endif
+#endif
+    } else {
+        nUpdateRegionRects = sraRgnCountRects(updateRegion);
+    }
+
+    mfu->type = rfbMulticastFramebufferUpdate;
+    if (nUpdateRegionRects != 0xFFFF) {
+	if(cl->screen->maxRectsPerUpdate>0
+	   /* CoRRE splits the screen into smaller squares */
+	   && cl->preferredEncoding != rfbEncodingCoRRE
+	   /* Ultra encoding splits rectangles up into smaller chunks */
+           && cl->preferredEncoding != rfbEncodingUltra
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+	   /* Zlib encoding splits rectangles up into smaller chunks */
+	   && cl->preferredEncoding != rfbEncodingZlib
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+	   /* Tight encoding counts the rectangles differently */
+	   && cl->preferredEncoding != rfbEncodingTight
+#endif
+#endif
+	   && nUpdateRegionRects>cl->screen->maxRectsPerUpdate) {
+	    sraRegion* newUpdateRegion = sraRgnBBox(updateRegion);
+	    sraRgnDestroy(updateRegion);
+	    updateRegion = newUpdateRegion;
+	    nUpdateRegionRects = sraRgnCountRects(updateRegion);
+	}
+	mfu->nRects = Swap16IfLE((uint16_t)(sraRgnCountRects(updateCopyRegion) +
+					   nUpdateRegionRects ));
+    } else {
+	mfu->nRects = 0xFFFF;
+    }
+    cl->ublen = sz_rfbMulticastFramebufferUpdateMsg;
+
+
+ 
+
+   
+    if (!sraRgnEmpty(updateCopyRegion)) {
+	if (!rfbSendCopyRegion(cl,updateCopyRegion,dx,dy))
+	        goto updateFailed;
+    }
+
+  
+
+    for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+        int x = rect.x1;
+        int y = rect.y1;
+        int w = rect.x2 - x;
+        int h = rect.y2 - y;
+
+        /* We need to count the number of rects in the scaled screen */
+        if (cl->screen!=cl->scaledScreen)
+            rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
+
+        switch (cl->preferredEncoding) {
+	case -1:
+        case rfbEncodingRaw:
+            if (!rfbSendRectEncodingRaw(cl, x, y, w, h))
+	        goto updateFailed;
+            break;
+        case rfbEncodingRRE:
+            if (!rfbSendRectEncodingRRE(cl, x, y, w, h))
+	        goto updateFailed;
+            break;
+        case rfbEncodingCoRRE:
+            if (!rfbSendRectEncodingCoRRE(cl, x, y, w, h))
+	        goto updateFailed;
+	    break;
+        case rfbEncodingHextile:
+            if (!rfbSendRectEncodingHextile(cl, x, y, w, h))
+	        goto updateFailed;
+            break;
+        case rfbEncodingUltra:
+            if (!rfbSendRectEncodingUltra(cl, x, y, w, h))
+                goto updateFailed;
+            break;
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+	case rfbEncodingZlib:
+	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h))
+	        goto updateFailed;
+	    break;
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+	case rfbEncodingTight:
+	    if (!rfbSendRectEncodingTight(cl, x, y, w, h))
+	        goto updateFailed;
+	    break;
+#endif
+#endif
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+       case rfbEncodingZRLE:
+       case rfbEncodingZYWRLE:
+           if (!rfbSendRectEncodingZRLE(cl, x, y, w, h))
+	       goto updateFailed;
+           break;
+#endif
+        }
+    }
+    if (i) {
+        sraRgnReleaseIterator(i);
+        i = NULL;
+    }
+
+    if ( nUpdateRegionRects == 0xFFFF &&
+	 !rfbSendLastRectMarker(cl) )
+	    goto updateFailed;
+
+    if (!rfbSendUpdateBuf(cl)) {
+updateFailed:
+	result = FALSE;
+    }
+
+    if (!cl->enableCursorShapeUpdates) {
+      rfbHideCursor(cl);
+    }
+
+    if(i)
+        sraRgnReleaseIterator(i);
+    sraRgnDestroy(updateRegion);
+    sraRgnDestroy(updateCopyRegion);
+    return result;
+}
+
+
 
 
 /*

@@ -699,6 +699,7 @@ extern void rfbClientConnFailed(rfbClientPtr cl, char *reason);
 extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
 extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
 extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
+extern rfbBool rfbSendMulticastFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
 extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);
 extern rfbBool rfbSendUpdateBufMulticast(rfbClientPtr cl);

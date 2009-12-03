@@ -55,6 +55,8 @@ char *messageNameServer2Client(uint32_t type, char *buf, int len) {
     case rfbFileTransfer:             snprintf(buf, len, "FileTransfer"); break;
     case rfbTextChat:                 snprintf(buf, len, "TextChat"); break;
     case rfbPalmVNCReSizeFrameBuffer: snprintf(buf, len, "PalmVNCReSize"); break;
+    case rfbMulticastFramebufferUpdate:
+                                      snprintf(buf, len, "MulticastFBUpd"); break;
     default:
         snprintf(buf, len, "svr2cli-0x%08X", 0xFF);
     }

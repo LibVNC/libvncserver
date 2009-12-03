@@ -332,7 +332,7 @@ extern rfbBool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
 extern rfbBool SendFramebufferUpdateRequest(rfbClient* client,
 					 int x, int y, int w, int h,
 					 rfbBool incremental);
-  extern rfbBool SendMulticastFramebufferUpdateRequest(rfbClient* client, rfbBool incremental);
+extern rfbBool SendMulticastFramebufferUpdateRequest(rfbClient* client, rfbBool incremental);
 extern rfbBool SendScaleSetting(rfbClient* client,int scaleSetting);
 extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
 extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);

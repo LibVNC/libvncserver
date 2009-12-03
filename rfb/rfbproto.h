@@ -372,6 +372,7 @@ typedef struct {
 #define rfbResizeFrameBuffer 4
 #define rfbKeyFrameUpdate 5
 #define rfbPalmVNCReSizeFrameBuffer 0xF
+#define rfbMulticastFramebufferUpdate 248
 
 
 /* client -> server */
@@ -507,6 +508,46 @@ typedef struct {
 } rfbFramebufferUpdateMsg;
 
 #define sz_rfbFramebufferUpdateMsg 4
+
+
+/*-----------------------------------------------------------------------------
+ * MulticastFramebufferUpdate 
+ 
+ * Like conventional framebuffer updates, a multicast framebuffer update
+ * consists of a sequence of rectangles of pixel data.
+
+ * To allow any kind of multicast client the server is required to keep track
+ * of which combinations of pixelformat and encoding it has to provide. For 
+ * each registered combination, it sends out a whole multicast framebuffer 
+ * update. Therefore, 'MulticastFramebufferUpdate' messages have a field
+ * identifying the pixelformat of the pixel data sent. The encoding of the 
+ * pixel data is specified in each of the update's rectangles.
+
+ * Since multicast is based on UDP datagrams with a fixed maximum size,
+ * the whole update may have to be packed into several UDP packets.
+ * Thus, framebuffer contents have to be sent using (maybe several)
+ * 'MulticastFramebufferUpdate' messages. These contain consecutive sequence
+ * numbers identifying the update as a whole (e.g. update no. 1138) and also the
+ * individual partial updates of this whole update (e.g. partial update no. 3 
+ * of 11 in total).
+
+ * The header is padded so that it is an exact multiple of 4 bytes (to
+ * help with alignment of 32-bit pixels).
+ */
+
+typedef struct {
+    uint8_t type;			/* always rfbMulticastFramebufferUpdate */
+    uint8_t pad;
+    uint16_t idPixelformat;             /* pixelformat id assigned at sending session info */
+    uint16_t idWholeUpd;                /* id of the update as a whole */
+    uint16_t nPartialUpds;              /* number of partial updates the whole one is split into */
+    uint16_t idPartialUpd;              /* id of this partial update */
+    uint16_t nRects;                    /* number of rectangles per message, not per whole update */
+    /* followed by nRects rectangles */
+} rfbMulticastFramebufferUpdateMsg;
+
+#define sz_rfbMulticastFramebufferUpdateMsg 12
+
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * KeyFrameUpdate - Acknowledgment of a key frame request, it tells the client
@@ -1112,6 +1153,7 @@ typedef union {
 	rfbPalmVNCReSizeFrameBufferMsg prsfb; 
 	rfbFileTransferMsg ft;
 	rfbTextChatMsg tc;
+        rfbMulticastFramebufferUpdateMsg mfu;
 } rfbServerToClientMsg;
 
 
