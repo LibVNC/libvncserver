@@ -37,7 +37,9 @@ so, delete this exception statement from your version.
 extern int grantpt(int);
 extern int unlockpt(int);
 extern char *ptsname(int);
-/* XXX remove need for this */
+#endif
+
+#ifndef DO_NOT_DECLARE_CRYPT
 extern char *crypt(const char*, const char *);
 #endif
 
@@ -800,7 +802,7 @@ int crypt_verify(char *user, char *pass) {
 		fprintf(stderr, "user='%s' pass='%s' realpw='%s' cr='%s'\n",
 		    user, pass, realpw, cr ? cr : "(null)");
 	}
-	if (cr == NULL) {
+	if (cr == NULL || cr[0] == '\0') {
 		return 0;
 	}
 	if (!strcmp(cr, realpw)) {

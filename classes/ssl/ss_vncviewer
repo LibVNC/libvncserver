@@ -3,8 +3,24 @@
 # ss_vncviewer:  wrapper for vncviewer to use an stunnel SSL tunnel
 #                or an SSH tunnel.
 #
-# Copyright (c) 2006-2008 by Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2006-2009 by Karl J. Runge <runge@karlrunge.com>
 #
+# ss_vncviewer is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or (at
+# your option) any later version.
+# 
+# ss_vncviewer is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with ss_vncviewer; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+# or see <http://www.gnu.org/licenses/>.
+# 
+# 
 # You must have stunnel(8) installed on the system and in your PATH
 # (however, see the -ssh option below, in which case you will need ssh(1)
 # installed)  Note: stunnel is usually installed in an "sbin" subdirectory.
@@ -129,7 +145,7 @@ fi
 #
 
 # turn on verbose debugging output
-if [ "X$SS_DEBUG" != "X" ]; then
+if [ "X$SS_DEBUG" != "X" -a "X$SS_DEBUG" != "X0" ]; then
 	set -xv 
 fi
 
@@ -141,6 +157,7 @@ if uname | grep Darwin >/dev/null; then
 fi
 
 # work out which stunnel to use (debian installs as stunnel4)
+stunnel_set_here=""
 if [ "X$STUNNEL" = "X" ]; then
 	check_stunnel=1
 	if [ "X$SSVNC_BASEDIRNAME" != "X" ]; then
@@ -161,6 +178,7 @@ if [ "X$STUNNEL" = "X" ]; then
 			STUNNEL=stunnel
 		fi
 	fi
+	stunnel_set_here=1
 fi
 
 help() {
@@ -217,10 +235,12 @@ if [ "X$1" = "X-viewerflavor" ]; then
 	str=`$VNCVIEWERCMD -h 2>&1 | head -n 5`
 	if echo "$str" | grep -i 'TightVNC.viewer' > /dev/null; then
 		echo "tightvnc"
-	elif echo "$str" | grep -i 'RealVNC.Ltd' > /dev/null; then
-		echo "realvnc4"
 	elif echo "$str" | grep -i 'VNC viewer version 3' > /dev/null; then
 		echo "realvnc3"
+	elif echo "$str" | grep -i 'VNC viewer .*Edition 4' > /dev/null; then
+		echo "realvnc4"
+	elif echo "$str" | grep -i 'RealVNC.Ltd' > /dev/null; then
+		echo "realvnc4"
 	else
 		echo "unknown"
 	fi
@@ -286,6 +306,8 @@ do
 	"-escape")	shift; VNCVIEWER_ESCAPE="$1"; export VNCVIEWER_ESCAPE
                 ;;
 	"-ssvnc_encodings")	shift; VNCVIEWER_ENCODINGS="$1"; export VNCVIEWER_ENCODINGS
+                ;;
+	"-ssvnc_extra_opts")	shift; VNCVIEWERCMD_EXTRA_OPTS="$1"; export VNCVIEWERCMD_EXTRA_OPTS
                 ;;
 	"-rfbversion")	shift; VNCVIEWER_RFBVERSION="$1"; export VNCVIEWER_RFBVERSION
                 ;;
@@ -438,7 +460,12 @@ if echo "$proxy" | egrep "vencrypt://" > /dev/null; then
 	vtmp=`mytmp "$vtmp"`
 	SSVNC_PREDIGESTED_HANDSHAKE="$vtmp"
 	export SSVNC_PREDIGESTED_HANDSHAKE
-	#echo "SSVNC_PREDIGESTED_HANDSHAKE=$SSVNC_PREDIGESTED_HANDSHAKE"
+	if [ "X$SSVNC_USE_OURS" = "X" ]; then
+		NEED_VENCRYPT_VIEWER_BRIDGE=1
+	fi
+fi
+if [ "X$SSVNC_USE_OURS" = "X" ]; then
+	VNCVIEWERCMD_EXTRA_OPTS=""
 fi
 
 
@@ -654,6 +681,9 @@ final() {
 	if [ "X$tail_pid" != "X" ]; then
 		kill -TERM $tail_pid
 	fi
+	if [ "X$tail_pid2" != "X" ]; then
+		kill -TERM $tail_pid2
+	fi
 }
 
 if [ "X$reverse" = "X" ]; then
@@ -685,6 +715,12 @@ fi
 # this is for my special use of ss_vncip -> vncip viewer.
 if echo "$0" | grep vncip > /dev/null; then
 	VNCVIEWERCMD="$VNCIPCMD"
+fi
+
+if echo "$VNCVIEWERCMD" | egrep -i '^(xmessage|sleep )' > /dev/null; then
+	:
+elif [ "X$VNCVIEWERCMD_EXTRA_OPTS" != "X" ]; then
+	VNCVIEWERCMD="$VNCVIEWERCMD $VNCVIEWERCMD_EXTRA_OPTS"
 fi
 
 # trick for the undocumented rsh://host:port method.
@@ -719,24 +755,56 @@ rsh_viewer() {
 	fi
 }
 
+check_perl() {
+	if type "$1" > /dev/null 2>&1; then
+		:
+	elif [ ! -x "$1" ]; then
+		echo ""
+		echo "*******************************************************"
+		echo "** Problem finding the Perl command '$1': **"
+		echo ""
+		type "perl"
+		echo ""
+		echo "** Perhaps you need to install the Perl package. **"
+		echo "*******************************************************"
+		echo ""
+		sleep 5
+	fi
+}
+
 # this is the PPROXY tool.  used only here for now... 
 pcode() {
 	tf=$1
 	PPROXY_PROXY=$proxy; export PPROXY_PROXY
 	PPROXY_DEST="$host:$port"; export PPROXY_DEST
+	check_perl /usr/bin/perl
+
 	cod='#!/usr/bin/perl
 
-# A hack to glue stunnel to a Web proxy or SOCKS for client connections.
+# A hack to glue stunnel to a Web or SOCKS proxy, UltraVNC repeater for
+# client connections.
+# Also acts as a VeNCrypt bridge (by redirecting to stunnel.)
 
 use IO::Socket::INET;
 
-if (exists $ENV{PPROXY_SLEEP}) {
+if (exists $ENV{PPROXY_SLEEP} && $ENV{PPROXY_SLEEP} > 0) {
 	print STDERR "PPROXY_PID: $$\n";
 	sleep $ENV{PPROXY_SLEEP};
 }
 
-foreach my $var (qw(PPROXY_PROXY PPROXY_SOCKS PPROXY_DEST PPROXY_LISTEN
-    PPROXY_REVERSE PPROXY_REPEATER PPROXY_REMOVE PPROXY_KILLPID PPROXY_SLEEP)) {
+foreach my $var (qw(
+		PPROXY_DEST
+		PPROXY_KILLPID
+		PPROXY_LISTEN
+		PPROXY_PROXY
+		PPROXY_REMOVE
+		PPROXY_REPEATER
+		PPROXY_REVERSE
+		PPROXY_SLEEP
+		PPROXY_SOCKS
+		PPROXY_VENCRYPT
+		PPROXY_VENCRYPT_VIEWER_BRIDGE
+    )) {
 	if (0 || $ENV{SS_DEBUG} || $ENV{SSVNC_VENCRYPT_DEBUG}) {
 		print STDERR "$var: $ENV{$var}\n";
 	}
@@ -779,14 +847,14 @@ sub gettime {
 	return $t;
 }
 
-sub append_handshake {
-	my $str = shift;
-	if ($handshake_file) {
-		if (open(HSF, ">>$handshake_file")) {
-			print HSF $str;
-			close HSF;
-		}
-	}
+my $listen_handle = "";
+my $sock = "";
+my $parent = $$;
+
+if ($ENV{PPROXY_VENCRYPT_VIEWER_BRIDGE}) {
+	my ($from, $to) = split(/,/, $ENV{PPROXY_VENCRYPT_VIEWER_BRIDGE});
+	do_vencrypt_viewer_bridge($from, $to);
+	exit 0;
 }
 
 my ($first, $second, $third) = split(/,/, $ENV{PPROXY_PROXY}, 3);
@@ -807,7 +875,7 @@ if ($third ne "") {
 
 
 print STDERR "\n";
-print STDERR "PPROXY v0.2: a tool for Web proxies and SOCKS connections.\n";
+print STDERR "PPROXY v0.3: a tool for Web, SOCKS, and UltraVNC proxies and VeNCrypt bridging.\n";
 print STDERR "proxy_host:       $proxy_host\n";
 print STDERR "proxy_port:       $proxy_port\n";
 print STDERR "proxy_connect:    $connect\n";
@@ -822,7 +890,12 @@ if (1) {
 	print STDERR "\n";
 }
 
-my $listen_handle = "";
+sub pdie {
+	my $msg = shift;
+	kill_proxy_pids();
+	die "$msg";
+}
+
 if ($ENV{PPROXY_REVERSE} ne "") {
 	my ($rhost, $rport) = split(/:/, $ENV{PPROXY_REVERSE});
 	$rport = 5900 unless $rport;
@@ -832,39 +905,57 @@ if ($ENV{PPROXY_REVERSE} ne "") {
 		Proto => "tcp"
 	);
 	if (! $listen_handle) {
-		die "pproxy: $! -- PPROXY_REVERSE\n";
+		pdie "pproxy: $! -- PPROXY_REVERSE\n";
 	}
 	print STDERR "PPROXY_REVERSE: connected to $rhost $rport\n";
 
 } elsif ($ENV{PPROXY_LISTEN} ne "") {
 	my $listen_sock = "";
-	if ($ENV{PPROXY_LISTEN} =~ /^INADDR_ANY:(.*)/) {
-		my $p = $1;
-		$listen_sock = IO::Socket::INET->new(
-			Listen    => 2,
-			LocalPort => $p,
-			Proto     => "tcp"
-		);
-	} else {
-		$listen_sock = IO::Socket::INET->new(
-			Listen    => 2,
-			LocalAddr => "127.0.0.1",
-			LocalPort => $ENV{PPROXY_LISTEN},
-			Proto     => "tcp"
-		);
+	my $maxtry = 12;
+	my $sleep = 5;
+	my $p2 = "";
+	for (my $i=0; $i < $maxtry; $i++)  {
+		if ($ENV{PPROXY_LISTEN} =~ /^INADDR_ANY:(.*)/) {
+			my $p = $1;
+			$p2 = "*:$p";
+			$listen_sock = IO::Socket::INET->new(
+				Listen    => 2,
+				LocalPort => $p,
+				Proto     => "tcp"
+			);
+		} else {
+			$p2 = "localhost:$ENV{PPROXY_LISTEN}";
+			$listen_sock = IO::Socket::INET->new(
+				Listen    => 2,
+				LocalAddr => "127.0.0.1",
+				LocalPort => $ENV{PPROXY_LISTEN},
+				Proto     => "tcp"
+			);
+		}
+		if (! $listen_sock) {
+			if ($i < $maxtry - 1) {
+				warn "pproxy: $!\n";
+				warn "Could not listen on port $p2, retrying in $sleep seconds... (Ctrl-C to quit)\n";
+				sleep $sleep;
+			}
+		} else {
+			last;
+		}
 	}
 	if (! $listen_sock) {
-		die "pproxy: $! -- PPROXY_LISTEN\n";
+		pdie "pproxy: $! -- PPROXY_LISTEN\n";
 	}
+	print STDERR "pproxy: listening on $p2\n";
 	my $ip;
 	($listen_handle, $ip) = $listen_sock->accept();
-	if (! $listen_handle) {
-		die "pproxy: $!\n";
-	}
+	my $err = $!;
 	close $listen_sock;
+	if (! $listen_handle) {
+		pdie "pproxy: $err\n";
+	}
 }
 
-my $sock = IO::Socket::INET->new(
+$sock = IO::Socket::INET->new(
 	PeerAddr => $proxy_host,
 	PeerPort => $proxy_port,
 	Proto => "tcp"
@@ -873,13 +964,13 @@ my $sock = IO::Socket::INET->new(
 if (! $sock) {
 	my $err = $!;
 	unlink($0) if $ENV{PPROXY_REMOVE};
-	die "pproxy: $err\n";
+	pdie "pproxy: $err\n";
 }
 
 unlink($0) if $ENV{PPROXY_REMOVE};
 
 if ($ENV{PPROXY_PROXY} =~ /^vencrypt:/ && $ENV{PPROXY_LISTEN} =~ /^INADDR_ANY:/) {
-	print STDERR "PPROXY: vencrypt+reverse: swapping listen socket with connect socket.\n";
+	print STDERR "\nPPROXY: vencrypt+reverse: swapping listen socket with connect socket.\n";
 	my $tmp_swap = $sock;
 	$sock = $listen_handle;
 	$listen_handle = $tmp_swap;
@@ -906,48 +997,10 @@ if ($second ne "") {
 	connection($connect, 1);
 }
 
-$parent = $$;
-$child = fork;
-if (! defined $child) {
-	if ($ENV{PPROXY_KILLPID}) {
-		foreach my $p (split(/,/, $ENV{PPROXY_KILLPID})) {
-			if ($p =~ /^(\+|-)/) {
-				$p = $parent + $p;
-			}
-			kill "TERM", $p;
-		}
+sub kill_proxy_pids() {
+	if ($ENV{PPROXY_VENCRYPT_VIEWER_BRIDGE}) {
+		return;
 	}
-	exit 1;
-}
-
-if ($child) {
-	print STDERR "pproxy parent\[$$]  STDIN -> socket\n";
-	if ($listen_handle) {
-		xfer($listen_handle, $sock);
-	} else {
-		xfer(STDIN, $sock);
-	}
-	select(undef, undef, undef, 0.25);
-	if (kill 0, $child) {
-		select(undef, undef, undef, 1.5);
-		print STDERR "pproxy\[$$]: kill TERM $child\n";
-		kill "TERM", $child;
-	}
-} else {
-	print STDERR "pproxy child \[$$]  socket -> STDOUT\n";
-	if ($listen_handle) {
-		xfer($sock, $listen_handle);
-	} else {
-		xfer($sock, STDOUT);
-	}
-	select(undef, undef, undef, 0.25);
-	if (kill 0, $parent) {
-		select(undef, undef, undef, 1.5);
-		print STDERR "pproxy\[$$]: kill TERM $parent\n";
-		kill "TERM", $parent;
-	}
-}
-if ($ENV{PPROXY_KILLPID} ne "") {
 	if ($ENV{PPROXY_KILLPID}) {
 		foreach my $p (split(/,/, $ENV{PPROXY_KILLPID})) {
 			if ($p =~ /^(\+|-)/) {
@@ -958,6 +1011,109 @@ if ($ENV{PPROXY_KILLPID} ne "") {
 		}
 	}
 }
+
+sub xfer {
+	my($in, $out) = @_;
+	$RIN = $WIN = $EIN = "";
+	$ROUT = "";
+	vec($RIN, fileno($in), 1) = 1;
+	vec($WIN, fileno($in), 1) = 1;
+	$EIN = $RIN | $WIN;
+
+	while (1) {
+		my $nf = 0;
+		while (! $nf) {
+			$nf = select($ROUT=$RIN, undef, undef, undef);
+		}
+		my $len = sysread($in, $buf, 8192);
+		if (! defined($len)) {
+			next if $! =~ /^Interrupted/;
+			print STDERR "pproxy[$$]: $!\n";
+			last;
+		} elsif ($len == 0) {
+			print STDERR "pproxy[$$]: Input is EOF.\n";
+			last;
+		}
+		my $offset = 0;
+		my $quit = 0;
+		while ($len) {
+			my $written = syswrite($out, $buf, $len, $offset);
+			if (! defined $written) {
+				print STDERR "pproxy[$$]: Output is EOF. $!\n";
+				$quit = 1;
+				last;
+			}
+			$len -= $written;
+			$offset += $written;
+		}
+		last if $quit;
+	}
+	close($out);
+	close($in);
+	print STDERR "pproxy[$$]: finished xfer.\n";
+}
+
+sub handler {
+	print STDERR "pproxy[$$]: got SIGTERM.\n";
+	close $listen_handle if $listen_handle;
+	close $sock if $sock;
+	exit;
+}
+
+sub xfer_both {
+	$child = fork;
+
+	if (! defined $child) {
+		kill_proxy_pids();
+		exit 1;
+	}
+
+	$SIG{TERM} = "handler";
+
+	if ($child) {
+		if ($listen_handle) {
+			print STDERR "pproxy parent[$$]  listen_handle -> socket\n";
+			xfer($listen_handle, $sock);
+		} else {
+			print STDERR "pproxy parent[$$]  STDIN -> socket\n";
+			xfer(STDIN, $sock);
+		}
+		select(undef, undef, undef, 0.25);
+		if (kill 0, $child) {
+			select(undef, undef, undef, 0.9);
+			if (kill 0, $child) {
+				print STDERR "pproxy[$$]: kill TERM child $child\n";
+				kill "TERM", $child;
+			} else {
+				print STDERR "pproxy[$$]: child  $child gone.\n";
+			}
+		}
+	} else {
+		select(undef, undef, undef, 0.05);
+		if ($listen_handle) {
+			print STDERR "pproxy child [$$]  socket -> listen_handle\n\n";
+			xfer($sock, $listen_handle);
+		} else {
+			print STDERR "pproxy child [$$]  socket -> STDOUT\n\n";
+			xfer($sock, STDOUT);
+		}
+		select(undef, undef, undef, 0.25);
+		if (kill 0, $parent) {
+			select(undef, undef, undef, 0.8);
+			if (kill 0, $parent) {
+				print STDERR "pproxy[$$]: kill TERM parent $parent\n";
+				kill "TERM", $parent;
+			} else {
+				print STDERR "pproxy[$$]: parent $parent gone.\n";
+			}
+		}
+	}
+
+	kill_proxy_pids();
+}
+
+xfer_both();
+
 exit;
 
 sub url_parse {
@@ -1186,13 +1342,14 @@ sub connection {
 sub vdie {
 	append_handshake("done\n");
 	close $sock;
+	kill_proxy_pids();
 	exit(1);
 }
 
 sub anontls_handshake {
 	my ($vmode, $db) = @_;
 
-	print STDERR "PPROXY: Doing ANONTLS Handshake\n";
+	print STDERR "\nPPROXY: Doing ANONTLS Handshake\n";
 
 	my $psec = pack("C", $rfbSecTypeAnonTls);
 	syswrite($sock, $psec, 1);
@@ -1204,7 +1361,7 @@ sub vencrypt_handshake {
 	
 	my ($vmode, $db) = @_;
 
-	print STDERR "PPROXY: Doing VeNCrypt Handshake\n";
+	print STDERR "\nPPROXY: Doing VeNCrypt Handshake\n";
 
 	my $psec = pack("C", $rfbSecTypeVencrypt);
 
@@ -1397,44 +1554,407 @@ sub vencrypt_dialog {
 	}
 }
 
-sub xfer {
-	my($in, $out) = @_;
-	$RIN = $WIN = $EIN = "";
-	$ROUT = "";
-	vec($RIN, fileno($in), 1) = 1;
-	vec($WIN, fileno($in), 1) = 1;
-	$EIN = $RIN | $WIN;
+sub append_handshake {
+	my $str = shift;
+	if ($handshake_file) {
+		if (open(HSF, ">>$handshake_file")) {
+			print HSF $str;
+			close HSF;
+		}
+	}
+}
 
-	while (1) {
-		my $nf = 0;
-		while (! $nf) {
-			$nf = select($ROUT=$RIN, undef, undef, undef);
-		}
-		my $len = sysread($in, $buf, 8192);
-		if (! defined($len)) {
-			next if $! =~ /^Interrupted/;
-			print STDERR "pproxy\[$$]: $!\n";
+sub do_vencrypt_viewer_bridge {
+	my ($listen, $connect) = @_;
+	print STDERR "\npproxy: starting vencrypt_viewer_bridge[$$]: $listen \-> $connect\n";
+	my $db = 0;
+	my $backwards = 0;
+	if ($listen < 0) {
+		$backwards = 1;
+		$listen = -$listen;
+	}
+	if ($handshake_file eq "") {
+		die "pproxy: vencrypt_viewer_bridge[$$]: no SSVNC_PREDIGESTED_HANDSHAKE\n";
+	}
+	my $listen_sock;
+	my $maxtry = 12;
+	my $sleep = 5;
+	for (my $i=0; $i < $maxtry; $i++)  {
+		$listen_sock = IO::Socket::INET->new(
+			Listen    => 2,
+			LocalAddr => "127.0.0.1",
+			LocalPort => $listen,
+			Proto     => "tcp"
+		);
+		if (! $listen_sock) {
+			if ($i < $maxtry - 1) {
+				warn "pproxy: vencrypt_viewer_bridge[$$]: $!\n";
+				warn "Could not listen on port $listen, retrying in $sleep seconds... (Ctrl-C to quit)\n";
+				sleep $sleep;
+			}
+		} else {
 			last;
-		} elsif ($len == 0) {
-			print STDERR "pproxy\[$$]: Input is EOF.\n";
-			last;
 		}
-		my $offset = 0;
-		my $quit = 0;
-		while ($len) {
-			my $written = syswrite($out, $buf, $len, $offset);
-			if (! defined $written) {
-				print STDERR "pproxy\[$$]: Output is EOF. $!\n";
-				$quit = 1;
+	}
+	if (! $listen_sock) {
+		die "pproxy: vencrypt_viewer_bridge[$$]: $!\n";
+	}
+	print STDERR "pproxy: vencrypt_viewer_bridge[$$]: listening on port $listen\n\n";
+	my ($viewer_sock, $ip) = $listen_sock->accept();
+	my $err = $!;
+	close $listen_sock;
+	if (! $viewer_sock) {
+		die "pproxy: vencrypt_viewer_bridge[$$]: $err\n";
+	}
+	print STDERR "vencrypt_viewer_bridge[$$]: viewer_sock $viewer_sock\n" if $db;
+
+	print STDERR "pproxy: vencrypt_viewer_bridge[$$]: connecting to 127.0.0.1:$connect\n";
+	my $server_sock = IO::Socket::INET->new(
+		PeerAddr => "127.0.0.1",
+		PeerPort => $connect,
+		Proto => "tcp"
+	);
+	print STDERR "vencrypt_viewer_bridge[$$]: server_sock $server_sock\n" if $db;
+	if (! $server_sock) {
+		my $err = $!;
+		die "pproxy: vencrypt_viewer_bridge[$$]: $err\n";
+	}
+
+	if ($backwards) {
+		print STDERR "vencrypt_viewer_bridge[$$]: reversing roles of viewer and server.\n";
+		my $t = $viewer_sock;
+		$viewer_sock = $server_sock;
+		$server_sock = $t;
+	}
+
+	my %hs = ();
+	my $dt = 0.2;
+	my $slept = 0.0;
+	while ($slept < 20.0) {
+		select(undef, undef, undef, $dt);
+		$slept += $dt;
+		if (-f $handshake_file && open(HSF, "<$handshake_file")) {
+			my $done = 0;
+			%hs = ();
+			my $str = "";
+			while (<HSF>) {
+				print STDERR "vencrypt_viewer_bridge[$$]: $_" if $ENV{VENCRYPT_VIEWER_BRIDGE_DEBUG};
+				$str .= "vencrypt_viewer_bridge[$$]: $_";
+				chomp;
+				if ($_ eq "done") {
+					$done = 1;
+				} else {
+					my ($k, $v) = split(/=/, $_, 2);
+					if ($k ne "" && $v ne "") {
+						$hs{$k} = $v;
+					}
+				}
+			}
+			close HSF;
+			if ($done) {
+				print STDERR "\n" . $str;
 				last;
 			}
-			$len -= $written;
-			$offset += $written;
 		}
-		last if $quit;
 	}
-	close($in);
-	close($out);
+	if (! exists $hs{server}) {
+		$hs{server} = "RFB 003.008";
+	}
+	if (! exists $hs{sectype}) {
+		unlink($handshake_file);
+		die "pproxy: vencrypt_viewer_bridge[$$]: no sectype.\n";
+	}
+	syswrite($viewer_sock, "$hs{server}\n", length($hs{server}) + 1);
+	my $viewer_rfb = "";
+	for (my $i = 0; $i < 12; $i++) {
+		my $c;
+		sysread($viewer_sock, $c, 1);
+		$viewer_rfb .= $c;
+		print STDERR $c;
+	}
+	my $viewer_major = 3;
+	my $viewer_minor = 8;
+	if ($viewer_rfb =~ /RFB (\d+)\.(\d+)/) {
+		$viewer_major = $1;	
+		$viewer_minor = $2;	
+	}
+	my $u0 = pack("C", 0);
+	my $u1 = pack("C", 1);
+	my $u2 = pack("C", 2);
+	if ($hs{sectype} == $rfbSecTypeAnonTls) {
+		unlink($handshake_file);
+		print STDERR "\npproxy: vencrypt_viewer_bridge[$$]: rfbSecTypeAnonTls\n";
+		if ($viewer_major > 3 || $viewer_minor >= 7) {
+			;	# setup ok, proceed to xfer.
+		} else {
+			print STDERR "pproxy: vencrypt_viewer_bridge[$$]: faking RFB version 3.3 to viewer.\n";
+			my $n;
+			sysread($server_sock, $n, 1);
+			$n = unpack("C", $n);
+			if ($n == 0) {
+				die "pproxy: vencrypt_viewer_bridge[$$]: nsectypes == $n.\n";
+			}
+			my %types;
+			for (my $i = 0; $i < $n; $i++) {
+				my $t;
+				sysread($server_sock, $t, 1);
+				$t = unpack("C", $t);
+				$types{$t} = 1;
+			}
+			my $use = 1;	# None
+			if (exists $types{1}) {
+				$use = 1;	# None
+			} elsif (exists $types{2}) {
+				$use = 2;	# VncAuth
+			} else {
+				die "pproxy: vencrypt_viewer_bridge[$$]: no valid sectypes" . join(",", keys %types) . "\n";
+			}
+				
+			# send 4 bytes sectype to viewer: 
+			# (note this should be MSB, network byte order...)
+			my $up = pack("C", $use);
+			syswrite($viewer_sock, $u0, 1);
+			syswrite($viewer_sock, $u0, 1);
+			syswrite($viewer_sock, $u0, 1);
+			syswrite($viewer_sock, $up, 1);
+			# and tell server the one we selected:
+			syswrite($server_sock, $up, 1);
+			if ($use == 1) {
+				# even None has security result, so read it here and discard it.
+				my $sr = "";
+				sysread($server_sock, $sr, 4);
+			}
+		}
+	} elsif ($hs{sectype} == $rfbSecTypeVencrypt) {
+		print STDERR "\npproxy: vencrypt_viewer_bridge[$$]: rfbSecTypeVencrypt\n";
+		if (! exists $hs{subtype}) {
+			unlink($handshake_file);
+			die "pproxy: vencrypt_viewer_bridge[$$]: no subtype.\n";
+		}
+		my $fake_type = "None";
+		my $plain = 0;
+		my $sub_type = $hs{subtype};
+		if ($sub_type == $rfbVencryptTlsNone) {
+			$fake_type = "None";
+		} elsif ($sub_type == $rfbVencryptTlsVnc) {
+			$fake_type = "VncAuth";
+		} elsif ($sub_type == $rfbVencryptTlsPlain) {
+			$fake_type = "None";
+			$plain = 1;
+		} elsif ($sub_type == $rfbVencryptX509None) {
+			$fake_type = "None";
+		} elsif ($sub_type == $rfbVencryptX509Vnc) {
+			$fake_type = "VncAuth";
+		} elsif ($sub_type == $rfbVencryptX509Plain) {
+			$fake_type = "None";
+			$plain = 1;
+		}
+		if ($plain) {
+			if (!open(W, ">$handshake_file")) {
+				unlink($handshake_file);
+				die "pproxy: vencrypt_viewer_bridge[$$]: $handshake_file $!\n";
+			}
+			print W <<"END";
+
+			proc print_out {} {
+				global user pass env
+
+				if [info exists env(SSVNC_UP_DEBUG)] {
+					toplevel .b
+					button .b.b -text "user=\$user pass=\$pass" -command {destroy .b}
+					pack .b.b
+					update
+					tkwait window .b
+				}
+				
+				if [info exists env(SSVNC_UP_FILE)] {
+					set fh "" 
+					catch {set fh [open \$env(SSVNC_UP_FILE) w]}
+					if {\$fh != ""} {
+						puts \$fh user=\$user\\npass=\$pass
+						flush \$fh
+						close \$fh
+						return
+					}
+				}
+				puts stdout user=\$user\\npass=\$pass
+				flush stdout
+			}
+
+			proc center_win {w} {
+				update
+				set W [winfo screenwidth  \$w]
+				set W [expr \$W + 1]
+				wm geometry \$w +\$W+0
+				update
+				set x [expr [winfo screenwidth  \$w]/2 - [winfo width  \$w]/2]
+				set y [expr [winfo screenheight \$w]/2 - [winfo height \$w]/2]
+
+				wm geometry \$w +\$x+\$y
+				wm deiconify \$w
+				update
+			}
+
+			wm withdraw .
+
+			global env
+			set up {}
+			if [info exists env(SSVNC_UNIXPW)] {
+				set rm 0
+				set up \$env(SSVNC_UNIXPW)
+				if [regexp {^rm:} \$up]  {
+					set rm 1
+					regsub {^rm:} \$up {} up
+				}
+				if [file exists \$up] {
+					set fh ""
+					set f \$up
+					catch {set fh [open \$up r]}
+					if {\$fh != ""} {
+						gets \$fh u	
+						gets \$fh p	
+						close \$fh
+						set up "\$u@\$p"
+					}
+					if {\$rm} {
+						catch {file delete \$f}
+					}
+				}
+			} elseif [info exists env(SSVNC_VENCRYPT_USERPASS)] {
+				set up \$env(SSVNC_VENCRYPT_USERPASS)
+			}
+			#puts stderr up=\$up
+			if {\$up != ""} {
+				if [regexp {@} \$up] {
+					global user pass
+					set user \$up
+					set pass \$up
+					regsub {@.*\$}  \$user "" user
+					regsub {^[^@]*@} \$pass "" pass
+					print_out
+					exit
+				}
+			}
+
+			wm title . {VeNCrypt Viewer Bridge User/Pass}
+
+			set user {}
+			set pass {}
+
+			label .l -text {SSVNC VeNCrypt Viewer Bridge}
+
+			frame .f0
+			frame .f0.fL
+			label .f0.fL.la -text {Username: }
+			label .f0.fL.lb -text {Password: }
+
+			pack .f0.fL.la .f0.fL.lb -side top
+
+			frame .f0.fR
+			entry .f0.fR.ea -width 24 -textvariable user
+			entry .f0.fR.eb -width 24 -textvariable pass -show *
+
+			pack .f0.fR.ea .f0.fR.eb -side top -fill x
+
+			pack .f0.fL -side left
+			pack .f0.fR -side right -expand 1 -fill x
+
+			button .no -text Cancel -command {destroy .}
+			button .ok -text Done   -command {print_out; destroy .}
+
+			center_win .
+			pack .l .f0 .no .ok -side top -fill x
+			update
+			wm deiconify .
+
+			bind .f0.fR.ea <Return> {focus .f0.fR.eb}
+			bind .f0.fR.eb <Return> {print_out; destroy .}
+			focus .f0.fR.ea
+
+			wm resizable . 1 0
+			wm minsize . [winfo reqwidth .] [winfo reqheight .]
+END
+			close W;
+
+			#system("cat $handshake_file");
+			my $w = "wish";
+			if ($ENV{WISH}) {
+				$w = $ENV{WISH};	
+			}
+			print STDERR "pproxy: vencrypt_viewer_bridge[$$]: prompt  VencryptPlain user and passwd.\n";
+			my $res = "";
+			if (`uname` =~ /Darwin/) {
+				my $mtmp = `mktemp /tmp/hsup.XXXXXX`;
+				chomp $mtmp;
+				system("env SSVNC_UP_FILE=$mtmp $w $handshake_file");
+				$res = `cat $mtmp`;
+				unlink $mtmp;
+			} else {
+				$res = `$w $handshake_file`;
+			}
+			my $user = "";
+			my $pass = "";
+			if ($res =~ /user=(\S*)/) {
+				$user = $1;
+			}
+			if ($res =~ /pass=(\S*)/) {
+				$pass = $1;
+			}
+			print STDERR "pproxy: vencrypt_viewer_bridge[$$]: sending VencryptPlain user and passwd.\n";
+			my $ulen = pack("C", length($user));
+			my $plen = pack("C", length($pass));
+			# (note this should be MSB, network byte order...)
+			syswrite($server_sock, $u0, 1);
+			syswrite($server_sock, $u0, 1);
+			syswrite($server_sock, $u0, 1);
+			syswrite($server_sock, $ulen, 1);
+			syswrite($server_sock, $u0, 1);
+			syswrite($server_sock, $u0, 1);
+			syswrite($server_sock, $u0, 1);
+			syswrite($server_sock, $plen, 1);
+			syswrite($server_sock, $user, length($user));
+			syswrite($server_sock, $pass, length($pass));
+		}
+		unlink($handshake_file);
+
+		my $ft = 0;
+		if ($fake_type eq "None") {
+			$ft = 1;
+		} elsif ($fake_type eq "VncAuth") {
+			$ft = 2;
+		} else {
+			die "pproxy: vencrypt_viewer_bridge[$$]: unknown fake type: $fake_type\n";
+		}
+		my $fp = pack("C", $ft);
+		if ($viewer_major > 3 || $viewer_minor >= 7) {
+			syswrite($viewer_sock, $u1, 1);
+			syswrite($viewer_sock, $fp, 1);
+			my $cr;
+			sysread($viewer_sock, $cr, 1);
+			$cr = unpack("C", $cr);
+			if ($cr != $ft) {
+				die "pproxy: vencrypt_viewer_bridge[$$]: client selected wrong type: $cr / $ft\n";
+			}
+		} else {
+			print STDERR "pproxy: vencrypt_viewer_bridge[$$]: faking RFB version 3.3 to viewer.\n";
+			# send 4 bytes sect type to viewer: 
+			# (note this should be MSB, network byte order...)
+			syswrite($viewer_sock, $u0, 1);
+			syswrite($viewer_sock, $u0, 1);
+			syswrite($viewer_sock, $u0, 1);
+			syswrite($viewer_sock, $fp, 1);
+			if ($ft == 1) {
+				# even None has security result, so read it here and discard it.
+				my $sr = "";
+				sysread($server_sock, $sr, 4);
+			}
+		}
+	}
+
+	$listen_handle = $viewer_sock;
+	$sock = $server_sock;
+
+	xfer_both();
 }
 '
 	# '
@@ -1520,11 +2040,33 @@ END
 }
 
 Kecho() {
-	if [ "X$USER" = "Xrunge" ]; then
+	NO_KECHO=1
+	if [ "X$USER" = "Xrunge" -a "X$NO_KECHO" = "X" ]; then
 		echo "dbg: $*"
 	fi
 }
 
+NHAFL_warning() {
+	echo "" 
+	echo "** Warning: For the proxy: $proxy" 
+	echo "** Warning: the ssh(1) option: $ssh_NHAFL" 
+	echo "** Warning: will be used to avoid frequent 'ssh key has changed for localhost'"
+	echo "** Warning: dialogs and connection failures (for example, ssh will exit asking"
+	echo "** Warning: you to manually remove a key from ~/.ssh/known_hosts.)"
+	echo "** Warning: "
+	echo "** Warning: This decreases security: a Man-In-The-Middle attack is possible."
+	echo "** Warning: You can set the SSVNC_SSH_LOCALHOST_AUTH=1 env. var. to disable" 
+	echo "** Warning: using the NoHostAuthenticationForLocalhost ssh option." 
+	echo "** Warning: "
+	echo "** Warning: A better solution is to configure (in the SSVNC GUI) the setting:"
+	echo "** Warning: 'Options -> Advanced -> Private SSH KnownHosts file' (or set" 
+	echo "** Warning: SSVNC_KNOWN_HOSTS_FILE directly) to a per-connection known hosts" 
+	echo "** Warning: file.  This yields a both secure and convenient solution." 
+	echo "" 
+}
+
+# handle ssh case:
+#
 if [ "X$use_ssh" = "X1" ]; then
 	#
 	# USING SSH
@@ -1532,8 +2074,46 @@ if [ "X$use_ssh" = "X1" ]; then
 	ssh_port="22"
 	ssh_host="$host"
 	vnc_host="$localhost"
+	ssh_UKHF=""
+	localhost_extra=""
 	# let user override ssh via $SSH
 	ssh=${SSH:-"ssh -x"}
+
+	sshword=`echo "$ssh" | awk '{print $1}'`
+	if [ "X$sshword" != "X" ]; then
+		if [ -x "$sshword" ]; then
+			:
+		elif type "$sshword" > /dev/null 2>&1; then
+			:
+		else
+			echo ""
+			echo "*********************************************************"
+			echo "** Problem finding the SSH command '$sshword': **"
+			echo ""
+			type "$sshword"
+			echo ""
+			echo "** Perhaps you need to install the SSH client package. **"
+			echo "*********************************************************"
+			echo ""
+			sleep 5
+		fi
+	fi
+
+	ssh_NHAFL="-o NoHostAuthenticationForLocalhost=yes"
+	if [ "X$SSVNC_SSH_LOCALHOST_AUTH" = "X1" ]; then
+		ssh_NHAFL=""
+	fi
+	if [ "X$SSVNC_KNOWN_HOSTS_FILE" != "X" ]; then
+		ssh_NHAFL=""
+	
+		ssh_UKHF="-o UserKnownHostsFile=$SSVNC_KNOWN_HOSTS_FILE"
+		ssh_args="$ssh_args $ssh_UKHF"
+		if [ ! -f "$SSVNC_KNOWN_HOSTS_FILE" ]; then
+			touch "$SSVNC_KNOWN_HOSTS_FILE" >/dev/null 2>&1
+		fi
+		chmod 600 "$SSVNC_KNOWN_HOSTS_FILE" >/dev/null 2>&1
+	fi
+	did_ssh_NHAFL=""
 
 	if [ "X$SSVNC_LIM_ACCEPT_PRELOAD" != "X" ]; then
 		SSVNC_LIM_ACCEPT_PRELOAD="$SSVNC_BASEDIR/$SSVNC_UNAME/$SSVNC_LIM_ACCEPT_PRELOAD"
@@ -1553,6 +2133,29 @@ if [ "X$use_ssh" = "X1" ]; then
 		SSVNC_LIM_ACCEPT_PRELOAD=""
 	fi
 
+	ssh_vencrypt_proxy=""
+	# We handle vencrypt for SSH+SSL mode.
+	if echo "$proxy" | grep 'vencrypt://' > /dev/null; then
+		proxynew=""
+		for part in `echo "$proxy" | tr ',' ' '`
+		do
+			if echo "$part" | egrep -i '^vencrypt://' > /dev/null; then
+				ssh_vencrypt_proxy=$part
+			else
+				if [ "X$proxynew" = "X" ]; then
+					proxynew="$part"
+				else
+					proxynew="$proxynew,$part"
+				fi
+			fi
+		done
+		proxy=$proxynew
+	fi 
+	Kecho ssh_vencrypt_proxy=$ssh_vencrypt_proxy
+
+	# note that user must supply http:// for web proxy in SSH and SSH+SSL.
+	# No xxxx:// implies ssh server+port.
+	#
 	if echo "$proxy" | egrep '(http|https|socks|socks4|socks5)://' > /dev/null; then
 		# Handle Web or SOCKS proxy(ies) for the initial connect.
 		Kecho host=$host
@@ -1638,11 +2241,16 @@ if [ "X$use_ssh" = "X1" ]; then
 		port=$port_save
 		host=$host_save
 
-		nd=`findfree 6700`
+		nd=`findfree 6600`
 		PPROXY_LISTEN=$nd; export PPROXY_LISTEN
 		$ptmp &
-		sleep 2
-		ssh_args="$ssh_args -o NoHostAuthenticationForLocalhost=yes"
+		sleep 1
+		if [ "X$ssh_NHAFL" != "X" -a "X$did_ssh_NHAFL" != "X1" ]; then
+			NHAFL_warning
+			ssh_args="$ssh_args $ssh_NHAFL"
+			did_ssh_NHAFL=1
+		fi
+		sleep 1
 		if [ "X$sproxy1" = "X" ]; then
 			u=""
 			if echo "$host" | grep '@' > /dev/null; then
@@ -1653,6 +2261,7 @@ if [ "X$use_ssh" = "X1" ]; then
 		else
 			proxy="${sproxy1_user}$localhost:$nd"
 		fi
+		localhost_extra=".2"
 		if [ "X$sproxy_rest" != "X" ]; then
 			proxy="$proxy,$sproxy_rest"
 		fi
@@ -1684,12 +2293,21 @@ if [ "X$use_ssh" = "X1" ]; then
 			ssh_port2="22"
 		fi
 		proxport=`findfree 3500`
+		if [ "X$ssh_NHAFL" != "X" -a "X$did_ssh_NHAFL" != "X1" ]; then
+			NHAFL_warning
+			did_ssh_NHAFL=1
+			sleep 1
+		fi
 		echo
 		echo "Running 1st ssh proxy:"
-		echo "$ssh -f -x $ssh_port1 $targ -e none -o NoHostAuthenticationForLocalhost=yes -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
+		ukhf=""
+		if [ "X$ssh_UKHF" != "X" ]; then 
+			ukhf="$ssh_UKHF$localhost_extra"
+		fi
+		echo "$ssh -f -x $ssh_port1 $targ -e none $ssh_NHAFL $ukhf -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
 		echo ""
-		      $ssh -f -x $ssh_port1 $targ -e none -o NoHostAuthenticationForLocalhost=yes -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
-		ssh_args="$ssh_args -o NoHostAuthenticationForLocalhost=yes"
+		      $ssh -f -x $ssh_port1 $targ -e none $ssh_NHAFL $ukhf -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
+		ssh_args="$ssh_args $ssh_NHAFL"
 		sleep 1
 		stty sane
 		proxy="${ssh_user2}$localhost:$proxport"
@@ -1764,6 +2382,8 @@ if [ "X$use_ssh" = "X1" ]; then
 	elif [ "X$getport" != "X" ]; then
 		tport=/tmp/ss_vncviewer_tport${RANDOM}.$$
 		tport=`mytmp "$tport"`
+		tport2=/tmp/ss_vncviewer_tport2${RANDOM}.$$
+		tport2=`mytmp "$tport2"`
 
 		if [ "X$rsh" != "X1" ]; then
 			if echo "$ssh_cmd" | grep "sudo " > /dev/null; then
@@ -1777,10 +2397,12 @@ if [ "X$use_ssh" = "X1" ]; then
 			fi
 			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
 			echo ""
-			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd" > $tport 
+			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd" > $tport 2> $tport2
 			if [ "X$teeport" = "X1" ]; then
-				tail -f $tport 1>&2 &
+				tail -f $tport  1>&2 &
 				tail_pid=$!
+				tail -f $tport2 1>&2 &
+				tail_pid2=$!
 			fi
 			rc=$?
 		else
@@ -1809,11 +2431,11 @@ if [ "X$use_ssh" = "X1" ]; then
 		while [ $i -lt $imax ]; do
 			#echo $sleepit
 			eval $sleepit
-			PORT=`grep "^PORT=" $tport | head -n 1 | sed -e 's/PORT=//' -e 's/\r//g'`
+			PORT=`grep "^PORT=" $tport | tr '\r' ' ' | head -n 1 | sed -e 's/PORT=//' -e 's/\r//g' -e 's/ *$//'`
 			if echo "$PORT" | grep '^[0-9][0-9]*$' > /dev/null; then
 				break
 			fi
-			vnss=`sed -e 's/\r//g' $tport | egrep -i '^(New.* desktop is|A VNC server is already running).*:[0-9[0-9]*$' | head -n 1 | awk '{print $NF}'`
+			vnss=`sed -e 's/\r//g' $tport $tport2 | egrep -i '^(New.* desktop is|A VNC server is already running).*:[0-9[0-9]*$' | head -n 1 | awk '{print $NF}'`
 			if [ "X$vnss" != "X" ]; then
 				PORT=`echo "$vnss" | awk -F: '{print $2}'`
 				if echo "$PORT" | grep '^[0-9][0-9]*$' > /dev/null; then
@@ -1822,14 +2444,16 @@ if [ "X$use_ssh" = "X1" ]; then
 					fi
 				fi
 				if echo "$PORT" | grep '^[0-9][0-9]*$' > /dev/null; then
+					vnss=`sed -e 's/\r//g' $tport | egrep -i '^(New.* desktop is|A VNC server is already running).*:[0-9[0-9]*$' | head -n 1`
+					echo "vncserver string: $vnss" 1>&2
 					break
 				fi
 			fi
 			i=`expr $i + 1`
 		done
 
-		echo "PORT=$PORT" 1>&2
-		rm -f $tport
+		echo "found: PORT='$PORT'" 1>&2
+		rm -f $tport $tport2
 		if [ "X$rsh" = "X1" ]; then
 			rsh_viewer "$@"
 			exit $?
@@ -1955,6 +2579,33 @@ if [ "X$use_ssh" = "X1" ]; then
 		else
 			proxy=""
 		fi
+		if [ "X$ssh_vencrypt_proxy" != "X" ]; then
+			ssh_vencrypt_proxy="vencrypt://$host:$port"
+			if [ "X$proxy" = "X" ]; then
+				proxy=$ssh_vencrypt_proxy
+			else
+				proxy="$proxy,$ssh_vencrypt_proxy"
+			fi
+			Kecho "proxy_now=$proxy"
+			unset PPROXY_LISTEN
+		fi
+	fi
+fi
+
+if [ "X$stunnel_set_here" = "X1" -a "X$showcert" = "X" ]; then
+	if type $STUNNEL > /dev/null 2>&1; then
+		:
+	else
+		echo ""
+		echo "***************************************************************"
+		echo "** Problem finding the Stunnel command '$STUNNEL': **"
+		echo ""
+		type $STUNNEL
+		echo ""
+		echo "** Perhaps you need to install the stunnel/stunnel4 package. **"
+		echo "***************************************************************"
+		echo ""
+		sleep 5
 	fi
 fi
 
@@ -1967,6 +2618,9 @@ if [ "X$verify" != "X" ]; then
 	fi
 	verify="$verify
 verify = 2"
+fi
+if [ "X$SSVNC_STUNNEL_VERIFY3" != "X" ]; then
+	verify=`echo "$verify" | sed -e 's/verify = 2/verify = 3/'`
 fi
 if [ "X$mycert" != "X" ]; then
 	cert="cert = $mycert"
@@ -1997,7 +2651,6 @@ if [ "X$proxy" != "X" ]; then
 				PPROXY_LISTEN=$nd
 				export PPROXY_LISTEN
 				if [ "X$reverse" = "X" ]; then
-					#$ptmp 2>/dev/null &
 					$ptmp &
 				fi
 				sleep 2
@@ -2016,6 +2669,8 @@ else
 	connect="connect = $host:$port"
 fi
 
+# handle showcert case:
+#
 if [ "X$showcert" = "X1" ]; then
 	if [ "X$proxy" != "X" ]; then
 		PPROXY_LISTEN=$use
@@ -2026,6 +2681,23 @@ if [ "X$showcert" = "X1" ]; then
 			$ptmp 2>/dev/null &
 		fi
 		sleep 1
+		more_sleep=1
+		if uname | grep Linux > /dev/null; then
+			if netstat -ant | grep LISTEN | grep "127.0.0.1:$use" > /dev/null; then
+				more_sleep=""
+			fi
+		elif uname | grep SunOS > /dev/null; then
+			if netstat -an -f inet -P tcp | grep LISTEN | grep "127.0.0.1.$use" > /dev/null; then
+				more_sleep=""
+			fi
+		elif uname | egrep -i 'bsd|darwin' > /dev/null; then
+			if netstat -ant -f inet | grep LISTEN | grep "127.0.0.1.$use" > /dev/null; then
+				more_sleep=""
+			fi
+		fi
+		if [ "X$more_sleep" = "X1" ]; then
+			sleep 1
+		fi
 		host="$localhost"
 		port="$use"
 	fi
@@ -2033,8 +2705,30 @@ if [ "X$showcert" = "X1" ]; then
 	if [ "X$ciphers" != "X" ]; then
 		cipher_args=`echo "$ciphers" | sed -e 's/ciphers=/-cipher /'`
 	fi
+	if type openssl > /dev/null 2>&1; then
+		:
+	else
+		echo ""
+		echo "********************************************************"
+		echo "** Problem finding the OpenSSL command 'openssl': **" 
+		echo ""
+		type openssl 2>&1
+		echo ""
+		echo "** Perhaps you need to install the 'openssl' package. **"
+		echo "********************************************************"
+		echo ""
+	fi
 	#echo "openssl s_client $cipher_args -connect $host:$port" 
 	if [ "X$reverse" = "X" ]; then
+		host $host >/dev/null 2>&1
+		host $host >/dev/null 2>&1
+		timeout=15
+		if [ "X$SSVNC_FETCH_TIMEOUT" != "X" ]; then
+			timeout=$SSVNC_FETCH_TIMEOUT
+		fi
+		if type pkill >/dev/null 2>&1; then
+			(sleep $timeout; if kill -0 $$; then pkill -TERM -f "openssl.*s_client.*$host.*$port"; fi) >/dev/null 2>&1 &
+		fi
 		openssl s_client $cipher_args -prexit -connect $host:$port 2>&1 < /dev/null
 		rc=$?
 	else
@@ -2051,6 +2745,9 @@ if [ "X$showcert" = "X1" ]; then
 		tmp_err=`mytmp "$tmp_err"`
 
 		#echo "openssl s_server $cipher_args $cert_args -accept $port -verify 2 > $tmp_out 2> $tmp_err" 1>&2
+
+		# assume we have perl:
+		check_perl perl
 
 		perl -e "
 			\$p = open(O, \"|openssl s_server $cipher_args $cert_args -accept $port -verify 2 1>$tmp_out 2> $tmp_err\");
@@ -2094,9 +2791,15 @@ if [ "X$showcert" = "X1" ]; then
 	if [ "X$SSVNC_PREDIGESTED_HANDSHAKE" != "X" ]; then
 		rm -f $SSVNC_PREDIGESTED_HANDSHAKE
 	fi
-	exit $rc
+	if [ "X$SSVNC_SHOWCERT_EXIT_0" = "X1" ]; then
+		exit 0
+	else
+		exit $rc
+	fi
 fi
 
+# handle direct connect case:
+#
 if [ "X$direct_connect" != "X" ]; then
 	if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
 		SSVNC_NO_ENC_WARN=1
@@ -2113,7 +2816,7 @@ if [ "X$direct_connect" != "X" ]; then
 			:
 		else
 			echo ""
-			echo "** NOTE: THERE WILL BE NO SSL OR SSH ENCRYPTION **"
+			echo "** WARNING: THERE WILL BE NO SSL OR SSH ENCRYPTION **"
 			echo ""
 		fi
 	fi
@@ -2334,6 +3037,14 @@ echo "Using this stunnel configuration:"
 echo ""
 cat "$tmp_cfg" | uniq
 echo ""
+if egrep -i '^[ 	]*(CApath|CAfile) =' "$tmp_cfg" > /dev/null ; then
+	:
+else
+	echo "** WARNING: THE STUNNEL CONFIG HAS NO SERVER CERTIFICATE SPECIFIED       **"
+	echo "** WARNING: (the CApath or CAfile stunnel option) THE VNC SERVER WILL    **"
+	echo "** WARNING: NOT BE AUTHENTICATED. A MAN-IN-THE-MIDDLE ATTACK IS POSSIBLE **"
+	echo ""
+fi
 sleep 1
 
 if [ "X$stunnel_exec" = "X" ]; then
@@ -2376,8 +3087,16 @@ if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
 	echo "sleep $SSVNC_EXTRA_SLEEP"
 	sleep $SSVNC_EXTRA_SLEEP
 fi
-echo "Running viewer:"
+
 if [ "X$reverse" = "X" ]; then
+	if [ "X$NEED_VENCRYPT_VIEWER_BRIDGE" = "X1" -a "X$ptmp" != "X" ] ; then
+		port1=`expr 5900 + $N`		# stunnel port
+		port2=`findfree 5970`		# bridge port (viewer connects to it.)
+		N=`expr $port2 - 5900`
+		env PPROXY_REMOVE=0 PPROXY_SLEEP=0 PPROXY_VENCRYPT_VIEWER_BRIDGE="$port2,$port1" $ptmp &
+		sleep 1
+	fi
+	echo "Running viewer:"
 	vnc_hp=$localhost:$N
 	if [ "X$stunnel_exec" != "X" ]; then
 		vnc_hp="exec=$STUNNEL $tmp_cfg"
@@ -2394,19 +3113,16 @@ if [ "X$reverse" = "X" ]; then
 		fi
 	fi
 else
+	echo "Running viewer:"
 	echo ""
 	echo "NOTE: Press Ctrl-C to terminate viewer LISTEN mode."
 	echo ""
-	N2=$N
-	if [ "X$VNCVIEWER_IS_REALVNC4" = "X1" ]; then
-		N2=`echo "$N2" | sed -e 's/://g'`
-		if [ $N2 -le 200 ]; then
-			N2=`expr $N2 + 5500`
-		fi
-	fi
-	echo "$VNCVIEWERCMD" "$@" -listen $N2
 	trap "final" 0 2 15
-	echo ""
+	N2=$N
+	N2_trim=`echo "$N2" | sed -e 's/://g'`
+	if [ $N2_trim -le 200 ]; then
+		N2_trim=`expr $N2_trim + 5500`
+	fi
 	if [ "X$proxy" != "X" ]; then
 		if echo "$proxy" | grep -i '^vencrypt:' > /dev/null; then
 			pstunnel=`echo "$proxy" | awk -F: '{print $2}'`
@@ -2416,13 +3132,30 @@ else
 			PPROXY_DEST="$localhost:$pstunnel"; export PPROXY_DEST
 			STUNNEL_ONCE=1; export STUNNEL_ONCE
 			STUNNEL_MAX_CLIENTS=1; export STUNNEL_MAX_CLIENTS
+			if [ "X$NEED_VENCRYPT_VIEWER_BRIDGE" = "X1" -a "X$ptmp" != "X" ] ; then
+				port1=`expr 5500 + $N2`
+				port2=`findfree 5580`
+				N2=`expr $port2 - 5500`
+				N2_trim=`echo "$N2" | sed -e 's/://g'`
+				if [ $N2_trim -le 200 ]; then
+					N2_trim=`expr $N2_trim + 5500`
+				fi
+				env PPROXY_REMOVE=0 PPROXY_SLEEP=0 PPROXY_VENCRYPT_VIEWER_BRIDGE="-$port1,$port2" $ptmp &
+				sleep 1
+			fi
 		else
 			PPROXY_REVERSE="$localhost:$port"; export PPROXY_REVERSE
 			PPROXY_SLEEP=1; export PPROXY_SLEEP;
 		fi
 		PPROXY_KILLPID=+1; export PPROXY_KILLPID;
 		$ptmp &
+		# Important to have no extra pids generated between here and VNCVIEWERCMD
 	fi
+	if [ "X$VNCVIEWER_IS_REALVNC4" = "X1" ]; then
+		N2=$N2_trim
+	fi
+	echo "$VNCVIEWERCMD" "$@" -listen $N2
+	echo ""
 	$VNCVIEWERCMD "$@" -listen $N2
 fi
 

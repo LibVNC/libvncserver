@@ -473,7 +473,7 @@ static void launch(Window win) {
 		char *q = strstr(cmd, "-connect_or_exit");
 		if (q) q = strstr(q, "_or_exit");
 		if (q) {
-			int i;
+			unsigned int i;
 			for (i=0; i < strlen("_or_exit"); i++) {
 				*q = ' ';
 				q++;
@@ -907,7 +907,7 @@ static void recurse_search(int level, int level_max, Window top, Window app, int
 	ok = XQueryTree(dpy, top, &r, &parent, &list, &nchild);
 	if (ok) {
 		int i;
-		for (i=0; i < nchild; i++) {
+		for (i=0; i < (int) nchild; i++) {
 			w = list[i];
 			if (w == None || find_win(w) >= 0) {
 				continue;
@@ -919,7 +919,7 @@ static void recurse_search(int level, int level_max, Window top, Window app, int
 				(*nw)++;
 			}
 		}
-		for (i=0; i < nchild; i++) {
+		for (i=0; i < (int) nchild; i++) {
 			w = list[i];
 			if (w == None || ours(w)) {
 				continue;
