@@ -2013,6 +2013,7 @@ int main(int argc, char* argv[]) {
 	int got_tls = 0;
 	int got_inetd = 0;
 	int got_noxrandr = 0;
+	int got_findauth = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc_max = 1024;
@@ -2180,24 +2181,14 @@ int main(int argc, char* argv[]) {
 			continue;
 		}
 		if (!strcmp(arg, "-findauth")) {
-			int ic = 0;
-			if (use_dpy != NULL) {
-				set_env("DISPLAY", use_dpy);
-			}
-			use_dpy = strdup("WAIT:cmd=FINDDISPLAY-run");
+			got_findauth = 1;
 			if (argc > i+1) {
-				set_env("X11VNC_SKIP_DISPLAY", argv[i+1]);
-			} else if (getenv("DISPLAY")) {
-				set_env("X11VNC_SKIP_DISPLAY", getenv("DISPLAY"));
-			} else {
-				set_env("X11VNC_SKIP_DISPLAY", ":0");
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					set_env("FINDAUTH_DISPLAY", argv[i+1]);
+					i++;
+				}
 			}
-			set_env("X11VNC_SKIP_DISPLAY_NEGATE", "1");
-			set_env("FIND_DISPLAY_XAUTHORITY_PATH", "1");
-			set_env("FIND_DISPLAY_NO_SHOW_XAUTH", "1");
-			set_env("FIND_DISPLAY_NO_SHOW_DISPLAY", "1");
-			wait_for_client(&ic, NULL, 0);
-			exit(0);
 			continue;
 		}
 		if (!strcmp(arg, "-create")) {
@@ -4028,6 +4019,33 @@ int main(int argc, char* argv[]) {
 	if (getenv("PATH") == NULL || !strcmp(getenv("PATH"), "")) {
 		/* set a minimal PATH, usually only null in inetd. */
 		set_env("PATH", "/bin:/usr/bin");
+	}
+
+	/* handle -findauth case now that cmdline has been read */
+	if (got_findauth) {
+		char *s;
+		int ic = 0;
+		if (use_dpy != NULL) {
+			set_env("DISPLAY", use_dpy);
+		}
+		use_dpy = strdup("WAIT:cmd=FINDDISPLAY-run");
+
+		s = getenv("FINDAUTH_DISPLAY");
+		if (s && strcmp("", s)) {
+			set_env("DISPLAY", s);
+		}
+		s = getenv("DISPLAY");
+		if (s && strcmp("", s)) {
+			set_env("X11VNC_SKIP_DISPLAY", s);
+		} else {
+			set_env("X11VNC_SKIP_DISPLAY", ":0");
+		}
+		set_env("X11VNC_SKIP_DISPLAY_NEGATE", "1");
+		set_env("FIND_DISPLAY_XAUTHORITY_PATH", "1");
+		set_env("FIND_DISPLAY_NO_SHOW_XAUTH", "1");
+		set_env("FIND_DISPLAY_NO_SHOW_DISPLAY", "1");
+		wait_for_client(&ic, NULL, 0);
+		exit(0);
 	}
 
 	/* set OS struct UT */

@@ -3681,19 +3681,26 @@ static void announce_http(int lport, int ssl, char *iface, char *extra) {
 	
 	char *host = this_host();
 	char *jvu;
+	int http = 0;
 
 	if (enc_str && !strcmp(enc_str, "none") && !use_stunnel) {
 		jvu = "Java viewer URL:         http";
+		http = 1;
 	} else if (ssl == 1) {
 		jvu = "Java SSL viewer URL:     https";
 	} else if (ssl == 2) {
 		jvu = "Java SSL viewer URL:     http";
+		http = 1;
 	} else {
 		jvu = "Java viewer URL:         http";
+		http = 1;
 	}
 
 	if (iface != NULL && *iface != '\0' && strcmp(iface, "any")) {
 		host = iface;
+	}
+	if (http && getenv("X11VNC_HTTP_LISTEN_LOCALHOST")) {
+		host = "localhost";
 	}
 	if (host != NULL) {
 		if (! inetd) {
@@ -3763,7 +3770,8 @@ void do_mention_java_urls(void) {
 				rfbLog("Where you replace \"host:port\" with that printed below, or\n");
 				rfbLog("whatever is needed to reach the host e.g. Internet IP number\n");
 				rfbLog("\n");
-				rfbLog("Append ?GET=1 to a URL for faster loading.\n");
+				rfbLog("Append ?GET=1 to a URL for faster loading or supply:\n");
+				rfbLog("-env X11VNC_EXTRA_HTTPS_PARAMS='?GET=1' to cmdline.\n");
 			}
 		}
 		rfbLog("\n");

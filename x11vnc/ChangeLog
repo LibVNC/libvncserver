@@ -1,3 +1,11 @@
+2009-12-06  Karl Runge <runge@karlrunge.com>
+	* x11vnc: findauth/-auth guess works with FD_XDM=1 for root
+	  finding dm's xauthority.  Work around for GDM's recent 
+	  'xhost SI:localuser:root' usage. X11VNC_REOPEN_SLEEP_MAX
+	  for longer lived -reopen-ing. X11VNC_EXTRA_HTTPS_PARAMS for
+	  additional URL parameters, X11VNC_HTTP_LISTEN_LOCALHOST=1 to
+	  force libvncserver http to listen on localhost.
+
 2009-12-04  Karl Runge <runge@karlrunge.com>
 	* classes/ssl: update binaries; new signing key; ss_vncviewer.
 	* x11vnc: add more wish possibilities for -gui.  Declare crypt()

@@ -2,7 +2,7 @@
 .TH X11VNC "1" "December 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.9, lastmod: 2009-12-04
+         version: 0.9.9, lastmod: 2009-12-06
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -80,6 +80,12 @@ man pages for more info.
 Use '-auth guess' to have x11vnc use its \fB-findauth\fR
 mechanism (described below) to try to guess the
 XAUTHORITY filename and use it.
+.IP
+XDM/GDM/KDM: if you are running x11vnc as root and want
+to find the XAUTHORITY before anyone has logged into an
+X session yet, use: x11vnc \fB-env\fR FD_XDM=1 \fB-auth\fR guess ...
+(This will also find the XAUTHORITY if a user is already
+logged into the X session.)
 .PP
 \fB-N\fR
 .IP
@@ -110,7 +116,10 @@ reopen the X display (up to one time.)  This is of use
 for display managers like GDM (KillInitClients option)
 that kill x11vnc just after the user logs into the
 X session.  Note: the reopened state may be unstable.
-Set X11VNC_REOPEN_DISPLAY=n to reopen n times.
+Set X11VNC_REOPEN_DISPLAY=n to reopen n times and
+set X11VNC_REOPEN_SLEEP_MAX to the number of seconds,
+default 10, to keep trying to reopen the display (once
+per second.)
 .IP
 Update: as of 0.9.9, x11vnc tries to automatically avoid
 being killed by the display manager by delaying creating
@@ -1184,17 +1193,23 @@ have access rights to).
 .PP
 \fB-findauth\fR \fI[disp]\fR
 .IP
-Apply the \fB-find/-finddpy\fR heuristics to try to guess the
-XAUTHORITY file for DISPLAY 'disp'.  If 'disp' is not
-supplied, then the value in the \fB-display\fR earlier in
+Apply the \fB-find/-finddpy\fR heuristics to try to guess
+the XAUTHORITY file for DISPLAY 'disp'.  If 'disp'
+is not supplied, then the value in the \fB-display\fR on
 the cmdline is used; failing that $DISPLAY is used;
 and failing that ":0" is used.
 .IP
 If nothing is printed out, that means no XAUTHORITY was
-found for 'disp'.  If "XAUTHORITY=" is printed out,
-that means use the default (i.e. do not set XAUTHORITY).
-If "XAUTHORITY=/path/to/file" is printed out, then
-use that file.
+found for 'disp'; i.e. failure.  If "XAUTHORITY="
+is printed out, that means use the default (i.e. do
+not set XAUTHORITY).  If "XAUTHORITY=/path/to/file"
+is printed out, then use that file.
+.IP
+XDM/GDM/KDM: if you are running x11vnc as root and want
+to find the XAUTHORITY before anyone has logged into an
+X session yet, use: x11vnc \fB-env\fR FD_XDM=1 \fB-findauth\fR ...
+(This will also find the XAUTHORITY if a user is already
+logged into the X session.)
 .PP
 \fB-create\fR
 .IP
@@ -1470,6 +1485,12 @@ blocks forever and this mode will not work.  See
 www.karlrunge.com/x11vnc/faq.html#faq-display-manager
 for how to disable this for dtgreet on Solaris and
 possibly for other greeters.
+.IP
+In \fB-find/cmd=FINDDISPLAY\fR mode, if you set FD_XDM=1,
+e.g. 'x11vnc \fB-env\fR FD_XDM=1 \fB-find\fR ...' and x11vnc is
+running as root (e.g. inetd) then it will try to find
+the XAUTHORITY file of a running XDM/GDM/KDM login
+greeter (i.e. no user has logged into an X session yet.)
 .IP
 As another special case, WAIT:cmd=HTTPONCE will allow
 x11vnc to service one http request and then exit.
@@ -2540,7 +2561,21 @@ https://mygateway.com:8000/?PORT=8000.  To avoid having
 to include the PORT= in the browser URL, simply supply
 "\fB-httpsredir\fR" to x11vnc.
 .IP
-This options does not work in \fB-stunnel\fR mode.
+This option does not work in \fB-stunnel\fR mode.
+.IP
+More tricks: set the env var X11VNC_EXTRA_HTTPS_PARAMS
+to be extra URL parameters to use.  This way you do
+not need to specify extra PARAMS in the index.vnc file.
+E.g. x11vnc \fB-env\fR X11VNC_EXTRA_HTTPS_PARAMS='?GET=1' ...
+.IP
+If you do not want to expose the non-SSL HTTP port to
+the network (i.e. you just want the single VNC/HTTPS
+port, e.g. 5900, open for connections) then specify the
+option \fB-env\fR X11VNC_HTTP_LISTEN_LOCALHOST=1  This way
+the connection to the libvncserver httpd server will
+only be available on localhost (note that in \fB-ssl\fR mode,
+HTTPS requests are redirected from SSL to the non-SSL
+libvncserver HTTP server.)
 .PP
 \fB-http_oneport\fR
 .IP
@@ -2573,6 +2608,10 @@ it means only one port needs to be redirected.
 The \fB-httpsredir\fR option may also be useful for this
 mode when using an SSH tunnel as well as for router
 port redirections.
+.IP
+Note that the \fB-env\fR X11VNC_HTTP_LISTEN_LOCALHOST=1
+option described above under \fB-httpsredir\fR applies for
+the libvncserver httpd server in all cases (ssl or not.)
 .PP
 \fB-ssh\fR \fIuser@host:disp\fR
 .IP
@@ -3605,6 +3644,12 @@ To include button events use "Button1", ... etc.
 .IP
 \fB-buttonmap\fR currently does not work on MacOSX console
 or in \fB-rawfb\fR mode.
+.IP
+Workaround: use \fB-buttonmap\fR IJ...-LM...=n to limit the
+number of mouse buttons to n, e.g. 123-123=3.  This will
+prevent x11vnc from crashing if the X server reports
+there are 5 buttons (4/5 scroll wheel), but there are
+only really 3.
 .PP
 \fB-nodragging\fR
 .IP

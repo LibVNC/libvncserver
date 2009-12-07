@@ -3626,8 +3626,26 @@ void accept_openssl(int mode, int presock) {
 			 * the rest of the SSL session to it:
 			 */
 			if (n > 0) {
-				if (db) fprintf(stderr, "sending http buffer httpsock: %d\n'%s'\n", httpsock, buf);
-				write(httpsock, buf, n);
+				char *s = getenv("X11VNC_EXTRA_HTTPS_PARAMS");
+				int did_extra = 0;
+
+				if (db) fprintf(stderr, "sending http buffer httpsock: %d n=%d\n'%s'\n", httpsock, n, buf);
+				if (s != NULL) {
+					char *q = strstr(buf, " HTTP/");
+					if (q) {
+						int m;
+						*q = '\0';
+						m = strlen(buf);
+						write(httpsock, buf, m);
+						write(httpsock, s, strlen(s));
+						*q = ' ';
+						write(httpsock, q, n-m);
+						did_extra = 1;
+					}
+				}
+				if (!did_extra) {
+					write(httpsock, buf, n);
+				}
 			}
 			ssl_xfer(httpsock, s_in, s_out, is_http);
 			rfbLog("SSL: ssl_helper[%d]: exit case 6 (https ssl_xfer done)\n", getpid());

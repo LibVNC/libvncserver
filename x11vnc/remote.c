@@ -469,6 +469,20 @@ int check_httpdir(void) {
 	}
 }
 
+static void rfb_http_init_sockets(void) {
+	in_addr_t iface;
+	if (!screen) {
+		return;
+	}
+	iface = screen->listenInterface;
+	if (getenv("X11VNC_HTTP_LISTEN_LOCALHOST")) {
+		rfbLog("http_connections: HTTP listen on localhost only. (not HTTPS)\n");
+		screen->listenInterface = htonl(INADDR_LOOPBACK);
+	}
+	rfbHttpInitSockets(screen);
+	screen->listenInterface = iface;
+}
+
 void http_connections(int on) {
 	if (!screen) {
 		return;
@@ -492,7 +506,7 @@ void http_connections(int on) {
 		screen->httpInitDone = FALSE;
 		if (check_httpdir()) {
 			screen->httpDir = http_dir;
-			rfbHttpInitSockets(screen);
+			rfb_http_init_sockets();
 			if (screen->httpPort != 0 && screen->httpListenSock < 0) {
 				rfbLog("http_connections: failed to listen on http port: %d\n", screen->httpPort);
 				clean_up_exit(1);
@@ -526,7 +540,7 @@ static void reset_httpport(int old, int new) {
 		}
 		rfbLog("reset_httpport: setting httpport %d -> %d.\n",
 		    old == -1 ? hp : old, hp);
-		rfbHttpInitSockets(screen);
+		rfb_http_init_sockets();
 		if (screen->httpPort != 0 && screen->httpListenSock < 0) {
 			rfbLog("reset_httpport: failed to listen on http port: %d\n", screen->httpPort);
 		}
