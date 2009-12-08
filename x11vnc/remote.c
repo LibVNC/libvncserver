@@ -469,6 +469,20 @@ int check_httpdir(void) {
 	}
 }
 
+static void rfb_http_init_sockets(void) {
+	in_addr_t iface;
+	if (!screen) {
+		return;
+	}
+	iface = screen->listenInterface;
+	if (getenv("X11VNC_HTTP_LISTEN_LOCALHOST")) {
+		rfbLog("http_connections: HTTP listen on localhost only. (not HTTPS)\n");
+		screen->listenInterface = htonl(INADDR_LOOPBACK);
+	}
+	rfbHttpInitSockets(screen);
+	screen->listenInterface = iface;
+}
+
 void http_connections(int on) {
 	if (!screen) {
 		return;
@@ -484,6 +498,7 @@ void http_connections(int on) {
 			if (screen->httpPort == 0) {
 				int port = find_free_port(5800, 5850);
 				if (port) {
+					/* mutex */
 					screen->httpPort = port;
 				}
 			}
@@ -491,7 +506,7 @@ void http_connections(int on) {
 		screen->httpInitDone = FALSE;
 		if (check_httpdir()) {
 			screen->httpDir = http_dir;
-			rfbHttpInitSockets(screen);
+			rfb_http_init_sockets();
 			if (screen->httpPort != 0 && screen->httpListenSock < 0) {
 				rfbLog("http_connections: failed to listen on http port: %d\n", screen->httpPort);
 				clean_up_exit(1);
@@ -517,6 +532,7 @@ static void reset_httpport(int old, int new) {
 		rfbLog("reset_httpport: cannot set httpport: %d"
 		    " in inetd.\n", hp);
 	} else if (screen) {
+		/* mutex */
 		screen->httpPort = hp;
 		screen->httpInitDone = FALSE;
 		if (screen->httpListenSock > -1) {
@@ -524,7 +540,7 @@ static void reset_httpport(int old, int new) {
 		}
 		rfbLog("reset_httpport: setting httpport %d -> %d.\n",
 		    old == -1 ? hp : old, hp);
-		rfbHttpInitSockets(screen);
+		rfb_http_init_sockets();
 		if (screen->httpPort != 0 && screen->httpListenSock < 0) {
 			rfbLog("reset_httpport: failed to listen on http port: %d\n", screen->httpPort);
 		}
@@ -544,6 +560,7 @@ static void reset_rfbport(int old, int new)  {
 		rfbClientIteratorPtr iter;
 		rfbClientPtr cl;
 		int maxfd;
+		/* mutex */
 		if (rp == 0) {
 			screen->autoPort = TRUE;
 		} else {
@@ -655,7 +672,9 @@ int remote_control_access_ok(void) {
 			}
 		}
 
+		X_LOCK;
 		xha = XListHosts(dpy, &n, &enabled);
+		X_UNLOCK;
 		if (! enabled) {
 			rfbLog("X access control is disabled, X clients can\n");
 			rfbLog("   connect from any host.  Run 'xhost -'\n");
@@ -1053,6 +1072,13 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		COLON_CHECK("disconnect:")
 		p += strlen("disconnect:");
 		close_clients(p);
+		goto done;
+	}
+	if (strstr(p, "id_cmd") == p) {
+		NOTAPP
+		COLON_CHECK("id_cmd:")
+		p += strlen("id_cmd:");
+		id_cmd(p);
 		goto done;
 	}
 	if (strstr(p, "id") == p) {
@@ -1465,6 +1491,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: enable sharing.\n");
 		shared = 1;
 		if (screen) {
+			/* mutex */
 			screen->alwaysShared = TRUE;
 			screen->neverShared = FALSE;
 		}
@@ -1477,6 +1504,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		rfbLog("remote_cmd: disable sharing.\n");
 		shared = 0;
 		if (screen) {
+			/* mutex */
 			screen->alwaysShared = FALSE;
 			screen->neverShared = TRUE;
 		}
@@ -1562,6 +1590,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		if (! screen->permitFileTransfer) {
 			rfbLog("remote_cmd: enabling -ultrafilexfer for clients.\n");
+			/* mutex */
 			screen->permitFileTransfer = TRUE;
 		}
 		goto done;
@@ -1577,6 +1606,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		if (screen->permitFileTransfer) {
 			rfbLog("remote_cmd: disabling -ultrafilexfer for clients.\n");
+			/* mutex */
 			screen->permitFileTransfer = FALSE;
 		}
 		goto done;
@@ -1595,6 +1625,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		p += strlen("rfbversion:");
 
 		if (sscanf(p, "%d.%d", &maj, &min) == 2) {
+			/* mutex */
 			screen->protocolMajorVersion = maj;
 			screen->protocolMinorVersion = min;
 			rfbLog("remote_cmd: set rfbversion to: %d.%d\n", maj, min);
@@ -1766,6 +1797,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		listen_str = strdup("localhost");
 
+		/* mutex */
 		screen->listenInterface = htonl(INADDR_LOOPBACK);
 		rfbLog("listening on loopback network only.\n");
 		rfbLog("allow list is: '%s'\n", NONUL(allow_list));
@@ -1813,6 +1845,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 		listen_str = NULL;
 
+		/* mutex */
 		screen->listenInterface = htonl(INADDR_ANY);
 		rfbLog("listening on ALL network interfaces.\n");
 		rfbLog("allow list is: '%s'\n", NONUL(allow_list));
@@ -1853,6 +1886,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 
 		ok = 1;
+		/* mutex */
 		if (listen_str == NULL || *listen_str == '\0' ||
 		    !strcmp(listen_str, "any")) {
 			screen->listenInterface = htonl(INADDR_ANY);
@@ -4134,6 +4168,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			}
 #endif
 		} else {
+			X_LOCK;
 			if (down == -1) {
  			        XTestFakeKeyEvent_wr(dpy, -1, kc, 1, CurrentTime);
 				usleep(50*1000);
@@ -4141,6 +4176,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			} else {
 			        XTestFakeKeyEvent_wr(dpy, -1, kc, down, CurrentTime);
 			}
+			X_UNLOCK;
 		}
 		goto done;
 	}
@@ -4340,8 +4376,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			rfbLog("bcx_xattach: failed grab check for '%s': %s.  Retrying[%d]...\n", p, res, try);
 			free(res);
 			pointer(0, dpy_x/2 + try, dpy_y/2 + try, NULL);
-			XFlush_wr(dpy);
 #if !NO_X11
+			X_LOCK;
+			XFlush_wr(dpy);
 			if (dpy) {
 				if (try == 2) {
 					XSync(dpy, False);
@@ -4349,6 +4386,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 					XSync(dpy, True);
 				}
 			}
+			X_UNLOCK;
 #endif
 			if (try == 1) {
 				usleep(250*1000);
@@ -4382,6 +4420,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (d < 0) d = 0;
 		rfbLog("remote_cmd: setting defer to %d ms.\n", d);
 		defer_update = d;
+		/* mutex */
 		screen->deferUpdateTime = d;
 		got_defer = 1;
 		goto done;
@@ -4403,6 +4442,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (d < 0) d = 0;
 		rfbLog("remote_cmd: setting defer to %d ms.\n", d);
 		defer_update = d;
+		/* mutex */
 		screen->deferUpdateTime = d;
 		got_defer = 1;
 		goto done;
@@ -4907,6 +4947,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (f < 0) f = 0;
 		rfbLog("remote_cmd: setting progressive %d -> %d.\n",
 		    screen->progressiveSliceHeight, f);
+		/* mutex */
 		screen->progressiveSliceHeight = f;
 		goto done;
 	}
@@ -4995,6 +5036,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		rfbLog("turning on enablehttpproxy.\n");
+		/* mutex */
 		screen->httpEnableProxyConnect = 1;
 		goto done;
 	}
@@ -5081,6 +5123,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			free(rfb_desktop_name);
 		}
 		rfb_desktop_name = strdup(p);
+		/* mutex */
 		screen->desktopName = rfb_desktop_name;
 		rfbLog("remote_cmd: setting desktop name to %s\n",
 		    rfb_desktop_name);
@@ -5449,6 +5492,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 		passwds_new[0] = strdup(p);
 
+		/* mutex */
 		if (screen->authPasswdData &&
 		    screen->passwordCheck == rfbCheckPasswordByList) {
 				passwds_new[1] = passwds_old[1];
@@ -5984,8 +6028,10 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		}
 	} else {
 		if (dpy) {	/* raw_fb hack */
+			X_LOCK;
 			set_x11vnc_remote_prop(buf);
 			XFlush_wr(dpy);
+			X_UNLOCK;
 		}
 	}
 #endif	/* REMOTE_CONTROL */

@@ -344,12 +344,14 @@ static void initialize_xinerama (void) {
 
 	RAWFB_RET_VOID
 
+	X_LOCK;
 	if (! XineramaQueryExtension(dpy, &ev, &er)) {
 		if (verbose) {
 			rfbLog("Xinerama: disabling: display does not support it.\n");
 		}
 		xinerama = 0;
 		xinerama_present = 0;
+		X_UNLOCK;
 		return;
 	}
 	if (! XineramaIsActive(dpy)) {
@@ -359,6 +361,7 @@ static void initialize_xinerama (void) {
 		}
 		xinerama = 0;
 		xinerama_present = 0;
+		X_UNLOCK;
 		return;
 	}
 	xinerama_present = 1;
@@ -385,6 +388,7 @@ static void initialize_xinerama (void) {
 			rfbLog("\n");
 		}
 		XFree_wr(xineramas);
+		X_UNLOCK;
 		return;		/* must be OK w/o change */
 	}
 
@@ -406,6 +410,7 @@ static void initialize_xinerama (void) {
 		sc++;
 	}
 	XFree_wr(xineramas);
+	X_UNLOCK;
 
 
 	if (sraRgnEmpty(black_region)) {

@@ -2666,8 +2666,8 @@ void check_https(void) {
 }
 
 void openssl_port(void) {
-	int sock, shutdown = 0;
-	static int port = 0;
+	int sock = -1, shutdown = 0;
+	static int port = -1;
 	static in_addr_t iface = INADDR_ANY;
 	int db = 0;
 
@@ -2683,6 +2683,8 @@ void openssl_port(void) {
 	if (screen->listenSock > -1 && screen->port > 0) {
 		port = screen->port;
 		shutdown = 1;
+	} else if (screen->port == 0) {
+		port = screen->port;
 	}
 	if (screen->listenInterface) {
 		iface = screen->listenInterface;
@@ -2696,14 +2698,18 @@ void openssl_port(void) {
 #endif
 	}
 
-	if (port <= 0) {
+	if (port < 0) {
 		rfbLog("openssl_port: could not obtain listening port %d\n", port);
 		clean_up_exit(1);
-	}
-	sock = rfbListenOnTCPPort(port, iface);
-	if (sock < 0) {
-		rfbLog("openssl_port: could not reopen port %d\n", port);
-		clean_up_exit(1);
+	} else if (port == 0) {
+		/* no listen case, i.e. -connect */
+		sock = -1;
+	} else {
+		sock = rfbListenOnTCPPort(port, iface);
+		if (sock < 0) {
+			rfbLog("openssl_port: could not reopen port %d\n", port);
+			clean_up_exit(1);
+		}
 	}
 	rfbLog("openssl_port: listen on port/sock %d/%d\n", port, sock);
 	if (!quiet) {
@@ -3620,8 +3626,26 @@ void accept_openssl(int mode, int presock) {
 			 * the rest of the SSL session to it:
 			 */
 			if (n > 0) {
-				if (db) fprintf(stderr, "sending http buffer httpsock: %d\n'%s'\n", httpsock, buf);
-				write(httpsock, buf, n);
+				char *s = getenv("X11VNC_EXTRA_HTTPS_PARAMS");
+				int did_extra = 0;
+
+				if (db) fprintf(stderr, "sending http buffer httpsock: %d n=%d\n'%s'\n", httpsock, n, buf);
+				if (s != NULL) {
+					char *q = strstr(buf, " HTTP/");
+					if (q) {
+						int m;
+						*q = '\0';
+						m = strlen(buf);
+						write(httpsock, buf, m);
+						write(httpsock, s, strlen(s));
+						*q = ' ';
+						write(httpsock, q, n-m);
+						did_extra = 1;
+					}
+				}
+				if (!did_extra) {
+					write(httpsock, buf, n);
+				}
 			}
 			ssl_xfer(httpsock, s_in, s_out, is_http);
 			rfbLog("SSL: ssl_helper[%d]: exit case 6 (https ssl_xfer done)\n", getpid());
@@ -3852,6 +3876,7 @@ void accept_openssl(int mode, int presock) {
 				if (screen->port == 0) {
 					int fd = fileno(stdin);
 					if (getenv("X11VNC_INETD_PORT")) {
+						/* mutex */
 						screen->port = atoi(getenv(
 						    "X11VNC_INETD_PORT"));
 					} else {

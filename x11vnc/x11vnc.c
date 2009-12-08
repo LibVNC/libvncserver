@@ -173,6 +173,7 @@ static void check_rcfile(int argc, char **argv);
 static void immediate_switch_user(int argc, char* argv[]);
 static void print_settings(int try_http, int bg, char *gui_str);
 static void check_loop_mode(int argc, char* argv[], int force);
+static void check_appshare_mode(int argc, char* argv[]);
 
 static int tsdo_timeout_flag;
 
@@ -1706,6 +1707,24 @@ static void check_loop_mode(int argc, char* argv[], int force) {
 #endif
 	}
 }
+
+extern int appshare_main(int argc, char* argv[]);
+
+static void check_appshare_mode(int argc, char* argv[]) {
+	int i;
+
+	for (i=1; i < argc; i++) {
+		char *p = argv[i];
+		if (strstr(p, "--") == p) {
+			p++;
+		}
+		if (strstr(p, "-appshare") == p) {
+			appshare_main(argc, argv);
+			exit(0);
+		}
+	}
+}
+
 static void store_homedir_passwd(char *file) {
 	char str1[32], str2[32], *p, *h, *f;
 	struct stat sbuf;
@@ -1996,21 +2015,33 @@ int main(int argc, char* argv[]) {
 	char *got_rfbport_str = NULL;
 	int got_rfbport_pos = -1;
 	int got_tls = 0;
+	int got_inetd = 0;
+	int got_noxrandr = 0;
+	int got_findauth = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc_max = 1024;
 	int argc_vnc = 1; char *argv_vnc[2048];
 
-
 	/* check for -loop mode: */
 	check_loop_mode(argc, argv, 0);
 
+	/* check for -appshare mode: */
+	check_appshare_mode(argc, argv);
+
 	dtime0(&x11vnc_start);
 
+	for (i=1; i < argc; i++) {
+		if (!strcmp(argv[i], "-inetd")) {
+			got_inetd = 1;
+		}
+	}
 
 	if (!getuid() || !geteuid()) {
 		started_as_root = 1;
-		rfbLog("getuid: %d  geteuid: %d\n", getuid(), geteuid());
+		if (0 && !got_inetd) {
+			rfbLog("getuid: %d  geteuid: %d\n", getuid(), geteuid());
+		}
 
 		/* check for '-users =bob' */
 		immediate_switch_user(argc, argv);
@@ -2154,24 +2185,14 @@ int main(int argc, char* argv[]) {
 			continue;
 		}
 		if (!strcmp(arg, "-findauth")) {
-			int ic = 0;
-			if (use_dpy != NULL) {
-				set_env("DISPLAY", use_dpy);
-			}
-			use_dpy = strdup("WAIT:cmd=FINDDISPLAY-run");
+			got_findauth = 1;
 			if (argc > i+1) {
-				set_env("X11VNC_SKIP_DISPLAY", argv[i+1]);
-			} else if (getenv("DISPLAY")) {
-				set_env("X11VNC_SKIP_DISPLAY", getenv("DISPLAY"));
-			} else {
-				set_env("X11VNC_SKIP_DISPLAY", ":0");
+				char *s = argv[i+1];
+				if (s[0] != '-') {
+					set_env("FINDAUTH_DISPLAY", argv[i+1]);
+					i++;
+				}
 			}
-			set_env("X11VNC_SKIP_DISPLAY_NEGATE", "1");
-			set_env("FIND_DISPLAY_XAUTHORITY_PATH", "1");
-			set_env("FIND_DISPLAY_NO_SHOW_XAUTH", "1");
-			set_env("FIND_DISPLAY_NO_SHOW_DISPLAY", "1");
-			wait_for_client(&ic, NULL, 0);
-			exit(0);
 			continue;
 		}
 		if (!strcmp(arg, "-create")) {
@@ -2365,6 +2386,14 @@ int main(int argc, char* argv[]) {
 		}
 		if (strstr(arg, "-loop") == arg) {
 			;	/* handled above */
+			continue;
+		}
+		if (strstr(arg, "-appshare") == arg) {
+			;	/* handled above */
+			continue;
+		}
+		if (strstr(arg, "-freeze_when_obscured") == arg) {
+			freeze_when_obscured = 1;
 			continue;
 		}
 		if (!strcmp(arg, "-timeout")) {
@@ -2959,6 +2988,7 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(arg, "-noxrandr")) {
 			xrandr = 0;
 			xrandr_maybe = 0;
+			got_noxrandr = 1;
 			continue;
 		}
 		if (!strcmp(arg, "-rotate")) {
@@ -3044,6 +3074,10 @@ int main(int argc, char* argv[]) {
 			quiet = 1;
 			continue;
 		}
+		if (!strcmp(arg, "-noquiet")) {
+			quiet = 0;
+			continue;
+		}
 		if (!strcmp(arg, "-v") || !strcmp(arg, "-verbose")) {
 			verbose = 1;
 			continue;
@@ -3053,7 +3087,9 @@ int main(int argc, char* argv[]) {
 			bg = 1;
 			opts_bg = bg;
 #else
-			fprintf(stderr, "warning: -bg mode not supported.\n");
+			if (!got_inetd) {
+				fprintf(stderr, "warning: -bg mode not supported.\n");
+			}
 #endif
 			continue;
 		}
@@ -3450,8 +3486,10 @@ int main(int argc, char* argv[]) {
 				*p = '\0';
 			}
 			if (atoi(s) < 1 || atoi(s) > pointer_mode_max) {
-				rfbLog("pointer_mode out of range 1-%d: %d\n",
-				    pointer_mode_max, atoi(s));
+				if (!got_inetd) {
+					rfbLog("pointer_mode out of range 1-%d: %d\n",
+					    pointer_mode_max, atoi(s));
+				}
 			} else {
 				pointer_mode = atoi(s);
 				got_pointer_mode = pointer_mode;
@@ -3595,7 +3633,9 @@ int main(int argc, char* argv[]) {
 		if (!strcmp(arg, "-chatwindow")) {
 			chat_window = 1;
 			if (argc_vnc + 1 < argc_vnc_max) {
-				rfbLog("setting '-rfbversion 3.6' for -chatwindow.\n");
+				if (!got_inetd) {
+					rfbLog("setting '-rfbversion 3.6' for -chatwindow.\n");
+				}
 				argv_vnc[argc_vnc++] = strdup("-rfbversion");
 				argv_vnc[argc_vnc++] = strdup("3.6");
 			}
@@ -3655,14 +3695,16 @@ int main(int argc, char* argv[]) {
 				/* we re-enable it due to threaded mode bugfixes. */
 				use_threads = 1;
 			} else {
-				rfbLog("\n");
-				rfbLog("The -threads mode is unstable and not tested or maintained.\n");
-				rfbLog("It is disabled in the source code.  If you really need\n");
-				rfbLog("the feature you can reenable it at build time by setting\n");
-				rfbLog("-DX11VNC_THREADED in CPPFLAGS. Or set X11VNC_THREADED=1\n");
-				rfbLog("in your runtime environment.\n");
-				rfbLog("\n");
-				usleep(500*1000);
+				if (!got_inetd) {
+					rfbLog("\n");
+					rfbLog("The -threads mode is unstable and not tested or maintained.\n");
+					rfbLog("It is disabled in the source code.  If you really need\n");
+					rfbLog("the feature you can reenable it at build time by setting\n");
+					rfbLog("-DX11VNC_THREADED in CPPFLAGS. Or set X11VNC_THREADED=1\n");
+					rfbLog("in your runtime environment.\n");
+					rfbLog("\n");
+					usleep(500*1000);
+				}
 			}
 #endif
 			continue;
@@ -3941,9 +3983,11 @@ int main(int argc, char* argv[]) {
 				if (!strcasecmp(argv[i+1], "prompt")) {
 					;
 				} else if (!is_decimal(argv[i+1])) {
-					rfbLog("Invalid -rfbport value: '%s'\n", argv[i+1]);
-					rfbLog("setting it to '-1' to induce failure.\n");
-					argv[i+1] = strdup("-1");
+					if (!got_inetd) {
+						rfbLog("Invalid -rfbport value: '%s'\n", argv[i+1]);
+						rfbLog("setting it to '-1' to induce failure.\n");
+						argv[i+1] = strdup("-1");
+					}
 				}
 				got_rfbport_str = strdup(argv[i+1]);
 				got_rfbport_pos = argc_vnc+1;
@@ -3985,6 +4029,33 @@ int main(int argc, char* argv[]) {
 	if (getenv("PATH") == NULL || !strcmp(getenv("PATH"), "")) {
 		/* set a minimal PATH, usually only null in inetd. */
 		set_env("PATH", "/bin:/usr/bin");
+	}
+
+	/* handle -findauth case now that cmdline has been read */
+	if (got_findauth) {
+		char *s;
+		int ic = 0;
+		if (use_dpy != NULL) {
+			set_env("DISPLAY", use_dpy);
+		}
+		use_dpy = strdup("WAIT:cmd=FINDDISPLAY-run");
+
+		s = getenv("FINDAUTH_DISPLAY");
+		if (s && strcmp("", s)) {
+			set_env("DISPLAY", s);
+		}
+		s = getenv("DISPLAY");
+		if (s && strcmp("", s)) {
+			set_env("X11VNC_SKIP_DISPLAY", s);
+		} else {
+			set_env("X11VNC_SKIP_DISPLAY", ":0");
+		}
+		set_env("X11VNC_SKIP_DISPLAY_NEGATE", "1");
+		set_env("FIND_DISPLAY_XAUTHORITY_PATH", "1");
+		set_env("FIND_DISPLAY_NO_SHOW_XAUTH", "1");
+		set_env("FIND_DISPLAY_NO_SHOW_DISPLAY", "1");
+		wait_for_client(&ic, NULL, 0);
+		exit(0);
 	}
 
 	/* set OS struct UT */
@@ -4042,7 +4113,9 @@ int main(int argc, char* argv[]) {
 				client_connect_file = str;
 			}
 			if (client_connect_file) {
-				rfbLog("MacOS X: set -connect file to %s\n", client_connect_file);
+				if (!got_inetd) {
+					rfbLog("MacOS X: set -connect file to %s\n", client_connect_file);
+				}
 			}
 		}
 	}
@@ -4063,7 +4136,9 @@ int main(int argc, char* argv[]) {
 			rfbLog("Port prompt indicated cancel.\n");
 			clean_up_exit(1);
 		}
-		rfbLog("Port prompt selected: %d\n", got_rfbport_val);
+		if (!got_inetd) {
+			rfbLog("Port prompt selected: %d\n", got_rfbport_val);
+		}
 		sprintf(tport, "%d", got_rfbport_val);
 		argv_vnc[got_rfbport_pos] = strdup(tport);
 		free(opts);
@@ -4127,8 +4202,9 @@ int main(int argc, char* argv[]) {
 				q = t + strlen(pstr); 
 			}
 			logfile = new;
-			if (!quiet) {
+			if (!quiet && !got_inetd) {
 				rfbLog("Expanded logfile to '%s'\n", new);
+				
 			}
 			free(s);
 		}
@@ -4162,7 +4238,7 @@ int main(int argc, char* argv[]) {
 				q = t + strlen(pstr); 
 			}
 			logfile = new;
-			if (!quiet) {
+			if (!quiet && !got_inetd) {
 				rfbLog("Expanded logfile to '%s'\n", new);
 			}
 			free(s);
@@ -4399,7 +4475,7 @@ int main(int argc, char* argv[]) {
 	if (1) {
 		/* mix things up a little bit */
 		unsigned char buf[CHALLENGESIZE];
-		int k, kmax = (int) (500 * rfac()) + 100;
+		int k, kmax = (int) (50 * rfac()) + 10;
 		for (k=0; k < kmax; k++) {
 			rfbRandomBytes(buf);
 		}
@@ -4560,6 +4636,13 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
+	if (use_threads && !got_noxrandr) {
+		xrandr = 1;
+		if (! quiet) {
+			rfbLog("enabling -xrandr in -threads mode.\n");
+		}
+	}
+
 	/* fixup settings that do not make sense */
 		
 	if (use_threads && nofb && cursor_pos_updates) {
@@ -4636,6 +4719,7 @@ int main(int argc, char* argv[]) {
 
 	/* increase rfbwait if threaded */
 	if (use_threads && ! got_rfbwait) {
+		/* ??? lower this ??? */
 		rfbMaxClientWait = 604800000;
 	}
 
@@ -4722,6 +4806,8 @@ int main(int argc, char* argv[]) {
 	X_INIT;
 	SCR_INIT;
 	CLIENT_INIT;
+	INPUT_INIT;
+	POINTER_INIT;
 	
 	/* open the X display: */
 
@@ -5373,9 +5459,7 @@ int main(int argc, char* argv[]) {
 	}
 #endif
 
-	if (!getenv("X11VNC_NO_CHECK_PM")) {
-		check_pm();
-	}
+	check_pm();
 
 	if (! quiet && ! raw_fb_str) {
 		rfbLog("--------------------------------------------------------\n");
@@ -5685,5 +5769,4 @@ int main(int argc, char* argv[]) {
 #undef argv
 
 }
-
 

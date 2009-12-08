@@ -1,3 +1,26 @@
+2009-12-06  Karl Runge <runge@karlrunge.com>
+	* x11vnc: findauth/-auth guess works with FD_XDM=1 for root
+	  finding dm's xauthority.  Work around for GDM's recent 
+	  'xhost SI:localuser:root' usage. X11VNC_REOPEN_SLEEP_MAX
+	  for longer lived -reopen-ing. X11VNC_EXTRA_HTTPS_PARAMS for
+	  additional URL parameters, X11VNC_HTTP_LISTEN_LOCALHOST=1 to
+	  force libvncserver http to listen on localhost.
+
+2009-12-04  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: update binaries; new signing key; ss_vncviewer.
+	* x11vnc: add more wish possibilities for -gui.  Declare crypt()
+	  on all platforms (disable with -DDO_NOT_DECLARE_CRYPT.)
+
+2009-12-02  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -appshare mode for sharing an application windows of the
+	  entire desktop. map port + 5500 in reverse connect.  Add id_cmd
+	  remote control functions for id (and other) windows.  Allow zero
+	  port in SSL reverse connections.  Adjust delays between multiple
+	  reverse connections; X11VNC_REVERSE_SLEEP_MAX env var.  Add some
+	  missing mutex locks; add INPUT_LOCK and threads_drop_input.
+	  More safety in -threads mode for new framebuffer change.  Fix
+	  some stderr leaking in -inetd mode.
+
 2009-11-18  Karl Runge <runge@karlrunge.com>
 	* x11vnc: use -timeout setting for reverse connections too.
 	  Delay calling xfixes at the beginning of 1st connection to avoid

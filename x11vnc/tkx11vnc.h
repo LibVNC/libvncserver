@@ -187,6 +187,7 @@ char gui_code[] = "";
 "	=GAL SubWindow::\n"
 "	id:\n"
 "	sid:\n"
+"	=RA id_cmd:\n"
 "	=GAL LOFF\n"
 "	=GAL ResizeRotate::\n"
 "	= xrandr\n"

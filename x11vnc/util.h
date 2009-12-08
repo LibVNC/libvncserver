@@ -72,6 +72,11 @@ extern char *choose_title(char *display);
 
 #define NONUL(x) ((x) ? (x) : "")
 
+/*
+	Put this in usleep2() for debug printout.
+	fprintf(stderr, "_mysleep: %08d %10.6f %s:%d\n", (x), dnow() - x11vnc_start, __FILE__, __LINE__); \
+ */
+
 /* XXX usleep(3) is not thread safe on some older systems... */
 extern struct timeval _mysleep;
 #define usleep2(x) \
@@ -96,6 +101,10 @@ extern struct timeval _mysleep;
  */
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 extern MUTEX(x11Mutex);
+extern MUTEX(scrollMutex);
+MUTEX(clientMutex);
+MUTEX(inputMutex);
+MUTEX(pointerMutex);
 #endif
 
 #define X_INIT INIT_MUTEX(x11Mutex)
@@ -105,25 +114,32 @@ extern MUTEX(x11Mutex);
 #define X_UNLOCK   UNLOCK(x11Mutex)
 #else
 extern int hxl;
-#define X_LOCK       fprintf(stderr, "*** X_LOCK**[%05d]  %d%s\n", \
-	__LINE__, hxl, hxl ? "  BAD-PRE-LOCK":""); LOCK(x11Mutex); hxl = 1;
-#define X_UNLOCK     fprintf(stderr, "    x_unlock[%05d]  %d%s\n", \
-	__LINE__, hxl, !hxl ? "  BAD-PRE-UNLOCK":""); UNLOCK(x11Mutex); hxl = 0;
+#define X_LOCK       fprintf(stderr, "*** X_LOCK**  %d%s  %s:%d\n", \
+	hxl, hxl  ? "  BAD-PRE-LOCK":"",   __FILE__, __LINE__);   LOCK(x11Mutex); hxl = 1;
+#define X_UNLOCK     fprintf(stderr, "    x_unlock  %d%s  %s:%d\n", \
+	hxl, !hxl ? "  BAD-PRE-UNLOCK":"", __FILE__, __LINE__); UNLOCK(x11Mutex); hxl = 0;
 #endif
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-extern MUTEX(scrollMutex);
-#endif
 #define SCR_LOCK   if (use_threads) {LOCK(scrollMutex);}
 #define SCR_UNLOCK if (use_threads) {UNLOCK(scrollMutex);}
 #define SCR_INIT INIT_MUTEX(scrollMutex)
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-MUTEX(clientMutex);
-#endif
 #define CLIENT_LOCK   if (use_threads) {LOCK(clientMutex);}
 #define CLIENT_UNLOCK if (use_threads) {UNLOCK(clientMutex);}
 #define CLIENT_INIT INIT_MUTEX(clientMutex)
+
+#if 1
+#define INPUT_LOCK   if (use_threads) {LOCK(inputMutex);}
+#define INPUT_UNLOCK if (use_threads) {UNLOCK(inputMutex);}
+#else
+#define INPUT_LOCK
+#define INPUT_UNLOCK
+#endif
+#define INPUT_INIT INIT_MUTEX(inputMutex)
+
+#define POINTER_LOCK   if (use_threads) {LOCK(pointerMutex);}
+#define POINTER_UNLOCK if (use_threads) {UNLOCK(pointerMutex);}
+#define POINTER_INIT INIT_MUTEX(pointerMutex)
 
 /*
  * The sendMutex member was added to libvncserver 0.9.8

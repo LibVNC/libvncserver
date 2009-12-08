@@ -178,6 +178,8 @@ extern int macosx_icon_anim_time;
 
 extern unsigned long subwin;
 extern int subwin_wait_mapped;
+extern int freeze_when_obscured;
+extern int subwin_obscured;
 
 extern int debug_xevents;
 extern int debug_xdamage;
@@ -367,6 +369,7 @@ extern int verbose;
 
 extern int use_threads;
 extern int started_rfbRunEventLoop;
+extern int threads_drop_input;
 
 extern int got_noxwarppointer;
 extern int got_rfbport;

@@ -471,6 +471,7 @@ double rfac(void) {
 void check_allinput_rate(void) {
 	static double last_all_input_check = 0.0;
 	static int set = 0, verb = -1;
+
 	if (use_threads) {
 		return;
 	}
@@ -703,7 +704,7 @@ double rect_overlap(int x1, int y1, int x2, int y2, int X1, int Y1,
 char *choose_title(char *display) {
 	static char title[(MAXN+10)];	
 
-	memset(title, 0, MAXN+10);
+	memset(title, 0, sizeof(title));
 	strcpy(title, "x11vnc");
 
 	if (display == NULL) {
@@ -724,12 +725,32 @@ char *choose_title(char *display) {
 	if (subwin && dpy && valid_window(subwin, NULL, 0)) {
 #if !NO_X11
 		char *name = NULL;
+		int do_appshare = getenv("X11VNC_APPSHARE_ACTIVE") ? 1 : 0;
+		if (0 && do_appshare) {
+			title[0] = '\0';
+		}
 		if (XFetchName(dpy, subwin, &name)) {
 			if (name) {
-				strncat(title, " ",  MAXN - strlen(title));
+				if (title[0] != '\0') {
+					strncat(title, " ",  MAXN - strlen(title));
+				}
 				strncat(title, name, MAXN - strlen(title));
 				free(name);
 			}
+		}
+		if (do_appshare) {
+			Window c;
+			int x, y;
+			if (xtranslate(subwin, rootwin, 0, 0, &x, &y, &c, 1)) {
+				char tmp[32];
+				if (scaling) {
+					x *= scale_fac_x;
+					y *= scale_fac_y;
+				}
+				sprintf(tmp, " XY=%d,%d", x, y);
+				strncat(title, tmp, MAXN - strlen(title));
+			}
+			rfbLog("appshare title: %s\n", title);
 		}
 #endif	/* NO_X11 */
 	}

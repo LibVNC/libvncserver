@@ -53,7 +53,9 @@ so, delete this exception statement from your version.
 #include "macosxCG.h"
 #include "userinput.h"
 #include "pointer.h"
+#include "xrandr.h"
 #include "xi2_devices.h"
+
 
 /*
  * routines for handling incoming, outgoing, etc connections
@@ -258,10 +260,10 @@ static rfbClientPtr *client_match(char *str) {
 	i = 0;
 	iter = rfbGetClientIterator(screen);
 	while( (cl = rfbClientIteratorNext(iter)) ) {
+		ClientData *cd = (ClientData *) cl->clientData;
 		if (strstr(str, "0x") == str) {
 			unsigned int in;
 			int id;
-			ClientData *cd = (ClientData *) cl->clientData;
 			if (! cd) {
 				continue;
 			}
@@ -278,25 +280,52 @@ static rfbClientPtr *client_match(char *str) {
 				cl_list[i++] = cl;
 			}
 		} else {
-			char *rstr = str;
+			int port = -1;
+			char *rstr = strdup(str);
+			char *q = strrchr(rstr, ':');
+			if (q) {
+				port = atoi(q+1);
+				*q = '\0';
+				if (port == 0 && q[1] != '0') {
+					port = -1;
+				} else if (port < 0) {
+					port = -port;
+				} else if (port < 200) {
+					port = 5500 + port;
+				}
+			}
 			if (! dotted_ip(str))  {
-				rstr = host2ip(str);
+				char *orig = rstr;
+				rstr = host2ip(rstr);
+				free(orig);
 				if (rstr == NULL || *rstr == '\0') {
 					if (host_warn++) {
 						continue;
 					}
-					rfbLog("skipping bad lookup: \"%s\"\n",
-					    str);
+					rfbLog("skipping bad lookup: \"%s\"\n", str);
 					continue;
 				}
-				rfbLog("lookup: %s -> %s\n", str, rstr);
+				rfbLog("lookup: %s -> %s port=%d\n", str, rstr, port);
 			}
 			if (!strcmp(rstr, cl->host)) {
-				cl_list[i++] = cl;
+				int ok = 1;
+				if (port > 0) {
+					if (cd != NULL && cd->client_port > 0) {
+						if (cd->client_port != port) {
+							ok = 0;
+						}
+					} else {
+						int cport = get_remote_port(cl->sock);
+						if (cport != port) {
+							ok = 0;
+						}
+					}
+				}
+				if (ok) {
+					cl_list[i++] = cl;
+				}
 			}
-			if (rstr != str) {
-				free(rstr);
-			}
+			free(rstr);
 		}
 		if (i >= n - 1) {
 			break;
@@ -767,6 +796,7 @@ void client_gone(rfbClientPtr client) {
 	if (unixpw_in_progress && unixpw_client) {
 		if (client == unixpw_client) {
 			unixpw_in_progress = 0;
+			/* mutex */
 			screen->permitFileTransfer = unixpw_file_xfer_save;
 			if ((tightfilexfer = unixpw_tightvnc_xfer_save)) {
 #ifdef LIBVNCSERVER_WITH_TIGHTVNC_FILETRANSFER
@@ -1681,14 +1711,20 @@ static void check_connect_file(char *file) {
 	FILE *in;
 	char line[VNC_CONNECT_MAX], host[VNC_CONNECT_MAX];
 	static int first_warn = 1, truncate_ok = 1;
-	static time_t last_time = 0; 
-	time_t now = time(NULL);
+	static double last_time = 0.0, delay = 0.5; 
+	double now = dnow();
+	struct stat sbuf;
 
-	if (last_time == 0) {
-		last_time = now;
+	if (last_time == 0.0) {
+		if (!getenv("X11VNC_APPSHARE_ACTIVE")) {
+			/* skip first */
+			last_time = now;
+		} else {
+			delay = 0.25;
+		}
 	}
-	if (now - last_time < 1) {
-		/* check only once a second */
+	if (now - last_time < delay) {
+		/* check only about once a second */
 		return;
 	}
 	last_time = now;
@@ -1698,6 +1734,13 @@ static void check_connect_file(char *file) {
 		if (access(file, W_OK) == 0) {
 			truncate_ok = 1;
 		} else {
+			return;
+		}
+	}
+
+	if (stat(file, &sbuf) == 0) {
+		/* skip empty file directly */
+		if (sbuf.st_size == 0) {
 			return;
 		}
 	}
@@ -2578,6 +2621,12 @@ void reverse_connect(char *str) {
 	int nclients0 = client_count;
 	int lcnt, j;
 	char **list;
+	int do_appshare = 0;
+
+	if (!getenv("X11VNC_REVERSE_USE_OLD_SLEEP")) {
+		sleep_min = 500;
+		sleep_max = 2500;
+	}
 
 	if (unixpw_in_progress) return;
 
@@ -2593,19 +2642,56 @@ void reverse_connect(char *str) {
 	}
 	free(tmp);
 
+	if (subwin && getenv("X11VNC_APPSHARE_ACTIVE")) {
+		do_appshare = 1;
+		sleep_between_host = 0;	/* too agressive??? */
+	}
+	if (getenv("X11VNC_REVERSE_SLEEP_BETWEEN_HOST")) {
+		sleep_between_host = atoi(getenv("X11VNC_REVERSE_SLEEP_BETWEEN_HOST"));
+	}
+
+	if (do_appshare) {
+		if (screen && dpy) {
+			char *s = choose_title(DisplayString(dpy));
+
+			/* mutex */
+			screen->desktopName = s;
+			if (rfb_desktop_name) {
+				free(rfb_desktop_name);
+			}
+			rfb_desktop_name = strdup(s);
+		}
+	}
+
 	for (j = 0; j < lcnt; j++) {
 		p = list[j];
 		
 		if ((n = do_reverse_connect(p)) != 0) {
+			int i;
 			progress_client();
-			rfbPE(-1);
+			for (i=0; i < 3; i++) {
+				rfbPE(-1);
+			}
 		}
 		cnt += n;
 		if (list[j+1] != NULL) {
 			t = 0;
 			while (t < sleep_between_host) {
+				double t1, t2;
+				int i;
+				t1 = dnow();
+				for (i=0; i < 8; i++) {
+					rfbPE(-1);
+					if (do_appshare && t == 0) {
+						rfbPE(-1);
+					}
+				}
+				t2 = dnow();
+				t += (int) (1000 * (t2 - t1));
+				if (t >= sleep_between_host) {
+					break;
+				}
 				usleep(dt * 1000);
-				rfbPE(-1);
 				t += dt;
 			}
 		}
@@ -2627,6 +2713,9 @@ void reverse_connect(char *str) {
 			}
 			clean_up_exit(0);
 		}
+		if (xrandr || xrandr_maybe) {
+			check_xrandr_event("reverse_connect1");
+		}
 		return;
 	}
 
@@ -2634,6 +2723,8 @@ void reverse_connect(char *str) {
 	 * XXX: we need to process some of the initial handshaking
 	 * events, otherwise the client can get messed up (why??) 
 	 * so we send rfbProcessEvents() all over the place.
+	 *
+	 * How much is this still needed?
 	 */
 
 	n = cnt;
@@ -2643,17 +2734,42 @@ void reverse_connect(char *str) {
 	t = sleep_max - sleep_min;
 	tot = sleep_min + ((n-1) * t) / (n_max-1);
 
+	if (do_appshare) {
+		tot /= 3;
+		if (tot < dt) {
+			tot = dt;
+		}
+		tot = 0;	/* too agressive??? */
+	}
+
+	if (getenv("X11VNC_REVERSE_SLEEP_MAX")) {
+		tot = atoi(getenv("X11VNC_REVERSE_SLEEP_MAX"));
+	}
+
 	t = 0;
 	while (t < tot) {
-		rfbPE(-1);
-		rfbPE(-1);
+		int i;
+		double t1, t2;
+		t1 = dnow();
+		for (i=0; i < 8; i++) {
+			rfbPE(-1);
+			if (t == 0) rfbPE(-1);
+		}
+		t2 = dnow();
+		t += (int) (1000 * (t2 - t1));
+		if (t >= tot) {
+			break;
+		}
 		usleep(dt * 1000);
 		t += dt;
 	}
 	if (connect_or_exit) {
 		if (client_count <= nclients0)  {
 			for (t = 0; t < 10; t++) {
-				rfbPE(-1);
+				int i;
+				for (i=0; i < 3; i++) {
+					rfbPE(-1);
+				}
 				usleep(100 * 1000);
 			}
 		}
@@ -2666,6 +2782,9 @@ void reverse_connect(char *str) {
 			}
 			clean_up_exit(0);
 		}
+	}
+	if (xrandr || xrandr_maybe) {
+		check_xrandr_event("reverse_connect2");
 	}
 }
 
@@ -2868,7 +2987,9 @@ static void pmove(int x, int y) {
 	}
 	rfbLog("pmove: x y: %d %d\n", x, y);
 	pointer(0, x, y, NULL);
+	X_LOCK;
 	XFlush_wr(dpy);
+	X_UNLOCK;
 }
 
 
@@ -3483,6 +3604,7 @@ static void turn_off_truecolor_ad(rfbClientPtr client) {
 	if (client) {}
 	if (turn_off_truecolor) {
 		rfbLog("turning off truecolor advertising.\n");
+		/* mutex */
 		screen->serverFormat.trueColour = FALSE;
 		screen->displayHook = NULL;
 		screen->serverFormat.redShift   = 0;
@@ -3658,6 +3780,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 			}
 		} else if (strstr(passwdfile, "custom:") == passwdfile) {
 			if (screen) {
+				/* mutex */
 				screen->passwordCheck = custom_passwd_check;
 			}
 		}
@@ -3746,8 +3869,9 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	cd->cmp_bytes_sent = 0;
 	cd->raw_bytes_sent = 0;
 
-	rfbLog("incr accepted_client for %s:%d  sock=%d\n", client->host, get_remote_port(client->sock), client->sock);
 	accepted_client++;
+	rfbLog("incr accepted_client=%d for %s:%d  sock=%d\n", accepted_client,
+	    client->host, get_remote_port(client->sock), client->sock);
 	last_client = time(NULL);
 
 	if (ncache) {
@@ -3783,6 +3907,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 		rfbSetTranslateFunction(client);
 
+		/* mutex */
 		screen->serverFormat.trueColour = TRUE;
 		screen->serverFormat.redShift   = rs;
 		screen->serverFormat.greenShift = gs;

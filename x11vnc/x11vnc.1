@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "November 2009" "x11vnc " "User Commands"
+.TH X11VNC "1" "December 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.9, lastmod: 2009-11-18
+         version: 0.9.9, lastmod: 2009-12-06
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -80,6 +80,12 @@ man pages for more info.
 Use '-auth guess' to have x11vnc use its \fB-findauth\fR
 mechanism (described below) to try to guess the
 XAUTHORITY filename and use it.
+.IP
+XDM/GDM/KDM: if you are running x11vnc as root and want
+to find the XAUTHORITY before anyone has logged into an
+X session yet, use: x11vnc \fB-env\fR FD_XDM=1 \fB-auth\fR guess ...
+(This will also find the XAUTHORITY if a user is already
+logged into the X session.)
 .PP
 \fB-N\fR
 .IP
@@ -110,7 +116,10 @@ reopen the X display (up to one time.)  This is of use
 for display managers like GDM (KillInitClients option)
 that kill x11vnc just after the user logs into the
 X session.  Note: the reopened state may be unstable.
-Set X11VNC_REOPEN_DISPLAY=n to reopen n times.
+Set X11VNC_REOPEN_DISPLAY=n to reopen n times and
+set X11VNC_REOPEN_SLEEP_MAX to the number of seconds,
+default 10, to keep trying to reopen the display (once
+per second.)
 .IP
 Update: as of 0.9.9, x11vnc tries to automatically avoid
 being killed by the display manager by delaying creating
@@ -157,6 +166,15 @@ As \fB-id,\fR but instead of using the window directly it
 shifts a root view to it: this shows SaveUnders menus,
 etc, although they will be clipped if they extend beyond
 the window.
+.PP
+\fB-appshare\fR
+.IP
+Simple application sharing based on the \fB-id/-sid\fR
+mechanism.  Every new toplevel window that the
+application creates induces a new viewer window via
+a reverse connection.  The \fB-id/-sid\fR and \fB-connect\fR
+options are required.  Run 'x11vnc \fB-appshare\fR \fB-help'\fR
+for more info.
 .PP
 \fB-clip\fR \fIWxH+X+Y\fR
 .IP
@@ -1175,17 +1193,23 @@ have access rights to).
 .PP
 \fB-findauth\fR \fI[disp]\fR
 .IP
-Apply the \fB-find/-finddpy\fR heuristics to try to guess the
-XAUTHORITY file for DISPLAY 'disp'.  If 'disp' is not
-supplied, then the value in the \fB-display\fR earlier in
+Apply the \fB-find/-finddpy\fR heuristics to try to guess
+the XAUTHORITY file for DISPLAY 'disp'.  If 'disp'
+is not supplied, then the value in the \fB-display\fR on
 the cmdline is used; failing that $DISPLAY is used;
 and failing that ":0" is used.
 .IP
 If nothing is printed out, that means no XAUTHORITY was
-found for 'disp'.  If "XAUTHORITY=" is printed out,
-that means use the default (i.e. do not set XAUTHORITY).
-If "XAUTHORITY=/path/to/file" is printed out, then
-use that file.
+found for 'disp'; i.e. failure.  If "XAUTHORITY="
+is printed out, that means use the default (i.e. do
+not set XAUTHORITY).  If "XAUTHORITY=/path/to/file"
+is printed out, then use that file.
+.IP
+XDM/GDM/KDM: if you are running x11vnc as root and want
+to find the XAUTHORITY before anyone has logged into an
+X session yet, use: x11vnc \fB-env\fR FD_XDM=1 \fB-findauth\fR ...
+(This will also find the XAUTHORITY if a user is already
+logged into the X session.)
 .PP
 \fB-create\fR
 .IP
@@ -1461,6 +1485,12 @@ blocks forever and this mode will not work.  See
 www.karlrunge.com/x11vnc/faq.html#faq-display-manager
 for how to disable this for dtgreet on Solaris and
 possibly for other greeters.
+.IP
+In \fB-find/cmd=FINDDISPLAY\fR mode, if you set FD_XDM=1,
+e.g. 'x11vnc \fB-env\fR FD_XDM=1 \fB-find\fR ...' and x11vnc is
+running as root (e.g. inetd) then it will try to find
+the XAUTHORITY file of a running XDM/GDM/KDM login
+greeter (i.e. no user has logged into an X session yet.)
 .IP
 As another special case, WAIT:cmd=HTTPONCE will allow
 x11vnc to service one http request and then exit.
@@ -2531,7 +2561,21 @@ https://mygateway.com:8000/?PORT=8000.  To avoid having
 to include the PORT= in the browser URL, simply supply
 "\fB-httpsredir\fR" to x11vnc.
 .IP
-This options does not work in \fB-stunnel\fR mode.
+This option does not work in \fB-stunnel\fR mode.
+.IP
+More tricks: set the env var X11VNC_EXTRA_HTTPS_PARAMS
+to be extra URL parameters to use.  This way you do
+not need to specify extra PARAMS in the index.vnc file.
+E.g. x11vnc \fB-env\fR X11VNC_EXTRA_HTTPS_PARAMS='?GET=1' ...
+.IP
+If you do not want to expose the non-SSL HTTP port to
+the network (i.e. you just want the single VNC/HTTPS
+port, e.g. 5900, open for connections) then specify the
+option \fB-env\fR X11VNC_HTTP_LISTEN_LOCALHOST=1  This way
+the connection to the libvncserver httpd server will
+only be available on localhost (note that in \fB-ssl\fR mode,
+HTTPS requests are redirected from SSL to the non-SSL
+libvncserver HTTP server.)
 .PP
 \fB-http_oneport\fR
 .IP
@@ -2564,6 +2608,10 @@ it means only one port needs to be redirected.
 The \fB-httpsredir\fR option may also be useful for this
 mode when using an SSH tunnel as well as for router
 port redirections.
+.IP
+Note that the \fB-env\fR X11VNC_HTTP_LISTEN_LOCALHOST=1
+option described above under \fB-httpsredir\fR applies for
+the libvncserver httpd server in all cases (ssl or not.)
 .PP
 \fB-ssh\fR \fIuser@host:disp\fR
 .IP
@@ -3110,7 +3158,7 @@ Instead of exiting after cleaning up, run a simple
 \fB-q,\fR \fB-quiet\fR
 .IP
 Be quiet by printing less informational output to
-stderr.
+stderr. (use \fB-noquiet\fR to undo an earlier \fB-quiet.)\fR
 .PP
 \fB-v,\fR \fB-verbose\fR
 .IP
@@ -3596,6 +3644,12 @@ To include button events use "Button1", ... etc.
 .IP
 \fB-buttonmap\fR currently does not work on MacOSX console
 or in \fB-rawfb\fR mode.
+.IP
+Workaround: use \fB-buttonmap\fR IJ...-LM...=n to limit the
+number of mouse buttons to n, e.g. 123-123=3.  This will
+prevent x11vnc from crashing if the X server reports
+there are 5 buttons (4/5 scroll wheel), but there are
+only really 3.
 .PP
 \fB-nodragging\fR
 .IP
@@ -3611,7 +3665,7 @@ Client-side caching scheme.  Framebuffer memory \fIn\fR
 (an integer) times that of the full display is allocated
 below the actual framebuffer to cache screen contents
 for rapid retrieval.  So a W x H frambuffer is expanded
-to a W x (n+1)*H one.  Use 0 to disable.  Default: XXX.
+to a W x (n+1)*H one.  Use 0 to disable.
 .IP
 The \fIn\fR is actually optional, the default is 10.
 .IP
@@ -3619,12 +3673,16 @@ For this and the other \fB-ncache*\fR options below you can
 abbreviate "\fB-ncache\fR" with "\fB-nc\fR".  Also, "\fB-nonc\fR"
 is the same as "\fB-ncache\fR \fI0\fR"
 .IP
-This is an experimental option, currently implemented
-in an awkward way in that in the VNC Viewer you can
-see the cache contents if you scroll down, etc.  So you
+This is an experimental option, currently implemented in
+an awkward way in that in the VNC Viewer you can see the
+pixel cache contents if you scroll down, etc.  So you
 will have to set things up so you can't see that region.
 If this method is successful, the changes required for
 clients to do this less awkwardly will be investigated.
+.IP
+The SSVNC viewer does a good job at automatically hiding
+the pixel cache region.  Or use SSVNC's \fB-ycrop\fR option
+to explicitly hide the region.
 .IP
 Note that this mode consumes a huge amount of memory,
 both on the x11vnc server side and on the VNC Viewer
@@ -4465,10 +4523,7 @@ In this mode new threads (one for input and one
 for output) are created to handle each new client.
 Default: \fB-nothreads.\fR
 .IP
-NOTE:  The \fB-threads\fR mode may be disabled due to its
-unstable behavior.  If it is disabled, a warning is
-printed out.  Stability has been improved in version
-0.9.8 and so the feature has been re-enabled.
+Thread stability is much improved in version 0.9.8.
 .IP
 Multiple clients in threaded mode should be stable
 for the ZRLE encoding on all platforms.  The Tight and
@@ -4476,9 +4531,14 @@ Zlib encodings are currently only stable on Linux for
 multiple clients.  Compile with \fB-DTLS=__thread\fR if your
 OS and compiler and linker support it.
 .IP
+For resizes (randr, etc.) set this env. var. to the number
+of milliseconds to sleep: X11VNC_THREADS_NEW_FB_SLEEP
+at various places in the do_new_fb() action.  This is to
+let various activities settle.  Default is about 500ms.
+.IP
 Multiple clients in threaded mode could yield better
-performance for 'class-room' broadcasting usage.
-See also the \fB-reflect\fR option.
+performance for 'class-room' broadcasting usage; also in
+\fB-appshare\fR broadcast mode.  See also the \fB-reflect\fR option.
 .PP
 \fB-fs\fR \fIf\fR
 .IP
@@ -5251,6 +5311,13 @@ id:windowid     set \fB-id\fR window to "windowid". empty
 or "root" to go back to root window
 .IP
 sid:windowid    set \fB-sid\fR window to "windowid"
+.IP
+id_cmd:cmd      cmds: raise, lower, map, unmap, iconify,
+move:dXdY, resize:dWdH, geom:WxH+X+Y. dX
+dY, dW, and dH must have a leading "+"
+or "-" e.g.: move:-30+10 resize:+20+35
+also: wm_delete, wm_name:string and
+icon_name:string. Also id_cmd:win=N:cmd
 .IP
 waitmapped      wait until subwin is mapped.
 .IP
@@ -6035,8 +6102,8 @@ query straight to the X11VNC_REMOTE property or connect
 file use "qry=..." instead of "cmd=..."
 .IP
 ans= stop quit exit shutdown ping resend_cutbuffer
-resend_clipboard resend_primary blacken zero
-refresh reset close disconnect id sid waitmapped
+resend_clipboard resend_primary blacken zero refresh
+reset close disconnect id_cmd id sid waitmapped
 nowaitmapped clip flashcmap noflashcmap shiftcmap
 truecolor notruecolor overlay nooverlay overlay_cursor
 overlay_yescursor nooverlay_nocursor nooverlay_cursor
@@ -6185,6 +6252,10 @@ Any corresponding output text for that remote control
 command is sent back to all client as rfbCutText.
 The returned output is also prefixed with \fIstr\fR.
 Example: \fB-remote_prefix\fR DO_THIS:
+.IP
+Note that enabling \fB-remote_prefix\fR allows the remote
+VNC viewers to run x11vnc \fB-remote\fR commands.  Do not
+use this option if they are not to be trusted.
 .PP
 \fB-noremote,\fR \fB-yesremote\fR
 .IP

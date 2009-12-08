@@ -344,13 +344,23 @@ static int XIOerr(Display *d) {
 #if !NO_X11
 	if (reopen < rmax && getenv("X11VNC_REOPEN_DISPLAY")) {
 		int db = getenv("X11VNC_REOPEN_DEBUG") ? 1 : 0;
+		int sleepmax = 10, i;
 		Display *save_dpy = dpy;
-		char *dstr = DisplayString(save_dpy);
+		char *dstr = strdup(DisplayString(save_dpy));
 		reopen++;	
+		if (getenv("X11VNC_REOPEN_SLEEP_MAX")) {
+			sleepmax = atoi(getenv("X11VNC_REOPEN_SLEEP_MAX"));
+		}
 		rfbLog("*** XIO error: Trying to reopen[%d/%d] display '%s'\n", reopen, rmax, dstr);
 		rfbLog("*** XIO error: Note the reopened state may be unstable.\n");
-		usleep (3000 * 1000);
-		dpy = XOpenDisplay_wr(dstr);
+		for (i=0; i < sleepmax; i++) {
+			usleep (1000 * 1000);
+			dpy = XOpenDisplay_wr(dstr);
+			rfbLog("dpy[%d/%d]: %p\n", i+1, sleepmax, dpy);
+			if (dpy) {
+				break;
+			}
+		}
 		last_open_xdisplay = time(NULL);
 		if (dpy) {
 			rfbLog("*** XIO error: Reopened display '%s' successfully.\n", dstr);
@@ -372,6 +382,7 @@ static int XIOerr(Display *d) {
 			do_new_fb(1);
 			if (db) rfbLog("*** XIO error: check_xevents\n");
 			check_xevents(1);
+
 			/* sadly, we can never return... */
 			if (db) rfbLog("*** XIO error: watch_loop\n");
 			watch_loop();
