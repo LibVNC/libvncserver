@@ -1085,6 +1085,7 @@ void install_passwds(void) {
 		passwds_new[0] = passwds_old[0];
 		passwds_new[1] = viewonly_passwd;
 		passwds_new[2] = NULL;
+		/* mutex */
 		screen->authPasswdData = (void*) passwds_new;
 	} else if (passwd_list) {
 		int i = 0;
@@ -1094,6 +1095,7 @@ void install_passwds(void) {
 		if (begin_viewonly < 0) {
 			begin_viewonly = i+1;
 		}
+		/* mutex */
 		screen->authPasswdData = (void*) passwd_list;
 		screen->authPasswdFirstViewOnly = begin_viewonly;
 	}
@@ -1167,6 +1169,7 @@ static void handle_one_http_request(void) {
 	if (inetd || screen->httpPort == 0) {
 		int port = find_free_port(5800, 5860);
 		if (port) {
+			/* mutex */
 			screen->httpPort = port;
 		} else {
 			rfbLog("handle_one_http_request: no http port.\n");
@@ -1703,6 +1706,7 @@ static void vnc_redirect_loop(char *vnc_redirect_test, int *vnc_redirect_cnt) {
 #if LIBVNCSERVER_HAVE_FORK
 			if ((pid = fork()) > 0) {
 				close(screen->httpListenSock);
+				/* mutex */
 				screen->httpListenSock = -2;
 				usleep(500 * 1000);
 			} else {

@@ -261,9 +261,11 @@ static void sigusr1 (int sig) {
 	if (0) sig = 0;
 }
 
+/* Most of the following mess is for wish on Solaris: */
+
 static char *extra_path = ":/usr/local/bin:/usr/bin/X11:/usr/sfw/bin"
-	    ":/usr/X11R6/bin:/usr/openwin/bin:/usr/dt/bin";
-static char *wishes[] = {"wish8.4", "wish", "wish8.3", "wish8.5", "wish8.0", NULL};
+	    ":/usr/X11R6/bin:/usr/openwin/bin:/usr/dt/bin:/opt/sfw/bin";
+static char *wishes[] = {"wish8.4", "wish", "wish8.3", "wish8.5", "wish8.6", "wish8.7", "wishx", "wish8.0", NULL};
 
 static void run_gui(char *gui_xdisplay, int connect_to_x11vnc, int start_x11vnc,
     int simple_gui, pid_t parent, char *gui_opts) {
@@ -439,6 +441,15 @@ if (0) fprintf(stderr, "run_gui: %s -- %d %d\n", gui_xdisplay, connect_to_x11vnc
 	free(tpath);
 	if (!wish) {
 		wish = strdup("wish");
+	}
+	if (getenv("WISH")) {
+		char *w = getenv("WISH");
+		if (strcmp(w, "")) {
+			wish = strdup(w);
+		}
+	}
+	if (getenv("DEBUG_WISH")) {
+		fprintf(stderr, "wish: %s\n", wish);
 	}
 	set_env("PATH", full_path);
 	set_env("DISPLAY", gui_xdisplay);

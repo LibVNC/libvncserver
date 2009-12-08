@@ -373,6 +373,7 @@ static void parse_wireframe_str(char *wf) {
 		Colormap cmap;
 		if (dpy && (bpp == 32 || bpp == 16)) {
 #if !NO_X11
+			X_LOCK;
 		 	cmap = DefaultColormap (dpy, scr);
 			if (XParseColor(dpy, cmap, str, &cdef) &&
 			    XAllocColor(dpy, cmap, &cdef)) {
@@ -389,6 +390,7 @@ static void parse_wireframe_str(char *wf) {
 				wireframe_shade = n;
 				ok = 1;
 			}
+			X_UNLOCK;
 #else
 			r = g = b = 0;
 			cmap = 0;

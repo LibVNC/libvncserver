@@ -3056,6 +3056,10 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	static double max_keyrepeat_last_time = 0.0;
 	static double max_keyrepeat_always = -1.0;
 
+	if (threads_drop_input) {
+		return;
+	}
+
 	dtime0(&tnow);
 	got_keyboard_calls++;
 
@@ -3124,6 +3128,8 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			keysym = XK_period; 
 		}
 	}
+
+	INPUT_LOCK;
 
 	last_down = down;
 	last_keysym = keysym;
@@ -3215,6 +3221,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			if (db) rfbLog("--- scroll keyrate skipping 0x%lx %s "
 			    "%.4f  %.4f\n", keysym, down ? "down":"up  ",
 			    tnow - x11vnc_start, tnow - max_keyrepeat_last_time); 
+			INPUT_UNLOCK;
 			return;
 		}
 	}
@@ -3237,6 +3244,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			    tnow - x11vnc_start, tnow - max_keyrepeat_last_time); 
 			max_keyrepeat_last_keysym = keysym;
 			skipped_last_down = 1;
+			INPUT_UNLOCK;
 			return;
 		} else {
 			if (db) rfbLog("--- scroll keyrate KEEPING  0x%lx %s "
@@ -3267,15 +3275,18 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 				got_user_input++;
 				got_keyboard_input++;
 			}
+			INPUT_UNLOCK;
 			return;
 		}
 	}
 
 	if (view_only) {
+		INPUT_UNLOCK;
 		return;
 	}
 	get_allowed_input(client, &input);
 	if (! input.keystroke) {
+		INPUT_UNLOCK;
 		return;
 	}
 
@@ -3327,6 +3338,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		char *b, bstr[32];
 
 		if (! down) {
+			INPUT_UNLOCK;
 			return;	/* nothing to send */
 		}
 		if (debug_keyboard) {
@@ -3360,6 +3372,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		}
 		XFlush_wr(dpy);
 		X_UNLOCK;
+		INPUT_UNLOCK;
 		return;
 	}
 
@@ -3368,6 +3381,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		X_LOCK;
 		XFlush_wr(dpy);
 		X_UNLOCK;
+		INPUT_UNLOCK;
 		return;
 	}
 
@@ -3394,6 +3408,7 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 	}
 
 	X_UNLOCK;
+	INPUT_UNLOCK;
 }
 
 

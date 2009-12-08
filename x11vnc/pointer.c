@@ -76,9 +76,6 @@ typedef struct ptrremap {
 	int up;
 } prtremap_t;
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-MUTEX(pointerMutex);
-#endif
 #define MAX_BUTTON_EVENTS 50
 static prtremap_t pointer_map[MAX_BUTTONS+1][MAX_BUTTON_EVENTS];
 
@@ -674,6 +671,10 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	int sent = 0, buffer_it = 0;
 	double now;
 
+	if (threads_drop_input) {
+		return;
+	}
+
 	if (mask >= 0) {
 		got_pointer_calls++;
 	}
@@ -721,6 +722,8 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		y = nfix(y, dpy_y);
 	}
 
+	INPUT_LOCK;
+
 	if ((pipeinput_fh != NULL || pipeinput_int) && mask >= 0) {
 		pipe_pointer(mask, x, y, client);	/* MACOSX here. */
 		if (! pipeinput_tee) {
@@ -739,11 +742,13 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			if (!view_only && (input.motion || input.button)) {
 				last_rfb_ptr_injected = dnow();
 			}
+			INPUT_UNLOCK;
 			return;
 		}
 	}
 
 	if (view_only) {
+		INPUT_UNLOCK;
 		return;
 	}
 
@@ -755,6 +760,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		 * to flush the event queue; there is no real pointer event.
 		 */
 		if (! input.motion && ! input.button) {
+			INPUT_UNLOCK;
 			return;
 		}
 
@@ -786,6 +792,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 					blackr[b].x1, blackr[b].y1,
 					blackr[b].x2, blackr[b].y2);
 				}
+				INPUT_UNLOCK;
 				return;
 			}
 		}
@@ -800,17 +807,11 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	if ((use_threads && pointer_mode != 1) || pointer_flush_delay > 0.0) {
 #		define NEV 32
 		/* storage for the event queue */
-		static int mutex_init = 0;
 		static int nevents = 0;
 		static int ev[NEV][3];
 		int i;
 		/* timer things */
 		static double dt = 0.0, tmr = 0.0, maxwait = 0.4;
-
-		if (! mutex_init) {
-			INIT_MUTEX(pointerMutex);
-			mutex_init = 1;
-		}
 
 		if (pointer_flush_delay > 0.0) {
 			maxwait = pointer_flush_delay;
@@ -821,7 +822,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			}
 		}
 
-		LOCK(pointerMutex);
+		POINTER_LOCK;
 
 		/* 
 		 * If the framebuffer is being copied in another thread
@@ -856,11 +857,12 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 					ev[i][1] = -1;
 					ev[i][2] = -1;
 				}
-				UNLOCK(pointerMutex);
 				if (debug_pointer) {
 					rfbLog("pointer(): deferring event %d"
 					    " %.4f\n", i, tmr - x11vnc_start);
 				}
+				POINTER_UNLOCK;
+				INPUT_UNLOCK;
 				return;
 			}
 		}
@@ -912,13 +914,14 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		dt = 0.0;
 		dtime0(&tmr);
 
-		UNLOCK(pointerMutex);
+		POINTER_UNLOCK;
 	}
 	if (mask < 0) {		/* -1 just means flush the event queue */
 		if (debug_pointer) {
 			rfbLog("pointer(): flush only.  %.4f\n",
 			    dnowx());
 		}
+		INPUT_UNLOCK;
 		return;
 	}
 
@@ -955,6 +958,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		XFlush_wr(dpy);	
 		X_UNLOCK;
 	}
+	INPUT_UNLOCK;
 }
 
 void initialize_pipeinput(void) {

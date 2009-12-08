@@ -143,6 +143,8 @@ static void handle_xrandr_change(int new_x, int new_y) {
 
 	RAWFB_RET_VOID
 
+	/* assumes no X_LOCK */
+
 	/* sanity check xrandr_mode */
 	if (! xrandr_mode) {
 		xrandr_mode = strdup("default");
@@ -183,6 +185,8 @@ int check_xrandr_event(char *msg) {
 	XEvent xev;
 
 	RAWFB_RET(0)
+
+	/* it is assumed that X_LOCK is on at this point. */
 
 	if (subwin) {
 		return handle_subwin_resize(msg);
@@ -235,8 +239,13 @@ int check_xrandr_event(char *msg) {
 
 		if (wdpy_x == rev->width && wdpy_y == rev->height &&
 		    xrandr_rotation == (int) rev->rotation) {
-		    rfbLog("check_xrandr_event: no change detected.\n");
+			rfbLog("check_xrandr_event: no change detected.\n");
 			do_change = 0;
+			if (! xrandr) {
+		    		rfbLog("check_xrandr_event: "
+				    "enabling full XRANDR trapping anyway.\n");
+				xrandr = 1;
+			}
 		} else {
 			do_change = 1;
 			if (! xrandr) {
@@ -256,6 +265,7 @@ int check_xrandr_event(char *msg) {
 		XRRUpdateConfiguration(&xev);
 
 		if (do_change) {
+			/* under do_change caller normally returns before its X_UNLOCK */
 			X_UNLOCK;
 			handle_xrandr_change(rev->width, rev->height);
 		}

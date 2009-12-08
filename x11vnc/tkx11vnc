@@ -176,6 +176,7 @@ Screen
 	=GAL SubWindow::
 	id:
 	sid:
+	=RA id_cmd:
 	=GAL LOFF
 	=GAL ResizeRotate::
 	= xrandr
