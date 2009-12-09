@@ -272,6 +272,14 @@ typedef struct _rfbScreenInfo
     char multicastTTL;
     SOCKET multicastSock;
     struct sockaddr_storage multicastSockAddr;
+    /*
+     * the constransts for MULTICAT_UPDATE_BUF_SIZE are the same as for UPDATE_BUF_SIZE 
+     * (see comment there), additionally, it _must_ fit into a UDP packet
+     */
+#define MULTICAST_UPDATE_BUF_SIZE 60000
+    char multicastUpdateBuf[MULTICAST_UPDATE_BUF_SIZE];
+    int mcublen;
+    
 
     int maxClientWait;
 
@@ -335,6 +343,7 @@ typedef struct _rfbScreenInfo
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     MUTEX(cursorMutex);
+    MUTEX(multicastOutputMutex);
     rfbBool backgroundLoop;
 #endif
 
@@ -667,7 +676,7 @@ extern void rfbCloseClient(rfbClientPtr cl);
 extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
 extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
-extern int rfbWriteExactMulticast(rfbClientPtr cl, const char *buf, int len);
+  extern int rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char *buf, int len);
 extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern int rfbConnectToTcpAddr(char* host, int port);
@@ -702,7 +711,7 @@ extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegi
 extern rfbBool rfbSendMulticastFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
 extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);
-extern rfbBool rfbSendUpdateBufMulticast(rfbClientPtr cl);
+extern rfbBool rfbSendMulticastUpdateBuf(rfbScreenInfoPtr rfbScreen);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
 extern rfbBool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
 extern rfbBool rfbSendLastRectMarker(rfbClientPtr cl);

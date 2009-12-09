@@ -820,6 +820,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->multicastAddr="224.0.42.138";
    screen->multicastPort=5900;
    screen->multicastTTL=1;
+   INIT_MUTEX(screen->multicastOutputMutex);
 
    screen->maxFd=0;
    screen->listenSock=-1;
@@ -1002,6 +1003,8 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   TINI_MUTEX(screen->cursorMutex);
   if(screen->cursor && screen->cursor->cleanup)
     rfbFreeCursor(screen->cursor);
+
+  TINI_MUTEX(screen->multicastOutputMutex);
 
   rfbRRECleanup(screen);
   rfbCoRRECleanup(screen);

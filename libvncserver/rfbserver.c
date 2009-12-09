@@ -3600,15 +3600,14 @@ rfbSendUpdateBuf(rfbClientPtr cl)
  */
 
 rfbBool
-rfbSendUpdateBufMulticast(rfbClientPtr cl)
+rfbSendMulticastUpdateBuf(rfbScreenInfoPtr rfbScreen)
 {
-  if (rfbWriteExactMulticast(cl, cl->updateBuf, cl->ublen) < 0) {
-    rfbLogPerror("rfbSendUpdateBufMulticast: write");
-    rfbCloseClient(cl);
+  if (rfbWriteExactMulticast(rfbScreen, rfbScreen->multicastUpdateBuf, rfbScreen->mcublen) < 0) {
+    rfbLogPerror("rfbSendMulticastUpdateBuf: write");
     return FALSE;
   }
 
-  cl->ublen = 0;
+  rfbScreen->mcublen = 0;
   return TRUE;
 }
 

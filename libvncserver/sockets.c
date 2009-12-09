@@ -619,20 +619,18 @@ rfbWriteExact(rfbClientPtr cl,
 /*
  * WriteExactMulticast writes an exact number of bytes to the 
  * screen's multicast socket.
- * Returns 1 if  * those bytes have been written, or -1 if an error occurred (errno is set to
- * ETIMEDOUT if it timed out).
+ * Returns 1 if those bytes have been written, or -1 if an error
+ * occurred (errno is set to ETIMEDOUT if it timed out).
  */
 
 int
-rfbWriteExactMulticast(rfbClientPtr cl,
-		       const char *buf,
-		       int len)
+rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 {
-  int sock = cl->screen->multicastSock;
+  int sock = rfbScreen->multicastSock;
   int n;
 
   if(sock < 0)
-    return FALSE;
+    return -1;
 
 #undef DEBUG_WRITE_EXACT
 #ifdef DEBUG_WRITE_EXACT
@@ -642,13 +640,13 @@ rfbWriteExactMulticast(rfbClientPtr cl,
   fprintf(stderr,"\n");
 #endif
 
-  LOCK(cl->outputMutex);
+  LOCK(rfbScreen->multicastOutputMutex);
   while(len > 0) 
     {
       n = sendto(sock, buf, len, 0, 
-		 (struct sockaddr*)&cl->screen->multicastSockAddr,
-		 sizeof(cl->screen->multicastSockAddr));
-
+		 (struct sockaddr*)&rfbScreen->multicastSockAddr,
+		 sizeof(rfbScreen->multicastSockAddr));
+      
       if(n > 0) 
 	{
 	  buf += n;
@@ -658,7 +656,7 @@ rfbWriteExactMulticast(rfbClientPtr cl,
 	if(n == 0)
 	  {
 	    rfbErr("WriteExactMulticast: sendto returned 0?\n");
-	    UNLOCK(cl->outputMutex);
+	    UNLOCK(rfbScreen->multicastOutputMutex);
 	    return 0;
 	  }
 	else 
@@ -671,13 +669,13 @@ rfbWriteExactMulticast(rfbClientPtr cl,
 
 	    if (errno != EWOULDBLOCK && errno != EAGAIN) 
 	      {
-		UNLOCK(cl->outputMutex);
+		UNLOCK(rfbScreen->multicastOutputMutex);
 		return n;
 	      }
 	  }
     }
   
-  UNLOCK(cl->outputMutex);
+  UNLOCK(rfbScreen->multicastOutputMutex);
   return 1;
 }
 
