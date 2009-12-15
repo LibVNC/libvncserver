@@ -212,6 +212,7 @@ char *ident_username(rfbClientPtr client) {
 		char msg[128];
 		int n, sock, ok = 0;
 		int block = 0;
+		int refused = 0;
 
 		/*
 		 * need to check to see if the operation will block for
@@ -221,14 +222,24 @@ char *ident_username(rfbClientPtr client) {
 	    {	pid_t pid, pidw;
 		int rc;
 		if ((pid = fork()) > 0) {
-			usleep(100 * 1000);	/* 0.1 sec */
+			usleep(100 * 1000);	/* 0.1 sec for quick success or refusal */
 			pidw = waitpid(pid, &rc, WNOHANG);
 			if (pidw <= 0) {
-				usleep(1000 * 1000);	/* 1.0 sec */
+				usleep(1500 * 1000);	/* 1.5 sec */
 				pidw = waitpid(pid, &rc, WNOHANG);
 				if (pidw <= 0) {
+					int rc2;
+					rfbLog("ident_username: set block=1 (hung)\n");
 					block = 1;
 					kill(pid, SIGTERM);
+					usleep(100 * 1000);
+					waitpid(pid, &rc2, WNOHANG);
+				}
+			}
+			if (pidw > 0 && !block) {
+				if (WIFEXITED(rc) && WEXITSTATUS(rc) == 1) {
+					rfbLog("ident_username: set refused=1 (exit)\n");
+					refused = 1;
 				}
 			}
 		} else if (pid == -1) {
@@ -249,10 +260,10 @@ char *ident_username(rfbClientPtr client) {
 		}
 	    }
 #endif
-		if (block) {
+		if (block || refused) {
 			;
 		} else if ((sock = rfbConnectToTcpAddr(client->host, 113)) < 0) {
-			rfbLog("could not connect to ident: %s:%d\n",
+			rfbLog("ident_username: could not connect to ident: %s:%d\n",
 			    client->host, 113);
 		} else {
 			int ret;

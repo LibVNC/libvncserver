@@ -87,18 +87,28 @@ static void grab_buster_watch(int parent, char *dstr);
 
 
 void initialize_vnc_connect_prop(void) {
+	char *prop_str;
 	vnc_connect_str[0] = '\0';
 	RAWFB_RET_VOID
 #if !NO_X11
+	prop_str = getenv("VNC_CONNECT");
+	if (prop_str == NULL) {
+		prop_str = "VNC_CONNECT";
+	}
 	vnc_connect_prop = XInternAtom(dpy, "VNC_CONNECT", False);
 #endif
 }
 
 void initialize_x11vnc_remote_prop(void) {
+	char *prop_str;
 	x11vnc_remote_str[0] = '\0';
 	RAWFB_RET_VOID
 #if !NO_X11
-	x11vnc_remote_prop = XInternAtom(dpy, "X11VNC_REMOTE", False);
+	prop_str = getenv("X11VNC_REMOTE");
+	if (prop_str == NULL) {
+		prop_str = "X11VNC_REMOTE";
+	}
+	x11vnc_remote_prop = XInternAtom(dpy, prop_str, False);
 #endif
 }
 
@@ -734,6 +744,7 @@ static void grab_buster_watch(int parent, char *dstr) {
 	char propval[200];
 	int ev, er, maj, min;
 	int db = 0;
+	char *ticker_str = "X11VNC_TICKER";
 
 	RAWFB_RET_VOID
 
@@ -771,7 +782,10 @@ static void grab_buster_watch(int parent, char *dstr) {
 
 	usleep(3 * sleep);
 
-	ticker_atom = XInternAtom(dpy, "X11VNC_TICKER", False);
+	if (getenv("X11VNC_TICKER")) {
+		ticker_str = getenv("X11VNC_TICKER");
+	}
+	ticker_atom = XInternAtom(dpy, ticker_str, False);
 	if (! ticker_atom) {
 		fprintf(stderr, "grab_buster_watch: no ticker atom\n");
 		return;
@@ -865,7 +879,11 @@ void sync_tod_with_servertime(void) {
 	}
 
 	if (! ticker_atom) {
-		ticker_atom = XInternAtom(dpy, "X11VNC_TICKER", False);
+		char *ticker_str = "X11VNC_TICKER";
+		if (getenv("X11VNC_TICKER")) {
+			ticker_str = getenv("X11VNC_TICKER");
+		}
+		ticker_atom = XInternAtom(dpy, ticker_str, False);
 	}
 	if (! ticker_atom) {
 		return;

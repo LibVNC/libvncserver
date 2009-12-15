@@ -1,0 +1,422 @@
+#!/usr/bin/perl
+#
+# Copyright (c) 2006-2009 by Karl J. Runge <runge@karlrunge.com>
+#
+# connect_switch is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or (at
+# your option) any later version.
+# 
+# connect_switch is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with connect_switch; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+# or see <http://www.gnu.org/licenses/>.
+# 
+# 
+# connect_switch:
+#
+# A kludge script that sits between web clients and a mod_ssl (https)
+# enabled apache webserver.  
+#
+# If an incoming web client connection makes a proxy CONNECT request
+# it is handled directly by this script (apache is not involved).
+# Otherwise, all other connections are forwarded to the apache webserver.
+#
+# This can be useful for VNC redirection using an existing https (port
+# 443) webserver, thereby not requiring a 2nd (non-https) port open on
+# the firewall for the CONNECT requests.
+#
+# It does not seem possible (to me) to achieve this entirely within apache
+# because the CONNECT request appears to be forwarded encrypted to
+# the remote host and so the SSL dies immediately. 
+#
+# Note: There is no need to use this script for a non-ssl apache webserver
+# port because mod_proxy works fine for doing the switching all inside
+# apache (see ProxyRequests and AllowCONNECT parameters).
+#
+# Apache configuration:
+#
+# The mod_ssl configuration is often in a file named ssl.conf.  In the
+# simplest case you change something like this:
+#
+#   From:
+#   
+#     Listen 443
+#     
+#     <VirtualHost _default_:443>
+#     ...
+#     </VirtualHost>
+#     
+#   To:
+#   
+#     Listen 127.0.0.1:443
+#     
+#     <VirtualHost _default_:443>
+#     ...
+#     </VirtualHost>
+#
+# (i.e. just change the Listen directive).
+#
+# If you have mod_ssl listening on a different internal port, you do
+# not need to specify the localhost Listen address.
+#
+# It is probably a good idea to set $listen_host below to the known
+# IP address you want the service to listen on (to avoid localhost where
+# apache is listening).
+
+
+############################################################################
+# The defaults for hosts and ports (you can override them below if needed):
+#
+# Look below for these environment variables that let you set the various
+# parameters without needing to edit this script:
+#
+#	CONNECT_SWITCH_LISTEN
+#	CONNECT_SWITCH_HTTPD
+#	CONNECT_SWITCH_ALLOWED
+#	CONNECT_SWITCH_ALLOW_FILE
+#	CONNECT_SWITCH_VERBOSE
+#	CONNECT_SWITCH_APPLY_VNC_OFFSET
+#	CONNECT_SWITCH_VNC_OFFSET
+
+my $hostname = `hostname`;
+chomp $hostname;
+
+my $listen_host = $hostname;	
+my $listen_port = 443;	
+
+if (exists $ENV{CONNECT_SWITCH_LISTEN}) {
+	# E.g. CONNECT_SWITCH_LISTEN=192.168.0.32:443
+	($listen_host, $listen_port) = split(/:/, $ENV{CONNECT_SWITCH_LISTEN});
+}
+
+my $httpd_host = 'localhost';	
+my $httpd_port = 443;	
+
+if (exists $ENV{CONNECT_SWITCH_HTTPD}) {
+	# E.g. CONNECT_SWITCH_HTTPD=127.0.0.1:443
+	($httpd_host, $httpd_port) = split(/:/, $ENV{CONNECT_SWITCH_HTTPD});
+}
+
+############################################################################
+# You can/should override the host/port settings here:
+#
+#$listen_host = '23.45.67.89';		# set to your interface IP number.
+#$listen_port = 555;			# and/or nonstandard port.
+#$httpd_host  = 'somehost';		# maybe you redir https to another machine.
+#$httpd_port  = 666;			# and/or nonstandard port.
+
+# You must set the allowed host:port CONNECT redirection list.
+# Only these host:port pairs will be redirected to.
+#
+my @allowed = qw(
+	machine1:5915
+	machine2:5900
+);
+
+if (exists $ENV{CONNECT_SWITCH_ALLOWED}) {
+	#
+	# E.g. CONNECT_SWITCH_ALLOWED=machine1:5915,machine2:5900
+	#
+	@allowed = split(/,/, $ENV{CONNECT_SWITCH_ALLOWED});
+}
+
+# Or you could also use an external "allow file".
+# They get added to the @allowed list.
+# The file is re-read for each new connection.
+#
+# Format of $allow_file:
+#
+#     host1 vncdisp
+#     host2 vncdisp
+#
+# where, e.g. vncdisp = 15 => port 5915, say
+#
+#     joesbox  15 
+#     fredsbox 15 
+#     rupert    1 
+
+my $allow_file = '/dist/apache/2.0/conf/vnc.hosts';
+$allow_file = '';
+
+if (exists $ENV{CONNECT_SWITCH_ALLOW_FILE}) {
+	# E.g. CONNECT_SWITCH_ALLOW_FILE=/usr/local/etc/allow.txt
+	$allow_file = $ENV{CONNECT_SWITCH_ALLOW_FILE};
+}
+
+# Set to 1 to re-map to vnc port, e.g. 'hostname 15' to 'hostname 5915'
+# i.e. assume a port 0 <= port < 200 is actually a VNC display
+# and add 5900 to it.  Set to 0 to not do the mapping.
+# Note that negative ports, e.g. 'joesbox -22' go directly to -port.
+#
+my $apply_vnc_offset = 1;
+my $vnc_offset = 5900;
+
+if (exists $ENV{CONNECT_SWITCH_APPLY_VNC_OFFSET}) {
+	# E.g. CONNECT_SWITCH_APPLY_VNC_OFFSET=0
+	$apply_vnc_offset = $ENV{CONNECT_SWITCH_APPLY_VNC_OFFSET};
+}
+if (exists $ENV{CONNECT_SWITCH_VNC_OFFSET}) {
+	# E.g. CONNECT_SWITCH_VNC_OFFSET=6000
+	$vnc_offset = $ENV{CONNECT_SWITCH_VNC_OFFSET};
+}
+
+# Set to 1 for more debugging output:
+#
+my $verbose = 0;
+
+if (exists $ENV{CONNECT_SWITCH_VERBOSE}) {
+	# E.g. CONNECT_SWITCH_VERBOSE=1
+	$verbose = $ENV{CONNECT_SWITCH_VERBOSE};
+}
+
+############################################################################
+#  No need for any changes below here.
+
+use IO::Socket::INET;
+use strict;
+use warnings;
+
+my $killpid = 1;
+
+setpgrp(0, 0);
+
+my $listen_sock = IO::Socket::INET->new(
+	Listen    => 10,
+	LocalAddr => $listen_host,
+	LocalPort => $listen_port,
+	Proto     => "tcp"
+);
+
+if (! $listen_sock) {
+	die "connect_switch: $!\n";
+}
+
+my $current_fh1 = '';
+my $current_fh2 = '';
+
+my $conn = 0;
+
+while (1) {
+	$conn++;
+	print STDERR "listening for connection: $conn\n" if $verbose; 
+	my ($client, $ip) = $listen_sock->accept();
+	if (! $client) {
+		fsleep(0.5);
+		next;
+	}
+	print STDERR "conn: $conn -- ", $client->peerhost(), "\n" if $verbose;
+
+	my $pid = fork();
+	if (! defined $pid) {
+		die "connect_switch: $!\n";
+	} elsif ($pid) {
+		wait;
+		next;
+	} else {
+		close $listen_sock;
+		if (fork) {
+			exit 0;
+		}
+		setpgrp(0, 0);
+		handle_conn($client);
+	}
+}
+
+exit 0;
+
+sub handle_conn {
+	my $client = shift;
+
+	my $start = time();
+
+	my @allow = @allowed;
+
+	if ($allow_file && -f $allow_file) {
+		if (open(ALLOW, "<$allow_file")) {
+			while (<ALLOW>) {
+				next if /^\s*#/;
+				next if /^\s*$/;
+				chomp;
+				my ($host, $dpy) = split(' ', $_); 
+				next if ! defined $host;
+				next if ! defined $dpy;
+				if ($dpy < 0) {
+					$dpy = -$dpy;
+				} elsif ($apply_vnc_offset) {
+					$dpy += $vnc_offset if $dpy < 200;
+				}
+				push @allow, "$host:$dpy";
+			}
+			close(ALLOW);
+		} else {
+			warn "$allow_file: $!\n";
+		}
+	}
+
+	my $str = '';
+	my $N = 0;
+	my $isconn = 1;
+	for (my $i = 0; $i < 7; $i++) {
+		my $b;
+		sysread($client, $b, 1);
+		$str .= $b;
+		$N++;
+		print STDERR "read: '$str'\n" if $verbose;
+		my $cstr = substr('CONNECT', 0, $i+1);
+		if ($str ne $cstr) {
+			$isconn = 0;
+			last;
+		}
+	}
+
+	my $sock = '';
+	if ($isconn) {
+		while ($str !~ /\r\n\r\n/) {
+			my $b;
+			sysread($client, $b, 1);
+			$str .= $b;
+		}
+		print STDERR "read: $str\n" if $verbose;
+
+		my $ok = 0;
+		my $hostport = '';
+		my $http_vers = '1.0';
+		if ($str =~ /^CONNECT\s+(\S+)\s+HTTP\/(\S+)/) {
+			$hostport = $1;
+			$http_vers = $2;
+			foreach my $hp (@allow) {
+				if ($hp eq $hostport) {
+					$ok = 1;
+					last;
+				}
+			}
+		}
+		if (! $ok) {
+			close $client;
+			exit 0;
+		}
+
+		my ($host, $port) = split(/:/, $hostport);
+
+		print STDERR "connecting to: $host:$port\n" if $verbose;
+
+		$sock = IO::Socket::INET->new(
+			PeerAddr => $host,
+			PeerPort => $port,
+			Proto => "tcp"
+		);
+		my $msg;
+		if ($sock) {
+			$msg = "HTTP/$http_vers 200 Connection Established\r\n"
+			     . "Proxy-agent: connect_switch v0.2\r\n\r\n";
+		} else {
+			$msg = "HTTP/$http_vers 502 Bad Gateway\r\n"
+			     . "Connection: close\r\n\r\n";
+		}
+		syswrite($client, $msg, length($msg));
+		$str = '';
+	} else {
+		print STDERR "connecting to: $httpd_host:$httpd_port\n"
+		    if $verbose;
+		$sock = IO::Socket::INET->new(
+			PeerAddr => $httpd_host,
+			PeerPort => $httpd_port,
+			Proto => "tcp"
+		);
+	}
+
+	if (! $sock) {
+		close $client;
+		die "connect_switch: $!\n";
+	}
+
+	$current_fh1 = $client;
+	$current_fh2 = $sock;
+
+	$SIG{TERM} = sub {print STDERR "got sigterm\[$$]\n" if $verbose; close $current_fh1; close $current_fh2; exit 0};
+
+	my $parent = $$;
+	if (my $child = fork()) {
+		xfer($sock, $client, 'S->C');
+		if ($killpid) {
+			fsleep(0.5);
+			kill 'TERM', $child;
+		}
+	} else {
+		if ($str ne '' && $N > 0) {
+			syswrite($sock, $str, $N);
+		}
+		xfer($client, $sock, 'C->S');
+		if ($killpid) {
+			fsleep(0.75);
+			kill 'TERM', $parent;
+		}
+	}
+	if ($verbose) {
+		my $dt = time() - $start;
+		print STDERR "dt\[$$]: $dt\n";
+	}
+	exit 0;
+}
+
+sub xfer {
+	my($in, $out, $lab) = @_;
+	my ($RIN, $WIN, $EIN, $ROUT);
+	$RIN = $WIN = $EIN = "";
+	$ROUT = "";
+	vec($RIN, fileno($in), 1) = 1;
+	vec($WIN, fileno($in), 1) = 1;
+	$EIN = $RIN | $WIN;
+	my $buf;
+
+	while (1) {
+		my $nf = 0;
+		while (! $nf) {
+			$nf = select($ROUT=$RIN, undef, undef, undef);
+		}
+		my $len = sysread($in, $buf, 8192);
+		if (! defined($len)) {
+			next if $! =~ /^Interrupted/;
+			print STDERR "connect_switch\[$lab/$conn/$$]: $!\n";
+			last;
+		} elsif ($len == 0) {
+			print STDERR "connect_switch\[$lab/$conn/$$]: "
+			    . "Input is EOF.\n";
+			last;
+		}
+
+		if (0) {
+			# verbose debugging of data:
+			syswrite(STDERR , "\n$lab: ", 6);
+			syswrite(STDERR , $buf, $len);
+		}
+
+		my $offset = 0;
+		my $quit = 0;
+		while ($len) {
+			my $written = syswrite($out, $buf, $len, $offset);
+			if (! defined $written) {
+				print STDERR "connect_switch\[$lab/$conn/$$]: "
+				    . "Output is EOF. $!\n";
+				$quit = 1;
+				last;
+			}
+			$len -= $written;
+			$offset += $written;
+		}
+		last if $quit;
+	}
+	close($in);
+	close($out);
+}
+
+sub fsleep {
+	my ($time) = @_;
+	select(undef, undef, undef, $time) if $time;
+}

@@ -4233,6 +4233,21 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 		goto done;
 	}
+	if (strstr(p, "fakebuttonevent") == p) {
+		int mb, down = 0;
+		NOTAPP
+		COLON_CHECK("fakebuttonevent:")
+		p += strlen("fakebuttonevent:");
+		rfbLog("remote_cmd: insert fakebuttonevent: %s\n", p);
+		if (sscanf(p, "%d,%d", &mb, &down) == 2) {
+			X_LOCK;
+			rfbLog("remote_cmd: XTestFakeButtonEvent(mb=%d, down=%d)\n", mb, down);
+			XTestFakeButtonEvent_wr(dpy, mb, down ? True : False, CurrentTime);
+			X_UNLOCK;
+		}
+
+		goto done;
+	}
 	if (strstr(p, "sleep") == p) {
 		NOTAPP
 		COLON_CHECK("sleep:")

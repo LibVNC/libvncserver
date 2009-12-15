@@ -1737,6 +1737,7 @@ static void store_homedir_passwd(char *file) {
 	fprintf(stderr, "Enter VNC password: ");
 	system("stty -echo");
 	if (fgets(str1, 32, stdin) == NULL) {
+		perror("fgets");
 		system("stty echo");
 		exit(1);
 	}
@@ -1744,6 +1745,7 @@ static void store_homedir_passwd(char *file) {
 
 	fprintf(stderr, "Verify password:    ");
 	if (fgets(str2, 32, stdin) == NULL) {
+		perror("fgets");
 		system("stty echo");
 		exit(1);
 	}
@@ -1794,6 +1796,7 @@ static void store_homedir_passwd(char *file) {
 	fprintf(stderr, "Write password to %s?  [y]/n ", f);
 
 	if (fgets(str2, 32, stdin) == NULL) {
+		perror("fgets");
 		exit(1);
 	}
 	if (str2[0] == 'n' || str2[0] == 'N') {
@@ -1802,14 +1805,16 @@ static void store_homedir_passwd(char *file) {
 	}
 
 	if (rfbEncryptAndStorePasswd(str1, f) != 0) {
-		fprintf(stderr, "** error creating password.\n");
+		fprintf(stderr, "** error creating password: %s\n", f);
 		perror("storepasswd");
 		exit(1);
 	}
-	fprintf(stderr, "Password written to: %s\n", f);
 	if (stat(f, &sbuf) != 0) {
+		fprintf(stderr, "** error creating password: %s\n", f);
+		perror("stat");
 		exit(1);
 	}
+	fprintf(stdout, "Password written to: %s\n", f);
 	exit(0);
 }
 
@@ -1945,7 +1950,7 @@ static void check_guess_auth_file(void)  {
 		}
 
 		cmd = (char *)malloc(100 + strlen(program_name) + strlen(disp));
-		sprintf(cmd, "%s -findauth %s", program_name, disp);
+		sprintf(cmd, "%s -findauth %s -env _D_XDM=1", program_name, disp);
 		p = popen(cmd, "r");
 		if (!p) {
 			rfbLog("-auth guess: could not run cmd '%s'\n", cmd);
@@ -1960,6 +1965,28 @@ static void check_guess_auth_file(void)  {
 			disp = getenv("DISPLAY");
 			if (!disp) {
 				disp = "unset";
+			}
+		}
+		if (strstr(line, "XAUTHORITY=") != line && !getenv("FD_XDM")) {
+			if (use_dpy == NULL || strstr(use_dpy, "cmd=FIND") == NULL) {
+				if (getuid() == 0 || geteuid() == 0) {
+					char *q = strstr(cmd, "_D_XDM=1");
+					if (q) {
+						*q = 'F';
+						rfbLog("-auth guess: failed for display='%s'\n", disp);
+						rfbLog("-auth guess: since we are root, retrying with FD_XDM=1\n");
+						p = popen(cmd, "r");
+						if (!p) {
+							rfbLog("-auth guess: could not run cmd '%s'\n", cmd);
+							clean_up_exit(1);
+						}
+						memset(line, 0, sizeof(line));
+						n = fread(line, 1, sizeof(line), p);
+						pclose(p);
+						q = strrchr(line, '\n');
+						if (q) *q = '\0';
+					}
+				}
 			}
 		}
 		if (!strcmp(line, "")) {
@@ -2013,7 +2040,6 @@ int main(int argc, char* argv[]) {
 	int got_tls = 0;
 	int got_inetd = 0;
 	int got_noxrandr = 0;
-	int got_findauth = 0;
 
 	/* used to pass args we do not know about to rfbGetScreen(): */
 	int argc_vnc_max = 1024;
@@ -2890,10 +2916,12 @@ int main(int argc, char* argv[]) {
 			}
 			if (argc >= i+4 || rfbEncryptAndStorePasswd(argv[i+1],
 			    argv[i+2]) != 0) {
-				fprintf(stderr, "-storepasswd failed\n");
+				perror("storepasswd");
+				fprintf(stderr, "-storepasswd failed for file: %s\n",
+				    argv[i+2]);
 				exit(1);
 			} else {
-				fprintf(stderr, "stored passwd in file %s\n",
+				fprintf(stderr, "stored passwd in file: %s\n",
 				    argv[i+2]);
 				exit(0);
 			}
@@ -2904,6 +2932,7 @@ int main(int argc, char* argv[]) {
 				char *f = argv[i+1];
 				char *s = rfbDecryptPasswdFromFile(f);
 				if (!s) {
+					perror("showrfbauth");
 					fprintf(stderr, "rfbDecryptPasswdFromFile failed: %s\n", f);
 					exit(1);
 				}
@@ -4801,13 +4830,6 @@ int main(int argc, char* argv[]) {
 	
 	/* open the X display: */
 
-	if (auth_file) {
-		check_guess_auth_file();
-		if (auth_file != NULL) {
-			set_env("XAUTHORITY", auth_file);
-		}
-	}
-
 #if LIBVNCSERVER_HAVE_XKEYBOARD
 	/*
 	 * Disable XKEYBOARD before calling XOpenDisplay()
@@ -4874,6 +4896,9 @@ int main(int argc, char* argv[]) {
 			rfbLog("warning: -display does not make sense in "
 			    "\"lurk=\" mode...\n");
 		}
+		if (auth_file != NULL && strcmp(auth_file, "guess")) {
+			set_env("XAUTHORITY", auth_file);
+		}
 		lurk_loop(users_list);
 
 	} else if (use_dpy && strstr(use_dpy, "WAIT:") == use_dpy) {
@@ -4885,6 +4910,13 @@ int main(int argc, char* argv[]) {
 		if (!mcm && multiple_cursors_mode) {
 			free(multiple_cursors_mode);
 			multiple_cursors_mode = NULL;
+		}
+	}
+
+	if (auth_file) {
+		check_guess_auth_file();
+		if (auth_file != NULL) {
+			set_env("XAUTHORITY", auth_file);
 		}
 	}
 
