@@ -1895,11 +1895,20 @@ char *setup_cmd(char *str, int *vnc_redirect, char **vnc_redirect_host, int *vnc
 		char com[100];
 		int fd = mkstemp(tmp);
 		if (fd >= 0) {
+			int ret;
 			write(fd, find_display, strlen(find_display));
 			close(fd);
 			set_env("FINDDISPLAY_run", "1");
-			sprintf(com, "/bin/sh %s -n; rm -f %s", tmp, tmp);
-			system(com);
+			sprintf(com, "/bin/sh %s -n", tmp);
+			ret = system(com);
+			if (WIFEXITED(ret) && WEXITSTATUS(ret) != 0) {
+				if (got_findauth && !getenv("FD_XDM")) {
+					if (getuid() == 0 || geteuid() == 0) {
+						set_env("FD_XDM", "1");
+						system(com);
+					}
+				}
+			}
 		}
 		unlink(tmp);
 		exit(0);
@@ -2328,8 +2337,8 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 	int internal_cmd = 0;
 	int tried_switch = 0;
 
-	memset(line1, 0, 1024);
-	memset(line2, 0, 16384);
+	memset(line1, 0, sizeof(line1));
+	memset(line2, 0, sizeof(line2));
 
 	if (users_list && strstr(users_list, "sslpeer=") == users_list) {
 		usslpeer = get_usslpeer();
@@ -2397,13 +2406,13 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 		int res = 0, k, j, i;
 		char line[18000];
 
-		memset(line, 0, 18000);
+		memset(line, 0, sizeof(line));
 
 		if (unixpw_system_greeter_active == 2) {
 			rfbLog("unixpw_system_greeter: forcing find display failure.\n");
 			res = 0;
 		} else if (keep_unixpw_user && keep_unixpw_pass) {
-			n = 18000;
+			n = sizeof(line);
 			if (unixpw_cmd != NULL) {
 				res = unixpw_cmd_run(keep_unixpw_user,
 				    keep_unixpw_pass, cmd, line, &n);
@@ -2432,13 +2441,13 @@ if (db) {fprintf(stderr, "line: "); write(2, line, n); write(2, "\n", 1); fprint
 
 			if (unixpw_cmd != NULL) {
 				/* let the external unixpw command do it: */
-				n = 18000;
+				n = sizeof(line);
 				close_exec_fds();
 				res = unixpw_cmd_run(keep_unixpw_user,
 				    keep_unixpw_pass, create_cmd, line, &n);
 			} else if (getuid() != 0 && unixpw_system_greeter_active != 2) {
 				/* if not root, run as the other user... */
-				n = 18000;
+				n = sizeof(line);
 				close_exec_fds();
 				res = su_verify(keep_unixpw_user,
 				    keep_unixpw_pass, create_cmd, line, &n, nodisp);

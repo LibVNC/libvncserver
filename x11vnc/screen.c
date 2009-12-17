@@ -1652,7 +1652,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 	}
 	if (strstr(rstr, "solid=") == rstr) {
 		char *n = rstr + strlen("solid=");
-		char tmp[] = "/tmp/solid.XXXXXX";
+		char tmp[] = "/tmp/rawfb_solid.XXXXXX";
 		char str[100];
 		unsigned int vals[1024], val;
 		int x, y, fd, w = 1024, h = 768;
@@ -1680,7 +1680,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		sprintf(str, "map:%s@%dx%dx32", tmp, w, h);
 		rstr = strdup(str);
 	} else if (strstr(rstr, "swirl") == rstr) {
-		char tmp[] = "/tmp/solid.XXXXXX";
+		char tmp[] = "/tmp/rawfb_swirl.XXXXXX";
 		char str[100];
 		unsigned int val[1024];
 		unsigned int c1, c2, c3, c4;

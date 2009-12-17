@@ -111,6 +111,7 @@ int connect_once = 1;		/* disconnect after first connection session. */
 int connect_once = 0;
 #endif
 int got_connect_once = 0;
+int got_findauth = 0;
 int deny_all = 0;		/* global locking of new clients */
 #ifndef REMOTE_DEFAULT
 #define REMOTE_DEFAULT 1
