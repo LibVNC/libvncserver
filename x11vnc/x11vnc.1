@@ -2,7 +2,7 @@
 .TH X11VNC "1" "December 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.9, lastmod: 2009-12-06
+         version: 0.9.9, lastmod: 2009-12-14
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -728,6 +728,15 @@ instead of vncconnect may
 work (see the FAQ).  The \fB-remote\fR control mechanism uses
 X11VNC_REMOTE channel, and this option disables/enables
 it as well.  Default: \fB-vncconnect\fR
+.IP
+To use different names for these X11 properties (e.g. to
+have separate communication channels for multiple
+x11vnc's on the same display) set the VNC_CONNECT or
+X11VNC_REMOTE env. vars. to the string you want, for
+example: \fB-env\fR X11VNC_REMOTE=X11VNC_REMOTE_12345
+Both sides of the channel must use the same unique name.
+The same can be done for the internal X11VNC_TICKER
+property (heartbeat and timestamp) if desired.
 .PP
 \fB-allow\fR \fIhost1[,host2..]\fR
 .IP
@@ -3159,6 +3168,11 @@ Instead of exiting after cleaning up, run a simple
 .IP
 Be quiet by printing less informational output to
 stderr. (use \fB-noquiet\fR to undo an earlier \fB-quiet.)\fR
+.IP
+The \fB-quiet\fR option does not eliminate all informational
+output, it only reduces it.  It is ignored in most
+auxiliary usage modes, e.g. \fB-storepasswd.\fR  To eliminate
+all output use: 2>/dev/null 1>&2, etc.
 .PP
 \fB-v,\fR \fB-verbose\fR
 .IP
@@ -5274,6 +5288,13 @@ For example: 'x11vnc \fB-remote\fR stop' (which is the same as
 \'x11vnc \fB-R\fR shared' will enable shared connections, and
 \'x11vnc \fB-R\fR scale:3/4' will rescale the desktop.
 .IP
+To use a different name for the X11 property (e.g. to
+have separate communication channels for multiple
+x11vnc's on the same display) set the X11VNC_REMOTE
+environment variable to the string you want, for
+example: \fB-env\fR X11VNC_REMOTE=X11VNC_REMOTE_12345
+Both sides of the channel must use the same unique name.
+.IP
 To run a bunch of commands in a sequence use something
 like: x11vnc \fB-R\fR 'script:firstcmd;secondcmd;...'
 .IP
@@ -5766,6 +5787,8 @@ keysym:str,down inject 'keysym' (down=0,1)
 .IP
 ptr:x,y,mask    inject pointer event x, y, button-mask
 .IP
+fakebuttonevent:button,down direct XTestFakeButtonEvent.
+.IP
 sleep:t         sleep floating point time t.
 .IP
 get_xprop:p     get X property named 'p'.
@@ -6148,8 +6171,8 @@ pointer_mode pm input_skip allinput noallinput input
 grabkbd nograbkbd grabptr nograbptr grabalways
 nograbalways grablocal client_input ssltimeout
 speeds wmdt debug_pointer dp nodebug_pointer nodp
-debug_keyboard dk nodebug_keyboard nodk keycode
-keysym ptr sleep get_xprop set_xprop wininfo
+debug_keyboard dk nodebug_keyboard nodk keycode keysym
+ptr fakebuttonevent sleep get_xprop set_xprop wininfo
 bcx_xattach deferupdate defer setdefer extra_fbur
 wait_ui wait_bog nowait_bog slow_fb xrefresh wait
 readtimeout nap nonap sb screen_blank fbpm nofbpm dpms

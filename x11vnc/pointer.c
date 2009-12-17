@@ -267,9 +267,11 @@ void initialize_pointer_map(char *pointer_remap) {
 		X_LOCK;
 		num_buttons = XGetPointerMapping(dpy, map, MAX_BUTTONS);
 		X_UNLOCK;
+		rfbLog("The X server says there are %d mouse buttons.\n", num_buttons);
 #endif
 	} else {
 		num_buttons = 5;
+		rfbLog("Manually set num_buttons to: %d\n", num_buttons);
 	}
 
 	if (num_buttons < 0) {

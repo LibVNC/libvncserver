@@ -771,6 +771,8 @@ void create_xdamage_if_needed(int force) {
 
 	RAWFB_RET_VOID
 
+	if (force) {}
+
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
 	if (! xdamage || force) {
 		X_LOCK;

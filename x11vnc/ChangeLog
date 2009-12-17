@@ -1,3 +1,15 @@
+2009-12-15  Karl Runge <runge@karlrunge.com>
+	* x11vnc: X11VNC_REMOTE, X11VNC_TICKER, and VNC_CONNECT properties
+	  names can be changed via env. vars (e.g. for multiple
+	  x11vnc instances.) The -quiet option documented better.
+	  Add fakebuttonevent remote control action.  Improve child
+	  test for connecting to port 113.  Add connect_switch and
+	  ultravnc_repeater.pl to CVS.	Report X server number of mouse
+	  buttons.  Change find_display script to check for stale pids
+	  in /tmp/.XNN-lock.  If root under find_display, try FD_XDM
+	  if previous failed to find auth.  Print error reasons for
+	  -storepasswd failures.
+
 2009-12-06  Karl Runge <runge@karlrunge.com>
 	* x11vnc: findauth/-auth guess works with FD_XDM=1 for root
 	  finding dm's xauthority.  Work around for GDM's recent 
