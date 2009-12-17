@@ -87,8 +87,9 @@
  If the server supports the requested feature, it tells the client
  about the multicast address and port to listen on for framebuffer
  updates and also adds its multicast update interval and a unique ID
- assigned to the pixelformat the client requested (if any) or 0 if the
- client was content with the server's default pixelformat.
+ bigger than 0 assigned to the pixelformat the client requested (if
+ any) or 0 if the client was content with the server's default
+ pixelformat.
 
  So, the server sends back a 'FramebufferUpdate' message consisting of
  one rectangle with:
