@@ -113,6 +113,11 @@ extern "C"
 #endif
 #endif
 
+/* region stuff */
+struct sraRegion;
+typedef struct sraRegion* sraRegionPtr;
+
+
 struct _rfbClientRec;
 struct _rfbScreenInfo;
 struct rfbCursor;
@@ -266,6 +271,7 @@ typedef struct _rfbScreenInfo
     rfbBool udpSockConnected;
     struct sockaddr_in udpRemoteAddr;
 
+    /* multicast stuff */
     rfbBool multicastVNC;
     char* multicastAddr;
     int multicastPort;
@@ -273,13 +279,16 @@ typedef struct _rfbScreenInfo
     SOCKET multicastSock;
     struct sockaddr_storage multicastSockAddr;
     /*
-     * the constransts for MULTICAT_UPDATE_BUF_SIZE are the same as for UPDATE_BUF_SIZE 
+     * the constraints for MULTICAT_UPDATE_BUF_SIZE are the same as for UPDATE_BUF_SIZE 
      * (see comment there), additionally, it _must_ fit into a UDP packet
      */
 #define MULTICAST_UPDATE_BUF_SIZE 60000
     char multicastUpdateBuf[MULTICAST_UPDATE_BUF_SIZE];
     int mcublen;
-    
+#define MULTICAST_MAX_CONCURRENT_PIXELFORMATS 256 /* could be up to 65535 */
+    char multicastUpdPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
+    char multicastUpdPendingForEncoding[1]; /* since non-pseudo encodings are < 256 */
+    sraRegionPtr multicastUpdateRegion;
 
     int maxClientWait;
 
@@ -344,6 +353,7 @@ typedef struct _rfbScreenInfo
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     MUTEX(cursorMutex);
     MUTEX(multicastOutputMutex);
+    MUTEX(multicastUpdateMutex);
     rfbBool backgroundLoop;
 #endif
 
@@ -384,10 +394,6 @@ typedef void (*rfbTranslateFnType)(char *table, rfbPixelFormat *in,
                                    int width, int height);
 
 
-/* region stuff */
-
-struct sraRegion;
-typedef struct sraRegion* sraRegionPtr;
 
 /*
  * Per-client structure.

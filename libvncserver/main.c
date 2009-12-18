@@ -396,6 +396,10 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr screen,sraRegionPtr modRegion)
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
 
+   LOCK(screen->multicastUpdateMutex);
+   sraRgnOr(screen->multicastUpdateRegion, modRegion);
+   UNLOCK(screen->multicastUpdateMutex);
+
    iterator=rfbGetClientIterator(screen);
    while((cl=rfbClientIteratorNext(iterator))) {
      LOCK(cl->updateMutex);
@@ -821,6 +825,9 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->multicastPort=5900;
    screen->multicastTTL=1;
    INIT_MUTEX(screen->multicastOutputMutex);
+   INIT_MUTEX(screen->multicastUpdateMutex);
+   screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
+     
 
    screen->maxFd=0;
    screen->listenSock=-1;
@@ -940,6 +947,9 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
   screen->bitsPerPixel = screen->depth = 8*bytesPerPixel;
   screen->paddedWidthInBytes = width*bytesPerPixel;
 
+  sraRgnDestroy(screen->multicastUpdateRegion);  
+  screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
+
   rfbInitServerFormat(screen, bitsPerSample);
 
   if (memcmp(&screen->serverFormat, &old_format,
@@ -1005,6 +1015,8 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
     rfbFreeCursor(screen->cursor);
 
   TINI_MUTEX(screen->multicastOutputMutex);
+  TINI_MUTEX(screen->multicastUpdateMutex);
+  sraRgnDestroy(screen->multicastUpdateRegion);  
 
   rfbRRECleanup(screen);
   rfbCoRRECleanup(screen);
@@ -1114,6 +1126,34 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	}
       }
     }
+
+    
+    if (screen->multicastVNC && screen->multicastSock >= 0 && 
+	cl->useMulticastVNC && !cl->onHold && //FIXME? cl->sock >= 0 
+	(screen->multicastUpdPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] &
+	 (1<<(cl->multicastPixelformatId % 8))) &&
+	(screen->multicastUpdPendingForEncoding[((cl->preferredEncoding & 0xFF)/8)] &
+	 (1<<(cl->preferredEncoding % 8))) &&
+	!sraRgnEmpty(screen->multicastUpdateRegion) ) {
+      result=TRUE;
+      if(screen->deferUpdateTime == 0) {
+	  rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
+      } else if(cl->startDeferring.tv_usec == 0) {
+	gettimeofday(&cl->startDeferring,NULL);
+	if(cl->startDeferring.tv_usec == 0)
+	  cl->startDeferring.tv_usec++;
+      } else {
+	gettimeofday(&tv,NULL);
+	if(tv.tv_sec < cl->startDeferring.tv_sec /* at midnight */
+	   || ((tv.tv_sec-cl->startDeferring.tv_sec)*1000
+	       +(tv.tv_usec-cl->startDeferring.tv_usec)/1000)
+	     > screen->deferUpdateTime) {
+	  cl->startDeferring.tv_usec = 0;
+	  rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
+	}
+      }
+    }
+
 
     if (!cl->viewOnly && cl->lastPtrX >= 0) {
       if(cl->startPtrDeferring.tv_usec == 0) {

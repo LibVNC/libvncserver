@@ -2281,8 +2281,6 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
     case rfbMulticastFramebufferUpdateRequest:
     {
-        sraRegionPtr tmpRegion;
-
         if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
 			      sz_rfbMulticastFramebufferUpdateRequestMsg-1)) <= 0) {
             if (n != 0)
@@ -2295,34 +2293,35 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 				 sz_rfbMulticastFramebufferUpdateRequestMsg,
 				 sz_rfbMulticastFramebufferUpdateRequestMsg);
 
-	tmpRegion = sraRgnCreateRect(0, 0, cl->screen->width, cl->screen->height);
+	LOCK(cl->screen->multicastUpdateMutex);
 
-        LOCK(cl->updateMutex);
-	sraRgnOr(cl->requestedRegion,tmpRegion);
+	/* mark client's pixelformat and encoding as requested */
+	rfbSetBit(cl->screen->multicastUpdPendingForPixelformat, cl->multicastPixelformatId);
+	rfbSetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredEncoding);
 
+	if (!msg.mfur.incremental) {
+	    sraRegionPtr tmpRegion = sraRgnCreateRect(0, 0, cl->screen->width, cl->screen->height);
+	    sraRgnOr(cl->screen->multicastUpdateRegion, tmpRegion);
+	    //sraRgnSubtract(cl->copyRegion,tmpRegion); //FIXME remove copyregion?
+	    sraRgnDestroy(tmpRegion);
+	}
+
+	UNLOCK(cl->screen->multicastUpdateMutex);
+	
+	
+	LOCK(cl->updateMutex);
+ 	
 	if (!cl->readyForSetColourMapEntries) {
 	    /* client hasn't sent a SetPixelFormat so is using server's */
 	    cl->readyForSetColourMapEntries = TRUE;
-	    if (!cl->format.trueColour) {
-		if (!rfbSetClientColourMap(cl, 0, 0)) {
-		    sraRgnDestroy(tmpRegion);
-		    TSIGNAL(cl->updateCond);
-		    UNLOCK(cl->updateMutex);
-		    return;
-		}
-	    }
+	    if (!cl->format.trueColour) 
+	      rfbSetClientColourMap(cl, 0, 0);
 	}
 
-       if (!msg.mfur.incremental) {
-	    sraRgnOr(cl->modifiedRegion,tmpRegion);
-	    sraRgnSubtract(cl->copyRegion,tmpRegion); //FIXME remove copyregion?
-       }
-       TSIGNAL(cl->updateCond);
-       UNLOCK(cl->updateMutex);
+	TSIGNAL(cl->updateCond);
+	UNLOCK(cl->updateMutex);
 
-       sraRgnDestroy(tmpRegion);
-
-       return;
+	return;
     }
 
     case rfbKeyEvent:
@@ -3066,6 +3065,10 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
+
+    rfbLog("sending MC FB upd for cl %s\n", cl->host );
+    return TRUE;
+
 
     LOCK(cl->updateMutex);
 
