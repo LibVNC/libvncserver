@@ -794,7 +794,7 @@ static void check_redir_services(void) {
 	}
 	if (db) fprintf(stderr, "TS_REDIR_PID Atom: %d = '%s'\n", (int) a, prop);
 
-	if (getenv("FD_TAG")) {
+	if (getenv("FD_TAG") && strcmp(getenv("FD_TAG"), "")) {
 		a = XInternAtom(dpy, "FD_TAG", False);
 		if (a != None) {
 			Window rwin = RootWindow(dpy, DefaultScreen(dpy));
@@ -4103,6 +4103,12 @@ int main(int argc, char* argv[]) {
 				    "mode\n");
 			}
 			bg = 0;
+		} else if (!bg && getenv("X11VNC_LOOP_MODE_BG")) {
+			if (! quiet) {
+				fprintf(stderr, "enabling -bg in -loopbg "
+				    "mode\n");
+			}
+			bg = 1;
 		}
 		if (inetd) {
 			if (! quiet) {
@@ -4601,10 +4607,18 @@ int main(int argc, char* argv[]) {
 			use_stunnel = 0;
 		}
 		if (! use_stunnel && ! use_openssl) {
-			if (getenv("UNIXPW_DISABLE_LOCALHOST")) {
+			if (getenv("UNIXPW_DISABLE_SSL")) {
 				rfbLog("Skipping -ssl/-stunnel requirement"
 				    " due to\n");
-				rfbLog("UNIXPW_DISABLE_LOCALHOST setting.\n");
+				rfbLog("UNIXPW_DISABLE_SSL setting.\n");
+
+				if (!getenv("UNIXPW_DISABLE_LOCALHOST")) {
+					if (!got_localhost) {
+						rfbLog("Forcing -localhost mode.\n");
+					}
+					allow_list = strdup("127.0.0.1");
+					got_localhost = 1;
+				}
 			} else if (have_ssh_env()) {
 				char *s = getenv("SSH_CONNECTION");
 				if (! s) s = getenv("SSH_CLIENT");
@@ -4615,13 +4629,17 @@ int main(int argc, char* argv[]) {
 				rfbLog("assuming your SSH encryption"
 				    " is:\n");
 				rfbLog("   %s\n", s);
-				rfbLog("Setting -localhost in SSH + -unixpw"
-				    " mode.\n");
+
+				if (!getenv("UNIXPW_DISABLE_LOCALHOST")) {
+					if (!got_localhost) {
+						rfbLog("Setting -localhost in SSH + -unixpw mode.\n");
+					}
+					allow_list = strdup("127.0.0.1");
+					got_localhost = 1;
+				}
+
 				rfbLog("If you *actually* want SSL, restart"
 				    " with -ssl on the cmdline\n");
-				fprintf(stderr, "\n");
-				allow_list = strdup("127.0.0.1");
-				got_localhost = 1;
 				if (! nopw) {
 					usleep(2000*1000);
 				}
@@ -4638,10 +4656,12 @@ int main(int argc, char* argv[]) {
 					use_stunnel = 1;
 				}
 			}
+			rfbLog("\n");
 		}
 		if (use_threads && !getenv("UNIXPW_THREADS")) {
 			if (! quiet) {
 				rfbLog("disabling -threads under -unixpw\n");
+				rfbLog("\n");
 			}
 			use_threads = 0;
 		}

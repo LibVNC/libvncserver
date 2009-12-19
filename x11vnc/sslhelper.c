@@ -2919,7 +2919,7 @@ static int is_ssl_readable(int s_in, double last_https, char *last_get,
 		 * for each socket (and some clients send requests
 		 * rapid fire).
 		 */
-		tv.tv_sec = 6;
+		tv.tv_sec = 4;
 	}
 
 	/*
@@ -2935,14 +2935,16 @@ static int is_ssl_readable(int s_in, double last_https, char *last_get,
 	if (getenv("X11VNC_HTTPS_VS_VNC_TIMEOUT")) {
 		tv.tv_sec  = atoi(getenv("X11VNC_HTTPS_VS_VNC_TIMEOUT"));
 	}
-if (db) fprintf(stderr, "tv_sec: %d - %s\n", (int) tv.tv_sec, last_get);
+if (db) fprintf(stderr, "tv_sec: %d - '%s'\n", (int) tv.tv_sec, last_get);
 
 	FD_ZERO(&rd);
 	FD_SET(s_in, &rd);
 
+	if (db) fprintf(stderr, "is_ssl_readable: begin  select(%d secs) %.6f\n", tv.tv_sec, dnow());
 	do {
 		nfd = select(s_in+1, &rd, NULL, NULL, &tv);
 	} while (nfd < 0 && errno == EINTR);
+	if (db) fprintf(stderr, "is_ssl_readable: finish select(%d secs) %.6f\n", tv.tv_sec, dnow());
 
 	if (db) fprintf(stderr, "https nfd: %d\n", nfd);
 

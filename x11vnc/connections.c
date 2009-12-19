@@ -2795,6 +2795,7 @@ void reverse_connect(char *str) {
 void set_vnc_connect_prop(char *str) {
 	RAWFB_RET_VOID
 #if !NO_X11
+	if (vnc_connect_prop == None) return;
 	XChangeProperty(dpy, rootwin, vnc_connect_prop, XA_STRING, 8,
 	    PropModeReplace, (unsigned char *)str, strlen(str));
 #else
@@ -2805,6 +2806,7 @@ void set_vnc_connect_prop(char *str) {
 void set_x11vnc_remote_prop(char *str) {
 	RAWFB_RET_VOID
 #if !NO_X11
+	if (x11vnc_remote_prop == None) return;
 	XChangeProperty(dpy, rootwin, x11vnc_remote_prop, XA_STRING, 8,
 	    PropModeReplace, (unsigned char *)str, strlen(str));
 #else
@@ -3292,6 +3294,9 @@ int set_xprop(char *prop, Window win, char *value) {
 		win = rootwin;
 	}
 	aprop = XInternAtom(dpy, prop, False);
+	if (aprop == None) {
+		return rc;
+	}
 	rc = XChangeProperty(dpy, win, aprop, XA_STRING, 8,
 	    PropModeReplace, (unsigned char *)value, strlen(value));
 	return rc;
