@@ -1262,6 +1262,7 @@ void user_supplied_opts(char *opts) {
 		"noncache", "nc",
 		"nodisplay", "nd",
 		"viewonly", "vo",
+		"tag",
 		NULL
 	};
 
@@ -2053,6 +2054,35 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 				sprintf(fdesd, "%d", p);
 			}
 		}
+		if (!getenv("FD_TAG")) {
+			char *s = NULL;
+
+			q = strstr(t, "tag=");
+			if (q) s = strchr(q, ',');
+			if (s) *s = '\0';
+
+			if (q && strlen(q) < 120) {
+				char *p;
+				int ok = 1;
+				q = strchr(q, '=') + 1;
+				p = q;
+				while (*p != '\0') {
+					char c = *p;
+					if (*p == '_' || *p == '-') {
+						;
+					} else if (!isalnum((int) c)) {
+						ok = 0;
+						rfbLog("bad tag char: '%c' in '%s'\n", c, q);
+						break;
+					}
+					p++;
+				}
+				if (ok) {
+					sprintf(fdtag, "%s", q);
+				}
+			}
+			if (s) *s = ',';
+		}
 		free(t);
 	}
 	if (fdgeom[0] == '\0' && getenv("FD_GEOM")) {
@@ -2097,6 +2127,20 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		snprintf(cdout, 120, "CREATE_DISPLAY_OUTPUT='%s'", getenv("CREATE_DISPLAY_OUTPUT"));
 	}
 
+	if (strchr(fdgeom, '\''))	fdgeom[0] = '\0';
+	if (strchr(fdopts, '\''))	fdopts[0] = '\0';
+	if (strchr(fdextra, '\''))	fdextra[0] = '\0';
+	if (strchr(fdprog, '\''))	fdprog[0] = '\0';
+	if (strchr(fdxsrv, '\''))	fdxsrv[0] = '\0';
+	if (strchr(fdcups, '\''))	fdcups[0] = '\0';
+	if (strchr(fdesd, '\''))	fdesd[0] = '\0';
+	if (strchr(fdnas, '\''))	fdnas[0] = '\0';
+	if (strchr(fdsmb, '\''))	fdsmb[0] = '\0';
+	if (strchr(fdtag, '\''))	fdtag[0] = '\0';
+	if (strchr(fdxdum, '\''))	fdxdum[0] = '\0';
+	if (strchr(fdsess, '\''))	fdsess[0] = '\0';
+	if (strchr(cdout, '\''))	cdout[0] = '\0';
+
 	set_env("FD_GEOM", fdgeom);
 	set_env("FD_OPTS", fdopts);
 	set_env("FD_EXTRA", fdextra);
@@ -2114,6 +2158,9 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		char *uu = usslpeer;
 		if (!uu) {
 			uu = keep_unixpw_user;
+		}
+		if (strchr(uu, '\''))  {
+			uu = "";
 		}
 		create_cmd = (char *) malloc(strlen(tmp)+1
 		    + strlen("env USER='' ")
@@ -2212,27 +2259,57 @@ static char *certret_extract() {
 	return upeer;
 }
 
-static void check_nodisplay(char **nd) {
-	if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
-		char *q, *t = keep_unixpw_opts;
+static void check_nodisplay(char **nd, char **tag) {
+	if (unixpw && !getenv("X11VNC_NO_UNIXPW_OPTS") && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
+		char *q, *t2, *t = keep_unixpw_opts;
 		q = strstr(t, "nd=");
 		if (! q) q = strstr(t, "nodisplay=");
 		if (q) {
-			char *t2;
 			q = strchr(q, '=') + 1;
 			t = strdup(q);
 			q = t;
 			t2 = strchr(t, ',');
 			if (t2) *t2 = '\0';
+
 			while (*t != '\0') {
 				if (*t == '+') {
 					*t = ',';
 				}
 				t++;
 			}
-			if (!strchr(q, '\'')) {
+			if (!strchr(q, '\'') && !strpbrk(q, "[](){}`'\"$&*|<>")) {
 				if (! quiet) rfbLog("set X11VNC_SKIP_DISPLAY: %s\n", q);
 				*nd = q;
+			}
+		}
+
+		q = strstr(keep_unixpw_opts, "tag=");
+		if (getenv("FD_TAG")) {
+			*tag = strdup(getenv("FD_TAG"));
+		} else if (q) {
+			q = strchr(q, '=') + 1;
+			t = strdup(q);
+			q = t;
+			t2 = strchr(t, ',');
+			if (t2) *t2 = '\0';
+
+			if (strlen(q) < 120) {
+				int ok = 1;
+				while (*t != '\0') {
+					char c = *t;
+					if (*t == '_' || *t == '-') {
+						;
+					} else if (!isalnum((int) c)) {
+						ok = 0;
+						rfbLog("bad tag char: '%c' in '%s'\n", c, q);
+						break;
+					}
+					t++;
+				}
+				if (ok) {
+					if (! quiet) rfbLog("set FD_TAG: %s\n", q);
+					*tag = q;
+				}
 			}
 		}
 	}
@@ -2360,6 +2437,7 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 	if (!strcmp(cmd, "FINDDISPLAY") ||
 	    strstr(cmd, "FINDCREATEDISPLAY") == cmd) {
 		char *nd = "";
+		char *tag = "";
 		char fdout[128];
 
 		internal_cmd = 1;
@@ -2388,7 +2466,7 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 		if (getenv("X11VNC_SKIP_DISPLAY")) {
 			nd = strdup(getenv("X11VNC_SKIP_DISPLAY"));
 		}
-		check_nodisplay(&nd);
+		check_nodisplay(&nd, &tag);
 
 		fdout[0] = '\0';
 		if (getenv("FIND_DISPLAY_OUTPUT")) {
@@ -2396,8 +2474,13 @@ static int do_run_cmd(char *cmd, char *create_cmd, char *users_list_save, int cr
 		}
 
 		cmd = (char *) malloc(strlen("env X11VNC_SKIP_DISPLAY='' ")
-		    + strlen(nd) + strlen(tmp) + strlen("/bin/sh ") + strlen(fdout) + 1);
-		sprintf(cmd, "env X11VNC_SKIP_DISPLAY='%s' %s /bin/sh %s", nd, fdout, tmp);
+		    + strlen(nd) + strlen(" FD_TAG='' ") + strlen(tag) + strlen(tmp) + strlen("/bin/sh ") + strlen(fdout) + 1);
+
+		if (strcmp(tag, "")) {
+			sprintf(cmd, "env X11VNC_SKIP_DISPLAY='%s' FD_TAG='%s' %s /bin/sh %s", nd, tag, fdout, tmp);
+		} else {
+			sprintf(cmd, "env X11VNC_SKIP_DISPLAY='%s' %s /bin/sh %s", nd, fdout, tmp);
+		}
 	}
 
 	rfbLog("wait_for_client: running: %s\n", cmd);

@@ -1,3 +1,12 @@
+2009-12-18  Karl Runge <runge@karlrunge.com>
+	* x11vnc: fix keycode and other remote control actions under
+	  DIRECT: with an extra XFlush and other safety measures.
+	  fflush(stderr) much in su_verify.  Make the -unixpw env. vars
+	  UNIXPW_DISABLE_SSL and UNIXPW_DISABLE_LOCALHOST work correctly.
+	  Make -loopbg actually imply -bg.  Add tag=... to unixpw opts
+	  to set FD_TAG.  Prefer Xvfb over Xdummy.  Reduce wait time
+	  for https. Add 'Login succeeded' output to unixpw panel.
+
 2009-12-15  Karl Runge <runge@karlrunge.com>
 	* x11vnc: X11VNC_REMOTE, X11VNC_TICKER, and VNC_CONNECT properties
 	  names can be changed via env. vars (e.g. for multiple

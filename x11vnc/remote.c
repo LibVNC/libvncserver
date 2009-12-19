@@ -4176,6 +4176,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			} else {
 				XTestFakeKeyEvent_wr(dpy, kc, down, CurrentTime);
 			}
+			XFlush_wr(dpy);
 			X_UNLOCK;
 		}
 		goto done;
@@ -4243,6 +4244,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			X_LOCK;
 			rfbLog("remote_cmd: XTestFakeButtonEvent(mb=%d, down=%d)\n", mb, down);
 			XTestFakeButtonEvent_wr(dpy, mb, down ? True : False, CurrentTime);
+			XFlush_wr(dpy);
 			X_UNLOCK;
 		}
 

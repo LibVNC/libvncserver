@@ -2282,7 +2282,7 @@ char create_display[] =
 "\n"
 "TRY=\"$1\"\n"
 "if [ \"X$TRY\" = \"X\" ]; then\n"
-"	TRY=Xdummy,Xvfb\n"
+"	TRY=Xvfb,Xdummy\n"
 "fi\n"
 "\n"
 "for curr_try in `echo \"$TRY\" | tr ',' ' '`\n"
