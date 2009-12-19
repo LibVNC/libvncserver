@@ -793,7 +793,7 @@ static void check_redir_services(void) {
 	}
 	if (db) fprintf(stderr, "TS_REDIR_PID Atom: %d = '%s'\n", (int) a, prop);
 
-	if (getenv("FD_TAG")) {
+	if (getenv("FD_TAG") && strcmp(getenv("FD_TAG"), "")) {
 		a = XInternAtom(dpy, "FD_TAG", False);
 		if (a != None) {
 			Window rwin = RootWindow(dpy, DefaultScreen(dpy));
@@ -4630,7 +4630,6 @@ int main(int argc, char* argv[]) {
 
 				rfbLog("If you *actually* want SSL, restart"
 				    " with -ssl on the cmdline\n");
-				fprintf(stderr, "\n");
 				if (! nopw) {
 					usleep(2000*1000);
 				}
@@ -4647,10 +4646,12 @@ int main(int argc, char* argv[]) {
 					use_stunnel = 1;
 				}
 			}
+			rfbLog("\n");
 		}
 		if (use_threads && !getenv("UNIXPW_THREADS")) {
 			if (! quiet) {
 				rfbLog("disabling -threads under -unixpw\n");
+				rfbLog("\n");
 			}
 			use_threads = 0;
 		}

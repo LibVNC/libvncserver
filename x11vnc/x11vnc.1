@@ -2,7 +2,7 @@
 .TH X11VNC "1" "December 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.9, lastmod: 2009-12-17
+         version: 0.9.9, lastmod: 2009-12-18
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -85,7 +85,8 @@ XDM/GDM/KDM: if you are running x11vnc as root and want
 to find the XAUTHORITY before anyone has logged into an
 X session yet, use: x11vnc \fB-env\fR FD_XDM=1 \fB-auth\fR guess ...
 (This will also find the XAUTHORITY if a user is already
-logged into the X session.)
+logged into the X session.)  When running as root,
+FD_XDM=1 will be tried if the initial \fB-auth\fR guess fails.
 .PP
 \fB-N\fR
 .IP
@@ -1221,7 +1222,8 @@ XDM/GDM/KDM: if you are running x11vnc as root and want
 to find the XAUTHORITY before anyone has logged into an
 X session yet, use: x11vnc \fB-env\fR FD_XDM=1 \fB-findauth\fR ...
 (This will also find the XAUTHORITY if a user is already
-logged into the X session.)
+logged into the X session.)  When running as root,
+FD_XDM=1 will be tried if the initial \fB-findauth\fR fails.
 .PP
 \fB-create\fR
 .IP
@@ -1448,6 +1450,12 @@ well. You can also supply "gnome", "kde", "twm",
 (same as "xterm") to have the created display use
 that mode for the user session.
 .IP
+Specify "tag=..." to set the unique FD_TAG desktop
+session tag described below.  Note: this option will
+be ignored if the FD_TAG env. var. is already set or
+if the viewer-side supplied value is not completely
+composed of alphanumeric or '_' or '-' characters.
+.IP
 To disable the option setting set the environment
 variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.
 To set any other options, the user can use the gui
@@ -1540,8 +1548,8 @@ The option "\fB-create\fR" is an alias for this mode.
 It will start looking for an open display number at :20
 Override via X11VNC_CREATE_STARTING_DISPLAY_NUMBER=n
 .IP
-By default FINDCREATEDISPLAY will try Xdummy and then
-Xvfb:
+By default FINDCREATEDISPLAY will try Xvfb and then
+Xdummy:
 .IP
 The Xdummy wrapper is part of the x11vnc source code
 (x11vnc/misc/Xdummy)  It should be available in PATH and

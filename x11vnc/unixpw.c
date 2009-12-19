@@ -52,6 +52,7 @@ extern char *crypt(const char*, const char *);
 #include "connections.h"
 #include "sslhelper.h"
 #include "cursor.h"
+#include "rates.h"
 #include <rfb/default8x16.h>
 
 #if LIBVNCSERVER_HAVE_FORK
@@ -1445,10 +1446,36 @@ int unixpw_verify(char *user, char *pass) {
 	return ok;
 }
 
+static int skip_it = 0;
+
+static void progress_skippy(void) {
+	int i, msec = get_net_latency();	/* probabaly not set yet.. */
+
+	if (msec > 300) {
+		msec = 300;
+	} else if (msec <= 100) {
+		msec = 100;
+	}
+
+	skip_it = 1;
+	for (i = 0; i < 5; i++) {
+		if (i == 2) {
+			rfbPE(msec * 1000);
+		} else {
+			rfbPE(-1);
+		}
+		usleep(10*1000);
+	}
+	skip_it = 0;
+
+	usleep(50*1000);
+}
+
 
 void unixpw_verify_screen(char *user, char *pass) {
 	int x, y;
 	char li[] = "Login incorrect";
+	char ls[] = "Login succeeded";
 	char log[] = "login: ";
 	char *colon = NULL;
 	ClientData *cd = NULL;
@@ -1481,7 +1508,18 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 	ok = unixpw_verify(user, pass);
 
 	if (ok) {
+		char_row++;
+		char_col = 0;
+
+		x = text_x();
+		y = text_y();
+		rfbDrawString(pscreen, &default8x16Font, x, y, ls, white_pixel());
+		unixpw_mark();
+
+		progress_skippy();
+
 		unixpw_accept(user);
+
 		if (keep_unixpw) {
 			keep_unixpw_user = strdup(user);
 			keep_unixpw_pass = strdup(pass);
@@ -1492,6 +1530,7 @@ if (db) fprintf(stderr, "unixpw_verify: '%s' '%s'\n", user, db > 1 ? pass : "***
 			}
 		}
 		if (colon) *colon = ':';
+
 		return;
 	}
 	if (colon) *colon = ':';
@@ -1536,7 +1575,6 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 	static int echo = 1;
 	char keystr[100];
 	char *str;
-	static int skip_it = 0;
 
 	if (skip_it) {
 		return;
@@ -1628,8 +1666,8 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 		char h2[] = "  Specify options after a ':' like this:  username:opt,opt=val,...    Where an opt may be any of:";
 		char h3[] = "    scale=... (n/m); scale_cursor=... (sc=); solid (so); id=; repeat; clear_mods (cm); clear_keys (ck);";
 		char h4[] = "    clear_all (ca); speeds=... (sp=); readtimeout=... (rd=) rotate=... (ro=); noncache (nc) (nc=n);";
-		char h5[] = "    geom=WxHxD (ge=); nodisplay=... (nd=); viewonly (vo); gnome kde twm fvwm mwm dtwm wmaker xfce";
-		char h6[] = "    enlightenment Xsession failsafe.   Examples:  fred:3/4,so,cm  wilma:geom=1024x768x16,kde";
+		char h5[] = "    geom=WxHxD (ge=); nodisplay=... (nd=); viewonly (vo); tag=...; gnome kde twm fvwm mwm dtwm wmaker";
+		char h6[] = "    xfce enlightenment Xsession failsafe.   Examples:  fred:3/4,so,cm  wilma:geom=1024x768x16,kde";
 		int ch = 13, p;
 		if (f1_help) {
 			p = black_pixel();
@@ -1673,12 +1711,8 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 			rfbDrawString(pscreen, &default8x16Font,
 			    text_x(), text_y(), msg, white_pixel());
 			unixpw_mark();
-			skip_it = 1;
-			rfbPE(-1);
-			rfbPE(-1);
-			rfbPE(-1);
-			skip_it = 0;
-			usleep(10*1000);
+
+			progress_skippy();
 		}
 		unixpw_accept(u);
 		free(u);
@@ -1848,12 +1882,8 @@ if (db && db <= 2) fprintf(stderr, "u_cnt: %d %d/%d ks: 0x%x  '%s'\n", u_cnt, x,
 				rfbDrawString(pscreen, &default8x16Font,
 				    text_x(), text_y(), msg, white_pixel());
 				unixpw_mark();
-				skip_it = 1;
-				rfbPE(-1);
-				rfbPE(-1);
-				rfbPE(-1);
-				skip_it = 0;
-				usleep(10*1000);
+
+				progress_skippy();
 			}
 
 			in_login = 0;
@@ -2118,6 +2148,8 @@ void unixpw_msg(char *msg, int delay) {
 
 	for (i=0; i<5; i++) {
 		rfbPE(-1);
+		rfbPE(-1);
+		rfbPE(50 * 1000);
 		rfbPE(-1);
 		usleep(500 * 1000);
 		if (i >= delay) {

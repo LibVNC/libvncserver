@@ -2,7 +2,7 @@
 Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
 
-x11vnc README file                         Date: Fri Dec 18 10:27:07 EST 2009
+x11vnc README file                         Date: Fri Dec 18 22:19:55 EST 2009
 
 The following information is taken from these URLs:
 
@@ -12905,7 +12905,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-12-17
+x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-12-18
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -13032,7 +13032,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-12-17
+x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-12-18
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -13104,7 +13104,8 @@ Options:
                        to find the XAUTHORITY before anyone has logged into an
                        X session yet, use: x11vnc -env FD_XDM=1 -auth guess ...
                        (This will also find the XAUTHORITY if a user is already
-                       logged into the X session.)
+                       logged into the X session.)  When running as root,
+                       FD_XDM=1 will be tried if the initial -auth guess fails.
 
 -N                     If the X display is :N, try to set the VNC display to
                        also be :N This just sets the -rfbport option to 5900+N
@@ -14067,7 +14068,8 @@ Options:
                        to find the XAUTHORITY before anyone has logged into an
                        X session yet, use: x11vnc -env FD_XDM=1 -findauth ...
                        (This will also find the XAUTHORITY if a user is already
-                       logged into the X session.)
+                       logged into the X session.)  When running as root,
+                       FD_XDM=1 will be tried if the initial -findauth fails.
 
 -create                First try to find the user's display using FINDDISPLAY,
                        if that doesn't succeed create an X session via the
@@ -14264,6 +14266,12 @@ Options:
                        (same as "xterm") to have the created display use
                        that mode for the user session.
 
+                       Specify "tag=..." to set the unique FD_TAG desktop
+                       session tag described below.  Note: this option will
+                       be ignored if the FD_TAG env. var. is already set or
+                       if the viewer-side supplied value is not completely
+                       composed of alphanumeric or '_' or '-' characters.
+
                        To disable the option setting set the environment
                        variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.
                        To set any other options, the user can use the gui
@@ -14352,8 +14360,8 @@ Options:
                        It will start looking for an open display number at :20
                        Override via X11VNC_CREATE_STARTING_DISPLAY_NUMBER=n
 
-                       By default FINDCREATEDISPLAY will try Xdummy and then
-                       Xvfb:
+                       By default FINDCREATEDISPLAY will try Xvfb and then
+                       Xdummy:
 
                        The Xdummy wrapper is part of the x11vnc source code
                        (x11vnc/misc/Xdummy)  It should be available in PATH and
