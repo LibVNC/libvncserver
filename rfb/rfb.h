@@ -289,6 +289,7 @@ typedef struct _rfbScreenInfo
     char multicastUpdPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
     char multicastUpdPendingForEncoding[1]; /* since non-pseudo encodings are < 256 */
     sraRegionPtr multicastUpdateRegion;
+    int deferMulticastUpdateTime;
 
     int maxClientWait;
 
@@ -588,6 +589,11 @@ typedef struct _rfbClientRec {
 
     rfbBool  useMulticastVNC;         /* framebuffer updates should be sent via multicast socket*/
     uint16_t multicastPixelformatId;  /* identifier assigned to client's pixelformat */
+    struct timeval startMulticastDeferring; /* this per-client tv is actually used per every combination
+					       of pixelformat and encoding, see main.c, each client is a
+					       representative of the (pixelformat, encoding) class it 
+					       belongs to */
+
 
     struct _rfbClientRec *prev;
     struct _rfbClientRec *next;

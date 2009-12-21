@@ -1122,7 +1122,7 @@ rfbSendMulticastVNCSessionInfo(rfbClientPtr cl)
    rect.encoding = Swap32IfLE(encoding);
    rect.r.x = Swap16IfLE(cl->multicastPixelformatId);
    rect.r.y = Swap16IfLE(cl->screen->multicastPort);
-   rect.r.w = Swap16IfLE(cl->screen->deferUpdateTime); //FIXME maybe introduce an extra multicast value?
+   rect.r.w = Swap16IfLE(cl->screen->deferMulticastUpdateTime);
    rect.r.h = 0;
 
    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,

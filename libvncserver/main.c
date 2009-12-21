@@ -824,6 +824,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->multicastAddr="224.0.42.138";
    screen->multicastPort=5900;
    screen->multicastTTL=1;
+   screen->deferMulticastUpdateTime=5;
+
    INIT_MUTEX(screen->multicastOutputMutex);
    INIT_MUTEX(screen->multicastUpdateMutex);
    screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
@@ -1136,19 +1138,19 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	 (1<<(cl->preferredEncoding % 8))) &&
 	!sraRgnEmpty(screen->multicastUpdateRegion) ) {
       result=TRUE;
-      if(screen->deferUpdateTime == 0) {
+      if(screen->deferMulticastUpdateTime == 0) {
 	  rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
-      } else if(cl->startDeferring.tv_usec == 0) {
-	gettimeofday(&cl->startDeferring,NULL);
-	if(cl->startDeferring.tv_usec == 0)
-	  cl->startDeferring.tv_usec++;
+      } else if(cl->startMulticastDeferring.tv_usec == 0) {
+	gettimeofday(&cl->startMulticastDeferring,NULL);
+	if(cl->startMulticastDeferring.tv_usec == 0)
+	  cl->startMulticastDeferring.tv_usec++;
       } else {
 	gettimeofday(&tv,NULL);
-	if(tv.tv_sec < cl->startDeferring.tv_sec /* at midnight */
-	   || ((tv.tv_sec-cl->startDeferring.tv_sec)*1000
-	       +(tv.tv_usec-cl->startDeferring.tv_usec)/1000)
-	     > screen->deferUpdateTime) {
-	  cl->startDeferring.tv_usec = 0;
+	if(tv.tv_sec < cl->startMulticastDeferring.tv_sec /* at midnight */
+	   || ((tv.tv_sec-cl->startMulticastDeferring.tv_sec)*1000
+	       +(tv.tv_usec-cl->startMulticastDeferring.tv_usec)/1000)
+	     > screen->deferMulticastUpdateTime) {
+	  cl->startMulticastDeferring.tv_usec = 0;
 	  rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
 	}
       }
