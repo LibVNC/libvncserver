@@ -2,7 +2,7 @@
 Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
 
-x11vnc README file                         Date: Fri Dec 18 22:19:55 EST 2009
+x11vnc README file                         Date: Mon Dec 21 00:00:59 EST 2009
 
 The following information is taken from these URLs:
 
@@ -841,6 +841,15 @@ make
    AIX 4.3.3 and 5.2 to get build header files like XShm.h, etc. You may
    also want to make sure that /usr/lpp/X11/include, etc is being picked
    up by the configure and make.
+
+   For a recent build on AIX 5.3 we needed to add these CFLAGS to be able
+   to build with gcc:
+  env CFLAGS='-maix64 -Xlinker -bbigtoc' ./configure ...
+
+   we also built our own libjpeg and libz using -maix64.
+
+   BTW, one way to run an Xvfb-like virtual X server for testing on AIX
+   is something like "/usr/bin/X11/X -force -vfb -ac :1".
 
 
    Building on Mac OS X:   There is now [112]native Mac OS X support for
@@ -12905,7 +12914,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-12-18
+x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-12-21
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -13032,7 +13041,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-12-18
+x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-12-21
 
 (type "x11vnc -opts" to just list the options.)
 

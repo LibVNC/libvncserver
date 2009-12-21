@@ -954,7 +954,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 	pid_t pid, pidw;
 	struct stat sbuf;
 	static int first = 1;
-	char instr[32], cbuf[10];
+	char instr[64], cbuf[10];
 
 	if (first) {
 		set_db();
@@ -1210,7 +1210,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 	 * 	auth      sufficient  pam_self.so
 	 * it may be commented out without problem.
 	 */
-	for (i=0; i<32; i++) {
+	for (i=0; i<sizeof(instr); i++) {
 		instr[i] = '\0';
 	}
 
@@ -1221,7 +1221,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 	j = 0;
 	for (i=0; i < (int) strlen("Password:"); i++) {
 		char pstr[] = "password:";
-		int n;	
+		int n, problem;	
 
 		cbuf[0] = '\0';
 		cbuf[1] = '\0';
@@ -1229,7 +1229,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 		n = read(fd, cbuf, 1);
 		if (n < 0 && errno == EINTR) {
 			i--;
-			if (i < 0) i = 0;
+			if (i < -1) i = -1;
 			continue;
 		}
 
@@ -1250,10 +1250,10 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 		if (n == 1) {
 			if (isspace((unsigned char) cbuf[0])) {
 				i--;
-				if (i < 0) i = 0;
+				if (i < -1) i = -1;
 				continue;
 			}
-			if (j >= 32-1) {
+			if (j >= sizeof(instr)-1) {
 				rfbLog("su_verify: problem finding Password:\n");	
 				fflush(stderr);
 				return 0;
@@ -1261,7 +1261,42 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 			instr[j++] = tolower((unsigned char)cbuf[0]);
 		}
 
-		if (n <= 0 || strstr(pstr, instr) != pstr) {
+		problem = 0;
+		if (n <= 0) {
+			problem = 1;
+		} else if (strstr(pstr, instr) != pstr) {
+#ifdef _AIX
+			if (UT.sysname && strstr(UT.sysname, "AIX")) {
+				/* handle: runge's Password: */
+				char *luser = (char *) malloc(strlen(user) + 10);
+
+				sprintf(luser, "%s's", user);
+				lowercase(luser);
+				if (strstr(luser, instr) == luser) {
+					if (!strcmp(luser, instr)) {
+						i = -1;	
+						j = 0;
+						memset(instr, 0, sizeof(instr));
+						free(luser);
+						continue;
+					} else {
+						i--;
+						if (i < -1) i = -1;
+						free(luser);
+						continue;
+					}
+				} else {
+					problem = 1;
+				}
+				free(luser);
+			} else
+#endif
+			{
+				problem = 1;
+			}
+		}
+
+		if (problem) {
 
 			if (db) {
 				fprintf(stderr, "\"Password:\" did not "
@@ -1571,7 +1606,7 @@ static void set_db(void) {
 void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 	int x, y, i, rc, nmax = 100;
 	static char user_r[100], user[100], pass[100];
-	static int  u_cnt = 0, p_cnt = 0, first = 1;
+	static int  u_cnt = 0, p_cnt = 0, t_cnt = 0, first = 1;
 	static int echo = 1;
 	char keystr[100];
 	char *str;
@@ -1601,6 +1636,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 
 		u_cnt = 0;
 		p_cnt = 0;
+		t_cnt = 0;
 		for (i=0; i<nmax; i++) {
 			user[i] = '\0';
 			pass[i] = '\0';
@@ -1725,6 +1761,8 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 		return;
 	}
 
+	t_cnt++;
+
 	if (in_login) {
 		if (keysym == XK_BackSpace || keysym == XK_Delete) {
 			if (u_cnt > 0) {
@@ -1765,6 +1803,11 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 				 * by the normal session after login.
 				 * (actually we already returned above)
 				 */
+				return;
+			}
+
+			if (t_cnt == 1) {
+				/* accidental initial return, e.g. from xterm */
 				return;
 			}
 
