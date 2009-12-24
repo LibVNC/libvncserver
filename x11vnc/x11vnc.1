@@ -2,7 +2,7 @@
 .TH X11VNC "1" "December 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.9, lastmod: 2009-12-21
+         version: 0.9.10, lastmod: 2009-12-24
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1247,6 +1247,16 @@ As in \fB-create,\fR except Xvnc instead of Xvfb.
 .IP
 As in \fB-create,\fR except Xvnc.redirect instead of Xvfb.
 .PP
+\fB-xdummy_xvfb\fR
+.IP
+Sets WAIT:cmd=FINDCREATEDISPLAY-Xdummy,Xvfb
+.PP
+\fB-create_x\fR \fIstr\fR
+.IP
+Sets WAIT:cmd=FINDCREATEDISPLAY-<str>  Can be on cmdline
+after anything that sets WAIT:.. and other things
+(e.g. \fB-svc,\fR \fB-xdmsvc)\fR to adjust the X server list.
+.PP
 \fB-svc\fR
 .IP
 Terminal services mode based on SSL access.  Alias for
@@ -1260,6 +1270,10 @@ As \fB-svc\fR except Xdummy instead of Xvfb.
 \fB-svc_xvnc\fR
 .IP
 As \fB-svc\fR except Xvnc instead of Xvfb.
+.PP
+\fB-svc_xdummy_xvfb\fR
+.IP
+As \fB-svc\fR with Xdummy,Xvfb.
 .PP
 \fB-xdmsvc\fR
 .IP
@@ -1444,11 +1458,13 @@ ge=). This only has an effect in FINDCREATEDISPLAY
 mode when a virtual X server such as Xvfb is going
 to be created.  It sets the width and height of
 the new display, and optionally the color depth as
-well. You can also supply "gnome", "kde", "twm",
+well.
+.IP
+You can also supply "gnome", "kde", "twm",
 "fvwm", "mwm", "dtwm", "wmaker", "xfce",
-"enlightenment", "Xsession", or "failsafe"
-(same as "xterm") to have the created display use
-that mode for the user session.
+"lxde", "enlightenment", "Xsession", or
+"failsafe" (same as "xterm") to have the created
+display use that mode for the user session.
 .IP
 Specify "tag=..." to set the unique FD_TAG desktop
 session tag described below.  Note: this option will
@@ -1552,18 +1568,20 @@ By default FINDCREATEDISPLAY will try Xvfb and then
 Xdummy:
 .IP
 The Xdummy wrapper is part of the x11vnc source code
-(x11vnc/misc/Xdummy)  It should be available in PATH and
-have run "Xdummy \fB-install"\fR once to create the shared
-library.  Xdummy requires root permission and only works
-on Linux.  (Note: specify FD_XDUMMY_NOROOT=1 to skip
-a check for the root id; evidently your 
-.IR sudo (1)
-will
-take care of everything.  The \fB-xdummy\fR and \fB-svc_xdummy\fR
-options imply FD_XDUMMY_NOROOT=1).
+(x11vnc/misc/Xdummy)  It should be available in PATH
+and have run "Xdummy \fB-install"\fR once to create the
+shared library.  Xdummy only works on Linux.  As of
+12/2009 it no longer needs to be run as root, and the
+default is to not run as root.  In some circumstances
+permissions may require running it as root, in these
+cases specify FD_XDUMMY_RUN_AS_ROOT=1, this is the same
+as supplying \fB-root\fR to the Xdummy cmdline.
 .IP
 Xvfb is available on most platforms and does not
 require root.
+.IP
+An advantage of Xdummy over Xvfb is that Xdummy supports
+RANDR dynamic screen resizing.
 .IP
 When x11vnc exits (i.e. user disconnects) the X
 server session stays running in the background.
@@ -1629,13 +1647,11 @@ be the full path to the session/windowmanager program.
 More FD tricks:  FD_CUPS=port or FD_CUPS=host:port
 will set the cups printing environment.  Similarly for
 FD_ESD=port or FD_ESD=host:port for esddsp sound
-redirection.  FD_XDUMMY_NOROOT means the Xdummy
-server does not need to be started as root (e.g. it
-will sudo automatically).  Set FD_EXTRA to a command
-to be run a few seconds after the X server starts up.
-Set FD_TAG to be a unique name for the session, it is
-set as an X property, that makes FINDDISPLAY only find
-sessions with that tag value.
+redirection.  Set FD_EXTRA to a command to be run a
+few seconds after the X server starts up.  Set FD_TAG
+to be a unique name for the session, it is set as an
+X property, that makes FINDDISPLAY only find sessions
+with that tag value.
 .IP
 If you want the FINDCREATEDISPLAY session to contact an
 XDMCP login manager (xdm/gdm/kdm) on the same machine,

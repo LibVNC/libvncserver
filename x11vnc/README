@@ -2,7 +2,7 @@
 Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com>
 All rights reserved.
 
-x11vnc README file                         Date: Mon Dec 21 00:00:59 EST 2009
+x11vnc README file                         Date: Thu Dec 24 16:08:39 EST 2009
 
 The following information is taken from these URLs:
 
@@ -586,12 +586,12 @@ vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
    SourceForge.net. I use libvncserver for all of the VNC aspects; I
    couldn't have done without it. The full source code may be found and
    downloaded (either file-release tarball or GIT tree) from the above
-   link. As of Jul 2009, the [91]x11vnc-0.9.8.tar.gz source package is
-   released (recommended download). The [92]x11vnc 0.9.8 release notes.
+   link. As of Dec 2009, the [91]x11vnc-0.9.9.tar.gz source package is
+   released (recommended download). The [92]x11vnc 0.9.9 release notes.
 
    The x11vnc package is the subset of the libvncserver package needed to
    build the x11vnc program. Also, you can get a copy of my latest,
-   bleeding edge [93]x11vnc-0.9.9.tar.gz tarball to build the most up to
+   bleeding edge [93]x11vnc-0.9.10.tar.gz tarball to build the most up to
    date one.
 
    Precompiled Binaries/Packages:  See the [94]FAQ below for information
@@ -629,13 +629,13 @@ vncviewer -via $host localhost:0      # must be TightVNC vncviewer.
    them by default.)
 
    If your OS has libjpeg.so and libz.so in standard locations you can
-   build as follows (example given for the 0.9.8 release of x11vnc:
+   build as follows (example given for the 0.9.9 release of x11vnc:
    replace with the version you downloaded):
 (un-tar the x11vnc+libvncserver tarball)
-# gzip -dc x11vnc-0.9.8.tar.gz | tar -xvf -
+# gzip -dc x11vnc-0.9.9.tar.gz | tar -xvf -
 
 (cd to the source directory)
-# cd x11vnc-0.9.8
+# cd x11vnc-0.9.9
 
 (run configure and then run make)
 # ./configure
@@ -886,13 +886,13 @@ make
    I'd appreciate any additional testing very much.
 
    Thanks to those who suggested features and helped beta test x11vnc
-   0.9.8 released in Jul 2009!
+   0.9.9 released in Dec 2009!
 
-   Please help test and debug the 0.9.9 version for release sometime in
-   2009.
+   Please help test and debug the 0.9.10 version for release sometime in
+   Spring 2010.
 
-   The version 0.9.9 beta tarball is kept here:
-   [114]x11vnc-0.9.9.tar.gz
+   The version 0.9.10 beta tarball is kept here:
+   [114]x11vnc-0.9.10.tar.gz
 
    There are also some Linux, Solaris, Mac OS X, and other OS test
    binaries [115]here. Please kick the tires and report bugs, performance
@@ -909,7 +909,11 @@ make
    Encryption Plugin' settings panel.)
 
 
-   Here are some features that will appear in the 0.9.9 release:
+   Here are some features that will appear in the 0.9.10 release:
+     * Coming Soon.
+
+
+   Here are some features that appeared in the 0.9.9 release:
      * The [122]-unixpw_system_greeter option, when used in combined
        unixpw and XDMCP FINDCREATEDISPLAY mode (e.g. [123]-xdmsvc),
        enables the user to press Escape to jump directly to the
@@ -1507,7 +1511,7 @@ LAY
        description of the [294]-create option that does all of this
        automatically for you.
        Also, a faster and more accurate way is to use the "dummy"
-       XFree86/Xorg device driver (or our Xdummy wrapper script.) See
+       Xorg/XFree86 device driver (or our Xdummy wrapper script.) See
        [295]this FAQ for details.
      * Somewhat surprisingly, the X11 mouse (cursor) shape is write-only
        and cannot be queried from the X server. So traditionally in
@@ -1629,9 +1633,9 @@ References
   88. http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-int
   89. http://www.karlrunge.com/x11vnc/ssvnc.html
   90. http://sourceforge.net/projects/libvncserver/
-  91. http://sourceforge.net/project/showfiles.php?group_id=32584&package_id=119006&release_id=695585
-  92. http://sourceforge.net/project/shownotes.php?group_id=32584&release_id=695585
-  93. http://x11vnc.sourceforge.net/dev/x11vnc-0.9.9.tar.gz
+  91. http://sourceforge.net/projects/libvncserver/files/x11vnc/0.9.9/
+  92. http://sourceforge.net/projects/libvncserver/files/x11vnc/0.9.9/release-notes-0.9.9.txt/view
+  93. http://x11vnc.sourceforge.net/dev/x11vnc-0.9.10.tar.gz
   94. http://www.karlrunge.com/x11vnc/faq.html#faq-binaries
   95. http://www.tightvnc.com/download.html
   96. http://www.realvnc.com/products/free/4.1/download.html
@@ -1652,7 +1656,7 @@ References
  111. http://www.karlrunge.com/x11vnc/faq.html#faq-solaris251build
  112. http://www.karlrunge.com/x11vnc/faq.html#faq-macosx
  113. http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-int
- 114. http://x11vnc.sourceforge.net/dev/x11vnc-0.9.9.tar.gz
+ 114. http://x11vnc.sourceforge.net/dev/x11vnc-0.9.10.tar.gz
  115. http://www.karlrunge.com/x11vnc/bins
  116. mailto:xvml@karlrunge.com
  117. http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-tunnel-int
@@ -5314,9 +5318,11 @@ xpw=
    FINDDISPLAY method it will create an X server session for the user
    (i.e. desktop/terminal server.) This is the only time x11vnc actually
    tries to start up an X server. By default it will only try to start up
-   virtual (non-hardware) X servers: first [439]Xdummy and if that is not
-   available then Xvfb. Note that Xdummy requires root permission and
-   only works on Linux whereas Xvfb works just about everywhere.
+   virtual (non-hardware) X servers: first [439]Xvfb and if that is not
+   available then Xdummy. Note that Xdummy only works on Linux whereas
+   Xvfb works just about everywhere (and in some situations Xdummy must
+   be run as root.) An advantage of Xdummy over Xvfb is that Xdummy
+   supports RANDR dynamic screen resizing.
 
    So an inetd(8) example might look like:
 5900 stream tcp nowait root /usr/sbin/tcpd /usr/local/bin/x11vnc -inetd \
@@ -5693,9 +5699,8 @@ xmodmap -e "add Mod1 = Alt_L Alt_R Meta_L"
    server that turn off the VT usage in the X server. Update: As of
    Jul/2005 we have an LD_PRELOAD script [470]Xdummy that allows you to
    use a stock (i.e. unpatched) Xorg or XFree86 server with the "dummy"
-   driver and not have any VT switching problems! Currently Xdummy needs
-   to be run as root, but with some luck that may be relaxed in the
-   future.
+   driver and not have any VT switching problems! An advantage of Xdummy
+   over Xvfb is that Xdummy supports RANDR dynamic screen resizing.
 
    The standard way to start the "dummy" driver would be:
 startx -- :1 -config /etc/X11/xorg.conf.dummy
@@ -12914,7 +12919,7 @@ x11vnc: a VNC server for real X displays
    Here are all of x11vnc command line options:
 % x11vnc -opts      (see below for -help long descriptions)
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-12-21
+x11vnc: allow VNC connections to real X11 displays. 0.9.10 lastmod: 2009-12-24
 
 x11vnc options:
   -display disp            -auth file               -N                     
@@ -12938,8 +12943,9 @@ x11vnc options:
   -unixpw_nis [list]       -unixpw_cmd cmd          -find                  
   -finddpy                 -listdpy                 -findauth [disp]       
   -create                  -xdummy                  -xvnc                  
-  -xvnc_redirect           -svc                     -svc_xdummy            
-  -svc_xvnc                -xdmsvc                  -sshxdmsvc             
+  -xvnc_redirect           -xdummy_xvfb             -create_x str          
+  -svc                     -svc_xdummy              -svc_xvnc              
+  -svc_xdummy_xvfb         -xdmsvc                  -sshxdmsvc             
   -unixpw_system_greeter   -redirect port           -display WAIT:...      
   -vencrypt mode           -anontls mode            -sslonly               
   -dhparams file           -nossl                   -ssl [pem]             
@@ -13041,7 +13047,7 @@ libvncserver-tight-extension options:
 
 % x11vnc -help
 
-x11vnc: allow VNC connections to real X11 displays. 0.9.9 lastmod: 2009-12-21
+x11vnc: allow VNC connections to real X11 displays. 0.9.10 lastmod: 2009-12-24
 
 (type "x11vnc -opts" to just list the options.)
 
@@ -14091,6 +14097,11 @@ Options:
 -xdummy                As in -create, except Xdummy instead of Xvfb.
 -xvnc                  As in -create, except Xvnc instead of Xvfb.
 -xvnc_redirect         As in -create, except Xvnc.redirect instead of Xvfb.
+-xdummy_xvfb           Sets WAIT:cmd=FINDCREATEDISPLAY-Xdummy,Xvfb
+
+-create_x str          Sets WAIT:cmd=FINDCREATEDISPLAY-<str>  Can be on cmdline
+                       after anything that sets WAIT:.. and other things
+                       (e.g. -svc, -xdmsvc) to adjust the X server list.
 
 -svc                   Terminal services mode based on SSL access.  Alias for
                        -display WAIT:cmd=FINDCREATEDISPLAY-Xvfb -unixpw -users
@@ -14098,6 +14109,7 @@ Options:
 
 -svc_xdummy            As -svc except Xdummy instead of Xvfb.
 -svc_xvnc              As -svc except Xvnc instead of Xvfb.
+-svc_xdummy_xvfb       As -svc with Xdummy,Xvfb.
 
 -xdmsvc                Display manager Terminal services mode based on SSL.
                        Alias for -display WAIT:cmd=FINDCREATEDISPLAY-Xvfb.xdmcp
@@ -14269,11 +14281,13 @@ Options:
                        mode when a virtual X server such as Xvfb is going
                        to be created.  It sets the width and height of
                        the new display, and optionally the color depth as
-                       well. You can also supply "gnome", "kde", "twm",
+                       well.
+
+                       You can also supply "gnome", "kde", "twm",
                        "fvwm", "mwm", "dtwm", "wmaker", "xfce",
-                       "enlightenment", "Xsession", or "failsafe"
-                       (same as "xterm") to have the created display use
-                       that mode for the user session.
+                       "lxde", "enlightenment", "Xsession", or
+                       "failsafe" (same as "xterm") to have the created
+                       display use that mode for the user session.
 
                        Specify "tag=..." to set the unique FD_TAG desktop
                        session tag described below.  Note: this option will
@@ -14373,16 +14387,20 @@ Options:
                        Xdummy:
 
                        The Xdummy wrapper is part of the x11vnc source code
-                       (x11vnc/misc/Xdummy)  It should be available in PATH and
-                       have run "Xdummy -install" once to create the shared
-                       library.  Xdummy requires root permission and only works
-                       on Linux.  (Note: specify FD_XDUMMY_NOROOT=1 to skip
-                       a check for the root id; evidently your sudo(1) will
-                       take care of everything.  The -xdummy and -svc_xdummy
-                       options imply FD_XDUMMY_NOROOT=1).
+                       (x11vnc/misc/Xdummy)  It should be available in PATH
+                       and have run "Xdummy -install" once to create the
+                       shared library.  Xdummy only works on Linux.  As of
+                       12/2009 it no longer needs to be run as root, and the
+                       default is to not run as root.  In some circumstances
+                       permissions may require running it as root, in these
+                       cases specify FD_XDUMMY_RUN_AS_ROOT=1, this is the same
+                       as supplying -root to the Xdummy cmdline.
 
                        Xvfb is available on most platforms and does not
                        require root.
+
+                       An advantage of Xdummy over Xvfb is that Xdummy supports
+                       RANDR dynamic screen resizing.
 
                        When x11vnc exits (i.e. user disconnects) the X
                        server session stays running in the background.
@@ -14441,13 +14459,11 @@ Options:
                        More FD tricks:  FD_CUPS=port or FD_CUPS=host:port
                        will set the cups printing environment.  Similarly for
                        FD_ESD=port or FD_ESD=host:port for esddsp sound
-                       redirection.  FD_XDUMMY_NOROOT means the Xdummy
-                       server does not need to be started as root (e.g. it
-                       will sudo automatically).  Set FD_EXTRA to a command
-                       to be run a few seconds after the X server starts up.
-                       Set FD_TAG to be a unique name for the session, it is
-                       set as an X property, that makes FINDDISPLAY only find
-                       sessions with that tag value.
+                       redirection.  Set FD_EXTRA to a command to be run a
+                       few seconds after the X server starts up.  Set FD_TAG
+                       to be a unique name for the session, it is set as an
+                       X property, that makes FINDDISPLAY only find sessions
+                       with that tag value.
 
                        If you want the FINDCREATEDISPLAY session to contact an
                        XDMCP login manager (xdm/gdm/kdm) on the same machine,

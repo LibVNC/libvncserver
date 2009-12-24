@@ -1272,8 +1272,11 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 
 				sprintf(luser, "%s's", user);
 				lowercase(luser);
+				if (db) fprintf(stderr, "\nAIX luser compare: \"%s\" to \"%s\"\n", luser, instr);
 				if (strstr(luser, instr) == luser) {
+					if (db) fprintf(stderr, "AIX luser compare: strstr OK.\n");
 					if (!strcmp(luser, instr)) {
+						if (db) fprintf(stderr, "AIX luser compare: strings equal.\n");
 						i = -1;	
 						j = 0;
 						memset(instr, 0, sizeof(instr));
@@ -1286,6 +1289,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 						continue;
 					}
 				} else {
+					if (db) fprintf(stderr, "AIX luser compare: problem=1\n");
 					problem = 1;
 				}
 				free(luser);
@@ -1297,7 +1301,6 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 		}
 
 		if (problem) {
-
 			if (db) {
 				fprintf(stderr, "\"Password:\" did not "
 				    "appear: '%s'" " n=%d\n", instr, n);
@@ -1319,7 +1322,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 		return 0;
 	}
 
-	if (db > 2) fprintf(stderr, "\nsending passwd: %s\n", pass);
+	if (db) fprintf(stderr, "\nsending passwd: %s\n", db > 2 ? pass : "****");
 	usleep(100 * 1000);
 	if (slow_pw) {
 		unsigned int k;
@@ -1703,7 +1706,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 		char h3[] = "    scale=... (n/m); scale_cursor=... (sc=); solid (so); id=; repeat; clear_mods (cm); clear_keys (ck);";
 		char h4[] = "    clear_all (ca); speeds=... (sp=); readtimeout=... (rd=) rotate=... (ro=); noncache (nc) (nc=n);";
 		char h5[] = "    geom=WxHxD (ge=); nodisplay=... (nd=); viewonly (vo); tag=...; gnome kde twm fvwm mwm dtwm wmaker";
-		char h6[] = "    xfce enlightenment Xsession failsafe.   Examples:  fred:3/4,so,cm  wilma:geom=1024x768x16,kde";
+		char h6[] = "    xfce lxde enlightenment Xsession failsafe.   Examples:  fred:3/4,so,cm  wilma:geom=1024x768x16,kde";
 		int ch = 13, p;
 		if (f1_help) {
 			p = black_pixel();
