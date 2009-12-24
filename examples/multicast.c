@@ -118,14 +118,16 @@ int main(int argc,char** argv)
   /* enable MulticastVNC */
   server->multicastVNC = TRUE;
   /* 
-     if we said TRUE above, we can supply the address for the multicast group,
-     port and TTL, otherwise libvncserver will use its defaults.
+     If we said TRUE above, we can supply the address for the multicast group,
+     port, TTL and a time interval in miliseconds by which to defer updates.
+     Otherwise, libvncserver will use its defaults.
   */
   /*
   server->multicastAddr = "ff00::e000:2a8a"; 
   server->multicastPort = 5901;
   server->multicastTTL = 32;
-  */
+  server->deferMulticastUpdateTime = 50;
+  */ 
 
 
   /* Initialize the server */
