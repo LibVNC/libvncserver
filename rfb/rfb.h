@@ -288,6 +288,7 @@ typedef struct _rfbScreenInfo
 #define MULTICAST_MAX_CONCURRENT_PIXELFORMATS 256 /* could be up to 65535 */
     char multicastUpdPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
     char multicastUpdPendingForEncoding[1]; /* since non-pseudo encodings are < 256 */
+    rfbBool multicastUseCopyRect;  /* all multicast clients support CopyRect */
     sraRegionPtr multicastUpdateRegion;
     int deferMulticastUpdateTime;
 

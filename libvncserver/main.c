@@ -829,7 +829,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    INIT_MUTEX(screen->multicastOutputMutex);
    INIT_MUTEX(screen->multicastUpdateMutex);
    screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
-     
+   screen->multicastUseCopyRect = TRUE;  
 
    screen->maxFd=0;
    screen->listenSock=-1;
@@ -1131,14 +1131,28 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 
     
     if (screen->multicastVNC && screen->multicastSock >= 0 && 
-	cl->useMulticastVNC && !cl->onHold && //FIXME? cl->sock >= 0 
+	cl->useMulticastVNC && !cl->onHold) {
+      rfbBool mcUpdPending = 
 	(screen->multicastUpdPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] &
 	 (1<<(cl->multicastPixelformatId % 8))) &&
 	(screen->multicastUpdPendingForEncoding[((cl->preferredEncoding & 0xFF)/8)] &
 	 (1<<(cl->preferredEncoding % 8))) &&
-	!sraRgnEmpty(screen->multicastUpdateRegion) ) {
+	!sraRgnEmpty(screen->multicastUpdateRegion);
       result=TRUE;
       if(screen->deferMulticastUpdateTime == 0) {
+	/* Handle CopyRect via unicast for _every_ multicast client. 
+	   We do this by preparing modifiedRegion and requestedRegion 
+	   so rfbSendFramebufferUpdate only sends CopyRect. 
+	*/
+	if(screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion) && cl->sock >= 0) {
+	  sraRgnMakeEmpty(cl->modifiedRegion);
+	  sraRegionPtr tmp = sraRgnCreateRect(0, 0, screen->width, screen->height);
+	  sraRgnOr(cl->requestedRegion, tmp);
+	  sraRgnDestroy(tmp);
+	  rfbSendFramebufferUpdate(cl,cl->copyRegion); 
+	  sraRgnSubtract(screen->multicastUpdateRegion, cl->copyRegion);
+	}
+	if(mcUpdPending)
 	  rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
       } else if(cl->startMulticastDeferring.tv_usec == 0) {
 	gettimeofday(&cl->startMulticastDeferring,NULL);
@@ -1149,9 +1163,22 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	if(tv.tv_sec < cl->startMulticastDeferring.tv_sec /* at midnight */
 	   || ((tv.tv_sec-cl->startMulticastDeferring.tv_sec)*1000
 	       +(tv.tv_usec-cl->startMulticastDeferring.tv_usec)/1000)
-	     > screen->deferMulticastUpdateTime) {
+	   > screen->deferMulticastUpdateTime) {
 	  cl->startMulticastDeferring.tv_usec = 0;
-	  rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
+	  /* Handle CopyRect via unicast for _every_ multicast client. 
+	     We do this by preparing modifiedRegion and requestedRegion 
+	     so rfbSendFramebufferUpdate only sends CopyRect. 
+	  */
+	  if(screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion) && cl->sock >= 0) {
+	    sraRgnMakeEmpty(cl->modifiedRegion);
+	    sraRegionPtr tmp = sraRgnCreateRect(0, 0, screen->width, screen->height);
+	    sraRgnOr(cl->requestedRegion, tmp);
+	    sraRgnDestroy(tmp);
+	    rfbSendFramebufferUpdate(cl,cl->copyRegion); 
+	    sraRgnSubtract(screen->multicastUpdateRegion, cl->copyRegion);
+	  }
+	  if(mcUpdPending)
+	    rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
 	}
       }
     }

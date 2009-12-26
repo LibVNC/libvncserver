@@ -2217,6 +2217,10 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	  cl->enableCursorPosUpdates = FALSE;
 	}
 
+	/* if one multicast enabled client does not support it, disable it for all */
+	if(cl->enableMulticastVNC && !cl->useCopyRect)
+	  cl->screen->multicastUseCopyRect = FALSE;
+
         return;
     }
 
@@ -2302,7 +2306,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	if (!msg.mfur.incremental) {
 	    sraRegionPtr tmpRegion = sraRgnCreateRect(0, 0, cl->screen->width, cl->screen->height);
 	    sraRgnOr(cl->screen->multicastUpdateRegion, tmpRegion);
-	    //sraRgnSubtract(cl->copyRegion,tmpRegion); //FIXME remove copyregion?
+	    sraRgnMakeEmpty(cl->copyRegion);
 	    sraRgnDestroy(tmpRegion);
 	}
 
