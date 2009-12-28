@@ -2532,7 +2532,7 @@ proc see_if_ok {query item expected} {
 }
 
 proc get_default_vars {} {
-	global default_var
+	global default_var env
 
 	set qry [all_query_vars]
 
@@ -2550,6 +2550,11 @@ proc get_default_vars {} {
 		if {$i > 50} {
 			set qargs [list "-QD" $q]
 			set a [run_remote_cmd $qargs]
+			if [info exists env(TKX11VNC_PRINT_ALL_QD)] {
+				puts $q
+				puts $a
+				puts "---------------"
+			}
 			if {$all != ""} {
 				append all ","
 			}
@@ -2561,6 +2566,11 @@ proc get_default_vars {} {
 	if {$q != ""} {
 		set qargs [list "-QD" $q]
 		set a [run_remote_cmd $qargs]
+		if [info exists env(TKX11VNC_PRINT_ALL_QD)] {
+			puts $q
+			puts $a
+			puts "---------------"
+		}
 		if {$all != ""} {
 			append all ","
 		}
@@ -5982,6 +5992,8 @@ proc get_settings_rcfile {} {
 			set qst $hmm
 		} elseif {$item == "nevershared"} {
 			set qst $hmm
+		} elseif {$item == "gui"} {
+			set qst $hmm
 		}
 
 		if {![info exists menu_var($item)]} {
@@ -6956,15 +6968,19 @@ if {$tk_version < 8.4} {
 
 set screen_height [winfo screenheight .]
 set screen_width  [winfo screenwidth  .]
-if {$screen_height < 500} {
-	# short screen, PDA?
-	set max_text_height 22
-	set text_height 13
-	if {$screen_height <= 360} {
-		# very short.
-		set max_text_height 16
-		set max_text_width  60
-		set text_height 11
+if {$screen_height < 700} {
+	# short screen, netbook?
+	set max_text_height 30
+	if {$screen_height < 500} {
+		# short screen, PDA?
+		set max_text_height 22
+		set text_height 13
+		if {$screen_height <= 360} {
+			# very short.
+			set max_text_height 16
+			set max_text_width  60
+			set text_height 11
+		}
 	}
 }
 if {[info exists env(X11VNC_GUI_TEXT_HEIGHT)]} {

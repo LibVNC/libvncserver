@@ -2,13 +2,13 @@
 .\" ** The above line should force tbl to be a preprocessor **
 .\" Man page for the SSVNC vncviewer
 .\"
-.\" Copyright (C) 2006-2008 Karl J. Runge <runge@karlrunge.com>
+.\" Copyright (C) 2006-2009 Karl J. Runge <runge@karlrunge.com>
 .\"
 .\" You may distribute under the terms of the GNU General Public
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH ssvnc 1 "September 2009" "" "SSVNC"
+.TH ssvnc 1 "December 2009" "" "SSVNC"
 .SH NAME
 ssvnc \- a GUI wrapper for SSL and SSH VNC connections.
 .SH SYNOPSIS
@@ -22,6 +22,10 @@ ssvnc \- a GUI wrapper for SSL and SSH VNC connections.
 .br
 .B ssvnc
 .RI [\| options \|]\ [\| host-or-profile \]
+.br
+.B ssvnc
+.IR \-cmd
+.RI [\| ssvnc_cmd-args \|]
 .br
 .B ssvnc
 .IR \--help
@@ -47,10 +51,10 @@ Or supply user@hostname:display and click on the "Use SSH" option, then
 press the "Connect" button to connect to the server via an SSH tunnel.
 E.g. "fred@far-away.east:0".
 
-As an easter egg, we note it is also possible to disable the use of SSL/SSH 
+Note it is also possible to disable the use of SSL/SSH 
 encryption tunnels by using a vnc:// or Vnc:// prefix before
 host:display.  Shift+Ctrl-E is a short-cut to add/remove it.
-See also the \fB-noenc\fR option below.
+See also the \fB-noenc\fR option below for the 'No Encryption' button.
 
 Normally you do not specify any command line options.  You simply
 run \fBssvnc\fR and use the GUI that starts up.
@@ -70,6 +74,12 @@ See below and the application Help for more information on the modes.
 You can also place certain settings in your ~/.ssvncrc, see the
 SSVNC Help panel ('Tips') for more info.
 
+The \fB-cmd\fR option does not start the GUI, it runs the command
+line utility \fBssvnc_cmd\fR directly with the given arguments.
+\fBssvnc_cmd\fR can launch the viewer directly (\fB-viewer ...\fR)
+or, by default, the \fBss_vncviewer\fR SSL/SSH tunnel wrapper script.
+See its help output for more information.
+
 There are also some command line options described as follows.
 .SH OPTIONS
 .TP
@@ -79,6 +89,12 @@ Prints out to the terminal a brief description and the options.
 \fB\--help\fR
 Starts up the GUI as though the 'Help' button was pressed to show the
 main Help panel.
+.TP
+\fB\-cmd\fR \fI[ssvnc_cmd-args]\fR
+Launch the ssvnc_cmd utility command directly (no GUI) with the given
+arguments (for use when ssvnc_cmd is not in one's PATH.) If neither
+ssvnc_cmd nor ssvncviewer is in PATH, one can launch the viewer
+directly via: ssvnc -cmd -viewer [viewer-args]
 .TP
 \fB\-profiles\fR
 List the saved SSVNC profiles you have created.  A profile
@@ -122,7 +138,8 @@ Start off in a mode where a 'No Encryption' check button is present.
 You can toggle the mode with Ctrl-E.
 Same as SSVNC_DISABLE_ENCRYPTION_BUTTON=1. Or \fInoenc=1\fR in ~/.ssvncrc.
 Selecting no encryption is the same as the vnc:// and Vnc:// prefixes
-described below.  \fB-enc\fR implies the opposite.
+described below.  The \fB\-noenc\fR mode is now the default, use \fB-enc\fR
+or \fInoenc=0\fR for the opposite behavior.
 .TP
 \fB\-killstunnel\fR
 On Windows, automatically terminate the STUNNEL process when the viewer

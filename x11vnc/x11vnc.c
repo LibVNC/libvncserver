@@ -5018,6 +5018,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (dpy && !xrandr && !got_noxrandr) {
+#if !NO_X11
 		Atom trap_xrandr = XInternAtom(dpy, "X11VNC_TRAP_XRANDR", True);
 		if (trap_xrandr != None) {
 			if (! quiet) {
@@ -5025,6 +5026,7 @@ int main(int argc, char* argv[]) {
 			}
 			xrandr = 1;
 		}
+#endif
 	}
 
 #ifdef MACOSX

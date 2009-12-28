@@ -444,6 +444,9 @@ void unixpw_screen(int init) {
 
 		x = nfix(dpy_x / 2 -  strlen(log) * char_w, dpy_x);
 		y = (int) (dpy_y / 3.5);
+		if (unixpw_system_greeter) {
+			y = (int) (dpy_y / 3);
+		}
 
 		if (scaling) {
 			x = (int) (x * scale_fac_x);
@@ -461,7 +464,7 @@ void unixpw_screen(int init) {
 			pscreen = screen;
 		}
 
-		if (pscreen && pscreen->width >= 640) {
+		if (pscreen && pscreen->width >= 640 && pscreen->height >= 480) {
 			rfbDrawString(pscreen, &default6x13Font, 8, 2+1*13, "F1-Help:", white_pixel());
 		}
 		f1_help = 0;
@@ -473,8 +476,8 @@ void unixpw_screen(int init) {
 					char moo[] = "Press 'Escape' for System Greeter";
 					rfbDrawString(pscreen, &default8x16Font, x-90, y-30, moo, white_pixel());
 				} else {
-					char moo1[] = "Press 'Escape' for New Session via System Greeter,";
-					char moo2[] = "or otherwise login here for Existing Session:     ";
+					char moo1[] = "Press 'Escape' for a New Session via System Greeter, or";
+					char moo2[] = "otherwise login here to connect to an Existing Session:";
 					rfbDrawString(pscreen, &default6x13Font, x-110, y-38, moo1, white_pixel());
 					rfbDrawString(pscreen, &default6x13Font, x-110, y-25, moo2, white_pixel());
 				}
@@ -1210,7 +1213,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 	 * 	auth      sufficient  pam_self.so
 	 * it may be commented out without problem.
 	 */
-	for (i=0; i<sizeof(instr); i++) {
+	for (i=0; i< (int) sizeof(instr); i++) {
 		instr[i] = '\0';
 	}
 
@@ -1253,7 +1256,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 				if (i < -1) i = -1;
 				continue;
 			}
-			if (j >= sizeof(instr)-1) {
+			if (j >= (int) sizeof(instr)-1) {
 				rfbLog("su_verify: problem finding Password:\n");	
 				fflush(stderr);
 				return 0;
@@ -1700,14 +1703,20 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 	} else if (! down) {
 		return;
 	}
-	if (keysym == XK_F1 && pscreen && pscreen->width >= 640) {
-		char h1[] = "F1-Help:  For 'login:' type in the username and press Enter, then for 'Password:' type in the password.";
+	if (keysym == XK_F1) {
+		char h1[] = "F1-Help:  For 'login:' type in the username and press Enter, then for 'Password:' enter the password.";
+		char hf[] = "  Once logged in, username's X session will be searched for and if found then attached to.";
+		char hc[] = "  Once logged in, username's X session is sought and attached to, otherwise a new session is created.";
+		char hx[] = "  Once logged in, username's X session is sought and attached to, otherwise a login greeter is presented.";
 		char h2[] = "  Specify options after a ':' like this:  username:opt,opt=val,...    Where an opt may be any of:";
 		char h3[] = "    scale=... (n/m); scale_cursor=... (sc=); solid (so); id=; repeat; clear_mods (cm); clear_keys (ck);";
 		char h4[] = "    clear_all (ca); speeds=... (sp=); readtimeout=... (rd=) rotate=... (ro=); noncache (nc) (nc=n);";
 		char h5[] = "    geom=WxHxD (ge=); nodisplay=... (nd=); viewonly (vo); tag=...; gnome kde twm fvwm mwm dtwm wmaker";
 		char h6[] = "    xfce lxde enlightenment Xsession failsafe.   Examples:  fred:3/4,so,cm  wilma:geom=1024x768x16,kde";
 		int ch = 13, p;
+		if (!pscreen || pscreen->width < 640 || pscreen->height < 480) {
+			return;
+		}
 		if (f1_help) {
 			p = black_pixel();
 			f1_help = 0;
@@ -1717,13 +1726,24 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 			unixpw_last_try_time = time(NULL) + 45;
 		}
 		rfbDrawString(pscreen, &default6x13Font, 8, 2+1*ch, h1, p);
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+2*ch, h2, p);
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+3*ch, h3, p);
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+4*ch, h4, p);
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+5*ch, h5, p);
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+6*ch, h6, p);
+		if (use_dpy == NULL) {
+			;
+		} else if (strstr(use_dpy, "cmd=FINDDISPLAY")) {
+			rfbDrawString(pscreen, &default6x13Font, 8, 2+2*ch, hf, p);
+		} else if (strstr(use_dpy, "cmd=FINDCREATEDISPLAY")) {
+			if (strstr(use_dpy, "xdmcp")) {
+				rfbDrawString(pscreen, &default6x13Font, 8, 2+2*ch, hx, p);
+			} else {
+				rfbDrawString(pscreen, &default6x13Font, 8, 2+2*ch, hc, p);
+			}
+		}
+		rfbDrawString(pscreen, &default6x13Font, 8, 2+3*ch, h2, p);
+		rfbDrawString(pscreen, &default6x13Font, 8, 2+4*ch, h3, p);
+		rfbDrawString(pscreen, &default6x13Font, 8, 2+5*ch, h4, p);
+		rfbDrawString(pscreen, &default6x13Font, 8, 2+6*ch, h5, p);
+		rfbDrawString(pscreen, &default6x13Font, 8, 2+7*ch, h6, p);
 		if (!f1_help) {
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+1*ch, "F1-Help:", white_pixel());
+			rfbDrawString(pscreen, &default6x13Font, 8, 2+1*ch, "F1-Help:", white_pixel());
 		}
 		unixpw_mark();
 		return;

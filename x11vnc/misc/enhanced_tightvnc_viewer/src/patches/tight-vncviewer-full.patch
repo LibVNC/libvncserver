@@ -664,7 +664,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/Vncviewer vnc_unixsrc/vncview
 +
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/vncviewer/argsresources.c
 --- vnc_unixsrc.orig/vncviewer/argsresources.c	2007-02-04 17:10:31.000000000 -0500
-+++ vnc_unixsrc/vncviewer/argsresources.c	2009-10-26 23:26:12.000000000 -0400
++++ vnc_unixsrc/vncviewer/argsresources.c	2009-11-25 00:02:42.000000000 -0500
 @@ -31,9 +31,9 @@
  
  char *fallback_resources[] = {
@@ -739,7 +739,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
       <ButtonPress>: SendRFBEvent()\\n\
       <ButtonRelease>: SendRFBEvent()\\n\
       <Motion>: SendRFBEvent()\\n\
-@@ -55,26 +107,129 @@
+@@ -55,26 +107,137 @@
  
    "*serverDialog.dialog.label: VNC server:",
    "*serverDialog.dialog.value:",
@@ -785,11 +785,19 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +                              "The above mappings are *always* active in ViewOnly mode, unless you set the\\n"
 +                              "Escape Keys value to 'never'.\\n"
 +                              "\\n"
-+                              "If the Escape Keys value below is set to 'default' then a default list of\\n"
-+                              "of modifier keys is used.  For Unix it is: Alt_L,Super_L and for MacOSX it\\n"
-+                              "is Control_L,Meta_L.  Note: the Super_L key usually has a Windows(TM) Flag\\n"
-+                              "on it.  Also note the _L and _R mean the key is on the LEFT or RIGHT side\\n"
-+                              "of the keyboard.\\n"
++                              "x11vnc -appshare hot-keys:  x11vnc has a simple application sharing mode\\n"
++                              "that enables the viewer-side to move, resize, or raise the remote toplevel\\n"
++                              "windows.  To enable it, hold down Shift + the Escape Keys and press these:\\n"
++                              "\\n"
++                              "   Arrow keys:              move the remote window around in its desktop.\\n"
++                              "   PageUp/PageDn/Home/End:  resize the remote window.\\n"
++                              "   +/-                      raise or lower the remote window.\\n"
++                              "   M or Button1 move win to local position;  D or Button3: delete remote win.\\n"
++                              "\\n"
++                              "If the Escape Keys value below is set to 'default' then a fixed list of\\n"
++                              "modifier keys is used.  For Unix it is: Alt_L,Super_L and for MacOSX it is\\n"
++                              "Control_L,Meta_L.  Note: the Super_L key usually has a Windows(TM) Flag.\\n"
++                              "Also note the _L and _R mean the key is on the LEFT or RIGHT side of keyboard.\\n"
 +                              "\\n"
 +                              "On Unix   the default is Alt and Windows keys on Left side of keyboard.\\n"
 +                              "On MacOSX the default is Control and Command keys on Left side of keyboard.\\n"
@@ -804,7 +812,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +                              "\\n"
 +                              "Current Escape Keys Value:",
 +  "*escapeDialog.dialog.value:",
-+  "*escapeDialog.dialog.value.width: 275",
++  "*escapeDialog.dialog.value.width: 280",
 +  "*escapeDialog.dialog.value.translations: #override\\n\
 +     <KeyRelease>Return: EscapeDialogDone()",
 +
@@ -875,7 +883,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    "*popup*button1.label: Dismiss popup",
    "*popup*button1.translations: #override\\n\
-@@ -84,7 +239,7 @@
+@@ -84,7 +247,7 @@
    "*popup*button2.translations: #override\\n\
       <Btn1Down>,<Btn1Up>: Quit()",
  
@@ -884,7 +892,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    "*popup*button3.type: toggle",
    "*popup*button3.translations: #override\\n\
       <Visible>: SetFullScreenState()\\n\
-@@ -105,16 +260,426 @@
+@@ -105,16 +268,426 @@
    "*popup*button7.label: Send ctrl-alt-del",
    "*popup*button7.translations: #override\\n\
       <Btn1Down>,<Btn1Up>: SendRFBEvent(keydown,Control_L)\
@@ -1316,7 +1324,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    NULL
  };
  
-@@ -124,7 +689,7 @@
+@@ -124,7 +697,7 @@
   * from a dialog box.
   */
  
@@ -1325,7 +1333,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  int vncServerPort = 0;
  
  
-@@ -135,6 +700,7 @@
+@@ -135,6 +708,7 @@
   */
  
  AppData appData;
@@ -1333,7 +1341,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  static XtResource appDataResourceList[] = {
    {"shareDesktop", "ShareDesktop", XtRBool, sizeof(Bool),
-@@ -155,14 +721,44 @@
+@@ -155,14 +729,44 @@
    {"userLogin", "UserLogin", XtRString, sizeof(String),
     XtOffsetOf(AppData, userLogin), XtRImmediate, (XtPointer) 0},
  
@@ -1380,7 +1388,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    {"nColours", "NColours", XtRInt, sizeof(int),
     XtOffsetOf(AppData, nColours), XtRImmediate, (XtPointer) 256},
-@@ -179,9 +775,12 @@
+@@ -179,9 +783,12 @@
    {"requestedDepth", "RequestedDepth", XtRInt, sizeof(int),
     XtOffsetOf(AppData, requestedDepth), XtRImmediate, (XtPointer) 0},
  
@@ -1394,7 +1402,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"wmDecorationWidth", "WmDecorationWidth", XtRInt, sizeof(int),
     XtOffsetOf(AppData, wmDecorationWidth), XtRImmediate, (XtPointer) 4},
  
-@@ -191,6 +790,9 @@
+@@ -191,6 +798,9 @@
    {"popupButtonCount", "PopupButtonCount", XtRInt, sizeof(int),
     XtOffsetOf(AppData, popupButtonCount), XtRImmediate, (XtPointer) 0},
  
@@ -1404,7 +1412,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"debug", "Debug", XtRBool, sizeof(Bool),
     XtOffsetOf(AppData, debug), XtRImmediate, (XtPointer) False},
  
-@@ -206,11 +808,13 @@
+@@ -206,11 +816,13 @@
    {"bumpScrollPixels", "BumpScrollPixels", XtRInt, sizeof(int),
     XtOffsetOf(AppData, bumpScrollPixels), XtRImmediate, (XtPointer) 20},
  
@@ -1419,7 +1427,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
    {"enableJPEG", "EnableJPEG", XtRBool, sizeof(Bool),
     XtOffsetOf(AppData, enableJPEG), XtRImmediate, (XtPointer) True},
-@@ -218,14 +822,88 @@
+@@ -218,14 +830,91 @@
    {"useRemoteCursor", "UseRemoteCursor", XtRBool, sizeof(Bool),
     XtOffsetOf(AppData, useRemoteCursor), XtRImmediate, (XtPointer) True},
  
@@ -1500,6 +1508,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +  {"recvText", "RecvText", XtRString, sizeof(String),
 +   XtOffsetOf(AppData, recvText), XtRImmediate, (XtPointer) 0},
 +
++  {"appShare", "AppShare", XtRBool, sizeof(Bool),
++   XtOffsetOf(AppData, appShare), XtRImmediate, (XtPointer) False},
++
 +  {"escapeKeys", "EscapeKeys", XtRString, sizeof(String),
 +   XtOffsetOf(AppData, escapeKeys), XtRImmediate, (XtPointer) 0},
 +
@@ -1510,7 +1521,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -242,8 +920,29 @@
+@@ -242,8 +931,29 @@
    {"-noraiseonbeep", "*raiseOnBeep",        XrmoptionNoArg,  "False"},
    {"-passwd",        "*passwordFile",       XrmoptionSepArg, 0},
    {"-user",          "*userLogin",          XrmoptionSepArg, 0},
@@ -1541,7 +1552,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
    {"-owncmap",       "*forceOwnCmap",       XrmoptionNoArg,  "True"},
    {"-truecolor",     "*forceTrueColour",    XrmoptionNoArg,  "True"},
    {"-truecolour",    "*forceTrueColour",    XrmoptionNoArg,  "True"},
-@@ -253,8 +952,27 @@
+@@ -253,8 +963,28 @@
    {"-nojpeg",        "*enableJPEG",         XrmoptionNoArg,  "False"},
    {"-nocursorshape", "*useRemoteCursor",    XrmoptionNoArg,  "False"},
    {"-x11cursor",     "*useX11Cursor",       XrmoptionNoArg,  "True"},
@@ -1562,6 +1573,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +  {"-termchat",      "*termChat",           XrmoptionNoArg,  "True"},
 +  {"-chatonly",      "*chatOnly",           XrmoptionNoArg,  "True"},
 +  {"-scale",         "*scale",              XrmoptionSepArg, 0},
++  {"-appshare",      "*appShare",           XrmoptionNoArg,  "True"},
 +  {"-escape",        "*escapeKeys",         XrmoptionSepArg, 0},
 +  {"-sendclipboard", "*sendClipboard",      XrmoptionNoArg,  "True"},
 +  {"-sendalways",    "*sendAlways",         XrmoptionNoArg,  "True"},
@@ -1571,7 +1583,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  int numCmdLineOptions = XtNumber(cmdLineOptions);
-@@ -267,16 +985,100 @@
+@@ -267,16 +997,100 @@
  static XtActionsRec actions[] = {
      {"SendRFBEvent", SendRFBEvent},
      {"ShowPopup", ShowPopup},
@@ -1672,7 +1684,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  };
  
  
-@@ -302,11 +1104,14 @@
+@@ -302,11 +1116,14 @@
  void
  usage(void)
  {
@@ -1689,7 +1701,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  	  "       %s [<OPTIONS>] -listen [<DISPLAY#>]\n"
  	  "       %s -help\n"
  	  "\n"
-@@ -319,7 +1124,7 @@
+@@ -319,7 +1136,7 @@
  	  "        -noraiseonbeep\n"
  	  "        -passwd <PASSWD-FILENAME> (standard VNC authentication)\n"
  	  "        -user <USERNAME> (Unix login authentication)\n"
@@ -1698,7 +1710,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  	  "        -bgr233\n"
  	  "        -owncmap\n"
  	  "        -truecolour\n"
-@@ -332,10 +1137,374 @@
+@@ -332,10 +1149,386 @@
  	  "        -autopass\n"
  	  "\n"
  	  "Option names may be abbreviated, e.g. -bgr instead of -bgr233.\n"
@@ -1966,6 +1978,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +	  "                    framebuffer update coming in.  Helps 'pipeline' the updates.\n"
 +	  "                    This is currently the default, use -nopipeline to disable.\n"
 +	  "\n"
++	  "     -appshare      Enable features for use with x11vnc's -appshare mode where\n"
++	  "                    instead of sharing the full desktop only the application's\n"
++	  "                    windows are shared.  Viewer multilisten mode is used to\n"
++	  "                    create the multiple windows: -multilisten is implied.\n"
++	  "                    See 'x11vnc -appshare -help' more information on the mode.\n"
++	  "\n"
++	  "                    Features enabled in the viewer under -appshare are:\n"
++	  "                    Minimum extra text in the title, auto -ycrop is disabled,\n"
++	  "                    x11vnc -remote_prefix X11VNC_APPSHARE_CMD: message channel,\n"
++	  "                    x11vnc initial window position hints.  See also Escape Keys\n"
++	  "                    below for additional key and mouse bindings.\n"
++	  "\n"
 +	  "     -escape str    This sets the 'Escape Keys' modifier sequence and enables\n"
 +	  "                    escape keys mode.  When the modifier keys escape sequence\n"
 +	  "                    is held down, the next keystroke is interpreted locally\n"
@@ -2075,7 +2099,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  
  
  /*
-@@ -347,73 +1516,223 @@
+@@ -343,77 +1536,234 @@
+  * not already processed by XtVaAppInitialize().  It sets vncServerHost and
+  * vncServerPort and all the fields in appData.
+  */
++extern int saw_appshare;
+ 
  void
  GetArgsAndResources(int argc, char **argv)
  {
@@ -2162,6 +2191,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
 +		if (appData.escapeKeys == NULL) {
 +			appData.escapeKeys = strdup(getenv("VNCVIEWER_ESCAPE"));
 +		}
++	}
++	if (saw_appshare) {
++		appData.appShare = True;
++	}
++	if (appData.appShare && appData.escapeKeys == NULL) {
++		appData.escapeKeys = strdup("default");
 +	}
 +	if (appData.escapeKeys != NULL) {
 +		appData.escapeActive = True;
@@ -2356,7 +2391,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/argsresources.c vnc_unixsrc/v
  }
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewer/colour.c
 --- vnc_unixsrc.orig/vncviewer/colour.c	2002-04-30 09:07:31.000000000 -0400
-+++ vnc_unixsrc/vncviewer/colour.c	2007-03-22 21:36:12.000000000 -0400
++++ vnc_unixsrc/vncviewer/colour.c	2009-11-29 22:31:14.000000000 -0500
 @@ -31,9 +31,12 @@
  #define BGR233_SIZE 256
  unsigned long BGR233ToPixel[BGR233_SIZE];
@@ -2375,7 +2410,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
  static void AllocateExactBGR233Colours();
  static Bool AllocateBGR233Colour(int r, int g, int b);
  
-+static void SetupBGR565Map();
++static void SetupBGR565Map(unsigned long red_mask, unsigned long green_mask, unsigned long blue_mask);
 +
  
  /*
@@ -2417,7 +2452,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
 +		fprintf(stderr, "Using default colormap and translating from BGR565 (65536 colors).  Pixel format:\n");
 +		PrintPixelFormat(&myFormat);
 +
-+		SetupBGR565Map();
++		SetupBGR565Map(vis->red_mask, vis->green_mask, vis->blue_mask);
 +		return;
 +  	}
 +  }
@@ -2547,12 +2582,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
  	    if (shared[nearestPixel] && !usedAsNearest[nearestPixel])
  	      nSharedUsed++;
  	    usedAsNearest[nearestPixel] = True;
-@@ -433,6 +528,53 @@
+@@ -433,6 +528,57 @@
    }
  }
  
 +static void
-+SetupBGR565Map()
++SetupBGR565Map(unsigned long red_mask, unsigned long green_mask, unsigned long blue_mask)
 +{
 +  int r, g, b;
 +  int r2, g2, b2;
@@ -2588,7 +2623,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
 +			pixel = (r2 << 16) | (g2 << 8) | (b2 << 0);
 +		}
 +
-+		idx = (b<<bs) | (g<<gs) | (r<<rs);
++		if (red_mask == 0xff) {
++			idx = (r<<bs) | (g<<gs) | (b<<rs);
++		} else {
++			idx = (b<<bs) | (g<<gs) | (r<<rs);
++		}
 +		if (0) fprintf(stderr, "cnt: %5d idx: %5d pixel: 0x%08x\n", cnt, idx, pixel);
 +		BGR565ToPixel[idx] = pixel;
 +		cnt++;
@@ -2601,7 +2640,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
  
  /*
   * AllocateExactBGR233Colours() attempts to allocate each of the colours in the
-@@ -484,8 +626,13 @@
+@@ -484,8 +630,13 @@
      ri = rn;
      for (gi = 0; gi < gn; gi++) {
        for (bi = 0; bi < bn; bi++) {
@@ -2617,7 +2656,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
        }
      }
      rn++;
-@@ -496,8 +643,13 @@
+@@ -496,8 +647,13 @@
      gi = gn;
      for (ri = 0; ri < rn; ri++) {
        for (bi = 0; bi < bn; bi++) {
@@ -2633,7 +2672,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
        }
      }
      gn++;
-@@ -507,8 +659,13 @@
+@@ -507,8 +663,13 @@
        bi = bn;
        for (ri = 0; ri < rn; ri++) {
  	for (gi = 0; gi < gn; gi++) {
@@ -2649,7 +2688,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/colour.c vnc_unixsrc/vncviewe
  	}
        }
        bn++;
-@@ -529,18 +686,36 @@
+@@ -529,18 +690,36 @@
  AllocateBGR233Colour(int r, int g, int b)
  {
    XColor c;
@@ -3687,8 +3726,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/cursor.c vnc_unixsrc/vncviewe
 -
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncviewer/desktop.c
 --- vnc_unixsrc.orig/vncviewer/desktop.c	2004-05-28 13:29:29.000000000 -0400
-+++ vnc_unixsrc/vncviewer/desktop.c	2009-10-16 22:04:39.000000000 -0400
-@@ -28,28 +28,487 @@
++++ vnc_unixsrc/vncviewer/desktop.c	2009-11-29 22:05:55.000000000 -0500
+@@ -28,28 +28,498 @@
  #include <X11/extensions/XShm.h>
  #endif
  
@@ -3704,6 +3743,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +Cursor waitCursor = None;
  Widget form, viewport, desktop;
  
++int appshare_0_hint = -10000;
++int appshare_x_hint = -10000;
++int appshare_y_hint = -10000;
++
  static Bool modifierPressed[256];
  
 -static XImage *image = NULL;
@@ -3914,10 +3957,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	/* now destroy image */
 +	if (image && image->data) {
 +		if (UsingShm()) {
-+			ShmCleanup();
++			ShmDetach();
 +		}
 +		XDestroyImage(image);
 +		fprintf(stderr, "rescale_image: destroyed 'image'\n");
++		if (UsingShm()) {
++			ShmCleanup();
++		}
 +		image = NULL;
 +	}
 +	if (image_ycrop && image_ycrop->data) {
@@ -4056,6 +4102,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			fprintf(stderr, "try_create_image: created *non-shm* image: %dx%d\n", image->width, image->height);
 +		}
 +	}
++	fprintf(stderr, "try_create_image: image->bytes_per_line: %d\n", image->bytes_per_line);
 +}
 +
 +void create_image() {
@@ -4167,6 +4214,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +}
 +
 +void check_tall(void) {
++	if (appData.appShare) {
++		return;
++	}
 +	if (! appData.yCrop) {
 +		int w = si.framebufferWidth;
 +		int h = si.framebufferHeight;
@@ -4180,7 +4230,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  
  /*
   * DesktopInitBeforeRealization creates the "desktop" widget and the viewport
-@@ -59,91 +518,1016 @@
+@@ -59,92 +529,1017 @@
  void
  DesktopInitBeforeRealization()
  {
@@ -4300,8 +4350,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		float t = 0.0;
 +		XtVaSetValues(w, XtNtopOfThumb, &t, NULL);
 +	}
-+}
-+
+ }
+ 
 +static XtCallbackProc Jumped(Widget w, XtPointer closure, XtPointer call_data) {
 +	float top = *((float *) call_data);
 +	Position x, y;
@@ -4319,8 +4369,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			XtVaSetValues(w, XtNtopOfThumb, *(XtArgVal*)&t, XtNshown, *(XtArgVal*)&s, NULL);
 +		}
 +	}
- }
- 
++}
++
 +extern double dnow(void);
 +
 +void check_things() {
@@ -4512,7 +4562,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			appData.useXserverBackingStore = False;
 +		}
 +	}
-+
+ 
+-  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
 +	if (appData.useXserverBackingStore) {
 +		XtVaGetApplicationResources(desktop, (XtPointer)&attr.backing_store,
 +		    desktopBackingStoreResources, 1, NULL);
@@ -4564,9 +4615,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	}
 +	FreeX11Cursor();
 +	FreeSoftCursor();
-+}
-+
-+
+ }
+ 
+ 
 +#define CEIL(x)  ( (double) ((int) (x)) == (x) ? \
 +	(double) ((int) (x)) : (double) ((int) (x) + 1) )
 +#define FLOOR(x) ( (double) ((int) (x)) )
@@ -4586,15 +4637,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +
 +int scale_round(int len, double fac) {
 +        double eps = 0.000001;
- 
--  XChangeWindowAttributes(dpy, desktopWin, valuemask, &attr);
++
 +        len = (int) (len * fac + eps);
 +        if (len < 1) {
 +                len = 1;
 +        }
 +        return len;
- }
- 
++}
++
 +static void scale_rect(double factor_x, double factor_y, int blend, int interpolate,
 +    int *px, int *py, int *pw, int *ph, int solid) {
 +
@@ -5256,10 +5306,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +}
 +
 +#define PR_EXPOSE fprintf(stderr, "Expose: %04dx%04d+%04d+%04d %04d/%04d/%04d now: %8.4f rescale: %8.4f fullscreen: %8.4f\n", width, height, x, y, si.framebufferWidth, appData.yCrop, si.framebufferHeight, now - start_time, now - last_rescale, now - last_fullscreen);
- 
++
  /*
   * HandleBasicDesktopEvent - deal with expose and leave events.
-@@ -152,41 +1536,404 @@
+  */
+@@ -152,42 +1547,528 @@
  static void
  HandleBasicDesktopEvent(Widget w, XtPointer ptr, XEvent *ev, Boolean *cont)
  {
@@ -5301,13 +5352,6 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			if (y + height < si.framebufferHeight)  height++;
 +		}
 +	}
-+
-+	if (x + width > si.framebufferWidth) {
-+		width = si.framebufferWidth - x;
-+		if (width <= 0) {
-+			break;
-+		}
-+	}
  
 -    if (ev->xexpose.x + ev->xexpose.width > si.framebufferWidth) {
 -      ev->xexpose.width = si.framebufferWidth - ev->xexpose.x;
@@ -5322,6 +5366,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 -    SendFramebufferUpdateRequest(ev->xexpose.x, ev->xexpose.y,
 -				 ev->xexpose.width, ev->xexpose.height, False);
 -    break;
++	if (x + width > si.framebufferWidth) {
++		width = si.framebufferWidth - x;
++		if (width <= 0) {
++			break;
++		}
++	}
++
 +	if (y + height > si.framebufferHeight) {
 +		height = si.framebufferHeight - y;
 +		if (height <= 0) {
@@ -5405,6 +5456,79 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  
 +extern Position desktopX, desktopY;
 +
++void x11vnc_appshare(char *cmd) {
++	char send[200], str[100];
++	char *id = "cmd=id_cmd";
++	int m_big = 80, m_fine = 15;
++	int resize = 100, db = 0;
++
++	if (getenv("X11VNC_APPSHARE_DEBUG")) {
++		db = atoi(getenv("X11VNC_APPSHARE_DEBUG"));
++	}
++
++	if (db) fprintf(stderr, "x11vnc_appshare: cmd=%s\n", cmd);
++
++	str[0] = '\0';
++
++	if (!strcmp(cmd, "left")) {
++		sprintf(str, "%s:move:-%d+0", id, m_big);
++	} else if (!strcmp(cmd, "right")) {
++		sprintf(str, "%s:move:+%d+0", id, m_big);
++	} else if (!strcmp(cmd, "up")) {
++		sprintf(str, "%s:move:+0-%d", id, m_big);
++	} else if (!strcmp(cmd, "down")) {
++		sprintf(str, "%s:move:+0+%d", id, m_big);
++	} else if (!strcmp(cmd, "left-fine")) {
++		sprintf(str, "%s:move:-%d+0", id, m_fine);
++	} else if (!strcmp(cmd, "right-fine")) {
++		sprintf(str, "%s:move:+%d+0", id, m_fine);
++	} else if (!strcmp(cmd, "up-fine")) {
++		sprintf(str, "%s:move:+0-%d", id, m_fine);
++	} else if (!strcmp(cmd, "down-fine")) {
++		sprintf(str, "%s:move:+0+%d", id, m_fine);
++	} else if (!strcmp(cmd, "taller")) {
++		sprintf(str, "%s:resize:+0+%d", id, resize);
++	} else if (!strcmp(cmd, "shorter")) {
++		sprintf(str, "%s:resize:+0-%d", id, resize);
++	} else if (!strcmp(cmd, "wider")) {
++		sprintf(str, "%s:resize:+%d+0", id, resize);
++	} else if (!strcmp(cmd, "narrower")) {
++		sprintf(str, "%s:resize:-%d+0", id, resize);
++	} else if (!strcmp(cmd, "lower")) {
++		sprintf(str, "%s:lower", id);
++	} else if (!strcmp(cmd, "raise")) {
++		sprintf(str, "%s:raise", id);
++	} else if (!strcmp(cmd, "delete")) {
++		sprintf(str, "%s:wm_delete", id);
++	} else if (!strcmp(cmd, "position")) {
++		Position x, y;
++		int xi, yi;
++
++		XtVaGetValues(toplevel, XtNx, &x, XtNy, &y, NULL);
++		xi = (int) x;
++		yi = (int) y;
++		if (appData.scale) {
++			double fx = 1.0, fy = 1.0;
++			get_scale_values(&fx, &fy);
++			if (fx > 0.0 && fy > 0.0) {
++				xi /= fx;
++				yi /= fx;
++			}
++		}
++		sprintf(str, "%s:geom:0x0+%d+%d", id, xi, yi);
++		fprintf(stderr, "str=%s\n", str);
++	}
++	if (strcmp(str, "")) {
++		Bool vo = appData.viewOnly;
++		strcpy(send, "X11VNC_APPSHARE_CMD:");
++		strcat(send, str);
++		if (db) fprintf(stderr, "x11vnc_appshare: send=%s\n", send);
++		if (vo) appData.viewOnly = False;
++		SendClientCutText(send, strlen(send));
++		if (vo) appData.viewOnly = True;
++	}
++}
++
 +void scroll_desktop(int horiz, int vert, double amount) {
 +	Dimension h, w;
 +	Position x, y;
@@ -5424,7 +5548,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +
 +	x2 = -x;
 +	y2 = -y;
-+
+ 
 +	if (amount == -1.0) {
 +		int dx = horiz;
 +		int dy = vert;
@@ -5591,6 +5715,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		p = strtok(s, ",+ ");
 +		while (p) {
 +			ks = XStringToKeysym(p);
++			if (ks == XK_Shift_L || ks == XK_Shift_R) {
++				putenv("NO_X11VNC_APPSHARE=1");
++			}
 +			if (k >= 8) {
 +				fprintf(stderr, "EscapeKeys: more than 8 modifier keys.\n");
 +				failed = 1;
@@ -5683,10 +5810,58 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +
 +	return pressed;
 +}
- 
++
++static int shift_is_down(void) {
++	int shift_down = 0;
++	KeyCode kc;
++
++	if (appData.viewOnly) {
++		int i, k;
++		char keys[32];
++		int keystate[256];
++
++		XQueryKeymap(dpy, keys);
++		for (i=0; i<32; i++) {
++			char c = keys[i];
++
++			for (k=0; k < 8; k++) {
++				if (c & 0x1) {
++					keystate[8*i + k] = 1;
++				} else {
++					keystate[8*i + k] = 0;
++				}
++				c = c >> 1;
++			}
++		}
++
++		kc = XKeysymToKeycode(dpy, XK_Shift_L);
++		if (kc != NoSymbol && keystate[kc]) {
++			shift_down = 1;
++		} else {
++			kc = XKeysymToKeycode(dpy, XK_Shift_R);
++			if (kc != NoSymbol && keystate[kc]) {
++				shift_down = 1;
++			}
++		}
++		return shift_down;
++	} else {
++		kc = XKeysymToKeycode(dpy, XK_Shift_L);
++		if (kc != NoSymbol && modifierPressed[kc]) {
++			shift_down = 1;
++		} else {
++			kc = XKeysymToKeycode(dpy, XK_Shift_R);
++			if (kc != NoSymbol && modifierPressed[kc]) {
++				shift_down = 1;
++			}
++		}
++		return shift_down;
++	}
++}
++			
  /*
   * SendRFBEvent is an action which sends an RFB event.  It can be used in two
-@@ -201,127 +1948,324 @@
+  * ways.  Without any parameters it simply sends an RFB event corresponding to
+@@ -201,127 +2082,406 @@
   * button2 down, 3 for both, etc).
   */
  
@@ -5713,6 +5888,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	int buttonMask, x, y;
 +	int do_escape;
 +	static int db = -1;
++	char *ek = appData.escapeKeys;
 +
 +	if (db < 0) {
 +		if (getenv("SSVNC_DEBUG_ESCAPE_KEYS")) {
@@ -5749,7 +5925,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	}
 +
 +	do_escape = 0;
-+	if (appData.escapeKeys != NULL && !strcasecmp(appData.escapeKeys, "never")) {
++	if (ek != NULL && (ek[0] == 'n' || ek[0] == 'N') && !strcasecmp(ek, "never")) {
 +		;
 +	} else if (appData.viewOnly) {
 +		do_escape = 1;
@@ -5783,11 +5959,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	if (!do_escape) {
 +		escape_drag_in_progress = 0;
 +	}
- 
--  if (appData.viewOnly) return;
++	if (db) fprintf(stderr, "do_escape: %d\n", do_escape);
++
 +	if (do_escape) {
 +		int W = si.framebufferWidth;
 +		int H = si.framebufferHeight;
++		int shift_down = 0;
++
++		if (!getenv("NO_X11VNC_APPSHARE")) {
++			shift_down = shift_is_down();
++		}
++		if (db) fprintf(stderr, "shift_down: %d\n", shift_down);
++
 +		if (*num_params != 0) {
 +			if (strcasecmp(params[0],"fbupdate") == 0) {
 +				SendFramebufferUpdateRequest(0, 0, W, H, False);
@@ -5797,7 +5980,11 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			XButtonEvent *b = (XButtonEvent *) ev;
 +			if (db) fprintf(stderr, "ButtonRelease: %d %d %d\n", b->x_root, b->y_root, b->state); 
 +			if (b->button == 3) {
-+				ShowPopup(w, ev, params, num_params);
++				if (shift_down) {
++					x11vnc_appshare("delete");
++				} else {
++					ShowPopup(w, ev, params, num_params);
++				}
 +			} else if (escape_drag_in_progress && b->button == 1) {
 +				escape_drag_in_progress = 0;
 +			}
@@ -5805,9 +5992,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			XButtonEvent *b = (XButtonEvent *) ev;
 +			if (db) fprintf(stderr, "ButtonPress:   %d %d %d\n", b->x_root, b->y_root, b->state); 
 +			if (b->button == 1) {
-+				escape_drag_in_progress = 1;
-+				last_x = b->x_root;
-+				last_y = b->y_root;
++				if (shift_down) {
++					x11vnc_appshare("position");
++				} else {
++					escape_drag_in_progress = 1;
++					last_x = b->x_root;
++					last_y = b->y_root;
++				}
 +			} else {
 +				escape_drag_in_progress = 0;
 +			}
@@ -5821,6 +6012,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +			}
 +		} else if (ev->type == KeyRelease) {
 +			int did = 1;
++
 +			XLookupString(&ev->xkey, keyname, 256, &ks, NULL);
 +			if (ks == XK_1 || ks == XK_KP_1) {
 +				set_server_scale(1);
@@ -5864,34 +6056,98 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +				SetEscapeKeys(w, ev, params, num_params);
 +			} else if (ks == XK_g || ks == XK_G) {
 +				ToggleXGrab(w, ev, params, num_params);
++			} else if (ks == XK_D) {
++				if (shift_down || appData.appShare) {
++					x11vnc_appshare("delete");
++				}
++			} else if (ks == XK_M) {
++				if (shift_down || appData.appShare) {
++					x11vnc_appshare("position");
++				}
 +			} else if (ks == XK_Left) {
-+				scroll_desktop(-1, 0, 0.1);
++				if (shift_down) {
++					x11vnc_appshare("left");
++				} else {
++					scroll_desktop(-1, 0, 0.1);
++				}
 +			} else if (ks == XK_Right) {
-+				scroll_desktop(+1, 0, 0.1);
++				if (shift_down) {
++					x11vnc_appshare("right");
++				} else {
++					scroll_desktop(+1, 0, 0.1);
++				}
 +			} else if (ks == XK_Up) {
-+				scroll_desktop(0, +1, 0.1);
++				if (shift_down) {
++					x11vnc_appshare("up");
++				} else {
++					scroll_desktop(0, +1, 0.1);
++				}
 +			} else if (ks == XK_Down) {
-+				scroll_desktop(0, -1, 0.1);
++				if (shift_down) {
++					x11vnc_appshare("down");
++				} else {
++					scroll_desktop(0, -1, 0.1);
++				}
 +			} else if (ks == XK_KP_Left) {
-+				scroll_desktop(-1, 0, 0.0);
++				if (shift_down) {
++					x11vnc_appshare("left-fine");
++				} else {
++					scroll_desktop(-1, 0, 0.0);
++				}
 +			} else if (ks == XK_KP_Right) {
-+				scroll_desktop(+1, 0, 0.0);
++				if (shift_down) {
++					x11vnc_appshare("right-fine");
++				} else {
++					scroll_desktop(+1, 0, 0.0);
++				}
 +			} else if (ks == XK_KP_Up) {
-+				scroll_desktop(0, +1, 0.0);
++				if (shift_down) {
++					x11vnc_appshare("up-fine");
++				} else {
++					scroll_desktop(0, +1, 0.0);
++				}
 +			} else if (ks == XK_KP_Down) {
-+				scroll_desktop(0, -1, 0.0);
++				if (shift_down) {
++					x11vnc_appshare("down-fine");
++				} else {
++					scroll_desktop(0, -1, 0.0);
++				}
 +			} else if (ks == XK_Next || ks == XK_KP_Next) {
-+				scroll_desktop(0, -1, 1.0);
++				if (shift_down && ks == XK_Next) {
++					x11vnc_appshare("shorter");
++				} else {
++					scroll_desktop(0, -1, 1.0);
++				}
 +			} else if (ks == XK_Prior || ks == XK_KP_Prior) {
-+				scroll_desktop(0, +1, 1.0);
++				if (shift_down && ks == XK_Prior) {
++					x11vnc_appshare("taller");
++				} else {
++					scroll_desktop(0, +1, 1.0);
++				}
 +			} else if (ks == XK_End || ks == XK_KP_End) {
-+				scroll_desktop(+1, 0, 1.0);
++				if (shift_down && ks == XK_End) {
++					x11vnc_appshare("narrower");
++				} else {
++					scroll_desktop(+1, 0, 1.0);
++				}
 +			} else if (ks == XK_Home || ks == XK_KP_Home) {
-+				scroll_desktop(-1, 0, 1.0);
++				if (shift_down && ks == XK_Home) {
++					x11vnc_appshare("wider");
++				} else {
++					scroll_desktop(-1, 0, 1.0);
++				}
 +			} else if (ks == XK_equal || ks == XK_plus) {
-+				scale_desktop(1, 0.1);
++				if (shift_down) {
++					x11vnc_appshare("raise");
++				} else {
++					scale_desktop(1, 0.1);
++				}
 +			} else if (ks == XK_underscore || ks == XK_minus) {
-+				scale_desktop(0, 0.1);
++				if (shift_down) {
++					x11vnc_appshare("lower");
++				} else {
++					scale_desktop(0, 0.1);
++				}
 +			} else {
 +				did = 0;
 +			}
@@ -5907,7 +6163,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	if (appData.viewOnly) {
 +		return;
 +	}
-+
+ 
+-  if (appData.viewOnly) return;
 +	if (*num_params != 0) {
 +		if (strncasecmp(params[0],"key",3) == 0) {
 +			if (*num_params != 2) {
@@ -6068,10 +6325,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 -    }
 -    return;
 -  }
+-
+-  switch (ev->type) {
 +		XLookupString(&ev->xkey, keyname, 256, &ks, NULL);
  
--  switch (ev->type) {
--
 -  case MotionNotify:
 -    while (XCheckTypedWindowEvent(dpy, desktopWin, MotionNotify, ev))
 -      ;	/* discard all queued motion notify events */
@@ -6119,7 +6376,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -329,26 +2273,207 @@
+@@ -329,26 +2489,207 @@
   * CreateDotCursor.
   */
  
@@ -6186,8 +6443,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	cursor = XCreatePixmapCursor(dpy, src, msk, &fg, &bg, 1, 1);
 +	XFreePixmap(dpy, src);
 +	XFreePixmap(dpy, msk);
- 
--  return cursor;
++
 +	return cursor;
 +}
 +#endif
@@ -6254,7 +6510,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	if (appData.chatOnly) {
 +		return;
 +	}
-+
+ 
+-  return cursor;
 +	if (widthInBytes > buflen || !buf)  {
 +		if (buf) {
 +			free(buf);
@@ -6343,7 +6600,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -359,38 +2484,37 @@
+@@ -359,38 +2700,39 @@
  void
  CopyDataToScreen(char *buf, int x, int y, int width, int height)
  {
@@ -6389,6 +6646,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		int scrWidthInBytes = si.framebufferWidth * myFormat.bitsPerPixel / 8;
 +		XImage *im = image_scale ? image_scale : image;
 +
++		if (scrWidthInBytes != im->bytes_per_line) scrWidthInBytes = im->bytes_per_line;
++
 +		char *scr = (im->data + y * scrWidthInBytes
 +		    + x * myFormat.bitsPerPixel / 8);
 +
@@ -6411,7 +6670,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
  }
  
  
-@@ -401,62 +2525,297 @@
+@@ -401,62 +2743,339 @@
  static void
  CopyBGR233ToScreen(CARD8 *buf, int x, int y, int width, int height)
  {
@@ -6424,16 +6683,19 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 -  CARD8 *scr8 = ((CARD8 *)image->data) + y * si.framebufferWidth + x;
 -  CARD16 *scr16 = ((CARD16 *)image->data) + y * si.framebufferWidth + x;
 -  CARD32 *scr32 = ((CARD32 *)image->data) + y * si.framebufferWidth + x;
++	XImage *im = image_scale ? image_scale : image;
 +	int p, q;
 +	int xoff = 7 - (x & 7);
 +	int xcur;
 +	int fbwb = si.framebufferWidth / 8;
-+	XImage *im = image_scale ? image_scale : image;
-+	CARD8 *scr1 = ((CARD8 *)im->data) + y * fbwb + x / 8;
-+	CARD8 *scrt;
-+	CARD8  *scr8  = ( (CARD8 *)im->data) + y * si.framebufferWidth + x;
-+	CARD16 *scr16 = ((CARD16 *)im->data) + y * si.framebufferWidth + x;
-+	CARD32 *scr32 = ((CARD32 *)im->data) + y * si.framebufferWidth + x;
++	int src_width8  = im->bytes_per_line/1;
++	int src_width16 = im->bytes_per_line/2;
++	int src_width32 = im->bytes_per_line/4;
++	CARD8 *src1 = ((CARD8 *)im->data) + y * fbwb + x / 8;
++	CARD8 *srct;
++	CARD8  *src8  = ( (CARD8 *)im->data) + y * src_width8  + x;
++	CARD16 *src16 = ((CARD16 *)im->data) + y * src_width16 + x;
++	CARD32 *src32 = ((CARD32 *)im->data) + y * src_width32 + x;
 +	int b0, b1, b2;
  
 -  switch (visbpp) {
@@ -6488,35 +6750,35 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	case 1:
 +		for (q = 0; q < height; q++) {
 +			xcur = xoff;
-+			scrt = scr1;
++			srct = src1;
 +			for (p = 0; p < width; p++) {
-+				*scrt = ((*scrt & ~(1 << xcur))
++				*srct = ((*srct & ~(1 << xcur))
 +					 | (BGR233ToPixel[*(buf++)] << xcur));
 +
 +				if (xcur-- == 0) {
 +					xcur = 7;
-+					scrt++;
++					srct++;
 +				}
 +			}
-+			scr1 += fbwb;
++			src1 += fbwb;
 +		}
 +		break;
 +
 +	case 8:
 +		for (q = 0; q < height; q++) {
 +			for (p = 0; p < width; p++) {
-+				*(scr8++) = BGR233ToPixel[*(buf++)];
++				*(src8++) = BGR233ToPixel[*(buf++)];
 +			}
-+			scr8 += si.framebufferWidth - width;
++			src8 += src_width8 - width;
 +		}
 +		break;
 +
 +	case 16:
 +		for (q = 0; q < height; q++) {
 +			for (p = 0; p < width; p++) {
-+				*(scr16++) = BGR233ToPixel[*(buf++)];
++				*(src16++) = BGR233ToPixel[*(buf++)];
 +			}
-+			scr16 += si.framebufferWidth - width;
++			src16 += src_width16 - width;
 +		}
 +		break;
 +
@@ -6526,25 +6788,25 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		} else {
 +			b0 = 2; b1 = 1; b2 = 0;
 +		}
-+		scr8  = ((CARD8 *)im->data) + (y * si.framebufferWidth + x) * 3;
++		src8  = ((CARD8 *)im->data) + (y * si.framebufferWidth + x) * 3;
 +		for (q = 0; q < height; q++) {
 +			for (p = 0; p < width; p++) {
 +				CARD32 v = BGR233ToPixel[*(buf++)];
-+				*(scr8 + b0) = (unsigned char) ((v & 0x0000ff) >> 0);
-+				*(scr8 + b1) = (unsigned char) ((v & 0x00ff00) >> 8);
-+				*(scr8 + b2) = (unsigned char) ((v & 0xff0000) >> 16);
-+				scr8 += 3;
++				*(src8 + b0) = (unsigned char) ((v & 0x0000ff) >> 0);
++				*(src8 + b1) = (unsigned char) ((v & 0x00ff00) >> 8);
++				*(src8 + b2) = (unsigned char) ((v & 0xff0000) >> 16);
++				src8 += 3;
 +			}
-+			scr8 += (si.framebufferWidth - width) * 3;
++			src8 += (si.framebufferWidth - width) * 3;
 +		}
 +		break;
 +
 +	case 32:
 +		for (q = 0; q < height; q++) {
 +			for (p = 0; p < width; p++) {
-+				*(scr32++) = BGR233ToPixel[*(buf++)];
++				*(src32++) = BGR233ToPixel[*(buf++)];
 +			}
-+			scr32 += si.framebufferWidth - width;
++			src32 += src_width32 - width;
 +		}
 +		break;
 +	}
@@ -6556,7 +6818,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	int p, q;
 +	int b0, b1, b2;
 +	XImage *im = image_scale ? image_scale : image;
-+	unsigned char *scr= (unsigned char *)im->data + (y * si.framebufferWidth + x) * 3;
++	unsigned char *src= (unsigned char *)im->data + (y * si.framebufferWidth + x) * 3;
 +
 +	if (isLSB) {
 +		b0 = 0; b1 = 1; b2 = 2;
@@ -6568,12 +6830,12 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	for (q = 0; q < height; q++) {
 +		for (p = 0; p < width; p++) {
 +			CARD32 v = BGR565ToPixel[*(buf++)];
-+			*(scr + b0) = (unsigned char) ((v & 0x0000ff) >> 0);
-+			*(scr + b1) = (unsigned char) ((v & 0x00ff00) >> 8);
-+			*(scr + b2) = (unsigned char) ((v & 0xff0000) >> 16);
-+			scr += 3;
++			*(src + b0) = (unsigned char) ((v & 0x0000ff) >> 0);
++			*(src + b1) = (unsigned char) ((v & 0x00ff00) >> 8);
++			*(src + b2) = (unsigned char) ((v & 0xff0000) >> 16);
++			src += 3;
 +		}
-+		scr += (si.framebufferWidth - width) * 3;
++		src += (si.framebufferWidth - width) * 3;
 +	}
 +}
 +
@@ -6582,7 +6844,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +{
 +	int p, q;
 +	XImage *im = image_scale ? image_scale : image;
-+	CARD32 *scr32 = ((CARD32 *)im->data) + y * si.framebufferWidth + x;
++	int src_width32 = im->bytes_per_line/4;
++	CARD32 *src32 = ((CARD32 *)im->data) + y * src_width32 + x;
 +
 +	if (visbpp == 24) {
 +		BGR565_24bpp(buf, x, y, width, height);
@@ -6592,15 +6855,15 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	/*  case 32: */
 +	for (q = 0; q < height; q++) {
 +		for (p = 0; p < width; p++) {
-+			*(scr32++) = BGR565ToPixel[*(buf++)];
++			*(src32++) = BGR565ToPixel[*(buf++)];
 +		}
-+		scr32 += si.framebufferWidth - width;
++		src32 += src_width32 - width;
 +	}
 +}
 +
 +static void reset_image(void) {
 +	if (UsingShm()) {
-+		ShmCleanup();
++		ShmDetach();
 +	}
 +	if (image && image->data) {
 +		XDestroyImage(image);
@@ -6618,6 +6881,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	}
 +	image_scale = NULL;
 +
++	if (UsingShm()) {
++		ShmCleanup();
++	}
 +	create_image();
 +	XFlush(dpy);
 +}
@@ -6626,12 +6892,17 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +	int w, w0, h, h0, x, y, dw, dh;
 +	int fs = 0;
 +	int autoscale = 0;
++	Position x_orig, y_orig;
++	Dimension w_orig, h_orig;
 +
 +	if (!appData.fullScreen && appData.scale != NULL && !strcmp(appData.scale, "auto")) {
 +		autoscale = 1;
 +	}
 +
 +	fprintf(stderr, "ReDoDesktop: ycrop: %d\n", appData.yCrop);
++
++	XtVaGetValues(toplevel, XtNx, &x_orig, XtNy, &y_orig, NULL);
++	XtVaGetValues(toplevel, XtNheight, &h_orig, XtNwidth, &w_orig, NULL);
 +
 +	check_tall();
 +
@@ -6739,9 +7010,6 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +
 +	XtVaSetValues(desktop, XtNwidth, w0, XtNheight, h0, NULL);
 +
-+	x = (dpyWidth  - w - dw)/2;
-+	y = (dpyHeight - h - dh)/2;
-+
 +	XtResizeWidget(desktop, w0, h0, 0);
 +
 +	if (appData.yCrop > 0) {
@@ -6753,7 +7021,40 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/desktop.c vnc_unixsrc/vncview
 +		XtVaSetValues(form,     XtNmaxHeight, ycrop, NULL);
 +	}
 +
++	x = (dpyWidth  - w - dw)/2;
++	y = (dpyHeight - h - dh)/2;
++
 +	if (!autoscale) {
++
++		if (!getenv("VNCVIEWER_ALWAYS_RECENTER")) {
++			int x_cm_old, y_cm_old;
++			int x_cm_new, y_cm_new;
++			int x_try, y_try;
++
++			x_cm_old = (int) x_orig + ((int) w_orig)/2;
++			y_cm_old = (int) y_orig + ((int) h_orig)/2;
++
++			x_cm_new = dpyWidth/2;
++			y_cm_new = dpyHeight/2;
++
++			x_try = x + (x_cm_old - x_cm_new);
++			y_try = y + (y_cm_old - y_cm_new);
++			if (x_try < 0) {
++				x_try = 0;
++			}
++			if (y_try < 0) {
++				y_try = 0;
++			}
++			if (x_try + w + dw > dpyWidth) {
++				x_try = dpyWidth - w - dw;
++			}
++			if (y_try + h + dh > dpyHeight) {
++				y_try = dpyHeight - h - dh;
++			}
++			x = x_try;
++			y = y_try;
++		}
++
 +		XtConfigureWidget(toplevel, x + dw, y + dh, w, h, 0);
 +	}
 +
@@ -8557,7 +8858,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/hextile.c vnc_unixsrc/vncview
 +#undef FillRectangle
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewer/listen.c
 --- vnc_unixsrc.orig/vncviewer/listen.c	2001-01-16 03:07:57.000000000 -0500
-+++ vnc_unixsrc/vncviewer/listen.c	2009-10-23 11:48:38.000000000 -0400
++++ vnc_unixsrc/vncviewer/listen.c	2009-11-24 18:26:13.000000000 -0500
 @@ -32,6 +32,7 @@
  #define FLASHDELAY 1	/* seconds */
  
@@ -8878,7 +9179,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/listen.c vnc_unixsrc/vncviewe
  /*
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/misc.c
 --- vnc_unixsrc.orig/vncviewer/misc.c	2003-01-15 02:58:32.000000000 -0500
-+++ vnc_unixsrc/vncviewer/misc.c	2009-07-25 19:39:44.000000000 -0400
++++ vnc_unixsrc/vncviewer/misc.c	2009-11-28 00:44:24.000000000 -0500
 @@ -33,12 +33,14 @@
  
  Dimension dpyWidth, dpyHeight;
@@ -8894,7 +9195,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
  
  /*
   * ToplevelInitBeforeRealization sets the title, geometry and other resources
-@@ -48,87 +50,103 @@
+@@ -48,87 +50,122 @@
  void
  ToplevelInitBeforeRealization()
  {
@@ -9018,6 +9319,25 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
 +			toplevelX = (dpyWidth  - toplevelWidth  - appData.wmDecorationWidth) / 2;
 +			toplevelY = (dpyHeight - toplevelHeight - appData.wmDecorationHeight) /2;
 +
++			if (appData.appShare) {
++				int X = appshare_x_hint;
++				int Y = appshare_y_hint;
++				if (appData.scale) {
++					double fx = 1.0, fy = 1.0;
++					get_scale_values(&fx, &fy);
++					if (fx > 0.0 && fy > 0.0) {
++						X *= fx;
++						Y *= fy;
++					}
++				}
++				if (appshare_x_hint != appshare_0_hint) {
++					toplevelX = X;
++				}
++				if (appshare_y_hint != appshare_0_hint) {
++					toplevelY = Y;
++				}
++			}
++
 +			/* set position via "geometry" so that window manager thinks it's a
 +			 user-specified position and therefore honours it */
 +
@@ -9075,7 +9395,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
  }
  
  
-@@ -141,14 +159,22 @@
+@@ -141,14 +178,22 @@
  void
  ToplevelInitAfterRealization()
  {
@@ -9106,7 +9426,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
  }
  
  
-@@ -157,9 +183,7 @@
+@@ -157,9 +202,7 @@
   * CurrentTime if the event has no time field.
   */
  
@@ -9117,7 +9437,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
    switch (ev->type) {
    case KeyPress:
    case KeyRelease:
-@@ -192,18 +216,15 @@
+@@ -192,18 +235,15 @@
   * generated by SendRFBEvent.
   */
  
@@ -9144,7 +9464,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
  }
  
  
-@@ -264,11 +285,9 @@
+@@ -264,11 +304,9 @@
   * Quit action - called when we get a "delete window" message.
   */
  
@@ -9159,7 +9479,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
  }
  
  
-@@ -276,49 +295,90 @@
+@@ -276,49 +314,93 @@
   * Cleanup - perform any cleanup operations prior to exiting.
   */
  
@@ -9187,6 +9507,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/misc.c vnc_unixsrc/vncviewer/
 -  if (appData.useShm)
 -    ShmCleanup();
 +	if (appData.useShm) {
++		if (UsingShm()) {
++			ShmDetach();
++		}
 +		ShmCleanup();
 +	}
  #endif
@@ -10170,7 +10493,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/popup_ad vnc_unixsrc/vncviewe
 +}
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncviewer/rfbproto.c
 --- vnc_unixsrc.orig/vncviewer/rfbproto.c	2008-09-05 19:51:24.000000000 -0400
-+++ vnc_unixsrc/vncviewer/rfbproto.c	2009-11-02 10:02:00.000000000 -0500
++++ vnc_unixsrc/vncviewer/rfbproto.c	2009-11-27 11:50:35.000000000 -0500
 @@ -23,6 +23,7 @@
   * rfbproto.c - functions to deal with client side of RFB protocol.
   */
@@ -10340,7 +10663,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +		pid_t pid;
 +
 +		q = strstr(cmd2, "pw=");
-+		if (q) {
++		if (q && !getenv("SSVNC_SHOW_ULTRAVNC_DSM_PASSWORD")) {
 +			q += strlen("pw=");
 +			while (*q != '\0' && !isspace(*q)) {
 +				*q = '*';
@@ -10479,7 +10802,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  /*
   * InitialiseRFBConnection.
   */
-@@ -212,211 +439,620 @@
+@@ -212,211 +439,649 @@
  Bool
  InitialiseRFBConnection(void)
  {
@@ -10791,7 +11114,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	sprintf(pv, rfbProtocolVersionFormat, viewer_major, viewer_minor);
  
 -  fprintf(stderr,"Desktop name \"%s\"\n",desktopName);
-+	usleep(100*1000);
++	if (!appData.appShare) {
++		usleep(100*1000);
++	}
 +	dt = dnow();
 +	if (!WriteExact(rfbsock, pv, sz_rfbProtocolVersionMsg)) {
 +		return False;
@@ -11049,6 +11374,33 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +
 +	desktopName[si.nameLength] = 0;
 +
++	if (appData.appShare) {
++		int x_hint, y_hint;
++		char *p, *q = NULL;
++		p = desktopName;
++		while (*p != '\0') {
++ 			char *t = strstr(p, " XY=");
++			if (t) q = t;
++			p++;
++		}
++		if (q) {
++			int ok = 1;
++			p = q + strlen(" XY=");
++			while (*p != '\0') {
++				if (!strpbrk(p, "0123456789,+-")) {
++					ok = 0;
++				}
++				p++;
++			}
++			if (ok && sscanf(q+1, "XY=%d,%d", &x_hint, &y_hint) == 2) {
++				fprintf(stderr,"Using x11vnc appshare position: %s\n\n", q);
++				*q = '\0';
++				appshare_x_hint = x_hint;
++				appshare_y_hint = y_hint;
++			}
++		}
++	}
++
 +	fprintf(stderr,"Desktop name \"%s\"\n\n", desktopName);
 +
 +	fprintf(stderr,"VNC server default format:\n");
@@ -11223,8 +11575,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +			return rfbSecTypeTight;
 +		}
 +	}
- 
--  return (int)secType;
++
 +	/* Find first supported security type */
 +	for (j = 0; j < (int)nSecTypes; j++) {
 +		for (i = 0; i < nKnownSecTypes; i++) {
@@ -11250,12 +11601,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	}
 +
 +	free(secTypes);
-+
+ 
+-  return (int)secType;
 +	return (int)secType;
  }
  
  
-@@ -451,6 +1087,9 @@
+@@ -451,6 +1116,9 @@
    return True;
  }
  
@@ -11265,7 +11617,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * Negotiate authentication scheme (protocol version 3.7t)
-@@ -459,58 +1098,388 @@
+@@ -459,58 +1127,388 @@
  static Bool
  PerformAuthenticationTight(void)
  {
@@ -11430,7 +11782,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +	}
 +}
 +#endif
-+
+ 
+-  fprintf(stderr, "No suitable authentication schemes offered by server\n");
+-  return False;
 +static void hexprint(char *label, char *data, int len) {
 +	int i;
 +	fprintf(stderr, "%s: ", label);
@@ -11450,16 +11804,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +static unsigned long long bytes_to_uint64(char *bytes) {
 +	unsigned long long result = 0;
 +	int i;
- 
--  fprintf(stderr, "No suitable authentication schemes offered by server\n");
--  return False;
++
 +	for (i=0; i < 8; i++) {
 +		result <<= 8;
 +		result += (unsigned char) bytes[i];
 +	}
 +	return result;
- }
- 
++}
++
 +static void uint64_to_bytes(unsigned long long n, char *bytes) {
 +	int i;
 +
@@ -11485,8 +11837,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
 +		}
 +	}
 +	return result;
-+}
-+
+ }
+ 
 +/*
 + * UltraVNC MS-Logon authentication (for v1.0.5 and later.)
 + */
@@ -11696,7 +12048,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * Standard VNC authentication.
-@@ -519,80 +1488,115 @@
+@@ -519,80 +1517,115 @@
  static Bool
  AuthenticateVNC(void)
  {
@@ -11875,7 +12227,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  /*
-@@ -602,68 +1606,75 @@
+@@ -602,68 +1635,75 @@
  static Bool
  AuthenticateUnixLogin(void)
  {
@@ -12003,7 +12355,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -675,19 +1686,20 @@
+@@ -675,19 +1715,20 @@
  static Bool
  ReadInteractionCaps(void)
  {
@@ -12036,7 +12388,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -700,19 +1712,67 @@
+@@ -700,19 +1741,67 @@
  static Bool
  ReadCapabilityList(CapsContainer *caps, int count)
  {
@@ -12113,7 +12465,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  /*
   * SetFormatAndEncodings.
-@@ -729,6 +1789,17 @@
+@@ -729,6 +1818,17 @@
    Bool requestCompressLevel = False;
    Bool requestQualityLevel = False;
    Bool requestLastRectEncoding = False;
@@ -12131,7 +12483,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
    spf.type = rfbSetPixelFormat;
    spf.format = myFormat;
-@@ -736,15 +1807,32 @@
+@@ -736,15 +1836,32 @@
    spf.format.greenMax = Swap16IfLE(spf.format.greenMax);
    spf.format.blueMax = Swap16IfLE(spf.format.blueMax);
  
@@ -12164,7 +12516,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
      do {
        char *nextEncStr = strchr(encStr, ' ');
        if (nextEncStr) {
-@@ -754,50 +1842,102 @@
+@@ -754,50 +1871,102 @@
  	encStrLen = strlen(encStr);
        }
  
@@ -12283,7 +12635,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRichCursor);
        if (se->nEncodings < MAX_ENCODINGS)
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingPointerPos);
-@@ -806,10 +1946,16 @@
+@@ -806,10 +1975,16 @@
      if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding) {
        encs[se->nEncodings++] = Swap32IfLE(rfbEncodingLastRect);
      }
@@ -12303,7 +12655,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	fprintf(stderr,"Same machine: preferring raw encoding\n");
  	encs[se->nEncodings++] = Swap32IfLE(rfbEncodingRaw);
        } else {
-@@ -818,44 +1964,84 @@
+@@ -818,44 +1993,84 @@
      }
  
      encs[se->nEncodings++] = Swap32IfLE(rfbEncodingCopyRect);
@@ -12410,7 +12762,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
    return True;
  }
-@@ -868,31 +2054,86 @@
+@@ -868,31 +2083,86 @@
  Bool
  SendIncrementalFramebufferUpdateRequest()
  {
@@ -12510,7 +12862,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -903,19 +2144,36 @@
+@@ -903,19 +2173,36 @@
  Bool
  SendPointerEvent(int x, int y, int buttonMask)
  {
@@ -12559,7 +12911,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -926,12 +2184,20 @@
+@@ -926,12 +2213,20 @@
  Bool
  SendKeyEvent(CARD32 key, Bool down)
  {
@@ -12585,7 +12937,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -942,281 +2208,1024 @@
+@@ -942,281 +2237,1024 @@
  Bool
  SendClientCutText(char *str, int len)
  {
@@ -13832,7 +14184,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  
  #ifdef MITSHM
      /* if using shared memory PutImage, make sure that the X server has
-@@ -1224,59 +3233,168 @@
+@@ -1224,59 +3262,168 @@
         mainly to avoid copyrect using invalid screen contents - not sure
         if we'd need it otherwise. */
  
@@ -14034,7 +14386,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  
-@@ -1296,26 +3414,93 @@
+@@ -1296,26 +3443,93 @@
  #define CONCAT2(a,b) a##b
  #define CONCAT2E(a,b) CONCAT2(a,b)
  
@@ -14128,7 +14480,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  #undef BPP
  
  /*
-@@ -1325,23 +3510,27 @@
+@@ -1325,23 +3539,27 @@
  static void
  ReadConnFailedReason(void)
  {
@@ -14170,7 +14522,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  }
  
  /*
-@@ -1358,9 +3547,9 @@
+@@ -1358,9 +3576,9 @@
  	    "  %s significant bit in each byte is leftmost on the screen.\n",
  	    (format->bigEndian ? "Most" : "Least"));
    } else {
@@ -14182,7 +14534,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rfbproto.c vnc_unixsrc/vncvie
  	      (format->bigEndian ? "Most" : "Least"));
      }
      if (format->trueColour) {
-@@ -1462,4 +3651,3 @@
+@@ -1462,4 +3680,3 @@
  
    cinfo->src = &jpegSrcManager;
  }
@@ -14255,7 +14607,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/rre.c vnc_unixsrc/vncviewer/r
 +#undef FillRectangle
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/selection.c vnc_unixsrc/vncviewer/selection.c
 --- vnc_unixsrc.orig/vncviewer/selection.c	2004-03-03 04:11:52.000000000 -0500
-+++ vnc_unixsrc/vncviewer/selection.c	2009-05-31 18:35:25.000000000 -0400
++++ vnc_unixsrc/vncviewer/selection.c	2009-11-24 13:34:03.000000000 -0500
 @@ -43,13 +43,16 @@
  				unsigned long* length, int* format);
  static void LoseSelection(Widget w, Atom *selection);
@@ -14485,7 +14837,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/selection.c vnc_unixsrc/vncvi
  }
  
  
-@@ -249,36 +264,61 @@
+@@ -249,36 +264,68 @@
  void
  SelectionFromVNC(Widget w, XEvent *event, String *params, Cardinal *num_params)
  {
@@ -14549,6 +14901,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/selection.c vnc_unixsrc/vncvi
 +
 +	newServerCutText = False;
 +
++	if (appData.appShare) {
++		if (strstr(serverCutText, "X11VNC_APPSHARE_CMD:") == serverCutText) {
++			/* do something with it? */
++			return;
++		}
++	}
++
 +	XStoreBytes(dpy, serverCutText, strlen(serverCutText));
 +
 +	if (appData.recvText == NULL) {
@@ -14577,7 +14936,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/selection.c vnc_unixsrc/vncvi
  }
  
  
-@@ -293,37 +333,36 @@
+@@ -293,37 +340,36 @@
  		 XtPointer* value, unsigned long* length, int* format)
  {
  
@@ -14643,7 +15002,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/selection.c vnc_unixsrc/vncvi
  }
  
  
-@@ -332,7 +371,12 @@
+@@ -332,7 +378,12 @@
   */
  
  static void
@@ -14661,46 +15020,43 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/selection.c vnc_unixsrc/vncvi
  }
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/shm.c vnc_unixsrc/vncviewer/shm.c
 --- vnc_unixsrc.orig/vncviewer/shm.c	2000-06-11 08:00:53.000000000 -0400
-+++ vnc_unixsrc/vncviewer/shm.c	2008-10-10 12:26:07.000000000 -0400
-@@ -33,68 +33,97 @@
- void
- ShmCleanup()
- {
++++ vnc_unixsrc/vncviewer/shm.c	2009-11-28 02:25:03.000000000 -0500
+@@ -30,71 +30,108 @@
+ static Bool caughtShmError = False;
+ static Bool needShmCleanup = False;
+ 
+-void
+-ShmCleanup()
+-{
 -  fprintf(stderr,"ShmCleanup called\n");
 -  if (needShmCleanup) {
 -    shmdt(shminfo.shmaddr);
 -    shmctl(shminfo.shmid, IPC_RMID, 0);
 -    needShmCleanup = False;
 -  }
-+	fprintf(stderr,"ShmCleanup called\n");
-+	if (needShmCleanup) {
-+		shmdt(shminfo.shmaddr);
-+		shmctl(shminfo.shmid, IPC_RMID, 0);
-+		needShmCleanup = False;
-+	}
-+}
-+
-+Bool UsingShm() {
-+	return needShmCleanup;
- }
- 
- static int
- ShmCreationXErrorHandler(Display *dpy, XErrorEvent *error)
- {
--  caughtShmError = True;
--  return 0;
++static int ShmCreationXErrorHandler(Display *dpy, XErrorEvent *error) {
 +	caughtShmError = True;
 +	return 0;
  }
  
-+int scale_round(int len, double fac);
-+extern int scale_x, scale_y;
-+extern double scale_factor_x, scale_factor_y;
-+
- XImage *
+-static int
+-ShmCreationXErrorHandler(Display *dpy, XErrorEvent *error)
+-{
+-  caughtShmError = True;
+-  return 0;
++void ShmDetach() {
++	if (needShmCleanup) {
++		XErrorHandler oldXErrorHandler = XSetErrorHandler(ShmCreationXErrorHandler);
++		fprintf(stderr,"ShmDetach called.\n");
++		XShmDetach(dpy, &shminfo);
++		XSync(dpy, False);
++		XSetErrorHandler(oldXErrorHandler);
++	}
+ }
+ 
+-XImage *
 -CreateShmImage()
-+CreateShmImage(int do_ycrop)
- {
+-{
 -  XImage *image;
 -  XErrorHandler oldXErrorHandler;
 -
@@ -14714,7 +15070,13 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/shm.c vnc_unixsrc/vncviewer/s
 -  shminfo.shmid = shmget(IPC_PRIVATE,
 -			 image->bytes_per_line * image->height,
 -			 IPC_CREAT|0777);
--
++void ShmCleanup() {
++	if (needShmCleanup) {
++		fprintf(stderr,"ShmCleanup called.\n");
++		XSync(dpy, False);
++		shmdt(shminfo.shmaddr);
++		shmctl(shminfo.shmid, IPC_RMID, 0);
+ 
 -  if (shminfo.shmid == -1) {
 -    XDestroyImage(image);
 -    return NULL;
@@ -14727,20 +15089,32 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/shm.c vnc_unixsrc/vncviewer/s
 -    shmctl(shminfo.shmid, IPC_RMID, 0);
 -    return NULL;
 -  }
--
++		needShmCleanup = False;
++	}
++}
+ 
 -  shminfo.readOnly = True;
--
++Bool UsingShm() {
++	return needShmCleanup;
++}
+ 
 -  oldXErrorHandler = XSetErrorHandler(ShmCreationXErrorHandler);
 -  XShmAttach(dpy, &shminfo);
 -  XSync(dpy, False);
 -  XSetErrorHandler(oldXErrorHandler);
--
++int scale_round(int len, double fac);
++extern int scale_x, scale_y;
++extern double scale_factor_x, scale_factor_y;
+ 
 -  if (caughtShmError) {
 -    XDestroyImage(image);
 -    shmdt(shminfo.shmaddr);
 -    shmctl(shminfo.shmid, IPC_RMID, 0);
 -    return NULL;
 -  }
++XImage *
++CreateShmImage(int do_ycrop)
++{
 +	XImage *image;
 +	XErrorHandler oldXErrorHandler;
 +	int ymax = si.framebufferHeight;
@@ -14829,7 +15203,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/smake vnc_unixsrc/vncviewer/s
 +fi
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncviewer/sockets.c
 --- vnc_unixsrc.orig/vncviewer/sockets.c	2001-01-14 22:54:18.000000000 -0500
-+++ vnc_unixsrc/vncviewer/sockets.c	2009-08-01 19:05:47.000000000 -0400
++++ vnc_unixsrc/vncviewer/sockets.c	2009-11-27 13:55:46.000000000 -0500
 @@ -27,11 +27,17 @@
  #include <netinet/in.h>
  #include <netinet/tcp.h>
@@ -15435,6 +15809,15 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/sockets.c vnc_unixsrc/vncview
    sock = socket(AF_INET, SOCK_STREAM, 0);
    if (sock < 0) {
      fprintf(stderr,programName);
+@@ -305,7 +731,7 @@
+     return -1;
+   }
+ 
+-  if (listen(sock, 5) < 0) {
++  if (listen(sock, 32) < 0) {
+     fprintf(stderr,programName);
+     perror(": ListenAtTcpPort: listen");
+     close(sock);
 @@ -392,6 +818,42 @@
    return False;
  }
@@ -16406,8 +16789,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/turbovnc/turbojpeg.h vnc_unix
 +#endif
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vncviewer/vncviewer._man
 --- vnc_unixsrc.orig/vncviewer/vncviewer._man	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer._man	2009-10-23 12:24:51.000000000 -0400
-@@ -0,0 +1,799 @@
++++ vnc_unixsrc/vncviewer/vncviewer._man	2009-11-25 00:03:28.000000000 -0500
+@@ -0,0 +1,823 @@
 +'\" t
 +.\" ** The above line should force tbl to be a preprocessor **
 +.\" Man page for X vncviewer
@@ -16875,6 +17258,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +framebuffer update coming in.  Helps 'pipeline' the updates.
 +This is currently the default, use \fB-nopipeline\fR to disable.
 +.TP
++\fB\-appshare\fR
++Enable features for use with x11vnc's \fB\-appshare\fR mode where
++instead of sharing the full desktop only the application's
++windows are shared.  Viewer multilisten mode is used to
++create the multiple windows: \fB\-multilisten\fR is implied.
++See 'x11vnc \fB\-appshare\fR \fB\-help\fR' more information on the mode.
++Features enabled in the viewer under \fB\-appshare\fR are:
++Minimum extra text in the title, auto \fB\-ycrop\fR is disabled,
++x11vnc \fB\-remote_prefix\fR X11VNC_APPSHARE_CMD: message channel,
++x11vnc initial window position hints.  See also Escape Keys
++below for additional key and mouse bindings.
++.TP
 +\fB\-escape \fR\fIstr\fR
 +This sets the 'Escape Keys' modifier sequence and enables
 +escape keys mode.  When the modifier keys escape sequence
@@ -16920,6 +17315,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +
 +The above mappings are \fBalways\fR active in ViewOnly mode, unless you set
 +the Escape Keys value to 'never'.
++
++x11vnc -appshare hot-keys:  x11vnc has a simple application sharing mode
++that enables the viewer-side to move, resize, or raise the remote toplevel
++windows.  To enable it, hold down Shift + the Escape Keys and press these:
++
++Arrow keys: move the remote window around in its desktop.
++
++PageUp/PageDn/Home/End:  resize the remote window.
++
+++/-: raise or lower the remote window.
++
++M or Button1 move win to local position;  D or Button3: delete remote win.
 +
 +If the Escape Keys value below is set to 'default' then a default list of
 +of modifier keys is used.  For Unix it is: Alt_L,Super_L and for MacOSX it
@@ -17209,7 +17616,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer._man vnc_unixsrc/vn
 +Karl J. Runge <runge@karlrunge.com>
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncviewer/vncviewer.c
 --- vnc_unixsrc.orig/vncviewer/vncviewer.c	2004-01-13 09:22:05.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.c	2009-10-23 11:53:44.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.c	2009-11-24 19:41:33.000000000 -0500
 @@ -22,6 +22,7 @@
   */
  
@@ -17218,7 +17625,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  
  char *programName;
  XtAppContext appContext;
-@@ -29,11 +30,241 @@
+@@ -29,11 +30,258 @@
  
  Widget toplevel;
  
@@ -17255,6 +17662,21 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +				fallback_resources[k] = p;
 +				if (db) fprintf(stderr, "res: %s\n\n", p);
 +			}
++		}
++		k++;
++	}
++}
++
++void min_title(void) {
++	char *q, *p;
++	int i, k, N = 4;
++	int db = 0;
++
++	k = 0;
++	while (fallback_resources[k] != NULL) {
++		q = strstr(fallback_resources[k], "Ssvnc.title: ");
++		if (q) {
++			fallback_resources[k] = strdup("Ssvnc.title: %s");
 +		}
 +		k++;
 +	}
@@ -17440,17 +17862,19 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	}
 +}
 +
++int saw_appshare = 0;
++
  int
  main(int argc, char **argv)
  {
 -  int i;
 -  programName = argv[0];
-+	int i, save_sbw;
++	int i, save_sbw, saw_listen = 0;
 +	char *pw_loc = NULL;
 +	programName = argv[0];
 +
 +	for (i = 1; i < argc; i++) {
-+		if (strcmp(argv[i], "-env") == 0) {
++		if (!strcmp(argv[i], "-env")) {
 +			if (i+1 < argc) {
 +				char *estr = argv[i+1];
 +				if (strchr(estr, '=')) {
@@ -17462,7 +17886,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  
    /* The -listen option is used to make us a daemon process which listens for
       incoming connections from servers, rather than actively connecting to a
-@@ -45,89 +276,1647 @@
+@@ -45,89 +293,1667 @@
       listenForIncomingConnections() returns, setting the listenSpecified
       flag. */
  
@@ -17478,36 +17902,49 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 -    }
 -  }
 +	for (i = 1; i < argc; i++) {
++		if (!strcmp(argv[i], "-appshare")) {
++			putenv("SSVNC_MULTIPLE_LISTEN=1");
++			fprintf(stderr, "Enabling -multilisten mode for 'x11vnc -appshare' usage.\n\n");
++			saw_appshare = 1;
++		}
++		if (!strcmp(argv[i], "-multilisten")) {
++			putenv("SSVNC_MULTIPLE_LISTEN=1");
++			saw_listen = 2;
++		}
++		if (!strcmp(argv[i], "-listen")) {
++			saw_listen = 1;
++		}
++		if (!strcmp(argv[i], "-acceptpopup")) {
++			putenv("SSVNC_ACCEPT_POPUP=1");
++		}
++		if (!strcmp(argv[i], "-acceptpopupsc")) {
++			putenv("SSVNC_ACCEPT_POPUP_SC=1");
++		}
 +		if (strstr(argv[i], " pw=") != NULL) {
 +			pw_loc = strstr(argv[i], " pw=") + 1;
 +		}
 +	}
 +
 +	for (i = 1; i < argc; i++) {
-+		if (strcmp(argv[i], "-acceptpopup") == 0) {
-+			putenv("SSVNC_ACCEPT_POPUP=1");
-+			continue;
-+		}
-+		if (strcmp(argv[i], "-acceptpopupsc") == 0) {
-+			putenv("SSVNC_ACCEPT_POPUP_SC=1");
-+			continue;
-+		}
-+		if (strcmp(argv[i], "-listen") == 0) {
++		if (!strcmp(argv[i], "-appshare") && !saw_listen) {
 +			listenForIncomingConnections(&argc, argv, i);
 +			break;
 +		}
-+		if (strcmp(argv[i], "-multilisten") == 0) {
-+			putenv("SSVNC_MULTIPLE_LISTEN=1");
++		if (!strcmp(argv[i], "-multilisten")) {
 +			listenForIncomingConnections(&argc, argv, i);
 +			break;
 +		}
-+		if (strcmp(argv[i], "-tunnel") == 0 || strcmp(argv[i], "-via") == 0) {
++		if (!strcmp(argv[i], "-listen")) {
++			listenForIncomingConnections(&argc, argv, i);
++			break;
++		}
++		if (!strcmp(argv[i], "-tunnel") || !strcmp(argv[i], "-via")) {
 +			if (!createTunnel(&argc, argv, i)) {
 +				exit(1);
 +			}
 +			break;
 +		}
-+		if (strcmp(argv[i], "-printres") == 0 || strcmp(argv[i], "-res") == 0) {
++		if (!strcmp(argv[i], "-printres") || !strcmp(argv[i], "-res")) {
 +			int j = 0;
 +			fprintf(stdout, "\n! Ssvnc fallback X resources:\n\n");
 +			while (1) {
@@ -17541,6 +17978,9 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 -			       cmdLineOptions, numCmdLineOptions,
 -			       &argc, argv, fallback_resources,
 -			       XtNborderWidth, 0, NULL);
++	if (saw_appshare || getenv("VNCVIEWER_MIN_TITLE")) {
++		min_title();
++	}
 +	appData.sbWidth = 0;
 +	if (getenv("VNCVIEWER_SBWIDTH")) {
 +		int sbw = atoi(getenv("VNCVIEWER_SBWIDTH"));
@@ -17580,6 +18020,10 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  
 -  GetArgsAndResources(argc, argv);
 +	GetArgsAndResources(argc, argv);
++
++	if (saw_appshare) {
++		appData.appShare = True;
++	}
 +
 +	if (save_sbw) {
 +		appData.sbWidth = save_sbw;
@@ -18379,8 +18823,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		schedule_fb_update();
 +	}
 +}
- 
--  Cleanup();
++
 +void
 +DoServerScale(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -18470,8 +18913,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		set_server_compress(n);
 +	}
 +}
- 
--  return 0;
++
 +extern void rescale_image(void);
 +
 +void
@@ -18537,7 +18979,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +		schedule_fb_update();
 +	}
 +}
-+
+ 
+-  Cleanup();
 +void
 +SetYCrop(Widget w, XEvent *ev, String *params, Cardinal *num_params)
 +{
@@ -18674,7 +19117,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
 +	appData.compressLevel = 0;
 +	UpdateQual();
 +}
-+
+ 
+-  return 0;
 +static void QualLosslessWAN(void) {
 +	appData.encodingsString = "tight copyrect";
 +	appData.enableJPEG = False;
@@ -19148,7 +19592,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.c vnc_unixsrc/vncvi
  }
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncviewer/vncviewer.h
 --- vnc_unixsrc.orig/vncviewer/vncviewer.h	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.h	2009-10-23 11:27:05.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.h	2009-11-28 00:45:15.000000000 -0500
 @@ -28,6 +28,7 @@
  #include <string.h>
  #include <sys/time.h>
@@ -19172,7 +19616,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  #define FLASH_PORT_OFFSET 5400
  #define LISTEN_PORT_OFFSET 5500
-@@ -64,60 +71,125 @@
+@@ -64,60 +71,126 @@
  #define DEFAULT_VIA_CMD     \
    (DEFAULT_SSH_CMD " -f -L %L:%H:%R %G sleep 20")
  
@@ -19313,6 +19757,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +
 +	char *scale;
 +	char *escapeKeys;
++	Bool appShare;
 +	Bool escapeActive;
 +	Bool pipelineUpdates;
 +
@@ -19338,7 +19783,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  extern int listenPort, flashPort;
  
  extern XrmOptionDescRec cmdLineOptions[];
-@@ -130,10 +202,11 @@
+@@ -130,10 +203,11 @@
  /* colour.c */
  
  extern unsigned long BGR233ToPixel[];
@@ -19351,8 +19796,14 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  
  extern void SetVisualAndCmap();
  
-@@ -157,13 +230,54 @@
+@@ -155,15 +229,60 @@
+ extern GC srcGC, dstGC;
+ extern Dimension dpyWidth, dpyHeight;
  
++extern int appshare_0_hint;
++extern int appshare_x_hint;
++extern int appshare_y_hint;
++
  extern void DesktopInitBeforeRealization();
  extern void DesktopInitAfterRealization();
 +extern void Xcursors(int set);
@@ -19406,7 +19857,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  extern void ServerDialogDone(Widget w, XEvent *event, String *params,
  			     Cardinal *num_params);
  extern char *DoServerDialog();
-@@ -171,6 +285,10 @@
+@@ -171,6 +290,10 @@
  			     Cardinal *num_params);
  extern char *DoPasswordDialog();
  
@@ -19417,7 +19868,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  /* fullscreen.c */
  
  extern void ToggleFullScreen(Widget w, XEvent *event, String *params,
-@@ -181,6 +299,13 @@
+@@ -181,6 +304,13 @@
  extern void FullScreenOn();
  extern void FullScreenOff();
  
@@ -19431,7 +19882,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  /* listen.c */
  
  extern void listenForIncomingConnections();
-@@ -196,6 +321,8 @@
+@@ -196,6 +326,8 @@
  		       Cardinal *num_params);
  extern void Quit(Widget w, XEvent *event, String *params,
  		 Cardinal *num_params);
@@ -19440,7 +19891,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  extern void Cleanup();
  
  /* popup.c */
-@@ -207,6 +334,29 @@
+@@ -207,6 +339,29 @@
  		      Cardinal *num_params);
  extern void CreatePopup();
  
@@ -19470,7 +19921,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  /* rfbproto.c */
  
  extern int rfbsock;
-@@ -229,8 +379,19 @@
+@@ -229,8 +384,19 @@
  extern Bool SendClientCutText(char *str, int len);
  extern Bool HandleRFBServerMessage();
  
@@ -19490,18 +19941,19 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  /* selection.c */
  
  extern void InitialiseSelection();
-@@ -241,8 +402,9 @@
+@@ -241,8 +407,10 @@
  
  /* shm.c */
  
 -extern XImage *CreateShmImage();
 +extern XImage *CreateShmImage(int do_ycrop);
  extern void ShmCleanup();
++extern void ShmDetach();
 +extern Bool UsingShm();
  
  /* sockets.c */
  
-@@ -253,10 +415,15 @@
+@@ -253,10 +421,15 @@
  extern int FindFreeTcpPort(void);
  extern int ListenAtTcpPort(int port);
  extern int ConnectToTcpAddr(unsigned int host, int port);
@@ -19517,7 +19969,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
  extern Bool SameMachine(int sock);
  
  /* tunnel.c */
-@@ -271,3 +438,82 @@
+@@ -271,3 +444,82 @@
  extern XtAppContext appContext;
  extern Display* dpy;
  extern Widget toplevel;
@@ -19602,7 +20054,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.h vnc_unixsrc/vncvi
 +extern void SetEscapeKeysState(Widget w, XEvent *ev, String *params, Cardinal *num_params);
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vncviewer/vncviewer.man
 --- vnc_unixsrc.orig/vncviewer/vncviewer.man	2004-03-11 13:14:40.000000000 -0500
-+++ vnc_unixsrc/vncviewer/vncviewer.man	2009-10-23 12:24:51.000000000 -0400
++++ vnc_unixsrc/vncviewer/vncviewer.man	2009-11-25 00:03:28.000000000 -0500
 @@ -5,38 +5,55 @@
  .\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
  .\" Copyright (C) 2000,2001 Red Hat, Inc.
@@ -19688,7 +20140,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .TP
  \fB\-bgr233\fR
  Always use the BGR233 format to encode pixel data. This reduces
-@@ -168,6 +185,394 @@
+@@ -168,6 +185,418 @@
  \fB\-autopass\fR
  Read a plain-text password from stdin. This option affects only the
  standard VNC authentication.
@@ -19972,6 +20424,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +framebuffer update coming in.  Helps 'pipeline' the updates.
 +This is currently the default, use \fB-nopipeline\fR to disable.
 +.TP
++\fB\-appshare\fR
++Enable features for use with x11vnc's \fB\-appshare\fR mode where
++instead of sharing the full desktop only the application's
++windows are shared.  Viewer multilisten mode is used to
++create the multiple windows: \fB\-multilisten\fR is implied.
++See 'x11vnc \fB\-appshare\fR \fB\-help\fR' more information on the mode.
++Features enabled in the viewer under \fB\-appshare\fR are:
++Minimum extra text in the title, auto \fB\-ycrop\fR is disabled,
++x11vnc \fB\-remote_prefix\fR X11VNC_APPSHARE_CMD: message channel,
++x11vnc initial window position hints.  See also Escape Keys
++below for additional key and mouse bindings.
++.TP
 +\fB\-escape \fR\fIstr\fR
 +This sets the 'Escape Keys' modifier sequence and enables
 +escape keys mode.  When the modifier keys escape sequence
@@ -20017,6 +20481,18 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +
 +The above mappings are \fBalways\fR active in ViewOnly mode, unless you set
 +the Escape Keys value to 'never'.
++
++x11vnc -appshare hot-keys:  x11vnc has a simple application sharing mode
++that enables the viewer-side to move, resize, or raise the remote toplevel
++windows.  To enable it, hold down Shift + the Escape Keys and press these:
++
++Arrow keys: move the remote window around in its desktop.
++
++PageUp/PageDn/Home/End:  resize the remote window.
++
+++/-: raise or lower the remote window.
++
++M or Button1 move win to local position;  D or Button3: delete remote win.
 +
 +If the Escape Keys value below is set to 'default' then a default list of
 +of modifier keys is used.  For Unix it is: Alt_L,Super_L and for MacOSX it
@@ -20083,7 +20559,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .SH ENCODINGS
  The server supplies information in whatever format is desired by the
  client, in order to make the client as easy as possible to implement. 
-@@ -238,6 +643,15 @@
+@@ -238,6 +667,15 @@
  \-quality and \-nojpeg options above). Tight encoding is usually the
  best choice for low\-bandwidth network environments (e.g. slow modem
  connections).
@@ -20099,7 +20575,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  .SH RESOURCES
  X resources that \fBvncviewer\fR knows about, aside from the
  normal Xt resources, are as follows:
-@@ -364,12 +778,13 @@
+@@ -364,12 +802,13 @@
  .B %R
  remote TCP port number.
  .SH SEE ALSO
@@ -20116,7 +20592,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
  
  \fBMan page authors:\fR
  .br
-@@ -380,3 +795,5 @@
+@@ -380,3 +819,5 @@
  Tim Waugh <twaugh@redhat.com>,
  .br
  Constantin Kaplinsky <const@ce.cctpu.edu.ru>
@@ -20124,8 +20600,8 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/vncviewer.man vnc_unixsrc/vnc
 +Karl J. Runge <runge@karlrunge.com>
 diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/zrle.c
 --- vnc_unixsrc.orig/vncviewer/zrle.c	2007-02-04 18:59:50.000000000 -0500
-+++ vnc_unixsrc/vncviewer/zrle.c	2008-10-08 00:04:43.000000000 -0400
-@@ -0,0 +1,618 @@
++++ vnc_unixsrc/vncviewer/zrle.c	2009-11-19 23:34:28.000000000 -0500
+@@ -0,0 +1,620 @@
 +/*
 + *  Copyright (C) 2005 Johannes E. Schindelin.  All Rights Reserved.
 + *
@@ -20657,6 +21133,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/
 +		// make this CopyDataFromScreen() or something.
 +		if (!appData.useBGR565) {
 +			scrWidthInBytes = si.framebufferWidth * myFormat.bitsPerPixel / 8;
++			if (scrWidthInBytes != im->bytes_per_line) scrWidthInBytes = im->bytes_per_line;
 +			scr = im->data + y * scrWidthInBytes + x * myFormat.bitsPerPixel / 8;
 +			buf = (char *) ptmp;
 +
@@ -20667,6 +21144,7 @@ diff -Naur -X ./exclude vnc_unixsrc.orig/vncviewer/zrle.c vnc_unixsrc/vncviewer/
 +			}
 +		} else {
 +			scrWidthInBytes = si.framebufferWidth * 4;
++			if (scrWidthInBytes != im->bytes_per_line) scrWidthInBytes = im->bytes_per_line;
 +			scr = im->data + y * scrWidthInBytes + x * 4;
 +			buf = (char *) ptmp;
 +

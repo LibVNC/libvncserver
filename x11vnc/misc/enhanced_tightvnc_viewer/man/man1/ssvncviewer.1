@@ -11,7 +11,7 @@
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH ssvncviewer 1 "September 2009" "" "SSVNC"
+.TH ssvncviewer 1 "December 2009" "" "SSVNC"
 .SH NAME
 ssvncviewer \- an X viewer client for VNC
 .SH SYNOPSIS
@@ -465,6 +465,18 @@ as possible instead of waiting until the end of the current
 framebuffer update coming in.  Helps 'pipeline' the updates.
 This is currently the default, use \fB-nopipeline\fR to disable.
 .TP
+\fB\-appshare\fR
+Enable features for use with x11vnc's \fB\-appshare\fR mode where
+instead of sharing the full desktop only the application's
+windows are shared.  Viewer multilisten mode is used to
+create the multiple windows: \fB\-multilisten\fR is implied.
+See 'x11vnc \fB\-appshare\fR \fB\-help\fR' more information on the mode.
+Features enabled in the viewer under \fB\-appshare\fR are:
+Minimum extra text in the title, auto \fB\-ycrop\fR is disabled,
+x11vnc \fB\-remote_prefix\fR X11VNC_APPSHARE_CMD: message channel,
+x11vnc initial window position hints.  See also Escape Keys
+below for additional key and mouse bindings.
+.TP
 \fB\-escape \fR\fIstr\fR
 This sets the 'Escape Keys' modifier sequence and enables
 escape keys mode.  When the modifier keys escape sequence
@@ -510,6 +522,18 @@ Clicking Mouse Button3 brings up the Popup Menu.
 
 The above mappings are \fBalways\fR active in ViewOnly mode, unless you set
 the Escape Keys value to 'never'.
+
+x11vnc -appshare hot-keys:  x11vnc has a simple application sharing mode
+that enables the viewer-side to move, resize, or raise the remote toplevel
+windows.  To enable it, hold down Shift + the Escape Keys and press these:
+
+Arrow keys: move the remote window around in its desktop.
+
+PageUp/PageDn/Home/End:  resize the remote window.
+
++/-: raise or lower the remote window.
+
+M or Button1 move win to local position;  D or Button3: delete remote win.
 
 If the Escape Keys value below is set to 'default' then a default list of
 of modifier keys is used.  For Unix it is: Alt_L,Super_L and for MacOSX it

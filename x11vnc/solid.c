@@ -561,6 +561,9 @@ char *dbus_session(void) {
 	if (dbus_env != NULL && strlen(dbus_env) > 0) {
 		return "";
 	}
+	if (!dpy) {
+		return "";
+	}
 #if NO_X11
 	return "";
 #else

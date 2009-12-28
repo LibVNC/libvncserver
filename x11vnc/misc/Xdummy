@@ -652,7 +652,8 @@ if [ -e "$xserver_path" -a "X$root" = "X" -a "X$runit" != "X" ]; then
 			warn ""
 			warn "Please restart Xdummy now."
 			exit 0
-		elif [ ! -O $new ]; then
+		fi
+		if [ ! -O $new ]; then
 			warn "file \"$new\" not owned by us!"
 			ls -l $new
 			exit 1

@@ -563,6 +563,9 @@ static void be_helper_pid(char *dpy_str) {
 
 	if (ms < 50) ms = 50;
 
+#if NO_X11
+	fprintf(stderr, "be_helper_pid: not compiled with X11.\n");
+#else
 	dpy = XOpenDisplay(dpy_str);
 	ticker_atom = XInternAtom(dpy, ticker_atom_str, False);
 
@@ -583,6 +586,7 @@ static void be_helper_pid(char *dpy_str) {
 			}
 		}
 	}
+#endif
 	exit(0);
 }
 
@@ -895,7 +899,7 @@ static void delete_win(Window win) {
 static void recurse_search(int level, int level_max, Window top, Window app, int *nw) {
 	Window w, r, parent, *list = NULL;
 	unsigned int nchild;
-	int ok;
+	int ok = 0;
 
 	if (appshare_debug > 1) {
 		fprintf(stderr, "level: %d level_max: %d  top: 0x%lx  app: 0x%lx\n", level, level_max, top, app);
@@ -904,6 +908,7 @@ static void recurse_search(int level, int level_max, Window top, Window app, int
 		return;
 	}
 	
+#if !NO_X11
 	ok = XQueryTree(dpy, top, &r, &parent, &list, &nchild);
 	if (ok) {
 		int i;
@@ -930,6 +935,7 @@ static void recurse_search(int level, int level_max, Window top, Window app, int
 	if (list) {
 		XFree(list);
 	}
+#endif
 }
 		
 static void add_app(Window app) {
