@@ -1,3 +1,7 @@
+2009-12-29  Karl Runge <runge@karlrunge.com>
+	* x11vnc: rename -create_x to -create_xsrv.  Hopefully
+	  done fixing Xdummy.
+
 2009-12-28  Karl Runge <runge@karlrunge.com>
 	* x11vnc: Fix problems in --without-x builds.  Fix crash
 	  with -QD query for dbus info.  Adjust window size for

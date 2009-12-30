@@ -2,7 +2,7 @@
 .TH X11VNC "1" "December 2009" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.10, lastmod: 2009-12-27
+         version: 0.9.10, lastmod: 2009-12-28
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1251,11 +1251,12 @@ As in \fB-create,\fR except Xvnc.redirect instead of Xvfb.
 .IP
 Sets WAIT:cmd=FINDCREATEDISPLAY-Xdummy,Xvfb
 .PP
-\fB-create_x\fR \fIstr\fR
+\fB-create_xsrv\fR \fIstr\fR
 .IP
 Sets WAIT:cmd=FINDCREATEDISPLAY-<str>  Can be on cmdline
 after anything that sets WAIT:.. and other things
 (e.g. \fB-svc,\fR \fB-xdmsvc)\fR to adjust the X server list.
+Example: \fB-svc\fR ... \fB-create_xsrv\fR Xdummy,X
 .PP
 \fB-svc\fR
 .IP

@@ -2221,7 +2221,7 @@ int main(int argc, char* argv[]) {
 			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvfb");
 			continue;
 		}
-		if (!strcmp(arg, "-create_x")) {
+		if (!strcmp(arg, "-create_xsrv")) {
 			CHECK_ARGC
 			use_dpy = (char *) malloc(strlen(argv[i+1])+100); 
 			sprintf(use_dpy, "WAIT:cmd=FINDCREATEDISPLAY-%s", argv[++i]);
