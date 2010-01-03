@@ -94,7 +94,7 @@ rfbVncAuthSendChallenge(rfbClientPtr cl)
 	}
 
 /*
- Enabled by runge on 2009/01/02
+ Enabled by runge on 2010/01/02
  */
 #define USE_SECTYPE_TIGHT_FOR_RFB_3_8
 
