@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com> 
+   Copyright (C) 2002-2010 Karl J. Runge <runge@karlrunge.com> 
    All rights reserved.
 
 This file is part of x11vnc.
@@ -44,6 +44,7 @@ static char *usage =
 "\n"
 "  x11vnc -appshare: an experiment in application sharing via x11vnc.\n"
 "\n"
+#if !SMALL_FOOTPRINT
 "  Usage:   x11vnc -appshare -id windowid -connect viewer_host:0\n"
 "           x11vnc -appshare -id pick     -connect viewer_host:0\n"
 "\n"
@@ -238,6 +239,7 @@ static char *usage =
 "     cover up existing windows that are being tracked.) See cmd=add_window\n"
 "     and cmd=add_app described above.\n"
 "\n"
+#endif
 ;
 
 #include <stdio.h>

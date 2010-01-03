@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com> 
+   Copyright (C) 2002-2010 Karl J. Runge <runge@karlrunge.com> 
    All rights reserved.
 
 This file is part of x11vnc.

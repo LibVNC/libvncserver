@@ -196,6 +196,9 @@ Options:
 			config file.  Use this to have a smaller geometry
 			than the one in the system config file.
 
+			The option -geometry can be used instead of -geom;
+			x11vnc calls Xdummy and Xvfb this way.
+
 	-depth n	Use pixel color depth n (e.g. 8, 16, or 24). This
 			makes sure the X config file has a Screen.Display
 			subsection of this depth.  Note this option is
@@ -432,7 +435,9 @@ do
 	"-uid") XDUMMY_UID="$2"; shift
 		export XDUMMY_UID
                 ;;
-	"-geom") geom="$2"; shift
+	"-geom")     geom="$2"; shift
+                ;;
+	"-geometry") geom="$2"; shift
                 ;;
 	"-depth") depth="$2"; args="$args -depth $2";
 		  shift

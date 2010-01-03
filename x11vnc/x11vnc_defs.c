@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com> 
+   Copyright (C) 2002-2010 Karl J. Runge <runge@karlrunge.com> 
    All rights reserved.
 
 This file is part of x11vnc.
@@ -47,7 +47,7 @@ int xtrap_base_event_type = 0;
 int xdamage_base_event_type = 0;
 
 /*               date +'lastmod: %Y-%m-%d' */
-char lastmod[] = "0.9.10 lastmod: 2009-12-28";
+char lastmod[] = "0.9.10 lastmod: 2010-01-02";
 
 /* X display info */
 

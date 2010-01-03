@@ -94,7 +94,7 @@ if [ $tunnel ]; then
 	# before we can connect.
 	#
 	time=15
-	$rsh -f $redir $host "$cmd $disp; echo END; sleep $time" > $tmp
+	$rsh -t -f $redir $host "$cmd $disp; echo END; sleep $time" > $tmp
 
 	i=0
 	while [ $i -lt $time ]

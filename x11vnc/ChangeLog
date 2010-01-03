@@ -1,3 +1,7 @@
+2010-01-02  Karl Runge <runge@karlrunge.com>
+	* x11vnc: small tweaks to Xdummy, rx11vnc*.  Apply
+	  SMALL_FOOTPRINT to -appshare text.  Copyright year change.
+
 2009-12-29  Karl Runge <runge@karlrunge.com>
 	* x11vnc: rename -create_x to -create_xsrv.  Hopefully
 	  done fixing Xdummy.
