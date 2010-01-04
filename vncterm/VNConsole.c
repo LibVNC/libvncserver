@@ -121,8 +121,8 @@ vncConsolePtr vcGetConsole(int *argc,char **argv,
   if(c->cy1<0)
     c->cy2=0;
 
-  c->screen=
-    rfbGetScreen(argc,argv,c->cWidth*c->width,c->cHeight*c->height,8,1,1);
+  if(!(c->screen = rfbGetScreen(argc,argv,c->cWidth*c->width,c->cHeight*c->height,8,1,1)))
+    return NULL;
   c->screen->screenData=(void*)c;
   c->screen->displayHook=vcMakeSureCursorIsDrawn;
   c->screen->frameBuffer=
