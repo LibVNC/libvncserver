@@ -161,10 +161,10 @@
  the whole update may have to be packed into several UDP packets.
  Therefore the framebuffer contents are sent using (maybe several)
  'MulticastFramebufferUpdate' server to client messages (message type
- 248).  These contain consecutive sequence numbers identifying the
- update as a whole (e.g. update no. 1138) and also the individual
- partial updates of this whole update (e.g. partial update no. 3 of 11
- in total).
+ 248). These contain consecutive sequence numbers (starting with 0)
+ identifying the update as a whole (e.g. update no. 1138) and also the
+ individual partial updates of this whole update (e.g. partial update
+ no. 3 of 11 in total).
 
  The header is padded so that it is an exact multiple of 4 bytes (to
  help with alignment of 32-bit pixels).
