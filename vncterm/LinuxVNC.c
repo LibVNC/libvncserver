@@ -62,7 +62,8 @@ void do_key(rfbBool down,rfbKeySym keySym,rfbClientPtr cl)
       }
     }
   } else if(keySym==XK_Control_L || keySym==XK_Control_R)
-    isControl--;
+    if(isControl>0)
+      isControl--;
 }
 
 /* these colours are from linux kernel drivers/char/console.c */
