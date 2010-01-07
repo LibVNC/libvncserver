@@ -1,3 +1,9 @@
+2010-01-02  Karl Runge <runge@karlrunge.com>
+	* tightvnc-filetransfer/rfbtightserver.c: enabled fix
+	  for tight security type for RFB 3.8 (debian bug 517422.)
+	  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=517422
+	  http://sourceforge.net/tracker/?func=detail&aid=2647349&group_id=32584&atid=405858
+
 2009-05-21  Karl Runge <runge@karlrunge.com>
 	* configure.ac: check for __thread.
 	* libvncserver/main.c, libvncserver/rfbserver.c: various

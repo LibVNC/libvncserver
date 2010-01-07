@@ -17,6 +17,7 @@ SYNOPSIS
        ssvnc [host][:display]
        ssvnc [saved-profile-name]
        ssvnc [options] [host-or-profile]
+       ssvnc -cmd [ssvnc_cmd-args]
        ssvnc --help
 
 DESCRIPTION
@@ -32,6 +33,12 @@ OPTIONS
 
        --help Starts  up  the  GUI  as though the 'Help' button was pressed to
               show the main Help panel.
+
+       -cmd [ssvnc_cmd-args]
+              Launch the ssvnc_cmd utility command directly (no GUI) with  the
+              given  arguments  (for use when ssvnc_cmd is not in one's PATH.)
+              If neither ssvnc_cmd nor ssvncviewer is in PATH, one can  launch
+              the viewer directly via: ssvnc -cmd -viewer [viewer-args]
 
        -profiles
               List the saved SSVNC profiles you have created.  A profile is  a
@@ -63,11 +70,12 @@ OPTIONS
               Make  the  Profile  Selection  Dialog  window  bigger.   Same as
               SSVNC_BIGGER_DIALOG=1.
 
-       -noenc Start off in a mode where a  'No  Encryption'  check  button  is
+       -noenc Start  off  in  a  mode  where a 'No Encryption' check button is
               present.   You  can  toggle  the  mode  with  Ctrl-E.   Same  as
               SSVNC_DISABLE_ENCRYPTION_BUTTON=1.  Or  noenc=1  in  ~/.ssvncrc.
-              Selecting  no  encryption  is  the same as the vnc:// and Vnc://
-              prefixes described below.  -enc implies the opposite.
+              Selecting no encryption is the same as  the  vnc://  and  Vnc://
+              prefixes  described  below.  The -noenc mode is now the default,
+              use -enc or noenc=0 for the opposite behavior.
 
        -killstunnel
               On Windows, automatically terminate the STUNNEL process when the
@@ -271,7 +279,7 @@ if [ -f "$dir/util/ultraftp.jar" ]; then
 	export SSVNC_ULTRA_FTP_JAR
 fi
 
-if [ "X$1" = "X-cmd" ]; then
+if [ "X$1" = "X-cmd" -o "X$1" = "X--cmd" ]; then
 	shift
 	exec ssvnc_cmd "$@"
 elif [ "X$WISH" = "Xwish" ]; then

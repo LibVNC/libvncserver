@@ -25,13 +25,16 @@
 #
 #     ssvnc_cmd [ss_vncviewer-args] hostname:N [vncviewer-args]
 #
-#  if, instead, this script is named "tightvncviewer" it calls the
-#  vncviewer directly and must be invoked as:
+#  if, instead, this script is named "tightvncviewer" or "-viewer" is the
+#  first argument it calls the vncviewer directly (there is no encryption)
+#  and must be invoked as:
 #
 #     tightvncviewer [vncviewer-args] hostname:N
+#  or
+#     ssvnc_cmd -viewer [vncviewer-args] hostname:N
 #
 # In both cases, "hostname:N" is the host and VNC display to connect to,
-# e.g. snoopy:0
+# e.g. snoopy:0. (-listen N and -appshare N modes works too.)
 #
 # See the script util/ss_vncviewer for details about its arguments:
 #
@@ -240,6 +243,15 @@ if [ "X$1" = "X-ssl" ]; then
 	base="ssvnc_cmd"
 fi
 
+do_viewer_directly=""
+if [ "X$1" = "X-viewer" ]; then
+	do_viewer_directly=1
+	shift	
+fi
+if [ "X$base" = "Xtightvncviewer" ]; then
+	do_viewer_directly=1
+fi
+
 # If ours (and not cotvnc), force the use of tight encoding for localhost
 # redir connection:
 #
@@ -260,13 +272,13 @@ if [ $use_ours = 1 ]; then
 		fi
 	fi
 
-	if [ "X$base" = "Xtightvncviewer" ]; then
+	if [ "X$do_viewer_directly" = "X1" ]; then
 		$VNCVIEWERCMD -encodings 'copyrect tight zrle zlib hextile' "$@"
 	else
 		ss_vncviewer "$@" -encodings 'copyrect tight zrle zlib hextile'
 	fi
 else
-	if [ "X$base" = "Xtightvncviewer" ]; then
+	if [ "X$do_viewer_directly" = "X1" ]; then
 		$VNCVIEWERCMD "$@"
 	else
 		ss_vncviewer "$@"

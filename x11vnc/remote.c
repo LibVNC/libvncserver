@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com> 
+   Copyright (C) 2002-2010 Karl J. Runge <runge@karlrunge.com> 
    All rights reserved.
 
 This file is part of x11vnc.
@@ -5920,7 +5920,9 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 
 			grab_state(&ptr_grabbed, &kbd_grabbed);
 			snprintf(buf, bufn, "aro=%s:%d,%d", p, ptr_grabbed, kbd_grabbed);
-			rfbLog("remote_cmd: ptr,kbd: %s\n", buf);
+			if (dpy) {
+				rfbLog("remote_cmd: ptr,kbd: %s\n", buf);
+			}
 			goto qry;
 		}
 

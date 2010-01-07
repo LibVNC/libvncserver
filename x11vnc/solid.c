@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com> 
+   Copyright (C) 2002-2010 Karl J. Runge <runge@karlrunge.com> 
    All rights reserved.
 
 This file is part of x11vnc.
@@ -559,6 +559,9 @@ char *dbus_session(void) {
 	char tmp[1000];
 
 	if (dbus_env != NULL && strlen(dbus_env) > 0) {
+		return "";
+	}
+	if (!dpy) {
 		return "";
 	}
 #if NO_X11

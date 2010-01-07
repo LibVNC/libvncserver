@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com> 
+   Copyright (C) 2002-2010 Karl J. Runge <runge@karlrunge.com> 
    All rights reserved.
 
 This file is part of x11vnc.
@@ -1988,6 +1988,8 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 			sprintf(fdsess, "gnome");
 		} else if (strstr(t, "kde")) {
 			sprintf(fdsess, "kde");
+		} else if (strstr(t, "lxde")) {
+			sprintf(fdsess, "lxde");
 		} else if (strstr(t, "twm")) {
 			sprintf(fdsess, "twm");
 		} else if (strstr(t, "fvwm")) {
@@ -2120,8 +2122,8 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	if (fdtag[0] == '\0' && getenv("FD_TAG")) {
 		snprintf(fdtag, 120, "%s", getenv("FD_TAG"));
 	}
-	if (fdxdum[0] == '\0' && getenv("FD_XDUMMY_NOROOT")) {
-		snprintf(fdxdum, 120, "%s", getenv("FD_XDUMMY_NOROOT"));
+	if (fdxdum[0] == '\0' && getenv("FD_XDUMMY_RUN_AS_ROOT")) {
+		snprintf(fdxdum, 120, "%s", getenv("FD_XDUMMY_RUN_AS_ROOT"));
 	}
 	if (getenv("CREATE_DISPLAY_OUTPUT")) {
 		snprintf(cdout, 120, "CREATE_DISPLAY_OUTPUT='%s'", getenv("CREATE_DISPLAY_OUTPUT"));
@@ -2151,7 +2153,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	set_env("FD_NAS",  fdnas);
 	set_env("FD_SMB",  fdsmb);
 	set_env("FD_TAG",  fdtag);
-	set_env("FD_XDUMMY_NOROOT", fdxdum);
+	set_env("FD_XDUMMY_RUN_AS_ROOT", fdxdum);
 	set_env("FD_SESS", fdsess);
 
 	if (usslpeer || (unixpw && keep_unixpw_user)) {
@@ -2174,7 +2176,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		    + strlen("FD_NAS='' ")
 		    + strlen("FD_SMB='' ")
 		    + strlen("FD_TAG='' ")
-		    + strlen("FD_XDUMMY_NOROOT='' ")
+		    + strlen("FD_XDUMMY_RUN_AS_ROOT='' ")
 		    + strlen("FD_SESS='' /bin/sh ")
 		    + strlen(uu) + 1
 		    + strlen(fdgeom) + 1
@@ -2194,7 +2196,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' "
 		    "FD_OPTS='%s' FD_EXTRA='%s' FD_PROG='%s' FD_XSRV='%s' FD_CUPS='%s' "
 		    "FD_ESD='%s' FD_NAS='%s' FD_SMB='%s' FD_TAG='%s' "
-		    "FD_XDUMMY_NOROOT='%s' %s /bin/sh %s %s",
+		    "FD_XDUMMY_RUN_AS_ROOT='%s' %s /bin/sh %s %s",
 		    uu, fdgeom, fdsess, fdopts, fdextra, fdprog, fdxsrv,
 		    fdcups, fdesd, fdnas, fdsmb, fdtag, fdxdum, cdout, tmp, opts);
 	} else {

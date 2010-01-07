@@ -195,6 +195,8 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->listenSock = -1;
   client->multicastSock = -1;
 
+  client->clientAuthSchemes = NULL;
+
   return client;
 }
 
@@ -344,5 +346,7 @@ void rfbClientCleanup(rfbClient* client) {
     close(client->listenSock);
   free(client->desktopName);
   free(client->serverHost);
+  if (client->clientAuthSchemes)
+    free(client->clientAuthSchemes);
   free(client);
 }

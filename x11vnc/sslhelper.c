@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com> 
+   Copyright (C) 2002-2010 Karl J. Runge <runge@karlrunge.com> 
    All rights reserved.
 
 This file is part of x11vnc.
@@ -2940,11 +2940,11 @@ if (db) fprintf(stderr, "tv_sec: %d - '%s'\n", (int) tv.tv_sec, last_get);
 	FD_ZERO(&rd);
 	FD_SET(s_in, &rd);
 
-	if (db) fprintf(stderr, "is_ssl_readable: begin  select(%d secs) %.6f\n", tv.tv_sec, dnow());
+	if (db) fprintf(stderr, "is_ssl_readable: begin  select(%d secs) %.6f\n", (int) tv.tv_sec, dnow());
 	do {
 		nfd = select(s_in+1, &rd, NULL, NULL, &tv);
 	} while (nfd < 0 && errno == EINTR);
-	if (db) fprintf(stderr, "is_ssl_readable: finish select(%d secs) %.6f\n", tv.tv_sec, dnow());
+	if (db) fprintf(stderr, "is_ssl_readable: finish select(%d secs) %.6f\n", (int) tv.tv_sec, dnow());
 
 	if (db) fprintf(stderr, "https nfd: %d\n", nfd);
 
@@ -4081,12 +4081,18 @@ if (db) rfbLog("raw_xfer bad write:  %d -> %d | %d/%d  errno=%d\n", csock, s_out
 #endif	/* FORK_OK */
 }
 
+/* compile with -DENC_HAVE_OPENSSL=0 to disable enc stuff but still have ssl */
+
 #define ENC_MODULE
+
 #if LIBVNCSERVER_HAVE_LIBSSL
+#ifndef ENC_HAVE_OPENSSL
 #define ENC_HAVE_OPENSSL 1
+#endif
 #else
 #define ENC_HAVE_OPENSSL 0
 #endif
+
 #include "enc.h"
 
 static void symmetric_encryption_xfer(int csock, int s_in, int s_out) {
