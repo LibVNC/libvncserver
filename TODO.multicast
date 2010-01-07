@@ -1,0 +1,28 @@
+
+- enableCursorShapeUpdates stuff in rfbSendMulticastFramebufferUpdate()
+
+- Implement other encodings than raw.
+
+- What about multicast specific stats? Right now it's still all
+  per-client.
+
+- Leave the nRect calculation in rfbSendMulticastFramebufferUpdate()
+  as it is (number of rects is returned by
+  rfbPutMulticastEndcodingPreferred)?
+  --> We're not able to catch some obscure errors in the encoding
+      specific functions. but what errors? It's guaranteed beforehand
+      that the rects always fit, so that leaves us with some deflate
+      errors and stuff. do these ever happen?
+  --> Other possibility would be to have sth like a
+      rfbGetNrRectsPreferredEncoding() which would be used by
+      rfbSendMulticastFramebufferUpdate() and
+      rfbSendFramebufferUpdate(). Then we would need to turn of
+      cl->lastrectenabled in the multicast case and re-enable it later
+      on
+
+
+
+  
+
+
+

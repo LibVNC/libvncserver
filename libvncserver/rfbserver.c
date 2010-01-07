@@ -89,6 +89,13 @@ static int compat_mkdir(const char *path, int mode)
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
+static rfbMulticastFramebufferUpdateMsg* rfbPutMulticastHeader(rfbClientPtr cl, 
+							       uint16_t idWholeUpd,
+							       uint16_t nPartialUpds, 
+							       uint16_t idPartialUpd, 
+							       uint16_t nRects);
+static int rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h);
+
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 void rfbIncrClientRef(rfbClientPtr cl)
@@ -849,7 +856,7 @@ rfbSendKeyboardLedState(rfbClientPtr cl)
 }
 
 
-#define rfbSetBit(buffer, position)  (buffer[(position & 255) / 8] |= (1 << (position % 8)))
+
 
 /*
  * Send rfbEncodingSupportedMessages.
@@ -3058,319 +3065,318 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 				  sraRegionPtr givenUpdateRegion)
 {
     sraRectangleIterator* i=NULL;
+    rfbMulticastFramebufferUpdateMsg* mfu = NULL;
     sraRect rect;
-    int nUpdateRegionRects;
-    //FIXME change to a buffer owned by server struct?
-    rfbMulticastFramebufferUpdateMsg *mfu = (rfbMulticastFramebufferUpdateMsg *)cl->updateBuf;
-    sraRegionPtr updateRegion,updateCopyRegion,tmpRegion;
-    int dx, dy;
-  
+    sraRegionPtr updateRegion;
+    int j;
+    uint16_t nPartialUpds = 0;
+    uint16_t idPartialUpd = 0;
+    uint16_t nRects = 0;
+    int sizePartUpd = 0;
+    rfbBool otherUpdatesPending = FALSE;
     rfbBool result = TRUE;
-    
+
+    /* FIXME call this here as well? */
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
 
-    rfbLog("sending MC FB upd for cl %s\n", cl->host );
-    return TRUE;
-
-
-    LOCK(cl->updateMutex);
-
-    /*
-     * The modifiedRegion may overlap the destination copyRegion.  We remove
-     * any overlapping bits from the copyRegion (since they'd only be
-     * overwritten anyway).
-     */
-    
-    sraRgnSubtract(cl->copyRegion,cl->modifiedRegion);
-
-    /*
-     * The client is interested in the region requestedRegion.  The region
-     * which should be updated now is the intersection of requestedRegion
-     * and the union of modifiedRegion and copyRegion.  If it's empty then
-     * no update is needed.
-     */
-
+  
     updateRegion = sraRgnCreateRgn(givenUpdateRegion);
-    if(cl->screen->progressiveSliceHeight>0) {
-	    int height=cl->screen->progressiveSliceHeight,
-	    	y=cl->progressiveSliceY;
-	    sraRegionPtr bbox=sraRgnBBox(updateRegion);
-	    sraRect rect;
-	    if(sraRgnPopRect(bbox,&rect,0)) {
-		sraRegionPtr slice;
-		if(y<rect.y1 || y>=rect.y2)
-		    y=rect.y1;
-	    	slice=sraRgnCreateRect(0,y,cl->screen->width,y+height);
-		sraRgnAnd(updateRegion,slice);
-		sraRgnDestroy(slice);
-	    }
-	    sraRgnDestroy(bbox);
-	    y+=height;
-	    if(y>=cl->screen->height)
-		    y=0;
-	    cl->progressiveSliceY=y;
-    }
-
-    sraRgnOr(updateRegion,cl->copyRegion);
-    if(!sraRgnAnd(updateRegion,cl->requestedRegion) &&
-       sraRgnEmpty(updateRegion) &&
-       (cl->enableCursorShapeUpdates ||
-	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY))) {
-      sraRgnDestroy(updateRegion);
-      UNLOCK(cl->updateMutex);
-      return TRUE;
-    }
+    sraRgnOr(updateRegion, cl->screen->multicastUpdateRegion);
 
     /*
-     * We assume that the client doesn't have any pixel data outside the
-     * requestedRegion.  In other words, both the source and destination of a
-     * copy must lie within requestedRegion.  So the region we can send as a
-     * copy is the intersection of the copyRegion with both the requestedRegion
-     * and the requestedRegion translated by the amount of the copy.  We set
-     * updateCopyRegion to this.
-     */
-
-    updateCopyRegion = sraRgnCreateRgn(cl->copyRegion);
-    sraRgnAnd(updateCopyRegion,cl->requestedRegion);
-    tmpRegion = sraRgnCreateRgn(cl->requestedRegion);
-    sraRgnOffset(tmpRegion,cl->copyDX,cl->copyDY);
-    sraRgnAnd(updateCopyRegion,tmpRegion);
-    sraRgnDestroy(tmpRegion);
-    dx = cl->copyDX;
-    dy = cl->copyDY;
-
-    /*
-     * Next we remove updateCopyRegion from updateRegion so that updateRegion
-     * is the part of this update which is sent as ordinary pixel data (i.e not
-     * a copy).
-     */
-
-    sraRgnSubtract(updateRegion,updateCopyRegion);
-
-    /*
-     * Finally we leave modifiedRegion to be the remainder (if any) of parts of
-     * the screen which are modified but outside the requestedRegion.  We also
-     * empty both the requestedRegion and the copyRegion - note that we never
-     * carry over a copyRegion for a future update.
-     */
-
-     sraRgnOr(cl->modifiedRegion,cl->copyRegion);
-     sraRgnSubtract(cl->modifiedRegion,updateRegion);
-     sraRgnSubtract(cl->modifiedRegion,updateCopyRegion);
-
-     sraRgnMakeEmpty(cl->requestedRegion);
-     sraRgnMakeEmpty(cl->copyRegion);
-     cl->copyDX = 0;
-     cl->copyDY = 0;
-   
-     UNLOCK(cl->updateMutex);
-   
-    if (!cl->enableCursorShapeUpdates) {
+      if (!cl->enableCursorShapeUpdates) {
       if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) {
-	rfbRedrawAfterHideCursor(cl,updateRegion);
-	LOCK(cl->screen->cursorMutex);
-	cl->cursorX = cl->screen->cursorX;
-	cl->cursorY = cl->screen->cursorY;
-	UNLOCK(cl->screen->cursorMutex);
-	rfbRedrawAfterHideCursor(cl,updateRegion);
+      rfbRedrawAfterHideCursor(cl,updateRegion);
+      LOCK(cl->screen->cursorMutex);
+      cl->cursorX = cl->screen->cursorX;
+      cl->cursorY = cl->screen->cursorY;
+      UNLOCK(cl->screen->cursorMutex);
+      rfbRedrawAfterHideCursor(cl,updateRegion);
       }
       rfbShowCursor(cl);
     }
-
-    /*
-     * Now send the update.
      */
-    
+
+
+    /* FIXME make this per-screen ?*/
     rfbStatRecordMessageSent(cl, rfbMulticastFramebufferUpdate, 0, 0);
-    if (cl->preferredEncoding == rfbEncodingCoRRE) {
-        nUpdateRegionRects = 0;
+     
+    
+    /* 
+     * Find out how many partial updates we need.
+     * This is analogous to the sending algorithm below. 
+     */
+    for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);)
+      {
+	int x = rect.x1;
+	int y = rect.y1;
+	int w = rect.x2 - x;
+	int h = rect.y2 - y;
+	int sizeRect = w * h * cl->format.bitsPerPixel/8;
 
-        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
-            int x = rect.x1;
-            int y = rect.y1;
-            int w = rect.x2 - x;
-            int h = rect.y2 - y;
-	    int rectsPerRow, rows;
-            /* We need to count the number of rects in the scaled screen */
-            if (cl->screen!=cl->scaledScreen)
-                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
-	    rectsPerRow = (w-1)/cl->correMaxWidth+1;
-	    rows = (h-1)/cl->correMaxHeight+1;
-	    nUpdateRegionRects += rectsPerRow*rows;
-        }
-	sraRgnReleaseIterator(i); i=NULL;
-    } else if (cl->preferredEncoding == rfbEncodingUltra) {
-        nUpdateRegionRects = 0;
-        
-        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
-            int x = rect.x1;
-            int y = rect.y1;
-            int w = rect.x2 - x;
-            int h = rect.y2 - y;
-            /* We need to count the number of rects in the scaled screen */
-            if (cl->screen!=cl->scaledScreen)
-                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
-            nUpdateRegionRects += (((h-1) / (ULTRA_MAX_SIZE( w ) / w)) + 1);
-          }
-        sraRgnReleaseIterator(i); i=NULL;
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-    } else if (cl->preferredEncoding == rfbEncodingZlib) {
-	nUpdateRegionRects = 0;
+	if(sizePartUpd + sz_rfbFramebufferUpdateRectHeader + sizeRect 
+	   > MULTICAST_UPDATE_BUF_SIZE - sz_rfbMulticastFramebufferUpdateMsg) /* would-be overflow */
+	  {                                            
+	    sizePartUpd = 0;                                                  /* would-be buffer flush */
+	    if(sz_rfbFramebufferUpdateRectHeader + sizeRect 
+	       <= MULTICAST_UPDATE_BUF_SIZE - sz_rfbMulticastFramebufferUpdateMsg)
+ 	      {                                                     /* rect would fit into now empty buffer */
+		++nPartialUpds;
+		sizePartUpd += sz_rfbFramebufferUpdateRectHeader + sizeRect;
+	      }
+	    else                                                    /* rect would have to be split up */
+	      {
+		int bytesPerLine = w * (cl->format.bitsPerPixel/8);
+		int linesPerUpd = ((MULTICAST_UPDATE_BUF_SIZE 
+				    - sz_rfbMulticastFramebufferUpdateMsg)
+				   - sz_rfbFramebufferUpdateRectHeader) / bytesPerLine;
+		int nPartUpdsThisRect = h/linesPerUpd;
+		if(nPartUpdsThisRect*linesPerUpd < h) 
+		  nPartialUpds += nPartUpdsThisRect+1; /* there is a remainder */
+		else
+		  nPartialUpds += nPartUpdsThisRect;   /* fits exactly */
+	      }
+	  }
+	else
+	  {
+	    if(sizePartUpd == 0)                                    /* new partial update */
+	      ++nPartialUpds;
+	    sizePartUpd += sz_rfbFramebufferUpdateRectHeader + sizeRect; /* would be put in buffer */
+	  }
+      }
+    sraRgnReleaseIterator(i); i=NULL;
 
-        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
-            int x = rect.x1;
-            int y = rect.y1;
-            int w = rect.x2 - x;
-            int h = rect.y2 - y;
-            /* We need to count the number of rects in the scaled screen */
-            if (cl->screen!=cl->scaledScreen)
-                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
-	    nUpdateRegionRects += (((h-1) / (ZLIB_MAX_SIZE( w ) / w)) + 1);
-	}
-	sraRgnReleaseIterator(i); i=NULL;
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-    } else if (cl->preferredEncoding == rfbEncodingTight) {
-	nUpdateRegionRects = 0;
-
-        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
-            int x = rect.x1;
-            int y = rect.y1;
-            int w = rect.x2 - x;
-            int h = rect.y2 - y;
-            int n;
-            /* We need to count the number of rects in the scaled screen */
-            if (cl->screen!=cl->scaledScreen)
-                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
-	    n = rfbNumCodedRectsTight(cl, x, y, w, h);
-	    if (n == 0) {
-		nUpdateRegionRects = 0xFFFF;
-		break;
-	    }
-	    nUpdateRegionRects += n;
-	}
-	sraRgnReleaseIterator(i); i=NULL;
-#endif
-#endif
-    } else {
-        nUpdateRegionRects = sraRgnCountRects(updateRegion);
-    }
-
-    mfu->type = rfbMulticastFramebufferUpdate;
-    if (nUpdateRegionRects != 0xFFFF) {
-	if(cl->screen->maxRectsPerUpdate>0
-	   /* CoRRE splits the screen into smaller squares */
-	   && cl->preferredEncoding != rfbEncodingCoRRE
-	   /* Ultra encoding splits rectangles up into smaller chunks */
-           && cl->preferredEncoding != rfbEncodingUltra
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-	   /* Zlib encoding splits rectangles up into smaller chunks */
-	   && cl->preferredEncoding != rfbEncodingZlib
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-	   /* Tight encoding counts the rectangles differently */
-	   && cl->preferredEncoding != rfbEncodingTight
-#endif
-#endif
-	   && nUpdateRegionRects>cl->screen->maxRectsPerUpdate) {
-	    sraRegion* newUpdateRegion = sraRgnBBox(updateRegion);
-	    sraRgnDestroy(updateRegion);
-	    updateRegion = newUpdateRegion;
-	    nUpdateRegionRects = sraRgnCountRects(updateRegion);
-	}
-	mfu->nRects = Swap16IfLE((uint16_t)(sraRgnCountRects(updateCopyRegion) +
-					   nUpdateRegionRects ));
-    } else {
-	mfu->nRects = 0xFFFF;
-    }
-    cl->ublen = sz_rfbMulticastFramebufferUpdateMsg;
-
-
- 
-
+    //FIXME debug
+    //rfbLog("\n--> nUpdateRegionRects: %d\n", nUpdateRegionRects);
+    rfbLog("\n--> region has: %d\n", sraRgnCountRects(updateRegion) );
+    rfbLog("\n-->     part updates: %d\n", nPartialUpds);
    
-    if (!sraRgnEmpty(updateCopyRegion)) {
-	if (!rfbSendCopyRegion(cl,updateCopyRegion,dx,dy))
-	        goto updateFailed;
-    }
 
+    LOCK(cl->screen->multicastUpdateMutex);
+    
   
-
+    //FIXME debug
+    int nr_rect=0;
     for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
         int x = rect.x1;
         int y = rect.y1;
         int w = rect.x2 - x;
         int h = rect.y2 - y;
+	
+	//FIXME debug
+	rfbLog("\n--> rect %d, %d raw bytes\n", nr_rect, w*h * cl->format.bitsPerPixel/8);
+	rfbLog("\n--> rect %d, at %d,%d (%d*%d)\n", nr_rect, x,y,w,h);
+	++nr_rect;
 
-        /* We need to count the number of rects in the scaled screen */
-        if (cl->screen!=cl->scaledScreen)
-            rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
+	size_t rawSizeRect = w * h * cl->format.bitsPerPixel/8;
 
-        switch (cl->preferredEncoding) {
-	case -1:
-        case rfbEncodingRaw:
-            if (!rfbSendRectEncodingRaw(cl, x, y, w, h))
-	        goto updateFailed;
-            break;
-        case rfbEncodingRRE:
-            if (!rfbSendRectEncodingRRE(cl, x, y, w, h))
-	        goto updateFailed;
-            break;
-        case rfbEncodingCoRRE:
-            if (!rfbSendRectEncodingCoRRE(cl, x, y, w, h))
-	        goto updateFailed;
-	    break;
-        case rfbEncodingHextile:
-            if (!rfbSendRectEncodingHextile(cl, x, y, w, h))
-	        goto updateFailed;
-            break;
-        case rfbEncodingUltra:
-            if (!rfbSendRectEncodingUltra(cl, x, y, w, h))
-                goto updateFailed;
-            break;
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-	case rfbEncodingZlib:
-	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h))
-	        goto updateFailed;
-	    break;
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-	case rfbEncodingTight:
-	    if (!rfbSendRectEncodingTight(cl, x, y, w, h))
-	        goto updateFailed;
-	    break;
-#endif
-#endif
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-       case rfbEncodingZRLE:
-       case rfbEncodingZYWRLE:
-           if (!rfbSendRectEncodingZRLE(cl, x, y, w, h))
-	       goto updateFailed;
-           break;
-#endif
-        }
+
+	if(cl->screen->mcublen + sz_rfbFramebufferUpdateRectHeader + rawSizeRect 
+	   > MULTICAST_UPDATE_BUF_SIZE)                 /* would overflow */
+	  {
+	    if(mfu)
+	      mfu->nRects = Swap16IfLE(nRects);
+
+	    //FIXME debug
+	    if(cl->screen->mcublen)
+	      {
+		rfbLog("--> about to send %d bytes!\n", cl->screen->mcublen);
+		rfbLog("   --> idwhole: %d\n", cl->screen->multicastUpdateId);
+		rfbLog("   --> npartial: %d\n", nPartialUpds);	    
+		rfbLog("   --> idpartial: %d\n", idPartialUpd-1);	    
+		rfbLog("   --> nrect: %d\n", nRects);	    
+	      }
+
+	    if(!rfbSendMulticastUpdateBuf(cl->screen))  /* flush buffer */
+	      {
+		result = FALSE;
+		break;
+	      }
+	    nRects = 0;
+	 
+	    if(sz_rfbMulticastFramebufferUpdateMsg + sz_rfbFramebufferUpdateRectHeader + rawSizeRect 
+	       <= MULTICAST_UPDATE_BUF_SIZE)            /* headers + rect fit into now empty buffer */
+	      {                                        
+		mfu = rfbPutMulticastHeader(cl, cl->screen->multicastUpdateId, nPartialUpds, ++idPartialUpd, 0);
+   		nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
+	      }
+	    else                                        /* rect too large for buffer, must be split up */
+	      {
+		int offs=0;
+		int bytesPerLine = w * (cl->format.bitsPerPixel/8);
+		int linesPerUpd = ((MULTICAST_UPDATE_BUF_SIZE 
+				    - sz_rfbMulticastFramebufferUpdateMsg)
+				   - sz_rfbFramebufferUpdateRectHeader) / bytesPerLine;
+		int nSplitRects = h/linesPerUpd;
+
+		if(nSplitRects*linesPerUpd < h)         /* there is a remainder */
+		  ++nSplitRects;
+	
+		while(nSplitRects)
+		  {
+		    mfu = rfbPutMulticastHeader(cl, cl->screen->multicastUpdateId, nPartialUpds, ++idPartialUpd, 0);
+		   
+		    if(offs*linesPerUpd + linesPerUpd <= h)
+		      {
+			nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+offs*linesPerUpd, w, linesPerUpd);
+		      }
+		    else
+		      {
+			nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+offs*linesPerUpd, w, h - offs*linesPerUpd);
+		      }
+		    mfu->nRects = Swap16IfLE(nRects);
+
+		    //FIXME debug
+		    rfbLog("--> about to send %d bytes! (rect splitted)\n", cl->screen->mcublen);
+		    rfbLog("   --> idwhole: %d\n", cl->screen->multicastUpdateId);
+		    rfbLog("   --> npartial: %d\n", nPartialUpds);	    
+		    rfbLog("   --> idpartial: %d\n", idPartialUpd-1);	    
+		    rfbLog("   --> nrect: %d\n", nRects);	    
+		    
+		    if(!rfbSendMulticastUpdateBuf(cl->screen))
+		      {
+			result = FALSE;
+			break;
+		      }
+		    nRects = 0;
+		    ++offs;
+		    --nSplitRects;
+		  }
+	      }
+	  }
+	else                                            /* rect fits */  
+	  {
+	    if(cl->screen->mcublen == 0)                /* new partial update */
+	      mfu = rfbPutMulticastHeader(cl, cl->screen->multicastUpdateId, nPartialUpds, ++idPartialUpd, 0);
+
+	    nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
+	  }
     }
-    if (i) {
-        sraRgnReleaseIterator(i);
-        i = NULL;
-    }
+    sraRgnReleaseIterator(i); i=NULL;
 
-    if ( nUpdateRegionRects == 0xFFFF &&
-	 !rfbSendLastRectMarker(cl) )
-	    goto updateFailed;
-
-    if (!rfbSendUpdateBuf(cl)) {
-updateFailed:
+    /* flush buffer at the end */
+    if (!rfbSendMulticastUpdateBuf(cl->screen)) {
 	result = FALSE;
     }
+    
+    /* increment sequence number no matter what */
+    cl->screen->multicastUpdateId++;
 
+   
+    if(result == TRUE) /* no error while sending */
+      {
+	/* mark this pixelformat and encoding combination as done */
+	rfbUnsetBit(cl->screen->multicastUpdPendingForPixelformat, cl->multicastPixelformatId);
+	rfbUnsetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredEncoding);
+    
+	/* empty multicastUpdateRegion if no updates are pending */
+	for(j=0; j < sizeof(cl->screen->multicastUpdPendingForPixelformat); ++j)
+	  if(cl->screen->multicastUpdPendingForPixelformat[j] != 0)
+	    {
+	      otherUpdatesPending = TRUE;
+	      break;
+	    }
+	if(j == sizeof(cl->screen->multicastUpdPendingForPixelformat)-1) /* no pf pending */
+	  for(j=0; j < sizeof(cl->screen->multicastUpdPendingForEncoding); ++j)
+	    if(cl->screen->multicastUpdPendingForEncoding[j] != 0)
+	      {
+		otherUpdatesPending = TRUE;
+		break;
+	      } 
+	if(!otherUpdatesPending)
+	  sraRgnMakeEmpty(cl->screen->multicastUpdateRegion);
+      }
+
+    UNLOCK(cl->screen->multicastUpdateMutex);
+
+    /*
     if (!cl->enableCursorShapeUpdates) {
       rfbHideCursor(cl);
     }
-
-    if(i)
-        sraRgnReleaseIterator(i);
+    */
+ 
     sraRgnDestroy(updateRegion);
-    sraRgnDestroy(updateCopyRegion);
+
     return result;
+}
+
+/*
+ * Puts the multicast message header into the multicast update buffer.
+ */
+
+rfbMulticastFramebufferUpdateMsg *
+rfbPutMulticastHeader(rfbClientPtr cl, 
+		      uint16_t idWholeUpd, uint16_t nPartialUpds,
+		      uint16_t idPartialUpd, uint16_t nRects)
+{
+  rfbMulticastFramebufferUpdateMsg *mfu =
+    (rfbMulticastFramebufferUpdateMsg *)cl->screen->multicastUpdateBuf;
+
+  mfu->type = rfbMulticastFramebufferUpdate;
+  mfu->idPixelformat = Swap16IfLE(cl->multicastPixelformatId);
+  mfu->idWholeUpd = Swap16IfLE(idWholeUpd);
+  mfu->nPartialUpds = Swap16IfLE(nPartialUpds);
+  mfu->idPartialUpd = Swap16IfLE(idPartialUpd);
+  mfu->nRects = Swap16IfLE(nRects);
+
+  cl->screen->mcublen = sz_rfbMulticastFramebufferUpdateMsg;
+
+  return mfu;
+}
+
+
+
+/*
+ * Puts the specified rectangle into the multicast update buffer,
+ * encoded in client's preferred encoding. 
+ */
+
+int 
+rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h)
+{
+  switch (cl->preferredEncoding) {
+  /*
+      case rfbEncodingRRE:
+      if (!rfbPutMulticastRectEncodingRRE(cl, x, y, w, h))
+      return FALSE;
+      break;
+      case rfbEncodingCoRRE:
+      if (!rfbPutMulticastRectEncodingCoRRE(cl, x, y, w, h))
+      return FALSE;
+      break;
+      case rfbEncodingHextile:
+      if (!rfbPutMulticastRectEncodingHextile(cl, x, y, w, h))
+      return FALSE;
+      break;
+      case rfbEncodingUltra:
+      if (!rfbPutMulticastRectEncodingUltra(cl, x, y, w, h))
+      return FALSE;
+      break;
+      #ifdef LIBVNCSERVER_HAVE_LIBZ
+      case rfbEncodingZlib:
+      if (!rfbPutMulticastRectEncodingZlib(cl, x, y, w, h))
+      return FALSE;
+      break;
+      #ifdef LIBVNCSERVER_HAVE_LIBJPEG
+      case rfbEncodingTight:
+      if (!rfbPutMulticastRectEncodingTight(cl, x, y, w, h))
+      return FALSE;
+      break;
+      #endif
+      #endif
+      #ifdef LIBVNCSERVER_HAVE_LIBZ
+      case rfbEncodingZRLE:
+      case rfbEncodingZYWRLE:
+      if (!rfbPutMulticastRectEncodingZRLE(cl, x, y, w, h))
+      return FALSE;
+      break;
+      #endif
+    */
+  default:
+    return rfbPutMulticastRectEncodingRaw(cl, x, y, w, h);
+    break;
+  }
 }
 
 
@@ -3503,6 +3509,47 @@ rfbSendRectEncodingRaw(rfbClientPtr cl,
             return FALSE;
         }
     }
+}
+
+
+/* 
+ *  Puts the specified rectangle into the multicast update buffer 
+ *  with raw encoding.
+ */
+int
+rfbPutMulticastRectEncodingRaw(rfbClientPtr cl,
+			       int x,
+			       int y,
+			       int w,
+			       int h)
+{
+    rfbFramebufferUpdateRectHeader rect;
+    int bytesPerLine = w * (cl->format.bitsPerPixel / 8);
+    rfbScreenInfoPtr s = cl->screen;
+    char *fbptr = (s->frameBuffer + (s->paddedWidthInBytes * y) + (x * (s->bitsPerPixel / 8)));
+
+    rect.r.x = Swap16IfLE(x);
+    rect.r.y = Swap16IfLE(y);
+    rect.r.w = Swap16IfLE(w);
+    rect.r.h = Swap16IfLE(h);
+    rect.encoding = Swap32IfLE(rfbEncodingRaw);
+
+    memcpy(&s->multicastUpdateBuf[s->mcublen], (char *)&rect,sz_rfbFramebufferUpdateRectHeader);
+    s->mcublen += sz_rfbFramebufferUpdateRectHeader;
+
+    /* FIXME maybe introduce extra multicast stats? */
+    rfbStatRecordEncodingSent(cl, rfbEncodingRaw,
+			      sz_rfbFramebufferUpdateRectHeader + bytesPerLine * h,
+			      sz_rfbFramebufferUpdateRectHeader + bytesPerLine * h);
+
+    (*cl->translateFn)(cl->translateLookupTable,
+		       &(cl->screen->serverFormat),
+		       &cl->format, fbptr, &s->multicastUpdateBuf[s->mcublen],
+		       s->paddedWidthInBytes, w, h);
+
+    cl->screen->mcublen += h * bytesPerLine;
+
+    return 1;
 }
 
 
