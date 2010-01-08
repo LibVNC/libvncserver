@@ -92,6 +92,12 @@ rfbVncAuthSendChallenge(rfbClientPtr cl)
 			return; \
 		} \
 	}
+
+/*
+ Enabled by runge on 2010/01/02
+ */
+#define USE_SECTYPE_TIGHT_FOR_RFB_3_8
+
 /*
  * Read client's preferred authentication type (protocol 3.7t).
  */

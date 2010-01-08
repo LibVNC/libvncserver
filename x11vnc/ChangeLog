@@ -1,3 +1,27 @@
+2010-01-02  Karl Runge <runge@karlrunge.com>
+	* x11vnc: small tweaks to Xdummy, rx11vnc*.  Apply
+	  SMALL_FOOTPRINT to -appshare text.  Copyright year change.
+
+2009-12-29  Karl Runge <runge@karlrunge.com>
+	* x11vnc: rename -create_x to -create_xsrv.  Hopefully
+	  done fixing Xdummy.
+
+2009-12-28  Karl Runge <runge@karlrunge.com>
+	* x11vnc: Fix problems in --without-x builds.  Fix crash
+	  with -QD query for dbus info.  Adjust window size for
+	  small screens in -gui.  Improve F1 help for xdm, etc.
+	  include ssvnc 1.0.25 source.
+
+2009-12-24  Karl Runge <runge@karlrunge.com>
+	* x11vnc: prepare_x11vnc_dist.sh for 0.9.10. -xdummy_xvfb,
+	  -svc_xdummy_xvfb and -create_x shorthand. lxde session.
+	  Xdummy improvements and root no longer required.
+
+2009-12-21  Karl Runge <runge@karlrunge.com>
+	* x11vnc: -DENC_HAVE_OPENSSL=0 to disable enc.h but still
+	  have ssl. Tweak ps command in find_display. Try to handle
+	  AIX su. Ignore an initial newline at login: for -unixpw.
+
 2009-12-18  Karl Runge <runge@karlrunge.com>
 	* x11vnc: fix keycode and other remote control actions under
 	  DIRECT: with an extra XFlush and other safety measures.

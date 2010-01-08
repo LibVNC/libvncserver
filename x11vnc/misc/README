@@ -28,10 +28,12 @@ x11vnc -pipeinput/-rawfb utilities:
 
 Misc. scripts:
 
-   shm_clear	  list or remove orphaned shm slots from hard x11vnc crashes.
-   x11vnc_loop	  kludge to run in bg attaching x11vnc to X login.  Better to
-		  use Xsetup mechanism.
-   xi2setcursor.c utility to change the cursor image of a given pointer device
-                  into a coloroured and labeled cursor image. Useful with 
-                  -afteraccept in multi-pointer setups.
-                  
+   shm_clear	list or remove orphaned shm slots from hard x11vnc crashes.
+   x11vnc_loop	kludge to run in bg attaching x11vnc to X login.  Better to
+		use Xsetup mechanism.
+   Xdummy       An LD_PRELOAD kludge to run the Xorg "dummy" device driver
+		like Xvfb.
+ xi2setcursor.c utility to change the cursor image of a given pointer device
+                into a coloroured and labeled cursor image. Useful with 
+                -afteraccept in multi-pointer setups.
+

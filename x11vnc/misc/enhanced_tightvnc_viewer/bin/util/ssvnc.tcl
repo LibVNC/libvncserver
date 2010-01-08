@@ -33,6 +33,15 @@ proc center_win {w} {
 	update
 }
 
+proc small_height {} {
+	set H [winfo screenheight .]
+	if {$H < 700} {
+		return 1
+	} else {
+		return 0
+	}
+}
+
 proc mac_raise {} {
 	global uname
 	if {$uname == "Darwin"} {
@@ -67,6 +76,9 @@ proc line_count {{str ""} {pad 0}} {
 proc scroll_text {fr {w 80} {h 35}} {
 	global help_font is_windows scroll_text_focus
 
+	if {$h == 35 && [small_height]} {
+		set h 28
+	}
 	catch {destroy $fr}
 	
 	frame $fr -bd 0
@@ -88,6 +100,9 @@ proc scroll_text {fr {w 80} {h 35}} {
 proc scroll_text_dismiss {fr {w 80} {h 35}} {
 	global help_font
 
+	if {$h == 35 && [small_height]} {
+		set h 28
+	}
 	scroll_text $fr $w $h
 
 	set up $fr
@@ -354,7 +369,11 @@ proc help {} {
 	}
 	toplev .h
 
-	scroll_text_dismiss .h.f 82 37
+	set h 37
+	if [small_height] {
+		set h 26
+	}
+	scroll_text_dismiss .h.f 82 $h
 
 	center_win .h
 	wm title .h "SSL/SSH VNC Viewer Help"
@@ -1693,7 +1712,11 @@ proc ssvnc_escape_help {} {
 proc help_certs {} {
 	toplev .ch
 
-	scroll_text_dismiss .ch.f 87 33
+	set h 33
+	if [small_height] {
+		set h 28
+	}
+	scroll_text_dismiss .ch.f 87 $h
 
 	center_win .ch
 	wm resizable .ch 1 0
@@ -2506,7 +2529,11 @@ set msg {
 proc help_fetch_cert {{selfsigned 1}} {
 	toplev .fh
 
-	scroll_text_dismiss .fh.f 85 35
+	set h 35
+	if [small_height] {
+		set h 28
+	}
+	scroll_text_dismiss .fh.f 85 $h
 
 	center_win .fh
 	wm resizable .fh 1 0
@@ -3566,7 +3593,11 @@ proc check_debug_netstat {port str wn} {
 
 	toplev .dbns
 
-	scroll_text_dismiss .dbns.f 82 35
+	set h 35
+	if [small_height] {
+		set h 28
+	}
+	scroll_text_dismiss .dbns.f 82 $h
 	center_win .dbns
 	.dbns.f.t insert end "LOOKING FOR PORT: $port\n\n$str"
 	jiggle_text .dbns.f.t
@@ -5189,6 +5220,10 @@ proc skip_non_self_signed {w hp} {
 proc fetch_dialog {cert_text hp hpnew ok n} {
 	toplev .fetch
 
+	if [small_height] {
+		set n 28
+	}
+
 	scroll_text_dismiss .fetch.f 90 $n
 
 	if {$ok} {
@@ -5867,6 +5902,11 @@ proc check_accepted_certs {{probe_only 0}} {
 		set n [expr $n + 2]
 	} else {
 		set n [expr $n + 1]
+	}
+	if [small_height] {
+		if {$n > 26} {
+			set n 26
+		}
 	}
 	toplev .acert
 	scroll_text .acert.f 83 $n
@@ -9005,11 +9045,13 @@ proc create_cert {{name ""}} {
 	wm title .ccrt "Create SSL Certificate"
 
 	global uname
-	if {$uname == "Darwin"} {
-		scroll_text .ccrt.f 80 20
-	} else {
-		scroll_text .ccrt.f 80 30
+	set h 27
+	if [small_height] {
+		set h 14
+	} elseif {$uname == "Darwin"} {
+		set h 20
 	}
+	scroll_text .ccrt.f 80 $h
 
 	set msg {
     This dialog helps you to create a simple Self-Signed SSL certificate.  
@@ -9451,11 +9493,13 @@ proc import_cert {} {
 	global scroll_text_focus
 	set scroll_text_focus 0
 	global uname
-	if {$uname == "Darwin"} {
-		scroll_text .icrt.f 90 16
-	} else {
-		scroll_text .icrt.f 90 20
+	set h 19
+	if [small_height] {
+		set h 12
+	} elseif {$uname == "Darwin"} {
+		set h 16
 	}
+	scroll_text .icrt.f 90 $h
 	set scroll_text_focus 1
 
 	set msg {
@@ -9530,11 +9574,13 @@ TCQ+tbQ/DOiTXGKx1nlcKoPdkG+QVQVJthlQcpam
 	$w.e configure -state disabled
 
 	label .icrt.plab -anchor w -text "Paste Certificate here:     (extra blank lines above or below are OK)" 
-	if {$uname == "Darwin"} {
-		scroll_text .icrt.paste 90 11
-	} else {
-		scroll_text .icrt.paste 90 22
+	set h 22
+	if [small_height] {
+		set h 11
+	} elseif {$uname == "Darwin"} {
+		set h 11
 	}
+	scroll_text .icrt.paste 90 $h
 
 	button .icrt.cancel -text "Cancel" -command {destroy .icrt; catch {raise .c}}
 	bind .icrt <Escape> {destroy .icrt; catch {raise .c}}
@@ -9577,20 +9623,29 @@ proc save_cert {hp} {
 	global cert_text
 
 	toplev .scrt
-	wm title .scrt "Import SSL Certificate"
+	wm title .scrt "Import/Save SSL Certificate"
 
 	global scroll_text_focus
 	set scroll_text_focus 0
 	global uname
 
 	global accepted_cert_dialog_in_progress
+	set h 20
 	if {$accepted_cert_dialog_in_progress} {
 		set mode "accepted"
-		scroll_text .scrt.f 90 15
+		set h 15
+		if [small_height] {
+			set h 11
+		}
 	} else {
 		set mode "normal"
-		scroll_text .scrt.f 90 20
+		set h 20
+		if [small_height] {
+			set h 16
+		}
 	}
+	scroll_text .scrt.f 90 $h
+
 	set scroll_text_focus 1
 
 	set msg1 {
@@ -9647,7 +9702,11 @@ proc save_cert {hp} {
 	set import_file ""
 	entry $w.e -width 40 -textvariable import_file
 
-	scroll_text .scrt.paste 90 23
+	set h 22
+	if [small_height] {
+		set h 10
+	}
+	scroll_text .scrt.paste 90 $h
 
 	button .scrt.cancel -text "Cancel" -command {destroy .scrt; catch {raise .c}}
 	bind .scrt <Escape> {destroy .scrt; catch {raise .c}}
@@ -11358,7 +11417,11 @@ proc ts_xlogin_dialog {} {
 	toplev .xlog
 	wm title .xlog "X Login Greeter"
 
-	scroll_text .xlog.f 80 33
+	set h 33
+	if [small_height] {
+		set h 28
+	}
+	scroll_text .xlog.f 80 $h
 
 	global ts_xlogin
 
@@ -11569,7 +11632,11 @@ proc ts_x11vnc_opts_dialog {} {
 	toplev .x11v
 	wm title .x11v "x11vnc Options"
 
-	scroll_text .x11v.f 80 23
+	set h 23
+	if [small_height] {
+		set h 21
+	}
+	scroll_text .x11v.f 80 $h
 
 	global ts_x11vnc_opts ts_x11vnc_path ts_x11vnc_autoport choose_x11vnc_opts
 	global additional_port_redirs_list
@@ -11699,7 +11766,11 @@ proc ts_cups_dialog {} {
 	global cups_local_server cups_remote_port cups_manage_rcfile ts_cups_manage_rcfile cups_x11vnc
 	global cups_local_smb_server cups_remote_smb_port
 
-	scroll_text .cups.f 80 30
+	set h 30
+	if [small_height] {
+		set h 24
+	}
+	scroll_text .cups.f 80 $h
 		
 
 	set msg {
@@ -11844,11 +11915,13 @@ proc cups_dialog {} {
 	}
 
 	global uname
-	if {$uname == "Darwin"} {
-		scroll_text .cups.f 80 25
-	} else {
-		scroll_text .cups.f
+	set h 33
+	if [small_height] {
+		set h 17
+	} elseif {$uname == "Darwin"} {
+		set h 24
 	}
+	scroll_text .cups.f 80 $h
 		
 
 	set msg {
@@ -12210,11 +12283,13 @@ proc sound_dialog {} {
 	wm title .snd "ESD/ARTSD Sound Tunnelling"
 
 	global uname
-	if {$uname == "Darwin"} {
-		scroll_text .snd.f 80 20
-	} else {
-		scroll_text .snd.f 80 30
+	set h 28
+	if [small_height] {
+		set h 14
+	} elseif {$uname == "Darwin"} {
+		set h 20
 	}
+	scroll_text .snd.f 80 $h
 
 	set msg {
     Sound tunnelling to a sound daemon requires SSH be used to set up the
@@ -12765,7 +12840,11 @@ proc smb_help_me_decide {} {
 	wm title .smbwiz $title
 	set id "  "
 
-	scroll_text .smbwiz.f 100 40
+	set h 40
+	if [small_height] {
+		set h 30
+	}
+	scroll_text .smbwiz.f 100 $h
 
 	set msg {
 For now you will have to verify the following information manually.
@@ -12979,11 +13058,13 @@ proc smb_dialog {} {
 	global help_font
 
 	global uname
-	if {$uname == "Darwin"} {
-		scroll_text .smb.f 80 25
-	} else {
-		scroll_text .smb.f
+	set h 33
+	if [small_height] {
+		set h 17
+	} elseif {$uname == "Darwin"} {
+		set h 24
 	}
+	scroll_text .smb.f 80 $h
 
 	set msg {
     Windows/Samba Filesystem mounting requires SSH be used to set up the SMB
@@ -13679,7 +13760,11 @@ proc help_ssvncviewer_opts {} {
 proc show_viewer_help {} {
 	toplev .vhlp
 
-	scroll_text_dismiss .vhlp.f 83 35
+	set h 35
+	if [small_height] {
+		set h 30
+	}
+	scroll_text_dismiss .vhlp.f 83 $h
 
 	center_win .vhlp
 	wm resizable .vhlp 1 0
@@ -13710,9 +13795,9 @@ proc change_vncviewer_dialog {} {
 
 	global help_font
 	if {$ts_only} {
-		eval text .chviewer.t -width 90 -height 18 $help_font
+		eval text .chviewer.t -width 90 -height 16 $help_font
 	} else {
-		eval text .chviewer.t -width 90 -height 29 $help_font
+		eval text .chviewer.t -width 90 -height 27 $help_font
 	}
 	apply_bg .chviewer.t
 
@@ -13726,8 +13811,7 @@ proc change_vncviewer_dialog {} {
     You can specify your own command line options below if you like (and try to
     avoid setting any others in this GUI under "Options").
 
-    If the path to the program name has any spaces it in, please surround it with
-    double quotes, e.g.
+    If the path to the program name has spaces it in, surround it with double quotes:
 
         "C:\Program Files\My Vnc Viewer\VNCVIEWER.EXE"
 
@@ -13739,11 +13823,10 @@ proc change_vncviewer_dialog {} {
     Since the command line options differ between them greatly, if you know it
     is of the RealVNC 4.x flavor, indicate on the check box. Otherwise we guess.
 
-    To have SSVNC act as a general STUNNEL redirector (no VNC) set the viewer to
-    be "xmessage OK" or "xmessage <port>" or "sleep n" or "sleep n <port>" (or
-    "NOTEPAD" on Windows).  The default listen port is 5930.  The destination is
-    set in "VNC Host:Display" (for a remote port less then 200 use the negative
-    of the port value).
+    To have SSVNC act as a general STUNNEL redirector (no VNC) set the viewer to be
+    "xmessage OK" or "xmessage <port>" or "sleep n" or "sleep n <port>" (or "NOTEPAD"
+    on Windows).  The default listen port is 5930.  The destination is set in "VNC
+    Host:Display" (for a remote port less than 200 use the negative of the port value).
 }
 
 	if {$ts_only} {
@@ -13785,11 +13868,11 @@ proc port_redir_dialog {} {
 	wm title .redirs "Additional Port Redirections (via SSH)"
 
 	global help_font uname
-	if {$uname == "Darwin"} {
-		eval text .redirs.t -width 80 -height 35 $help_font
-	} else {
-		eval text .redirs.t -width 80 -height 35 $help_font
+	set h 35
+	if [small_height] {
+		set h 27
 	}
+	eval text .redirs.t -width 80 -height $h $help_font
 	apply_bg .redirs.t
 
 	set msg {
@@ -13856,11 +13939,12 @@ proc stunnel_sec_dialog {} {
 	wm title .stlsec "STUNNEL Local Port Protections"
 
 	global help_font uname
-	if {$uname == "Darwin"} {
-		scroll_text .stlsec.f 82 37
-	} else {
-		scroll_text .stlsec.f 82 37
+	
+	set h 37
+	if [small_height] {
+		set h 26
 	}
+	scroll_text .stlsec.f 82 $h
 
 	apply_bg .stlsec.f
 
@@ -13924,7 +14008,11 @@ proc disable_ssl_workarounds_dialog {} {
 	wm title .sslwrk "Disable SSL Workarounds"
 
 	global help_font uname
-	scroll_text .sslwrk.f 86 36
+	set h 36
+	if [small_height] {
+		set h 24
+	}
+	scroll_text .sslwrk.f 86 $h
 
 	apply_bg .sslwrk.f
 
@@ -14020,7 +14108,11 @@ proc ultra_dsm_dialog {} {
 	wm title .ultradsm "UltraVNC DSM Encryption Plugin"
 
 	global help_font
-	scroll_text .ultradsm.f 85 40
+	set h 40
+	if [small_height] {
+		set h 22
+	}
+	scroll_text .ultradsm.f 85 $h
 
 	set msg {
     On Unix and MacOSX with the provided SSVNC vncviewer, you can connect to an
@@ -14200,7 +14292,11 @@ proc ssh_known_hosts_dialog {} {
 	wm title .sshknownhosts "Private SSH KnownHosts file"
 
 	global help_font
-	scroll_text .sshknownhosts.f 80 31
+	set h 31
+	if [small_height] {
+		set h 23
+	}
+	scroll_text .sshknownhosts.f 80 $h
 
 	set msg {
       Private SSH KnownHosts file:
@@ -14318,7 +14414,11 @@ proc multilisten_dialog {} {
 	wm title .multil "Multiple LISTEN Connections"
 
 	global help_font
-	eval text .multil.t -width 84 -height 35 $help_font
+	set h 35
+	if [small_height] {
+		set h 30
+	}
+	eval text .multil.t -width 84 -height $h $help_font
 
 	apply_bg .multil.t
 
@@ -14805,11 +14905,14 @@ proc port_knocking_dialog {} {
 	global help_font
 
 	global uname
-	if {$uname == "Darwin"} {
-		scroll_text .pk.f 85 25
-	} else {
-		scroll_text .pk.f 85
+
+	set h 35
+	if [small_height] {
+		set h 22
+	} elseif {$uname == "Darwin"} {
+		set h 25
 	}
+	scroll_text .pk.f 85 $h
 
 	set msg {
  Description:
@@ -15355,18 +15458,18 @@ proc set_ts_adv_options {} {
 }
 
 proc change_vncviewer_dialog_wrap {} {
-	global change_vncviewer ts_uss_button
+	global change_vncviewer ts_uss_button is_windows
 	if {$change_vncviewer} {
 		change_vncviewer_dialog
 		catch {tkwait window .chviewer}
 	}
-	if {$change_vncviewer} {
+	if {$change_vncviewer || $is_windows} {
 		catch {.oa.ss configure -state disabled}
 	} else {
 		catch {.oa.ss configure -state normal}
 	}
 	if [info exists ts_uss_button] {
-		if {$change_vncviewer} {
+		if {$change_vncviewer || $is_windows} {
 			catch {$ts_uss_button configure -state disabled}
 		} else {
 			catch {$ts_uss_button configure -state normal}
@@ -15529,7 +15632,7 @@ proc set_advanced_options {} {
 	set t1 "         Unix ssvncviewer ..."
 	if {$uname == "Darwin" } { regsub {^ *} $t1 "" t1 }
 	button .oa.ss -anchor w -text $t1 -command set_ssvncviewer_options
-	pack .oa.ss -side top -fill x
+	pack   .oa.ss -side top -fill x
 	if {$is_windows} {
 		.oa.ss configure -state disabled
 	}
@@ -15817,7 +15920,7 @@ proc set_ssvncviewer_options {} {
 	frame $fr.b$j -relief $relief -borderwidth 2
 
 	label $fr.b$j.l1 -font $ffont -anchor w -text "Add any extra options for ssvncviewer that you want.";
-	label $fr.b$j.l2 -font $ffont -anchor w -text "For example: -16bpp -noshm etc.  See Help for a list.";
+	label $fr.b$j.l2 -font $ffont -anchor w -text "For example: -16bpp -appshare -noshm etc. See Help for a list.";
 
 	global ssvnc_extra_opts
 	frame $fr.b$j.f

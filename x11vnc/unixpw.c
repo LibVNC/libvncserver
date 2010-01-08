@@ -1,5 +1,5 @@
 /*
-   Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com> 
+   Copyright (C) 2002-2010 Karl J. Runge <runge@karlrunge.com> 
    All rights reserved.
 
 This file is part of x11vnc.
@@ -444,6 +444,9 @@ void unixpw_screen(int init) {
 
 		x = nfix(dpy_x / 2 -  strlen(log) * char_w, dpy_x);
 		y = (int) (dpy_y / 3.5);
+		if (unixpw_system_greeter) {
+			y = (int) (dpy_y / 3);
+		}
 
 		if (scaling) {
 			x = (int) (x * scale_fac_x);
@@ -461,7 +464,7 @@ void unixpw_screen(int init) {
 			pscreen = screen;
 		}
 
-		if (pscreen && pscreen->width >= 640) {
+		if (pscreen && pscreen->width >= 640 && pscreen->height >= 480) {
 			rfbDrawString(pscreen, &default6x13Font, 8, 2+1*13, "F1-Help:", white_pixel());
 		}
 		f1_help = 0;
@@ -473,8 +476,8 @@ void unixpw_screen(int init) {
 					char moo[] = "Press 'Escape' for System Greeter";
 					rfbDrawString(pscreen, &default8x16Font, x-90, y-30, moo, white_pixel());
 				} else {
-					char moo1[] = "Press 'Escape' for New Session via System Greeter,";
-					char moo2[] = "or otherwise login here for Existing Session:     ";
+					char moo1[] = "Press 'Escape' for a New Session via System Greeter, or";
+					char moo2[] = "otherwise login here to connect to an Existing Session:";
 					rfbDrawString(pscreen, &default6x13Font, x-110, y-38, moo1, white_pixel());
 					rfbDrawString(pscreen, &default6x13Font, x-110, y-25, moo2, white_pixel());
 				}
@@ -954,7 +957,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 	pid_t pid, pidw;
 	struct stat sbuf;
 	static int first = 1;
-	char instr[32], cbuf[10];
+	char instr[64], cbuf[10];
 
 	if (first) {
 		set_db();
@@ -1210,7 +1213,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 	 * 	auth      sufficient  pam_self.so
 	 * it may be commented out without problem.
 	 */
-	for (i=0; i<32; i++) {
+	for (i=0; i< (int) sizeof(instr); i++) {
 		instr[i] = '\0';
 	}
 
@@ -1221,7 +1224,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 	j = 0;
 	for (i=0; i < (int) strlen("Password:"); i++) {
 		char pstr[] = "password:";
-		int n;	
+		int n, problem;	
 
 		cbuf[0] = '\0';
 		cbuf[1] = '\0';
@@ -1229,7 +1232,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 		n = read(fd, cbuf, 1);
 		if (n < 0 && errno == EINTR) {
 			i--;
-			if (i < 0) i = 0;
+			if (i < -1) i = -1;
 			continue;
 		}
 
@@ -1250,10 +1253,10 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 		if (n == 1) {
 			if (isspace((unsigned char) cbuf[0])) {
 				i--;
-				if (i < 0) i = 0;
+				if (i < -1) i = -1;
 				continue;
 			}
-			if (j >= 32-1) {
+			if (j >= (int) sizeof(instr)-1) {
 				rfbLog("su_verify: problem finding Password:\n");	
 				fflush(stderr);
 				return 0;
@@ -1261,8 +1264,46 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 			instr[j++] = tolower((unsigned char)cbuf[0]);
 		}
 
-		if (n <= 0 || strstr(pstr, instr) != pstr) {
+		problem = 0;
+		if (n <= 0) {
+			problem = 1;
+		} else if (strstr(pstr, instr) != pstr) {
+#ifdef _AIX
+			if (UT.sysname && strstr(UT.sysname, "AIX")) {
+				/* handle: runge's Password: */
+				char *luser = (char *) malloc(strlen(user) + 10);
 
+				sprintf(luser, "%s's", user);
+				lowercase(luser);
+				if (db) fprintf(stderr, "\nAIX luser compare: \"%s\" to \"%s\"\n", luser, instr);
+				if (strstr(luser, instr) == luser) {
+					if (db) fprintf(stderr, "AIX luser compare: strstr OK.\n");
+					if (!strcmp(luser, instr)) {
+						if (db) fprintf(stderr, "AIX luser compare: strings equal.\n");
+						i = -1;	
+						j = 0;
+						memset(instr, 0, sizeof(instr));
+						free(luser);
+						continue;
+					} else {
+						i--;
+						if (i < -1) i = -1;
+						free(luser);
+						continue;
+					}
+				} else {
+					if (db) fprintf(stderr, "AIX luser compare: problem=1\n");
+					problem = 1;
+				}
+				free(luser);
+			} else
+#endif
+			{
+				problem = 1;
+			}
+		}
+
+		if (problem) {
 			if (db) {
 				fprintf(stderr, "\"Password:\" did not "
 				    "appear: '%s'" " n=%d\n", instr, n);
@@ -1284,7 +1325,7 @@ int su_verify(char *user, char *pass, char *cmd, char *rbuf, int *rbuf_size, int
 		return 0;
 	}
 
-	if (db > 2) fprintf(stderr, "\nsending passwd: %s\n", pass);
+	if (db) fprintf(stderr, "\nsending passwd: %s\n", db > 2 ? pass : "****");
 	usleep(100 * 1000);
 	if (slow_pw) {
 		unsigned int k;
@@ -1571,7 +1612,7 @@ static void set_db(void) {
 void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 	int x, y, i, rc, nmax = 100;
 	static char user_r[100], user[100], pass[100];
-	static int  u_cnt = 0, p_cnt = 0, first = 1;
+	static int  u_cnt = 0, p_cnt = 0, t_cnt = 0, first = 1;
 	static int echo = 1;
 	char keystr[100];
 	char *str;
@@ -1601,6 +1642,7 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 
 		u_cnt = 0;
 		p_cnt = 0;
+		t_cnt = 0;
 		for (i=0; i<nmax; i++) {
 			user[i] = '\0';
 			pass[i] = '\0';
@@ -1661,14 +1703,20 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 	} else if (! down) {
 		return;
 	}
-	if (keysym == XK_F1 && pscreen && pscreen->width >= 640) {
-		char h1[] = "F1-Help:  For 'login:' type in the username and press Enter, then for 'Password:' type in the password.";
+	if (keysym == XK_F1) {
+		char h1[] = "F1-Help:  For 'login:' type in the username and press Enter, then for 'Password:' enter the password.";
+		char hf[] = "  Once logged in, username's X session will be searched for and if found then attached to.";
+		char hc[] = "  Once logged in, username's X session is sought and attached to, otherwise a new session is created.";
+		char hx[] = "  Once logged in, username's X session is sought and attached to, otherwise a login greeter is presented.";
 		char h2[] = "  Specify options after a ':' like this:  username:opt,opt=val,...    Where an opt may be any of:";
 		char h3[] = "    scale=... (n/m); scale_cursor=... (sc=); solid (so); id=; repeat; clear_mods (cm); clear_keys (ck);";
 		char h4[] = "    clear_all (ca); speeds=... (sp=); readtimeout=... (rd=) rotate=... (ro=); noncache (nc) (nc=n);";
 		char h5[] = "    geom=WxHxD (ge=); nodisplay=... (nd=); viewonly (vo); tag=...; gnome kde twm fvwm mwm dtwm wmaker";
-		char h6[] = "    xfce enlightenment Xsession failsafe.   Examples:  fred:3/4,so,cm  wilma:geom=1024x768x16,kde";
+		char h6[] = "    xfce lxde enlightenment Xsession failsafe.   Examples:  fred:3/4,so,cm  wilma:geom=1024x768x16,kde";
 		int ch = 13, p;
+		if (!pscreen || pscreen->width < 640 || pscreen->height < 480) {
+			return;
+		}
 		if (f1_help) {
 			p = black_pixel();
 			f1_help = 0;
@@ -1678,13 +1726,24 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 			unixpw_last_try_time = time(NULL) + 45;
 		}
 		rfbDrawString(pscreen, &default6x13Font, 8, 2+1*ch, h1, p);
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+2*ch, h2, p);
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+3*ch, h3, p);
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+4*ch, h4, p);
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+5*ch, h5, p);
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+6*ch, h6, p);
+		if (use_dpy == NULL) {
+			;
+		} else if (strstr(use_dpy, "cmd=FINDDISPLAY")) {
+			rfbDrawString(pscreen, &default6x13Font, 8, 2+2*ch, hf, p);
+		} else if (strstr(use_dpy, "cmd=FINDCREATEDISPLAY")) {
+			if (strstr(use_dpy, "xdmcp")) {
+				rfbDrawString(pscreen, &default6x13Font, 8, 2+2*ch, hx, p);
+			} else {
+				rfbDrawString(pscreen, &default6x13Font, 8, 2+2*ch, hc, p);
+			}
+		}
+		rfbDrawString(pscreen, &default6x13Font, 8, 2+3*ch, h2, p);
+		rfbDrawString(pscreen, &default6x13Font, 8, 2+4*ch, h3, p);
+		rfbDrawString(pscreen, &default6x13Font, 8, 2+5*ch, h4, p);
+		rfbDrawString(pscreen, &default6x13Font, 8, 2+6*ch, h5, p);
+		rfbDrawString(pscreen, &default6x13Font, 8, 2+7*ch, h6, p);
 		if (!f1_help) {
-		rfbDrawString(pscreen, &default6x13Font, 8, 2+1*ch, "F1-Help:", white_pixel());
+			rfbDrawString(pscreen, &default6x13Font, 8, 2+1*ch, "F1-Help:", white_pixel());
 		}
 		unixpw_mark();
 		return;
@@ -1724,6 +1783,8 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 		rfbLog("unixpw_keystroke: echo off.\n");
 		return;
 	}
+
+	t_cnt++;
 
 	if (in_login) {
 		if (keysym == XK_BackSpace || keysym == XK_Delete) {
@@ -1765,6 +1826,11 @@ void unixpw_keystroke(rfbBool down, rfbKeySym keysym, int init) {
 				 * by the normal session after login.
 				 * (actually we already returned above)
 				 */
+				return;
+			}
+
+			if (t_cnt == 1) {
+				/* accidental initial return, e.g. from xterm */
 				return;
 			}
 

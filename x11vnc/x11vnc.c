@@ -2225,8 +2225,18 @@ int main(int argc, char* argv[]) {
 			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xvfb");
 			continue;
 		}
+		if (!strcmp(arg, "-create_xsrv")) {
+			CHECK_ARGC
+			use_dpy = (char *) malloc(strlen(argv[i+1])+100); 
+			sprintf(use_dpy, "WAIT:cmd=FINDCREATEDISPLAY-%s", argv[++i]);
+			continue;
+		}
 		if (!strcmp(arg, "-xdummy")) {
 			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xdummy");
+			continue;
+		}
+		if (!strcmp(arg, "-xdummy_xvfb")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xdummy,Xvfb");
 			continue;
 		}
 		if (!strcmp(arg, "-xvnc")) {
@@ -2561,7 +2571,14 @@ int main(int argc, char* argv[]) {
 			users_list = strdup("unixpw=");
 			use_openssl = 1;
 			openssl_pem = strdup("SAVE");
-			set_env("FD_XDUMMY_NOROOT", "1");
+			continue;
+		}
+		if (!strcmp(arg, "-svc_xdummy_xvfb")) {
+			use_dpy = strdup("WAIT:cmd=FINDCREATEDISPLAY-Xdummy,Xvfb");
+			unixpw = 1;
+			users_list = strdup("unixpw=");
+			use_openssl = 1;
+			openssl_pem = strdup("SAVE");
 			continue;
 		}
 		if (!strcmp(arg, "-svc_xvnc")) {
@@ -4934,6 +4951,15 @@ int main(int argc, char* argv[]) {
 	} else if (use_dpy && strstr(use_dpy, "WAIT:") == use_dpy) {
 		char *mcm = multiple_cursors_mode;
 
+		if (strstr(use_dpy, "Xdummy")) {
+			if (!xrandr && !got_noxrandr) {
+				if (! quiet) {
+					rfbLog("Enabling -xrandr for possible use of Xdummy server.\n");
+				}
+				xrandr = 1;
+			}
+		}
+
 		waited_for_client = wait_for_client(&argc_vnc, argv_vnc,
 		    try_http && ! got_httpdir);
 
@@ -4942,6 +4968,7 @@ int main(int argc, char* argv[]) {
 			multiple_cursors_mode = NULL;
 		}
 	}
+
 
 	if (auth_file) {
 		check_guess_auth_file();
@@ -4998,6 +5025,18 @@ int main(int argc, char* argv[]) {
 	if (terminal_services_daemon != NULL) {
 		terminal_services(terminal_services_daemon);
 		exit(0);
+	}
+
+	if (dpy && !xrandr && !got_noxrandr) {
+#if !NO_X11
+		Atom trap_xrandr = XInternAtom(dpy, "X11VNC_TRAP_XRANDR", True);
+		if (trap_xrandr != None) {
+			if (! quiet) {
+				rfbLog("Enabling -xrandr due to X11VNC_TRAP_XRANDR atom.\n");
+			}
+			xrandr = 1;
+		}
+#endif
 	}
 
 #ifdef MACOSX

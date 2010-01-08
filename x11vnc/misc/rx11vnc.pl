@@ -141,7 +141,7 @@ $cmd = $x11vnc_cmd;
 $cmd =~ s/%DISP/$disp/;
 
 # This is the ssh cmd for the local side (this machine):
-$ssh_cmd = "ssh -f $remote_user $redir $host '$cmd; echo END; sleep $sleep_time'";
+$ssh_cmd = "ssh -t -f $remote_user $redir $host '$cmd; echo END; sleep $sleep_time'";
 $ssh_cmd =~ s/  / /g;
 print STDERR "running ssh command:\n\n$ssh_cmd\n\n";
 

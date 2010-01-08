@@ -62,7 +62,8 @@ void do_key(rfbBool down,rfbKeySym keySym,rfbClientPtr cl)
       }
     }
   } else if(keySym==XK_Control_L || keySym==XK_Control_R)
-    isControl--;
+    if(isControl>0)
+      isControl--;
 }
 
 /* these colours are from linux kernel drivers/char/console.c */
@@ -113,7 +114,9 @@ int main(int argc,char **argv)
   sprintf(title,"LinuxVNC: /dev/tty%d",tty);
 
   /* console init */
-  console=vcGetConsole(&argc,argv,width,height,&vgaFont,TRUE);
+  if(!(console=vcGetConsole(&argc,argv,width,height,&vgaFont,TRUE)))
+    exit(1);
+
   for(i=0;i<16;i++) {
     console->screen->colourMap.data.bytes[i*3+0]=default_red[color_table[i]];
     console->screen->colourMap.data.bytes[i*3+1]=default_grn[color_table[i]];
