@@ -1,5 +1,27 @@
 #!/bin/sh
-#
+# ----------------------------------------------------------------------
+#    Copyright (C) 2005-2010 Karl J. Runge <runge@karlrunge.com> 
+#    All rights reserved.
+# 
+# This file is part of Xdummy.
+# 
+# Xdummy is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or (at
+# your option) any later version.
+# 
+# Xdummy is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with Xdummy; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+# or see <http://www.gnu.org/licenses/>.
+# ----------------------------------------------------------------------
+# 
+# 
 # Xdummy: an LD_PRELOAD hack to run a stock Xorg(1) or XFree86(1) server
 # with the "dummy" video driver to make it avoid Linux VT switching, etc.
 #
@@ -14,6 +36,7 @@ root=""
 nosudo=""
 xserver=""
 geom=""
+nomodelines=""
 depth=""
 debug=""
 strace=""
@@ -51,13 +74,20 @@ $program:
     LD_PRELOAD tricks are usually "clever hacks" and so might not work
     in all situations or break when something changes.
 
-    This program does not need to be run as root as of 12/2009.  However,
-    if there are problems for certain situations (usually older servers)
-    it may perform better if run as root (use the -root option.)
+    WARNING: Take care in using Xdummy, although it never has it is
+    possible that it could damage hardware.  One can use the -prconf
+    option to have it print out the xorg.conf config that it would use
+    and then inspect it carefully before actually using it.
 
-    Also, gcc/cc and other build tools are required for this script to
-    be able to compile the LD_PRELOAD shared object.  Be sure they are
-    installed on the system.  See -install and -uninstall described below.
+    This program no longer needs to be run as root as of 12/2009.
+    However, if there are problems for certain situations (usually older
+    servers) it may perform better if run as root (use the -root option.)
+    When running as root remember the previous paragraph and that Xdummy
+    comes without any warranty.
+
+    gcc/cc and other build tools are required for this script to be able
+    to compile the LD_PRELOAD shared object.  Be sure they are installed
+    on the system.  See -install and -uninstall described below.
 
     Your Linux distribution may not install the dummy driver by default,
     e.g:
@@ -190,14 +220,19 @@ Options:
 			argument.  It is passed to the real X server and
 			also used by the Xdummy script as an identifier.
 
-	-geom geom1[,geom2...]  Take the geometry (e.g. 1024x768) or
-			list of geometries and insert them into the
-			Screen section of the tweaked X server 
-			config file.  Use this to have a smaller geometry
-			than the one in the system config file.
+	-geom geom1[,geom2...]	Take the geometry (e.g. 1024x768) or list
+			of geometries and insert them into the Screen
+			section of the tweaked X server config file.
+			Use this to have a different geometry than the
+			one(s) in the system config file.
 
 			The option -geometry can be used instead of -geom;
 			x11vnc calls Xdummy and Xvfb this way.
+
+	-nomodelines	When you specify -geom/-geometry, $program will
+			create Modelines for each geometry and put them
+			in the Monitor section.  If you do not want this
+			then supply -nomodelines.
 
 	-depth n	Use pixel color depth n (e.g. 8, 16, or 24). This
 			makes sure the X config file has a Screen.Display
@@ -273,6 +308,8 @@ Options:
 	found, a built-in one is used.	Any settings in the config file
 	that are not consistent with "dummy" mode will be overwritten
 	(unless -notweak is specified.)
+
+	Use -config xdummy-builtin to force usage of the builtin config.
 
 	If "file" is only a basename (e.g. "xorg.dummy.conf") with no /'s,
 	then no tweaking of it is done: the X server will look for that
@@ -439,6 +476,8 @@ do
                 ;;
 	"-geometry") geom="$2"; shift
                 ;;
+	"-nomodelines") nomodelines=1
+                ;;
 	"-depth") depth="$2"; args="$args -depth $2";
 		  shift
                 ;;
@@ -513,18 +552,18 @@ make_so() {
 	tail -n +$n1 $0 | head -n $dn > $tmp
 
 	# compile it to Xdummy.so:
-	if [ -f $SO ]; then
+	if [ -f "$SO" ]; then
 		mv $SO $SO.$$
 		rm -f $SO.$$
 	fi
 	rm -f $SO
 	touch $SO
-	if [ ! -f $SO ]; then
+	if [ ! -f "$SO" ]; then
 		SO=$tdir/Xdummy.$user.so
 		warn "warning switching LD_PRELOAD shared object to: $SO"
 	fi
 
-	if [ -f $SO ]; then
+	if [ -f "$SO" ]; then
 		mv $SO $SO.$$
 		rm -f $SO.$$
 	fi
@@ -559,21 +598,21 @@ fi
 # Handle -install/-uninstall case:
 SO=$0.so
 if [ "X$install" != "X" -o "X$uninstall" != "X" ]; then
-	if [ -e $SO -o -h $SO ]; then
+	if [ -e "$SO" -o -h "$SO" ]; then
 		warn "$program: removing $SO"
 	fi
-	if [ -f $SO ]; then
+	if [ -f "$SO" ]; then
 		mv $SO $SO.$$
 		rm -f $SO.$$
 	fi
 	rm -f $SO
-	if [ -e $SO -o -h $SO ]; then
+	if [ -e "$SO" -o -h "$SO" ]; then
 		warn "warning: $SO still exists."
 		exit 1
 	fi
 	if [ $install ]; then
 		make_so
-		if [ ! -f $SO ]; then
+		if [ ! -f "$SO" ]; then
 			exit 1
 		fi
 	fi
@@ -628,7 +667,7 @@ fi
 #
 tfile="$XDUMMY_TMPDIR/test.file"
 touch $tfile
-if [ ! -f $tfile ]; then
+if [ ! -f "$tfile" ]; then
 	XDUMMY_TMPDIR="/tmp/Xdummy.$$.$USER"
 	warn "warning: setting tmpdir to $XDUMMY_TMPDIR ..."
 	rm -rf $XDUMMY_TMPDIR || exit 1
@@ -640,7 +679,7 @@ export XDUMMY_TMPDIR
 
 # Compile the LD_PRELOAD shared object if needed (needs XDUMMY_TMPDIR)
 #
-if [ ! -f $SO ]; then
+if [ ! -f "$SO" ]; then
 	SO="$XDUMMY_TMPDIR/Xdummy.so"
 	make_so
 fi
@@ -835,10 +874,13 @@ tweak_config() {
     #
     env XDUMMY_GEOM=$geom \
         XDUMMY_DEPTH=$depth \
+        XDUMMY_NOMODELINES=$nomodelines \
         perl > $config2 < $in -e '
     $n = 0;
     $geom  = $ENV{XDUMMY_GEOM};
     $depth = $ENV{XDUMMY_DEPTH};
+    $nomodelines = $ENV{XDUMMY_NOMODELINES};
+    $mode_str = "";
     $videoram = "24000";
     $HorizSync   = "30.0 - 130.0";
     $VertRefresh = "50.0 - 250.0";
@@ -846,6 +888,22 @@ tweak_config() {
     	my $tmp = "";
 	foreach $g (split(/,/, $geom)) {
 		$tmp .= "\"$g\" ";
+		if (!$nomodelines && $g =~ /(\d+)x(\d+)/) {
+			my $w = $1;
+			my $h = $2;
+			$mode_str .= "  Modeline \"$g\" ";
+			my $dot = sprintf("%.2f", $w * $h * 70 * 1.e-6);
+			$mode_str .= $dot;
+			$mode_str .= " " . $w;
+			$mode_str .= " " . int(1.02 * $w);
+			$mode_str .= " " . int(1.10 * $w);
+			$mode_str .= " " . int(1.20 * $w);
+			$mode_str .= " " . $h;
+			$mode_str .= " " . int($h + 1);
+			$mode_str .= " " . int($h + 3);
+			$mode_str .= " " . int($h + 20);
+			$mode_str .= "\n";
+		}
 	}
 	$tmp =~ s/\s*$//;
 	$geom = $tmp;
@@ -912,6 +970,10 @@ tweak_config() {
 				print "  ##Xdummy:##\n";
 				print "  VertRefresh $VertRefresh\n";
 			}
+			if (!$nomodelines) {
+				print "  ##Xdummy:##\n";
+				print $mode_str;
+			}
 		}
 		$sect = "";
 		print;
@@ -925,7 +987,7 @@ tweak_config() {
 		$subsect =~ y/A-Z/a-z/;
 		$subsects{$subsect} = 1;
 		if ($sect eq "screen" && $subsect eq "display") {
-			$got_Mode = 0;
+			$got_Modes = 0;
 		}
 		print;
 		next;
@@ -938,7 +1000,7 @@ tweak_config() {
 					print "          ##Xdummy:##\n";
 					print "          Depth\t$depth\n";
 				}
-				if ($geom ne "" && ! $got_Mode) {
+				if ($geom ne "" && ! $got_Modes) {
 					print "          ##Xdummy:##\n";
 					print "          Modes\t$geom\n";
 				}
@@ -1073,7 +1135,9 @@ tweak_config() {
     	print "  SubSection \"Display\"\n";
     	print "    Viewport 0 0\n";
     	print "    Depth 24\n";
-	if ($geom ne "") {
+	if ($got_Modes) {
+		;
+	} elsif ($geom ne "") {
     		print "    Modes $geom\n";
 	} else {
     		print "    Modes \"1280x1024\" \"1024x768\" \"800x600\"\n";
@@ -1087,6 +1151,8 @@ tweak_config() {
 # Work out config file and tweak it.
 #
 if [ "X$cmdline_config" = "X" ]; then
+	:
+elif [ "X$cmdline_config" = "Xxdummy-builtin" ]; then
 	:
 elif echo "$cmdline_config" | grep '/' > /dev/null; then
 	:
@@ -1119,7 +1185,7 @@ if [ ! $notweak ]; then
 				config="/etc/X11/XF86Config"
 			fi
 		fi
-		if [ ! -f $config ]; then
+		if [ ! -f "$config" ]; then
 			for c in /etc/X11/xorg.conf /etc/X11/XF86Config-4 /etc/X11/XF86Config
 			do
 				if [ -f $c ]; then
@@ -1130,7 +1196,11 @@ if [ ! $notweak ]; then
 		fi
 	fi
 
-	if [ ! -f $config ]; then
+	if [ "X$config" = "Xxdummy-builtin" ]; then
+		config=""
+	fi
+
+	if [ ! -f "$config" ]; then
 		config="$XDUMMY_TMPDIR/xorg.conf"
 		warn "$program: using minimal built-in xorg.conf settings."
 		cat > $config <<END
@@ -1195,7 +1265,7 @@ EndSection
 END
 	fi
 
-	if [ -f $config ]; then
+	if [ -f "$config" ]; then
 		tweak_config $config
 	fi
 
