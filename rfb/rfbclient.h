@@ -181,6 +181,7 @@ typedef struct _rfbClient {
 
 	int sock;
         int multicastSock;
+#define MULTICAST_SO_RCVBUF 327675
 	rfbBool canUseCoRRE;
 	rfbBool canUseHextile;
 	char *desktopName;

@@ -1,3 +1,6 @@
+- change ReadFromRFBServerMulticast() and associated data
+
+- verify sender address in  ReadFromRFBServerMulticast().
 
 - enableCursorShapeUpdates stuff in rfbSendMulticastFramebufferUpdate()
 

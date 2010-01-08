@@ -737,7 +737,9 @@ CreateMulticastSocket(struct sockaddr_storage multicastSockAddr)
 {
   int sock; 
   struct sockaddr_storage localAddr;
-  int yes = 1;
+  int optval;
+  socklen_t optval_len = sizeof(optval);
+  int dfltrcvbuf;
 
   if (!initSockets())
     return -1;
@@ -757,19 +759,45 @@ CreateMulticastSocket(struct sockaddr_storage multicastSockAddr)
       }
 
  
+  optval = 1;
   if((sock = socket(localAddr.ss_family, SOCK_DGRAM, 0)) < 0)
     {
       rfbClientErr("CreateMulticastSocket socket(): %s\n", strerror(errno));
       return -1;
     }
 
-  
-  if(setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(yes)) < 0) 
+  optval = 1;
+  if(setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&optval,sizeof(optval)) < 0) 
     {
       rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
       close(sock);
       return -1;
     } 
+
+  /* get/set socket receive buffer */
+  if(getsockopt(sock, SOL_SOCKET, SO_RCVBUF,&optval, &optval_len) <0)
+    {
+      rfbClientErr("CreateMulticastSocket getsockopt(): %s\n", strerror(errno));
+      close(sock);
+      return -1;
+    } 
+  dfltrcvbuf = optval;
+  optval = MULTICAST_SO_RCVBUF;
+  if(setsockopt(sock,SOL_SOCKET,SO_RCVBUF,&optval,sizeof(optval)) < 0) 
+    {
+      rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
+      close(sock);
+      return -1;
+    } 
+  if(getsockopt(sock, SOL_SOCKET, SO_RCVBUF,&optval, &optval_len) <0)
+    {
+      rfbClientErr("CreateMulticastSocket getsockopt(): %s\n", strerror(errno));
+      close(sock);
+      return -1;
+    } 
+  rfbClientLog("MulticastVNC: tried to set socket receive buffer from %d to %d, got %d\n",
+	       dfltrcvbuf, MULTICAST_SO_RCVBUF, optval);
+
 
   if(bind(sock, (struct sockaddr*)&localAddr, sizeof(localAddr)) < 0)
     {

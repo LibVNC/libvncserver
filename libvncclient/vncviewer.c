@@ -344,6 +344,8 @@ void rfbClientCleanup(rfbClient* client) {
     close(client->sock);
   if (client->listenSock >= 0)
     close(client->listenSock);
+  if (client->multicastSock >= 0)
+    close(client->multicastSock);
   free(client->desktopName);
   free(client->serverHost);
   if (client->clientAuthSchemes)
