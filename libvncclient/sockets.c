@@ -679,7 +679,8 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 
   FD_ZERO(&fds);
   FD_SET(client->sock,&fds);
-  FD_SET(client->multicastSock,&fds);
+  if(client->multicastSock >= 0)
+    FD_SET(client->multicastSock,&fds);
 
   num=select(maxfd+1, &fds, NULL, NULL, &timeout);
   if(num<0)
@@ -687,7 +688,7 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 
   if(FD_ISSET(client->sock, &fds))
     client->serverMsg = TRUE;
-  if(FD_ISSET(client->multicastSock, &fds))
+  if(client->multicastSock >= 0 && FD_ISSET(client->multicastSock, &fds))
     client->serverMsgMulticast = TRUE;
 
   return num;
