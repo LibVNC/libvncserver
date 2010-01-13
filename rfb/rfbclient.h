@@ -197,6 +197,11 @@ typedef struct _rfbClient {
 	char *bufoutptr;
 	int buffered;
 
+#define RFB_MULTICAST_BUF_SIZE 65507 /* max payload of one UDP packet */
+        char multicastbuf[RFB_MULTICAST_BUF_SIZE];
+  	char *multicastbufoutptr;
+	int multicastbuffered;
+
 	/* The zlib encoding requires expansion/decompression/deflation of the
 	   compressed data in the "buffer" above into another, result buffer.
 	   However, the size of the result buffer can be determined precisely

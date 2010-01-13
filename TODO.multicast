@@ -1,8 +1,7 @@
-- change ReadFromRFBServerMulticast() and associated data
-
 - verify sender address in  ReadFromRFBServerMulticast().
 
-- enableCursorShapeUpdates stuff in rfbSendMulticastFramebufferUpdate()
+- what about the enableCursorShapeUpdates stuff in 
+  rfbSendMulticastFramebufferUpdate()?
 
 - Implement other encodings than raw.
 
