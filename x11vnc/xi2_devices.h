@@ -1,7 +1,7 @@
 /*
   XInput2 device handling routines for x11vnc.  
 
-  Copyright (C) 2009 Christian Beier <dontmind@freeshell.org>
+  Copyright (C) 2009-2010 Christian Beier <dontmind@freeshell.org>
   All rights reserved.
 
   This file is part of x11vnc.
