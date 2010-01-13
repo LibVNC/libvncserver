@@ -202,6 +202,9 @@ typedef struct _rfbClient {
   	char *multicastbufoutptr;
 	int multicastbuffered;
 
+        rfbBool serverMsgMulticast; /* this flag is set by WaitForMessage() if there's multicast input */
+        rfbBool serverMsg;          /* this flag is set by WaitForMessage() if there's unicast input */
+
 	/* The zlib encoding requires expansion/decompression/deflation of the
 	   compressed data in the "buffer" above into another, result buffer.
 	   However, the size of the result buffer can be determined precisely

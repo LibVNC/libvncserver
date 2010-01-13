@@ -664,11 +664,11 @@ PrintInHex(char *buf, int len)
 
 int WaitForMessage(rfbClient* client,unsigned int usecs)
 {
-  //FIXME hier den multicastSock mit reintun
-
   fd_set fds;
   struct timeval timeout;
   int num;
+  int maxfd = max(client->sock, client->multicastSock);
+  client->serverMsg = client->serverMsgMulticast = FALSE;
 
   if (client->serverPort==-1)
     /* playing back vncrec file */
@@ -679,10 +679,16 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 
   FD_ZERO(&fds);
   FD_SET(client->sock,&fds);
+  FD_SET(client->multicastSock,&fds);
 
-  num=select(client->sock+1, &fds, NULL, NULL, &timeout);
+  num=select(maxfd+1, &fds, NULL, NULL, &timeout);
   if(num<0)
     rfbClientLog("Waiting for message failed: %d (%s)\n",errno,strerror(errno));
+
+  if(FD_ISSET(client->sock, &fds))
+    client->serverMsg = TRUE;
+  if(FD_ISSET(client->multicastSock, &fds))
+    client->serverMsgMulticast = TRUE;
 
   return num;
 }
