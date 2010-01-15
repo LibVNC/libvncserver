@@ -3198,7 +3198,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	    if(sz_rfbMulticastFramebufferUpdateMsg + sz_rfbFramebufferUpdateRectHeader + rawSizeRect 
 	       <= MULTICAST_UPDATE_BUF_SIZE)            /* headers + rect fit into now empty buffer */
 	      {                                        
-		mfu = rfbPutMulticastHeader(cl, cl->screen->multicastUpdateId, nPartialUpds, ++idPartialUpd, 0);
+		mfu = rfbPutMulticastHeader(cl, cl->screen->multicastUpdateId, nPartialUpds, idPartialUpd++, 0);
    		nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
 	      }
 	    else                                        /* rect too large for buffer, must be split up */
@@ -3215,7 +3215,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	
 		while(nSplitRects)
 		  {
-		    mfu = rfbPutMulticastHeader(cl, cl->screen->multicastUpdateId, nPartialUpds, ++idPartialUpd, 0);
+		    mfu = rfbPutMulticastHeader(cl, cl->screen->multicastUpdateId, nPartialUpds, idPartialUpd++, 0);
 		   
 		    if(offs*linesPerUpd + linesPerUpd <= h)
 		      {
