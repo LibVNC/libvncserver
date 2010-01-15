@@ -1,4 +1,8 @@
-- verify sender address in  ReadFromRFBServerMulticast().
+- add mechanism on client side that reacts to lost packets
+  (request a TCP fb update, throttle the server, fallback to TCP)
+
+- verify sender address in  ReadFromRFBServerMulticast(). 
+  -> use connect()!
 
 - what about the enableCursorShapeUpdates stuff in 
   rfbSendMulticastFramebufferUpdate()?
@@ -7,6 +11,11 @@
 
 - What about multicast specific stats? Right now it's still all
   per-client.
+
+- client side: introduce a new multicast function for each unicast one
+  or use a solution with an internal flag that signals that a function
+  should behave the multicast way instead? actually, this also hold
+  true for the server side... hmm.
 
 - Leave the nRect calculation in rfbSendMulticastFramebufferUpdate()
   as it is (number of rects is returned by
