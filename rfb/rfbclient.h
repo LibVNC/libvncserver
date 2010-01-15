@@ -180,8 +180,6 @@ typedef struct _rfbClient {
 	/* rfbproto.c */
 
 	int sock;
-        int multicastSock;
-#define MULTICAST_SO_RCVBUF 327675
 	rfbBool canUseCoRRE;
 	rfbBool canUseHextile;
 	char *desktopName;
@@ -196,14 +194,6 @@ typedef struct _rfbClient {
 	char buf[RFB_BUF_SIZE];
 	char *bufoutptr;
 	int buffered;
-
-#define RFB_MULTICAST_BUF_SIZE 65507 /* max payload of one UDP packet */
-        char multicastbuf[RFB_MULTICAST_BUF_SIZE];
-  	char *multicastbufoutptr;
-	int multicastbuffered;
-
-        rfbBool serverMsgMulticast; /* this flag is set by WaitForMessage() if there's multicast input */
-        rfbBool serverMsg;          /* this flag is set by WaitForMessage() if there's unicast input */
 
 	/* The zlib encoding requires expansion/decompression/deflation of the
 	   compressed data in the "buffer" above into another, result buffer.
@@ -270,9 +260,6 @@ typedef struct _rfbClient {
 
 	int canHandleNewFBSize;
 
-	/* Multicast framebuffer updates */
-	int canHandleMulticastVNC;
-
 	/* hooks */
 	HandleTextChatProc         HandleTextChat;
 	HandleKeyboardLedStateProc HandleKeyboardLedState;
@@ -322,6 +309,18 @@ typedef struct _rfbClient {
 	/* The 0-terminated security types supported by the client.
 	 * Set by function SetClientAuthSchemes() */
 	uint32_t *clientAuthSchemes;
+
+        /* all the multicast stuff */
+	int canHandleMulticastVNC;
+        int multicastSock;
+#define MULTICAST_SO_RCVBUF 327675
+#define RFB_MULTICAST_BUF_SIZE 65507 /* max payload of one UDP packet */
+        char multicastbuf[RFB_MULTICAST_BUF_SIZE];
+  	char *multicastbufoutptr;
+	int multicastbuffered;
+        rfbBool serverMsgMulticast; /* this flag is set by WaitForMessage() if there's multicast input */
+        rfbBool serverMsg;          /* this flag is set by WaitForMessage() if there's unicast input */
+
 } rfbClient;
 
 /* cursor.c */

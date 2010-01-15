@@ -271,29 +271,6 @@ typedef struct _rfbScreenInfo
     rfbBool udpSockConnected;
     struct sockaddr_in udpRemoteAddr;
 
-    /* multicast stuff */
-    rfbBool multicastVNC;
-    char* multicastAddr;
-    int multicastPort;
-    char multicastTTL;
-    SOCKET multicastSock;
-    struct sockaddr_storage multicastSockAddr;
-    /*
-     * the constraints for MULTICAT_UPDATE_BUF_SIZE are the same as for UPDATE_BUF_SIZE 
-     * (see comment there), additionally, it _must_ fit into a UDP packet
-     */
-#define MULTICAST_UPDATE_BUF_SIZE 60000
-    char multicastUpdateBuf[MULTICAST_UPDATE_BUF_SIZE];
-    int mcublen;
-    uint16_t multicastUpdateId;
-
-#define MULTICAST_MAX_CONCURRENT_PIXELFORMATS 256 /* could be up to 65535 */
-    char multicastUpdPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
-    char multicastUpdPendingForEncoding[1]; /* since non-pseudo encodings are < 256 */
-    rfbBool multicastUseCopyRect;  /* all multicast clients support CopyRect */
-    sraRegionPtr multicastUpdateRegion;
-    int deferMulticastUpdateTime;
-
     int maxClientWait;
 
     /* http stuff */
@@ -356,8 +333,6 @@ typedef struct _rfbScreenInfo
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     MUTEX(cursorMutex);
-    MUTEX(multicastOutputMutex);
-    MUTEX(multicastUpdateMutex);
     rfbBool backgroundLoop;
 #endif
 
@@ -384,6 +359,33 @@ typedef struct _rfbScreenInfo
 
     /* command line authorization of file transfers */
     rfbBool permitFileTransfer;
+
+    
+    /* multicast stuff */
+    rfbBool multicastVNC;
+    char*   multicastAddr;
+    int     multicastPort;
+    char    multicastTTL;
+    SOCKET  multicastSock;
+    struct sockaddr_storage multicastSockAddr;
+    /*
+     * the constraints for MULTICAT_UPDATE_BUF_SIZE are the same as for UPDATE_BUF_SIZE 
+     * (see comment there), additionally, it _must_ fit into a UDP packet
+     */
+#define MULTICAST_UPDATE_BUF_SIZE 60000
+    char multicastUpdateBuf[MULTICAST_UPDATE_BUF_SIZE];
+    int  mcublen;
+    uint16_t multicastUpdateId;
+#define MULTICAST_MAX_CONCURRENT_PIXELFORMATS 256 /* could be up to 65535 */
+    char multicastUpdPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
+    char multicastUpdPendingForEncoding[1]; /* since non-pseudo encodings are < 256 */
+    rfbBool multicastUseCopyRect;  /* all multicast clients support CopyRect */
+    sraRegionPtr multicastUpdateRegion;
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+    MUTEX(multicastOutputMutex);
+    MUTEX(multicastUpdateMutex);
+#endif
+    int deferMulticastUpdateTime;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -580,7 +582,6 @@ typedef struct _rfbClientRec {
     rfbBool enableLastRectEncoding;   /* client supports LastRect encoding */
     rfbBool enableCursorShapeUpdates; /* client supports cursor shape updates */
     rfbBool enableCursorPosUpdates;   /* client supports cursor position updates */
-    rfbBool enableMulticastVNC;       /* client supports multicast FramebufferUpdates messages */
     rfbBool useRichCursorEncoding;    /* rfbEncodingRichCursor is preferred */
     rfbBool cursorWasChanged;         /* cursor shape update should be sent */
     rfbBool cursorWasMoved;           /* cursor position update should be sent */
@@ -589,14 +590,6 @@ typedef struct _rfbClientRec {
 
     rfbBool useNewFBSize;             /* client supports NewFBSize encoding */
     rfbBool newFBSizePending;         /* framebuffer size was changed */
-
-    rfbBool  useMulticastVNC;         /* framebuffer updates should be sent via multicast socket*/
-    uint16_t multicastPixelformatId;  /* identifier assigned to client's pixelformat */
-    struct timeval startMulticastDeferring; /* this per-client tv is actually used per every combination
-					       of pixelformat and encoding, see main.c, each client is a
-					       representative of the (pixelformat, encoding) class it 
-					       belongs to */
-
 
     struct _rfbClientRec *prev;
     struct _rfbClientRec *next;
@@ -638,6 +631,14 @@ typedef struct _rfbClientRec {
     MUTEX(sendMutex);
 #endif
 
+    /* multicast stuff */
+    rfbBool  enableMulticastVNC;      /* client supports multicast FramebufferUpdates messages */
+    rfbBool  useMulticastVNC;         /* framebuffer updates should be sent via multicast socket*/
+    uint16_t multicastPixelformatId;  /* identifier assigned to client's pixelformat */
+    struct timeval startMulticastDeferring; /* this per-client tv is actually used per every combination
+					       of pixelformat and encoding, see main.c, each client is a
+					       representative of the (pixelformat, encoding) class it 
+					       belongs to */
 } rfbClientRec, *rfbClientPtr;
 
 /*
