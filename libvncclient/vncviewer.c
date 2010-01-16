@@ -306,16 +306,17 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 
 	if(client->serverHost)
 	  free(client->serverHost);
+        client->serverPort = 5900;
 
 	if(colon) {
-	  client->serverHost=strdup(argv[i]);
-	  client->serverHost[(int)(colon-argv[i])]='\0';
-	  client->serverPort=atoi(colon+1);
+	  client->serverHost = strdup(argv[i]);
+	  client->serverHost[(int)(colon-argv[i])] = '\0';
+	  client->serverPort = atoi(colon+1);
 	} else {
-	  client->serverHost=strdup(argv[i]);
+	  client->serverHost = strdup(argv[i]);
 	}
-	if(client->serverPort>=0 && client->serverPort<5900)
-	  client->serverPort+=5900;
+	if(client->serverPort >= 0 && client->serverPort < 5900)
+	  client->serverPort += 5900;
       }
       /* purge arguments */
       if (j>i) {
