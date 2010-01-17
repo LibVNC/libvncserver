@@ -270,6 +270,9 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
       } else if (strcmp(argv[i], "-play") == 0) {
 	client->serverPort = -1;
 	j++;
+      } else if (strcmp(argv[i], "-multicast") == 0) {
+	client->canHandleMulticastVNC = TRUE;
+	j++;
       } else if (i+1<*argc && strcmp(argv[i], "-encodings") == 0) {
 	client->appData.encodingsString = argv[i+1];
 	j+=2;
