@@ -4243,7 +4243,7 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 		if (sscanf(p, "%d,%d", &mb, &down) == 2) {
 			X_LOCK;
 			rfbLog("remote_cmd: XTestFakeButtonEvent(mb=%d, down=%d)\n", mb, down);
-			XTestFakeButtonEvent_wr(dpy, mb, down ? True : False, CurrentTime);
+			XTestFakeButtonEvent_wr(dpy, -1, mb, down ? True : False, CurrentTime);
 			XFlush_wr(dpy);
 			X_UNLOCK;
 		}
