@@ -754,7 +754,8 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys
 
 # x11vnc only:
 if test "$build_x11vnc" = "yes"; then
-	AC_CHECK_HEADERS([pwd.h sys/wait.h utmpx.h termios.h sys/ioctl.h sys/stropts.h X11/extensions/shmproto.h])
+	AC_CHECK_HEADERS([pwd.h sys/wait.h utmpx.h termios.h sys/ioctl.h sys/stropts.h])
+	AC_CHECK_HEADER([X11/extensions/shmproto.h], , , [#include <X11/Xmd.h>])
 fi
 
 # Checks for typedefs, structures, and compiler characteristics.
