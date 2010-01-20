@@ -1,8 +1,17 @@
 - add mechanism on client side that reacts to lost packets
   (request a TCP fb update, throttle the server, fallback to TCP)
+   -> add a "nothing changed" msg to rfbserver.c, we need to
+  distinguish between "nothing new" and "no packets got through"!
 
 - verify sender address in  ReadFromRFBServerMulticast(). 
   -> use connect()!
+
+- make SendMulticastFramebufferUpdate() fail when we got no
+  multicast server!
+
+- sendCursorShape, sendCursorPos, sendKeyboardLedState, 
+  rfbSendCopyRegion must be sent even if unicast update 
+  region is empty! --> put these in rfbSendMulticastFBupdate()?
 
 - what about the enableCursorShapeUpdates stuff in 
   rfbSendMulticastFramebufferUpdate()?
