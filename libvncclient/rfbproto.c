@@ -832,11 +832,6 @@ InitialiseRFBConnection(rfbClient* client)
       DefaultSupportedMessagesTightVNC(client);
   }
 
-  if(client->canHandleMulticastVNC) {
-      rfbClientLog("Enabling MulticastVNC specific messages\n",pv);
-      DefaultSupportedMessagesMulticastVNC(client);
-  }
-
   /* we do not support > RFB3.8 */
   if ((major==3 && minor>8) || major>3)
   {
@@ -1809,7 +1804,10 @@ HandleRFBServerMessage(rfbClient* client)
 	client->multicastSock = CreateMulticastSocket(multicastSockAddr);
 	client->multicastUpdInterval = rect.r.w;
 	client->multicastPixelformatId = rect.r.x;
-	
+
+	rfbClientLog("Enabling MulticastVNC specific messages\n");
+	DefaultSupportedMessagesMulticastVNC(client);
+ 	
 	continue;
       }
 

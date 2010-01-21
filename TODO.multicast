@@ -6,9 +6,6 @@
 - verify sender address in  ReadFromRFBServerMulticast(). 
   -> use connect()!
 
-- make SendMulticastFramebufferUpdate() fail when we got no
-  multicast server!
-
 - sendCursorShape, sendCursorPos, sendKeyboardLedState, 
   rfbSendCopyRegion must be sent even if unicast update 
   region is empty! --> put these in rfbSendMulticastFBupdate()?
