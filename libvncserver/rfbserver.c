@@ -3114,14 +3114,12 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
         int y = rect.y1;
         int w = rect.x2 - x;
         int h = rect.y2 - y;
-	
+	size_t rawSizeRect = w * h * cl->format.bitsPerPixel/8;
+
 	//FIXME debug
 	rfbLog("\n--> rect %d, %d raw bytes\n", nr_rect, w*h * cl->format.bitsPerPixel/8);
 	rfbLog("\n--> rect %d, at %d,%d (%d*%d)\n", nr_rect, x,y,w,h);
 	++nr_rect;
-
-	size_t rawSizeRect = w * h * cl->format.bitsPerPixel/8;
-
 
 	if(cl->screen->mcublen + sz_rfbFramebufferUpdateRectHeader + rawSizeRect 
 	   > MULTICAST_UPDATE_BUF_SIZE)                 /* would overflow */
@@ -3212,6 +3210,16 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	  }
     }
     sraRgnReleaseIterator(i); i=NULL;
+
+
+    /* if nothing was done above, at least send a heartbeat
+       so that clients don't assume the connection is dead */
+    if(sraRgnEmpty(updateRegion))
+      rfbPutMulticastHeader(cl,  
+			    cl->screen->multicastWholeUpdId,
+			    cl->screen->multicastPartialUpdId++,
+			    0);
+    
 
     /* flush buffer at the end */
     if (!rfbSendMulticastUpdateBuf(cl->screen)) {
