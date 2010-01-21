@@ -91,8 +91,7 @@ static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
 static rfbMulticastFramebufferUpdateMsg* rfbPutMulticastHeader(rfbClientPtr cl, 
 							       uint16_t idWholeUpd,
-							       uint16_t nPartialUpds, 
-							       uint16_t idPartialUpd, 
+							       uint32_t idPartialUpd, 
 							       uint16_t nRects);
 static int rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h);
 
@@ -3069,10 +3068,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     sraRect rect;
     sraRegionPtr updateRegion;
     int j;
-    uint16_t nPartialUpds = 0;
-    uint16_t idPartialUpd = 0;
     uint16_t nRects = 0;
-    int sizePartUpd = 0;
     rfbBool otherUpdatesPending = FALSE;
     rfbBool result = TRUE;
 
@@ -3102,55 +3098,10 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     /* FIXME make this per-screen ?*/
     rfbStatRecordMessageSent(cl, rfbMulticastFramebufferUpdate, 0, 0);
      
-    
-    /* 
-     * Find out how many partial updates we need.
-     * This is analogous to the sending algorithm below. 
-     */
-    for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);)
-      {
-	int x = rect.x1;
-	int y = rect.y1;
-	int w = rect.x2 - x;
-	int h = rect.y2 - y;
-	int sizeRect = w * h * cl->format.bitsPerPixel/8;
-
-	if(sizePartUpd + sz_rfbFramebufferUpdateRectHeader + sizeRect 
-	   > MULTICAST_UPDATE_BUF_SIZE - sz_rfbMulticastFramebufferUpdateMsg) /* would-be overflow */
-	  {                                            
-	    sizePartUpd = 0;                                                  /* would-be buffer flush */
-	    if(sz_rfbFramebufferUpdateRectHeader + sizeRect 
-	       <= MULTICAST_UPDATE_BUF_SIZE - sz_rfbMulticastFramebufferUpdateMsg)
- 	      {                                                     /* rect would fit into now empty buffer */
-		++nPartialUpds;
-		sizePartUpd += sz_rfbFramebufferUpdateRectHeader + sizeRect;
-	      }
-	    else                                                    /* rect would have to be split up */
-	      {
-		int bytesPerLine = w * (cl->format.bitsPerPixel/8);
-		int linesPerUpd = ((MULTICAST_UPDATE_BUF_SIZE 
-				    - sz_rfbMulticastFramebufferUpdateMsg)
-				   - sz_rfbFramebufferUpdateRectHeader) / bytesPerLine;
-		int nPartUpdsThisRect = h/linesPerUpd;
-		if(nPartUpdsThisRect*linesPerUpd < h) 
-		  nPartialUpds += nPartUpdsThisRect+1; /* there is a remainder */
-		else
-		  nPartialUpds += nPartUpdsThisRect;   /* fits exactly */
-	      }
-	  }
-	else
-	  {
-	    if(sizePartUpd == 0)                                    /* new partial update */
-	      ++nPartialUpds;
-	    sizePartUpd += sz_rfbFramebufferUpdateRectHeader + sizeRect; /* would be put in buffer */
-	  }
-      }
-    sraRgnReleaseIterator(i); i=NULL;
 
     //FIXME debug
     //rfbLog("\n--> nUpdateRegionRects: %d\n", nUpdateRegionRects);
     rfbLog("\n--> region has: %d\n", sraRgnCountRects(updateRegion) );
-    rfbLog("\n-->     part updates: %d\n", nPartialUpds);
    
 
     LOCK(cl->screen->multicastUpdateMutex);
@@ -3182,9 +3133,8 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	    if(cl->screen->mcublen)
 	      {
 		rfbLog("--> about to send %d bytes!\n", cl->screen->mcublen);
-		rfbLog("   --> idwhole: %d\n", cl->screen->multicastUpdateId);
-		rfbLog("   --> npartial: %d\n", nPartialUpds);	    
-		rfbLog("   --> idpartial: %d\n", idPartialUpd-1);	    
+		rfbLog("   --> idwhole: %d\n", cl->screen->multicastWholeUpdId);
+		rfbLog("   --> idpartial: %d\n", cl->screen->multicastPartialUpdId-1);	    
 		rfbLog("   --> nrect: %d\n", nRects);	    
 	      }
 
@@ -3198,7 +3148,10 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	    if(sz_rfbMulticastFramebufferUpdateMsg + sz_rfbFramebufferUpdateRectHeader + rawSizeRect 
 	       <= MULTICAST_UPDATE_BUF_SIZE)            /* headers + rect fit into now empty buffer */
 	      {                                        
-		mfu = rfbPutMulticastHeader(cl, cl->screen->multicastUpdateId, nPartialUpds, idPartialUpd++, 0);
+		mfu = rfbPutMulticastHeader(cl, 
+					    cl->screen->multicastWholeUpdId,
+					    cl->screen->multicastPartialUpdId++,
+					    0);
    		nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
 	      }
 	    else                                        /* rect too large for buffer, must be split up */
@@ -3215,7 +3168,10 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	
 		while(nSplitRects)
 		  {
-		    mfu = rfbPutMulticastHeader(cl, cl->screen->multicastUpdateId, nPartialUpds, idPartialUpd++, 0);
+		    mfu = rfbPutMulticastHeader(cl, 
+						cl->screen->multicastWholeUpdId,
+						cl->screen->multicastPartialUpdId++,
+						0);
 		   
 		    if(offs*linesPerUpd + linesPerUpd <= h)
 		      {
@@ -3229,9 +3185,8 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 
 		    //FIXME debug
 		    rfbLog("--> about to send %d bytes! (rect splitted)\n", cl->screen->mcublen);
-		    rfbLog("   --> idwhole: %d\n", cl->screen->multicastUpdateId);
-		    rfbLog("   --> npartial: %d\n", nPartialUpds);	    
-		    rfbLog("   --> idpartial: %d\n", idPartialUpd-1);	    
+		    rfbLog("   --> idwhole: %d\n", cl->screen->multicastWholeUpdId);
+		    rfbLog("   --> idpartial: %d\n", cl->screen->multicastPartialUpdId-1);
 		    rfbLog("   --> nrect: %d\n", nRects);	    
 		    
 		    if(!rfbSendMulticastUpdateBuf(cl->screen))
@@ -3248,7 +3203,10 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	else                                            /* rect fits */  
 	  {
 	    if(cl->screen->mcublen == 0)                /* new partial update */
-	      mfu = rfbPutMulticastHeader(cl, cl->screen->multicastUpdateId, nPartialUpds, ++idPartialUpd, 0);
+	      mfu = rfbPutMulticastHeader(cl, 
+					  cl->screen->multicastWholeUpdId,
+					  cl->screen->multicastPartialUpdId++,
+					  0);
 
 	    nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
 	  }
@@ -3261,7 +3219,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     }
     
     /* increment sequence number no matter what */
-    cl->screen->multicastUpdateId++;
+    cl->screen->multicastWholeUpdId++;
 
    
     if(result == TRUE) /* no error while sending */
@@ -3306,18 +3264,15 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
  */
 
 rfbMulticastFramebufferUpdateMsg *
-rfbPutMulticastHeader(rfbClientPtr cl, 
-		      uint16_t idWholeUpd, uint16_t nPartialUpds,
-		      uint16_t idPartialUpd, uint16_t nRects)
+rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUpd, uint16_t nRects)
 {
   rfbMulticastFramebufferUpdateMsg *mfu =
     (rfbMulticastFramebufferUpdateMsg *)cl->screen->multicastUpdateBuf;
 
   mfu->type = rfbMulticastFramebufferUpdate;
   mfu->idPixelformat = Swap16IfLE(cl->multicastPixelformatId);
+  mfu->idPartialUpd = Swap32IfLE(idPartialUpd);
   mfu->idWholeUpd = Swap16IfLE(idWholeUpd);
-  mfu->nPartialUpds = Swap16IfLE(nPartialUpds);
-  mfu->idPartialUpd = Swap16IfLE(idPartialUpd);
   mfu->nRects = Swap16IfLE(nRects);
 
   cl->screen->mcublen = sz_rfbMulticastFramebufferUpdateMsg;

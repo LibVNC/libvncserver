@@ -375,7 +375,8 @@ typedef struct _rfbScreenInfo
 #define MULTICAST_UPDATE_BUF_SIZE 60000
     char multicastUpdateBuf[MULTICAST_UPDATE_BUF_SIZE];
     int  mcublen;
-    uint16_t multicastUpdateId;
+    uint16_t multicastWholeUpdId;
+    uint32_t multicastPartialUpdId;
 #define MULTICAST_MAX_CONCURRENT_PIXELFORMATS 256 /* could be up to 65535 */
     char multicastUpdPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
     char multicastUpdPendingForEncoding[1]; /* since non-pseudo encodings are < 256 */

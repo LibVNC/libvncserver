@@ -526,10 +526,12 @@ typedef struct {
  * Since multicast is based on UDP datagrams with a fixed maximum size,
  * the whole update may have to be packed into several UDP packets.
  * Thus, framebuffer contents have to be sent using (maybe several)
- * 'MulticastFramebufferUpdate' messages. These contain consecutive sequence
- * numbers identifying the update as a whole (e.g. update no. 1138) and also the
- * individual partial updates of this whole update (e.g. partial update no. 3 
- * of 11 in total).
+ * 'MulticastFramebufferUpdate' messages. These contain consecutive sequence 
+ * numbers (starting with 0) identifying whole and partial updates. A whole 
+ * update number identifies a response to a 'MulticastFramebufferUpdateRequest', 
+ * which may have to be split into several MulticastFramebufferUpdate' server
+ * to client messages. Each of these is identified by a partial update
+ * sequence number.
 
  * The header is padded so that it is an exact multiple of 4 bytes (to
  * help with alignment of 32-bit pixels).
@@ -539,9 +541,8 @@ typedef struct {
     uint8_t type;			/* always rfbMulticastFramebufferUpdate */
     uint8_t pad;
     uint16_t idPixelformat;             /* pixelformat id assigned at sending session info */
+    uint32_t idPartialUpd;              /* id of this partial update */
     uint16_t idWholeUpd;                /* id of the update as a whole */
-    uint16_t nPartialUpds;              /* number of partial updates the whole one is split into */
-    uint16_t idPartialUpd;              /* id of this partial update */
     uint16_t nRects;                    /* number of rectangles per message, not per whole update */
     /* followed by nRects rectangles */
 } rfbMulticastFramebufferUpdateMsg;

@@ -1479,8 +1479,7 @@ HandleRFBServerMessage(rfbClient* client)
 	  else
 	    {
 	      msg.mfu.idWholeUpd = rfbClientSwap16IfLE(msg.mfu.idWholeUpd);
-	      msg.mfu.nPartialUpds = rfbClientSwap16IfLE(msg.mfu.nPartialUpds);
-	      msg.mfu.idPartialUpd = rfbClientSwap16IfLE(msg.mfu.idPartialUpd);
+	      msg.mfu.idPartialUpd = rfbClientSwap32IfLE(msg.mfu.idPartialUpd);
 	      msg.mfu.nRects = rfbClientSwap16IfLE(msg.mfu.nRects);	      
 	      
 	      /* calculate lost packages from sequence numbers */
@@ -1510,7 +1509,6 @@ HandleRFBServerMessage(rfbClient* client)
 
 	      //FIXME debug
 	      rfbClientLog("  --> id whole:    %d\n", msg.mfu.idWholeUpd);
-	      rfbClientLog("  --> num partial: %d\n", msg.mfu.nPartialUpds);
 	      rfbClientLog("  --> id partial:  %d\n", msg.mfu.idPartialUpd);
 
 	      /* handle rects */
