@@ -110,7 +110,12 @@ void UpdateFramebuffer(rfbScreenInfoPtr rfbScreen)
 
 int main(int argc,char** argv)
 {                                                                
-  rfbScreenInfoPtr server = rfbGetScreen(&argc,argv,WIDTH,HEIGHT,8,3,BYTESPERPIXEL);
+  rfbScreenInfoPtr server = NULL;
+  if(!rfbGetScreen(&argc,argv,WIDTH,HEIGHT,8,3,BYTESPERPIXEL))
+    {
+      rfbErr("Could not get server.\n");
+      return EXIT_FAILURE;
+    }
   server->frameBuffer=(char*)malloc(WIDTH*HEIGHT*BYTESPERPIXEL);
 
   server->desktopName = "MulticastVNC example";
