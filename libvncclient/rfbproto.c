@@ -1444,62 +1444,169 @@ HandleRFBServerMessage(rfbClient* client)
   if (client->serverPort==-1)
     client->vncRec->readTimestamp = TRUE;
   
-  //FIXME
-  if(0 && client->multicastSock >= 0)
+  if(client->serverMsgMulticast)
     {
+      //FIXME debug
+      rfbClientLog("Got mc msgs\n");
+
       if (!ReadFromRFBServerMulticast(client, (char *)&msg, 1))
+	return FALSE;
+      
+      if(msg.type == rfbMulticastFramebufferUpdate)
 	{
-	  rfbClientErr("--->err recv multicast\n");
-	  return FALSE;
+	  rfbFramebufferUpdateRectHeader rect;
+	  int linesToRead;
+	  int bytesPerLine;
+	  int i;
+
+	  if (!ReadFromRFBServerMulticast(client, ((char *)&msg.mfu) + 1,
+					  sz_rfbMulticastFramebufferUpdateMsg - 1))
+	    return FALSE;
+
+	  /* 
+	     only handle this message if it's our pixelformat, 
+	     otherwise flush the multicast buffer since 
+	     the data in there is useless for us.
+	  */
+	  if(rfbClientSwap16IfLE(msg.mfu.idPixelformat) != client->multicastPixelformatId)
+	    {
+	      // FIXME debug
+	      rfbClientLog("  --> discarding pf: %d\n", rfbClientSwap16IfLE(msg.mfu.idPixelformat));
+
+	      client->multicastbufoutptr = client->multicastbuf;
+	      client->multicastbuffered = 0;
+	    }
+	  else
+	    {
+	      msg.mfu.idWholeUpd = rfbClientSwap16IfLE(msg.mfu.idWholeUpd);
+	      msg.mfu.nPartialUpds = rfbClientSwap16IfLE(msg.mfu.nPartialUpds);
+	      msg.mfu.idPartialUpd = rfbClientSwap16IfLE(msg.mfu.idPartialUpd);
+	      msg.mfu.nRects = rfbClientSwap16IfLE(msg.mfu.nRects);	      
+	      
+	      /* calculate lost packages from sequence numbers */
+	      client->multicastRcvd++;
+	      /* only check on the second and later runs */
+	      /*
+	      if(client->multicastLastWholeUpd >= 0) 
+		{
+		  if(msg.mfu.idWholeUpd == client->multicastLastWholeUpd)
+		    {
+		      if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1)
+			client->multicastLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
+		    }
+		  else
+		    if(msg.mfu.idWholeUpd > client->multicastLastWholeUpd)
+		      {
+			
+		      }
+		    else
+		      if(msg.mfu.idWholeUpd < client->multicastLastWholeUpd)
+			;
+		}
+	      client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
+	      client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
+	      */
+	      
+
+	      //FIXME debug
+	      rfbClientLog("  --> id whole:    %d\n", msg.mfu.idWholeUpd);
+	      rfbClientLog("  --> num partial: %d\n", msg.mfu.nPartialUpds);
+	      rfbClientLog("  --> id partial:  %d\n", msg.mfu.idPartialUpd);
+
+	      /* handle rects */
+	      for (i = 0; i < msg.mfu.nRects; i++) 
+		{
+		  if (!ReadFromRFBServerMulticast(client, (char *)&rect, sz_rfbFramebufferUpdateRectHeader))
+		    return FALSE;
+
+		  rect.encoding = rfbClientSwap32IfLE(rect.encoding);
+		  rect.r.x = rfbClientSwap16IfLE(rect.r.x);
+		  rect.r.y = rfbClientSwap16IfLE(rect.r.y);
+		  rect.r.w = rfbClientSwap16IfLE(rect.r.w);
+		  rect.r.h = rfbClientSwap16IfLE(rect.r.h);
+
+		  client->SoftCursorLockArea(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+      
+		  switch (rect.encoding) 
+		    {
+		    case rfbEncodingRaw: 
+		      {
+			int y=rect.r.y, h=rect.r.h;
+		    
+			bytesPerLine = rect.r.w * client->format.bitsPerPixel / 8;
+			linesToRead = RFB_BUFFER_SIZE / bytesPerLine;
+		    
+			while (h > 0) {
+			  if (linesToRead > h)
+			    linesToRead = h;
+		  
+			  if (!ReadFromRFBServerMulticast(client, client->buffer,bytesPerLine * linesToRead))
+			    return FALSE;
+		      
+			  CopyRectangle(client, (uint8_t *)client->buffer,
+					rect.r.x, y, rect.r.w,linesToRead);
+		      
+			  h -= linesToRead;
+			  y += linesToRead;
+			}
+		      }
+		      break;
+   
+		    default:
+		      {
+			rfbBool handled = FALSE;
+			rfbClientProtocolExtension* e;
+		  
+			for(e = rfbClientExtensions; !handled && e; e = e->next)
+			  if(e->handleEncoding && e->handleEncoding(client, &rect))
+			    handled = TRUE;
+		  
+			if(!handled) {
+			  rfbClientLog("Unknown rect encoding %d\n",
+				       (int)rect.encoding);
+			  return FALSE;
+			}
+		      }
+		    }
+	      
+
+		  /* Now we may discard "soft cursor locks". */
+		  client->SoftCursorUnlockScreen(client);
+
+		  /* FIXME well, it's a framebuffer update, but via multicast...*/
+		  client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+		}
+	    }
+
+	  if(1) // FIXME add some mechanism that resorts to unicast 
+	        // if packet loss too high, also too many request this way...
+	    {
+	      /* request a multicast framebuffer update*/
+	      //if(msg.mfu.idWholeUpd != client->multicastLastWholeUpd)
+	      if (!SendMulticastFramebufferUpdateRequest(client, TRUE))
+		return FALSE;
+	    }
+	  else
+	    {
+	      if (!SendIncrementalFramebufferUpdateRequest(client))
+		return FALSE;
+	    }
+
+
+	  /* FIXME well, it's a framebuffer update, but via multicast...*/
+	  if (client->FinishedFrameBufferUpdate)
+	    client->FinishedFrameBufferUpdate(client);
 	}
       else
 	{
-	  if(msg.type == rfbFramebufferUpdate)
-	    {
-	      rfbClientLog("--->got fb update\n");
-	      rfbFramebufferUpdateRectHeader rect;
-	     
-	      int i;
-
-	      if (!ReadFromRFBServerMulticast(client, ((char *)&msg.fu) + 1,
-					      sz_rfbFramebufferUpdateMsg - 1))
-		return FALSE;
-
-	      msg.fu.nRects = rfbClientSwap16IfLE(msg.fu.nRects);
-
-	      for (i = 0; i < msg.fu.nRects; i++) 
-		{
-		if (!ReadFromRFBServerMulticast(client, (char *)&rect, sz_rfbFramebufferUpdateRectHeader))
-		  return FALSE;
-
-		rect.encoding = rfbClientSwap32IfLE(rect.encoding);
-	
-
-		rect.r.x = rfbClientSwap16IfLE(rect.r.x);
-		rect.r.y = rfbClientSwap16IfLE(rect.r.y);
-		rect.r.w = rfbClientSwap16IfLE(rect.r.w);
-		rect.r.h = rfbClientSwap16IfLE(rect.r.h);
-
-  /* rect.r.w=byte count */
-      if (rect.encoding == rfbEncodingServerIdentity) {
-          char *buffer;
-          buffer = malloc(rect.r.w+1);
-          if (!ReadFromRFBServer(client, buffer, rect.r.w))
-          {
-              free(buffer);
-              return FALSE;
-          }
-          buffer[rect.r.w]=0; /* null terminate, just in case */
-          rfbClientLog("got multicast msg \"%s\"\n", buffer);
-          free(buffer);
-          continue;
-      }
-
-		}
-	    }
+	  rfbClientLog("Got unsupported multicast message type %d from VNC server\n",msg.type);
+	  return FALSE;
 	}
     }
-
+  
+  /* if there's no unicast msg pending, we can bail out here */
+  if(!client->serverMsg) 
+    return TRUE;
 
   if (!ReadFromRFBServer(client, (char *)&msg, 1))
     return FALSE;
@@ -1705,6 +1812,8 @@ HandleRFBServerMessage(rfbClient* client)
 	rfbClientLog("MulticastVNC: received pixelformat identifier: %d\n", rect.r.x);
 
 	client->multicastSock = CreateMulticastSocket(multicastSockAddr);
+	client->multicastUpdInterval = rect.r.w;
+	client->multicastPixelformatId = rect.r.x;
 	
 	continue;
       }
@@ -1988,8 +2097,17 @@ HandleRFBServerMessage(rfbClient* client)
       client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
     }
 
-    if (!SendIncrementalFramebufferUpdateRequest(client))
-      return FALSE;
+    if(client->multicastSock >= 0) // FIXME add some mechanism that resorts to unicast 
+                                   // if packet loss too high
+      {
+	if (!SendMulticastFramebufferUpdateRequest(client, TRUE))
+	  return FALSE;
+      }
+    else
+      {
+	if (!SendIncrementalFramebufferUpdateRequest(client))
+	  return FALSE;
+      }
 
     if (client->FinishedFrameBufferUpdate)
       client->FinishedFrameBufferUpdate(client);

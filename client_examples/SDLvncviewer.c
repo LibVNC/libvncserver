@@ -532,9 +532,6 @@ int main(int argc,char** argv) {
 		break;
 	    }
 	    else {
-	      //FIXME prevent call of normal update req
-	      SendMulticastFramebufferUpdateRequest(cl, FALSE);
-
 	      i=WaitForMessage(cl,500);
 	      if(i<0)
 		{
