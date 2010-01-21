@@ -322,8 +322,8 @@ typedef struct _rfbClient {
         int multicastPixelformatId;
         rfbBool serverMsgMulticast; /* this flag is set by WaitForMessage() if there's multicast input */
         rfbBool serverMsg;          /* this flag is set by WaitForMessage() if there's unicast input */
-        int multicastLastWholeUpd;
-        int multicastLastPartialUpd;
+        int     multicastLastWholeUpd;
+        int64_t multicastLastPartialUpd;
         uint32_t multicastRcvd;     /* counts received multicast packets */
         uint32_t multicastLost;     /* counts lost multicast packets */
 

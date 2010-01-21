@@ -1484,32 +1484,29 @@ HandleRFBServerMessage(rfbClient* client)
 	      
 	      /* calculate lost packages from sequence numbers */
 	      client->multicastRcvd++;
-	      /* only check on the second and later runs */
-	      /*
-	      if(client->multicastLastWholeUpd >= 0) 
+	      if(client->multicastLastWholeUpd >= 0) /* only check on the second and later runs */
 		{
-		  if(msg.mfu.idWholeUpd == client->multicastLastWholeUpd)
-		    {
-		      if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1)
-			client->multicastLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
-		    }
-		  else
-		    if(msg.mfu.idWholeUpd > client->multicastLastWholeUpd)
-		      {
-			
-		      }
-		    else
-		      if(msg.mfu.idWholeUpd < client->multicastLastWholeUpd)
-			;
+		  /* it can happen that we get a mis-ordered packet 
+		     with a sequence number near to overflow, consider a succession of
+		     (1021, 0, 1022, 1) in a [0...1023] example seq.no. range */
+		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 0x0FFF0000)
+		    client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
+
+		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1)
+		    client->multicastLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
 		}
-	      client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
 	      client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
-	      */
+	      client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
 	      
 
 	      //FIXME debug
 	      rfbClientLog("  --> id whole:    %d\n", msg.mfu.idWholeUpd);
 	      rfbClientLog("  --> id partial:  %d\n", msg.mfu.idPartialUpd);
+	      rfbClientLog("  --> received:    %d\n", client->multicastRcvd);
+	      rfbClientLog("  --> lost:        %d\n", client->multicastLost);
+	      rfbClientLog("  --> loss ratio:  %f\n", client->multicastLost / 
+			   (double)(client->multicastRcvd+client->multicastLost));
+
 
 	      /* handle rects */
 	      for (i = 0; i < msg.mfu.nRects; i++) 
