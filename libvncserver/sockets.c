@@ -643,9 +643,7 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
   LOCK(rfbScreen->multicastOutputMutex);
   while(len > 0) 
     {
-      n = sendto(sock, buf, len, 0, 
-		 (struct sockaddr*)&rfbScreen->multicastSockAddr,
-		 sizeof(rfbScreen->multicastSockAddr));
+      n = write(sock, buf, len);
       
       if(n > 0) 
 	{
@@ -837,7 +835,7 @@ rfbCreateMulticastSocket(char *addr,
       return -1;
     }
 
-  /* Set TTL of multicast packet */
+  /* set multicast TTL */
   if(setsockopt(sock,
 		multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
 		multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_HOPS : IP_MULTICAST_TTL,
@@ -849,8 +847,17 @@ rfbCreateMulticastSocket(char *addr,
       return -1;
     }
    
+  /* connect the socket */
+  if(connect(sock,(struct sockaddr*)sockAddr, sizeof(*sockAddr)) < 0)
+    {
+      rfbLogPerror("rfbCreateMulticastSocket connect()");
+      freeaddrinfo(multicastAddrInfo);  
+      closesocket(sock);
+      return -1;
+    }
+
   /* set the sending interface */
-  //FIXME does it have to be a ipv6 iface in case we're doing ipv6?
+  /* FIXME does it have to be a ipv6 iface in case we're doing ipv6? */
   if(setsockopt (sock, 
 		 multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
 		 multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_IF : IP_MULTICAST_IF,
