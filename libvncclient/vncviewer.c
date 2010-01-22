@@ -306,7 +306,6 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 
 	if(client->serverHost)
 	  free(client->serverHost);
-        client->serverPort = 5900;
 
 	if(colon) {
 	  client->serverHost = strdup(argv[i]);
