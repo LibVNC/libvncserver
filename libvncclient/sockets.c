@@ -667,7 +667,7 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
   fd_set fds;
   struct timeval timeout;
   int num;
-  int maxfd = max(client->sock, client->multicastSock);
+  int maxfd; 
   client->serverMsg = client->serverMsgMulticast = FALSE;
 
   if (client->serverPort==-1)
@@ -679,8 +679,12 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 
   FD_ZERO(&fds);
   FD_SET(client->sock,&fds);
+  maxfd = client->sock;
   if(client->multicastSock >= 0)
-    FD_SET(client->multicastSock,&fds);
+    {
+      FD_SET(client->multicastSock,&fds);
+      maxfd = max(client->sock, client->multicastSock);
+    }
 
   num=select(maxfd+1, &fds, NULL, NULL, &timeout);
   if(num<0)
@@ -695,13 +699,7 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 }
 
 
-
-
-
-
-
-int 
-CreateMulticastSocket(struct sockaddr_storage multicastSockAddr)
+int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr)
 {
   int sock; 
   struct sockaddr_storage localAddr;
