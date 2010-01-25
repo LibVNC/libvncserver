@@ -1462,9 +1462,9 @@ HandleRFBServerMessage(rfbClient* client)
 	  */
 	  if(rfbClientSwap16IfLE(msg.mfu.idPixelformat) != client->multicastPixelformatId)
 	    {
-	      // FIXME debug
-	      rfbClientLog("  --> discarding pf: %d\n", rfbClientSwap16IfLE(msg.mfu.idPixelformat));
-
+#ifdef MULTICAST_DEBUG
+	      rfbClientLog("MulticastVNC DEBUG: discarding pf: %d\n", rfbClientSwap16IfLE(msg.mfu.idPixelformat));
+#endif
 	      client->multicastbufoutptr = client->multicastbuf;
 	      client->multicastbuffered = 0;
 	    }
@@ -1489,16 +1489,15 @@ HandleRFBServerMessage(rfbClient* client)
 		}
 	      client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
 	      client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
-	      
 
-	      //FIXME debug
-	      rfbClientLog("  --> id whole:    %d\n", msg.mfu.idWholeUpd);
-	      rfbClientLog("  --> id partial:  %d\n", msg.mfu.idPartialUpd);
-	      rfbClientLog("  --> received:    %d\n", client->multicastRcvd);
-	      rfbClientLog("  --> lost:        %d\n", client->multicastLost);
-	      rfbClientLog("  --> loss ratio:  %f\n", client->multicastLost / 
+#ifdef MULTICAST_DEBUG
+	      rfbClientLog("MulticastVNC DEBUG: id whole:    %d\n", msg.mfu.idWholeUpd);
+	      rfbClientLog("MulticastVNC DEBUG: id partial:  %d\n", msg.mfu.idPartialUpd);
+	      rfbClientLog("MulticastVNC DEBUG: received:    %d\n", client->multicastRcvd);
+	      rfbClientLog("MulticastVNC DEBUG: lost:        %d\n", client->multicastLost);
+	      rfbClientLog("MulticastVNC DEBUG: loss ratio:  %f\n", client->multicastLost / 
 			   (double)(client->multicastRcvd+client->multicastLost));
-
+#endif
 
 	      /* handle rects */
 	      for (i = 0; i < msg.mfu.nRects; i++) 
