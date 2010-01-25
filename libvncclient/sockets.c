@@ -668,11 +668,15 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
   struct timeval timeout;
   int num;
   int maxfd; 
-  client->serverMsg = client->serverMsgMulticast = FALSE;
 
   if (client->serverPort==-1)
-    /* playing back vncrec file */
-    return 1;
+    {
+      /* playing back vncrec file */
+      client->serverMsg = TRUE;
+      return 1;
+    }
+
+  client->serverMsg = client->serverMsgMulticast = FALSE;
   
   timeout.tv_sec=(usecs/1000000);
   timeout.tv_usec=(usecs%1000000);

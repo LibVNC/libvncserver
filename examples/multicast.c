@@ -133,7 +133,7 @@ int main(int argc,char** argv)
   server->multicastTTL = 32;
   server->deferMulticastUpdateTime = 50;
   */ 
-
+  server->deferMulticastUpdateTime = 10;
 
   /* Initialize the server */
   rfbInitServer(server);           

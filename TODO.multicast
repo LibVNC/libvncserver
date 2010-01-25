@@ -1,5 +1,3 @@
-- check if this vncrec stuff is still working.
-
 - implement server throttling
 
 - verify sender address in  ReadFromRFBServerMulticast(). 
