@@ -197,8 +197,21 @@
 
  See examples/multicast.c for a sample MulticastVNC server.
 
+
  To enable MulticastVNC for a client set the 'canHandleMulticastVNC'
- member of your rfbClient* to TRUE. 
+ member of your rfbClient* to TRUE. To get going, the most simple way
+ is to call rfbProcessServerMsgs() in your main loop, which includes
+ requesting multicast framebuffer updates, waiting for messages and
+ handling them. It also includes some default actions regarding packet
+ loss and timeouts.
+
+ Note that you don't have to use rfbProcessServerMsgs(), you can also
+ call all the functions it uses from your main loop, thus implementing
+ your own version.
+
+
+ 
+
 
 
 

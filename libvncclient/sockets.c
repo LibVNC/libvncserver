@@ -680,7 +680,7 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
   FD_ZERO(&fds);
   FD_SET(client->sock,&fds);
   maxfd = client->sock;
-  if(client->multicastSock >= 0)
+  if(client->multicastSock >= 0 && !client->multicastDisabled)
     {
       FD_SET(client->multicastSock,&fds);
       maxfd = max(client->sock, client->multicastSock);

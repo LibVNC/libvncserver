@@ -311,7 +311,8 @@ typedef struct _rfbClient {
 	uint32_t *clientAuthSchemes;
 
         /* all the multicast stuff */
-	int canHandleMulticastVNC;
+	rfbBool canHandleMulticastVNC;
+        int maxMulticastTimeouts;
         int multicastSock;
 #define MULTICAST_SO_RCVBUF 327675
 #define RFB_MULTICAST_BUF_SIZE 65507 /* max payload of one UDP packet */
@@ -319,6 +320,7 @@ typedef struct _rfbClient {
   	char *multicastbufoutptr;
 	int multicastbuffered;
         int multicastUpdInterval;
+        struct timeval multicastRequestTimestamp; /* gets set when multicast framebuffer update was requested */
         int multicastPixelformatId;
         rfbBool serverMsgMulticast; /* this flag is set by WaitForMessage() if there's multicast input */
         rfbBool serverMsg;          /* this flag is set by WaitForMessage() if there's unicast input */
@@ -326,6 +328,8 @@ typedef struct _rfbClient {
         int64_t multicastLastPartialUpd;
         uint32_t multicastRcvd;     /* counts received multicast packets */
         uint32_t multicastLost;     /* counts lost multicast packets */
+        int multicastTimeouts;
+        rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
 
 } rfbClient;
 
@@ -413,6 +417,8 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,int bytesPerPixel)
 rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv);
 /* rfbClientCleanup() does not touch client->frameBuffer */
 void rfbClientCleanup(rfbClient* client);
+rfbBool rfbProcessServerMessage(rfbClient* client, int timeout);
+
 
 #if(defined __cplusplus)
 }

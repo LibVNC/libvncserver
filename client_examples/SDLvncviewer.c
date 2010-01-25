@@ -507,7 +507,6 @@ int main(int argc,char** argv) {
 	  cl=rfbGetClient(8,3,4);
 	  cl->MallocFrameBuffer=resize;
 	  cl->canHandleNewFBSize = TRUE;
-	  cl->canHandleMulticastVNC = TRUE;
 	  cl->GotFrameBufferUpdate=update;
 	  cl->HandleKeyboardLedState=kbd_leds;
 	  cl->HandleTextChat=text_chat;
@@ -532,18 +531,11 @@ int main(int argc,char** argv) {
 		break;
 	    }
 	    else {
-	      i=WaitForMessage(cl,500);
-	      if(i<0)
+	      if(!rfbProcessServerMessage(cl, 500))
 		{
-		  cleanup(cl);
+ 		  cleanup(cl);
 		  break;
 		}
-	      if(i)
-		if(!HandleRFBServerMessage(cl))
-		  {
-		    cleanup(cl);
-		    break;
-		  }
 	    }
 	  }
 	}

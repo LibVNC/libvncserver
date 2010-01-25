@@ -1,5 +1,6 @@
-- add mechanism on client side that reacts to lost packets
-  (request a TCP fb update, throttle the server, fallback to TCP)
+- check if this vncrec stuff is still working.
+
+- implement server throttling
 
 - verify sender address in  ReadFromRFBServerMulticast(). 
   -> use connect()!
@@ -12,6 +13,12 @@
   rfbSendMulticastFramebufferUpdate()?
 
 - Implement other encodings than raw.
+
+- make the lossratio levels in rfbProcessServerMessage()
+  configurable like maxMulticastTimeouts? Shall we then provide
+  pluggable actions for each of these via function pointers. OTOH,
+  users still have every freedom if they just don't use 
+  rfbProcessServerMessage() and implement their own one...
 
 - What about multicast specific stats? Right now it's still all
   per-client.

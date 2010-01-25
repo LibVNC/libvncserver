@@ -1441,9 +1441,6 @@ HandleRFBServerMessage(rfbClient* client)
   
   if(client->serverMsgMulticast)
     {
-      //FIXME debug
-      rfbClientLog("Got mc msgs\n");
-
       if (!ReadFromRFBServerMulticast(client, (char *)&msg, 1))
 	return FALSE;
       
@@ -1567,21 +1564,6 @@ HandleRFBServerMessage(rfbClient* client)
 		  client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 		}
 	    }
-
-	  if(1) // FIXME add some mechanism that resorts to unicast 
-	        // if packet loss too high, also too many request this way...
-	    {
-	      /* request a multicast framebuffer update*/
-	      //if(msg.mfu.idWholeUpd != client->multicastLastWholeUpd)
-	      if (!SendMulticastFramebufferUpdateRequest(client, TRUE))
-		return FALSE;
-	    }
-	  else
-	    {
-	      if (!SendIncrementalFramebufferUpdateRequest(client))
-		return FALSE;
-	    }
-
 
 	  /* FIXME well, it's a framebuffer update, but via multicast...*/
 	  if (client->FinishedFrameBufferUpdate)
@@ -1803,7 +1785,7 @@ HandleRFBServerMessage(rfbClient* client)
 
 	client->multicastSock = CreateMulticastSocket(multicastSockAddr);
 	client->multicastUpdInterval = rect.r.w;
-	client->multicastPixelformatId = rect.r.x;
+  	client->multicastPixelformatId = rect.r.x;
 
 	rfbClientLog("Enabling MulticastVNC specific messages\n");
 	DefaultSupportedMessagesMulticastVNC(client);
@@ -2090,8 +2072,7 @@ HandleRFBServerMessage(rfbClient* client)
       client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
     }
 
-    if(client->multicastSock >= 0) // FIXME add some mechanism that resorts to unicast 
-                                   // if packet loss too high
+    if(client->multicastSock >= 0 && !client->multicastDisabled) 
       {
 	if (!SendMulticastFramebufferUpdateRequest(client, TRUE))
 	  return FALSE;
