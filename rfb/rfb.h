@@ -386,7 +386,7 @@ typedef struct _rfbScreenInfo
     MUTEX(multicastOutputMutex);
     MUTEX(multicastUpdateMutex);
 #endif
-    int deferMulticastUpdateTime;
+    int multicastDeferUpdateTime;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 

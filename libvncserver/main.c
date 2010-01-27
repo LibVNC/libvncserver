@@ -824,7 +824,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->multicastAddr="224.0.42.138";
    screen->multicastPort=5900;
    screen->multicastTTL=1;
-   screen->deferMulticastUpdateTime=5;
+   screen->multicastDeferUpdateTime=30;
 
    INIT_MUTEX(screen->multicastOutputMutex);
    INIT_MUTEX(screen->multicastUpdateMutex);
@@ -1139,7 +1139,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	 (1<<(cl->preferredEncoding % 8))) &&
 	!sraRgnEmpty(screen->multicastUpdateRegion);
       result=TRUE;
-      if(screen->deferMulticastUpdateTime == 0) {
+      if(screen->multicastDeferUpdateTime == 0) {
 	/* Handle CopyRect via unicast for _every_ multicast client. 
 	   We do this by preparing modifiedRegion and requestedRegion 
 	   so rfbSendFramebufferUpdate only sends CopyRect. 
@@ -1163,7 +1163,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	if(tv.tv_sec < cl->startMulticastDeferring.tv_sec /* at midnight */
 	   || ((tv.tv_sec-cl->startMulticastDeferring.tv_sec)*1000
 	       +(tv.tv_usec-cl->startMulticastDeferring.tv_usec)/1000)
-	   > screen->deferMulticastUpdateTime) {
+	   > screen->multicastDeferUpdateTime) {
 	  cl->startMulticastDeferring.tv_usec = 0;
 	  /* Handle CopyRect via unicast for _every_ multicast client. 
 	     We do this by preparing modifiedRegion and requestedRegion 

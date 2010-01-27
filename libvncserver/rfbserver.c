@@ -1128,7 +1128,7 @@ rfbSendMulticastVNCSessionInfo(rfbClientPtr cl)
    rect.encoding = Swap32IfLE(encoding);
    rect.r.x = Swap16IfLE(cl->multicastPixelformatId);
    rect.r.y = Swap16IfLE(cl->screen->multicastPort);
-   rect.r.w = Swap16IfLE(cl->screen->deferMulticastUpdateTime);
+   rect.r.w = Swap16IfLE(cl->screen->multicastDeferUpdateTime);
    rect.r.h = 0;
 
    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
