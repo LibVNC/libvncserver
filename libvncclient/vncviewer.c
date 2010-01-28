@@ -418,7 +418,8 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
   if(r==0) /* timeout */
     {
       if(client->multicastSock >= 0 &&
-	 !client->multicastDisabled && 
+	 !client->multicastDisabled &&
+	 client->multicastRcvd > 0 &&
 	 ++client->multicastTimeouts > client->maxMulticastTimeouts)
 	{
 	  rfbClientLog("MulticastVNC: too many timeouts (%d), falling back to unicast\n", client->multicastTimeouts);
