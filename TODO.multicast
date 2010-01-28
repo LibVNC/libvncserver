@@ -1,14 +1,14 @@
 - implement server throttling
 
-- verify sender address in  ReadFromRFBServerMulticast(). 
-  -> use connect()!
+- verify sender address+port in  ReadFromRFBServerMulticast()?
+  -> would need bind() to address we got from getaddrinfo() 
+     (plus a SO_REUSEADDR setsockopt() if same port as client &
+     running on same host...) on server side, address and port
+     transmitted to client, then a connect() at client side.
 
 - sendCursorShape, sendCursorPos, sendKeyboardLedState, 
   rfbSendCopyRegion must be sent even if unicast update 
   region is empty! --> put these in rfbSendMulticastFBupdate()?
-
-- what about the enableCursorShapeUpdates stuff in 
-  rfbSendMulticastFramebufferUpdate()?
 
 - Implement other encodings than raw.
 

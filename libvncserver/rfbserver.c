@@ -3080,19 +3080,20 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     updateRegion = sraRgnCreateRgn(givenUpdateRegion);
     sraRgnOr(updateRegion, cl->screen->multicastUpdateRegion);
 
-    /*
-      if (!cl->enableCursorShapeUpdates) {
-      if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) {
-      rfbRedrawAfterHideCursor(cl,updateRegion);
-      LOCK(cl->screen->cursorMutex);
-      cl->cursorX = cl->screen->cursorX;
-      cl->cursorY = cl->screen->cursorY;
-      UNLOCK(cl->screen->cursorMutex);
-      rfbRedrawAfterHideCursor(cl,updateRegion);
+    /* draw cursor into framebuffer */
+    if (!cl->enableCursorShapeUpdates) 
+      {
+	if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) 
+	  {
+	    rfbRedrawAfterHideCursor(cl,updateRegion);
+	    LOCK(cl->screen->cursorMutex);
+	    cl->cursorX = cl->screen->cursorX;
+	    cl->cursorY = cl->screen->cursorY;
+	    UNLOCK(cl->screen->cursorMutex);
+	    rfbRedrawAfterHideCursor(cl,updateRegion);
+	  }
+	rfbShowCursor(cl);
       }
-      rfbShowCursor(cl);
-    }
-     */
 
 
     /* FIXME make this per-screen ?*/
@@ -3255,11 +3256,11 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 
     UNLOCK(cl->screen->multicastUpdateMutex);
 
-    /*
+  
     if (!cl->enableCursorShapeUpdates) {
       rfbHideCursor(cl);
     }
-    */
+  
  
     sraRgnDestroy(updateRegion);
 
