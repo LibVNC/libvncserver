@@ -26,6 +26,7 @@ rfbUsage(void)
     fprintf(stderr, "-rfbauth passwd-file   use authentication on RFB protocol\n"
                     "                       (use 'storepasswd' to create a password file)\n");
     fprintf(stderr, "-rfbversion 3.x        Set the version of the RFB we choose to advertise\n");
+    fprintf(stderr, "-multicast             Enable MulticastVNC extension\n");
     fprintf(stderr, "-permitfiletransfer    permit file transfer support\n");
     fprintf(stderr, "-passwd plain-password use authentication \n"
                     "                       (use plain-password as password, USE AT YOUR RISK)\n");
@@ -33,6 +34,8 @@ rfbUsage(void)
                                                              "(default 40)\n");
     fprintf(stderr, "-deferptrupdate time   time in ms to defer pointer updates"
                                                            " (default none)\n");
+    fprintf(stderr, "-defermcupdate time    time in ms to defer multicast updates"
+                                                           " (default 30)\n");
     fprintf(stderr, "-desktop name          VNC desktop name (default \"LibVNCServer\")\n");
     fprintf(stderr, "-alwaysshared          always treat new clients as shared\n");
     fprintf(stderr, "-nevershared           never treat new clients as shared\n");
@@ -94,7 +97,9 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
             rfbScreen->authPasswdData = argv[++i];
 
         } else if (strcmp(argv[i], "-permitfiletransfer") == 0) {  /* -permitfiletransfer  */
-            rfbScreen->permitFileTransfer = TRUE;
+	    rfbScreen->permitFileTransfer = TRUE;
+	} else if (strcmp(argv[i], "-multicast") == 0) {   /* -multicast */
+	    rfbScreen->multicastVNC = TRUE;
         } else if (strcmp(argv[i], "-rfbversion") == 0) {  /* -rfbversion 3.6  */
             if (i + 1 >= *argc) {
 		rfbUsage();
@@ -123,6 +128,12 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		return FALSE;
 	    }
             rfbScreen->deferPtrUpdateTime = atoi(argv[++i]);
+	} else if (strcmp(argv[i], "-defermcupdate") == 0) {  /* -defermcupdate milliseconds */
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
+            rfbScreen->multicastDeferUpdateTime = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-desktop") == 0) {  /* -desktop desktop-name */
             if (i + 1 >= *argc) {
 		rfbUsage();
