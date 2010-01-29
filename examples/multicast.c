@@ -56,6 +56,8 @@ void UpdateFramebuffer(rfbScreenInfoPtr rfbScreen)
   unsigned char* buffer = (unsigned char*)rfbScreen->frameBuffer;
   rfbClientIteratorPtr it;
   int clients=0;
+  int mc_clients=0;
+  rfbClientPtr cl;
 
   /*
    * simulate grabbing data from a device by updating the entire framebuffer
@@ -95,12 +97,17 @@ void UpdateFramebuffer(rfbScreenInfoPtr rfbScreen)
 
   /* number of clients */
   it = rfbGetClientIterator(rfbScreen);
-  while(rfbClientIteratorNext(it) != NULL) 
-    ++clients;
+  while((cl=rfbClientIteratorNext(it)) != NULL)
+    {
+      if(cl->useMulticastVNC)
+	++mc_clients;
+      else
+	++clients;
+    }
   
   rfbReleaseClientIterator(it);
 
-  snprintf(fps_string, 256, "Frame %04d of %04d (%03d fps on server side) - %d Clients \r", line, HEIGHT, fps, clients);
+  snprintf(fps_string, 256, "Frame %04d of %04d (%03d fps on server side) - Clients: %d unicast, %d multicast\r", line, HEIGHT, fps, clients, mc_clients);
   rfbDrawString(rfbScreen, &radonFont, 20, 100, fps_string, 0xffffff);
   fprintf(stderr, "%s", fps_string);
 }
