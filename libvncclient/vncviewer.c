@@ -195,7 +195,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->listenSock = -1;
   client->multicastSock = -1;
 
-  client->maxMulticastTimeouts = 10;
+  client->maxMulticastTimeouts = 100;
   client->multicastLastWholeUpd = -1;
   client->multicastLastPartialUpd = -1;
 
