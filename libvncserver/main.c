@@ -1136,8 +1136,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	(screen->multicastUpdPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] &
 	 (1<<(cl->multicastPixelformatId % 8))) &&
 	(screen->multicastUpdPendingForEncoding[((cl->preferredEncoding & 0xFF)/8)] &
-	 (1<<(cl->preferredEncoding % 8))) &&
-	!sraRgnEmpty(screen->multicastUpdateRegion);
+	 (1<<(cl->preferredEncoding % 8)));
 
       /* update pending for non-image data to be sent via unicast */
       rfbBool auxUpdPending =
@@ -1168,7 +1167,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	    UNLOCK(screen->multicastUpdateMutex);
 	  }
 	  /* if requestedRegion is empty, this only sends auxiliary data */
-	  rfbSendFramebufferUpdate(cl,cl->copyRegion); 
+	  rfbSendFramebufferUpdate(cl, cl->copyRegion); 
 	}
 
 	if(mcUpdPending)
@@ -1203,7 +1202,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	      UNLOCK(screen->multicastUpdateMutex);
 	    }
 	    /* if requestedRegion is empty, this only sends auxiliary data */
-	    rfbSendFramebufferUpdate(cl,cl->copyRegion); 
+	    rfbSendFramebufferUpdate(cl, cl->copyRegion); 
 	  }
 
 	  if(mcUpdPending)

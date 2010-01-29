@@ -3212,7 +3212,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     if(sraRgnEmpty(updateRegion))
       {
 #ifdef MULTICAST_DEBUG
-	rfbLog("MulticastVNC DEBUG:   put heartbeat into buffer(now %d)\n", cl->screen->mcublen);
+	rfbLog("MulticastVNC DEBUG:   nothing changed, putting heartbeat into buffer(now %d)\n", cl->screen->mcublen);
 #endif
 	rfbPutMulticastHeader(cl,  
 			      cl->screen->multicastWholeUpdId,
