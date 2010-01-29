@@ -1129,29 +1129,47 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
       }
     }
 
-    
     if (screen->multicastVNC && screen->multicastSock >= 0 && 
-	cl->useMulticastVNC && !cl->onHold) {
+	cl->useMulticastVNC && cl->sock >= 0 && !cl->onHold) {
+      /* image data update pending for this (pixelformat,encoding) combination */
       rfbBool mcUpdPending = 
 	(screen->multicastUpdPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] &
 	 (1<<(cl->multicastPixelformatId % 8))) &&
 	(screen->multicastUpdPendingForEncoding[((cl->preferredEncoding & 0xFF)/8)] &
 	 (1<<(cl->preferredEncoding % 8))) &&
 	!sraRgnEmpty(screen->multicastUpdateRegion);
+
+      /* update pending for non-image data to be sent via unicast */
+      rfbBool auxUpdPending =
+	(((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||       
+	 (((cl)->enableCursorShapeUpdates == FALSE &&                
+	   ((cl)->cursorX != (cl)->screen->cursorX ||
+	    (cl)->cursorY != (cl)->screen->cursorY))) ||             
+	 ((cl)->useNewFBSize && (cl)->newFBSizePending) ||                     
+	 ((cl)->enableCursorPosUpdates && (cl)->cursorWasMoved) ||
+	 !sraRgnEmpty(cl->copyRegion)); 
+
       result=TRUE;
+
       if(screen->multicastDeferUpdateTime == 0) {
-	/* Handle CopyRect via unicast for _every_ multicast client. 
-	   We do this by preparing modifiedRegion and requestedRegion 
-	   so rfbSendFramebufferUpdate only sends CopyRect. 
-	*/
-	if(screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion) && cl->sock >= 0) {
-	  sraRgnMakeEmpty(cl->modifiedRegion);
-	  sraRegionPtr tmp = sraRgnCreateRect(0, 0, screen->width, screen->height);
-	  sraRgnOr(cl->requestedRegion, tmp);
-	  sraRgnDestroy(tmp);
+
+	if(auxUpdPending) {
+	  /* Do CopyRect only if  _every_ multicast client supports it.
+	     We do this by preparing modifiedRegion and requestedRegion 
+	     so rfbSendFramebufferUpdate only sends CopyRect. 
+	  */
+	  if(screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion)) {
+	    sraRgnMakeEmpty(cl->modifiedRegion);
+	    sraRegionPtr tmp = sraRgnCreateRect(0, 0, screen->width, screen->height);
+	    sraRgnOr(cl->requestedRegion, tmp);
+	    sraRgnDestroy(tmp);
+	    /* subtract copyRegion from the region to be sent via multicast */
+	    sraRgnSubtract(screen->multicastUpdateRegion, cl->copyRegion);
+	  }
+	  /* if requestedRegion is empty, this only sends auxiliary data */
 	  rfbSendFramebufferUpdate(cl,cl->copyRegion); 
-	  sraRgnSubtract(screen->multicastUpdateRegion, cl->copyRegion);
 	}
+
 	if(mcUpdPending)
 	  rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
       } else if(cl->startMulticastDeferring.tv_usec == 0) {
@@ -1165,24 +1183,29 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	       +(tv.tv_usec-cl->startMulticastDeferring.tv_usec)/1000)
 	   > screen->multicastDeferUpdateTime) {
 	  cl->startMulticastDeferring.tv_usec = 0;
-	  /* Handle CopyRect via unicast for _every_ multicast client. 
-	     We do this by preparing modifiedRegion and requestedRegion 
-	     so rfbSendFramebufferUpdate only sends CopyRect. 
-	  */
-	  if(screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion) && cl->sock >= 0) {
-	    sraRgnMakeEmpty(cl->modifiedRegion);
-	    sraRegionPtr tmp = sraRgnCreateRect(0, 0, screen->width, screen->height);
-	    sraRgnOr(cl->requestedRegion, tmp);
-	    sraRgnDestroy(tmp);
+
+	  if(auxUpdPending) {
+	    /* Do CopyRect only if  _every_ multicast client supports it.
+	       We do this by preparing modifiedRegion and requestedRegion 
+	       so rfbSendFramebufferUpdate only sends CopyRect. 
+	    */
+	    if(screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion)) {
+	      sraRgnMakeEmpty(cl->modifiedRegion);
+	      sraRegionPtr tmp = sraRgnCreateRect(0, 0, screen->width, screen->height);
+	      sraRgnOr(cl->requestedRegion, tmp);
+	      sraRgnDestroy(tmp);
+	      /* subtract copyRegion from the region to be sent via multicast */
+	      sraRgnSubtract(screen->multicastUpdateRegion, cl->copyRegion);
+	    }
+	    /* if requestedRegion is empty, this only sends auxiliary data */
 	    rfbSendFramebufferUpdate(cl,cl->copyRegion); 
-	    sraRgnSubtract(screen->multicastUpdateRegion, cl->copyRegion);
 	  }
+
 	  if(mcUpdPending)
 	    rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
 	}
       }
     }
-
 
     if (!cl->viewOnly && cl->lastPtrX >= 0) {
       if(cl->startPtrDeferring.tv_usec == 0) {

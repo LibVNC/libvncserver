@@ -6,9 +6,7 @@
      running on same host...) on server side, address and port
      transmitted to client, then a connect() at client side.
 
-- sendCursorShape, sendCursorPos, sendKeyboardLedState, 
-  rfbSendCopyRegion must be sent even if unicast update 
-  region is empty! --> put these in rfbSendMulticastFBupdate()?
+- add some locking to the multicast stuff in main.c
 
 - Implement other encodings than raw.
 
