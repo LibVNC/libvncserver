@@ -417,6 +417,12 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
   
   if(r==0) /* timeout */
     {
+#ifdef MULTICAST_DEBUG
+      if(client->multicastSock >= 0 &&
+	 !client->multicastDisabled &&
+	 client->multicastRcvd > 0)
+	rfbClientLog("MulticastVNC DEBUG:   timeout, now %d!\n", client->multicastTimeouts);
+#endif
       if(client->multicastSock >= 0 &&
 	 !client->multicastDisabled &&
 	 client->multicastRcvd > 0 &&

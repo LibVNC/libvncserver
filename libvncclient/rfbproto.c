@@ -1497,6 +1497,7 @@ HandleRFBServerMessage(rfbClient* client)
 	      rfbClientLog("MulticastVNC DEBUG: lost:        %d\n", client->multicastLost);
 	      rfbClientLog("MulticastVNC DEBUG: loss ratio:  %f\n", client->multicastLost / 
 			   (double)(client->multicastRcvd+client->multicastLost));
+	      rfbClientLog("MulticastVNC DEBUG: timeouts     %d\n", client->multicastTimeouts);
 #endif
 
 	      /* handle rects */

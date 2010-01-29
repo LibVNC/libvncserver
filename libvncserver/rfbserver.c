@@ -2298,7 +2298,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
             rfbCloseClient(cl);
             return;
         }
-
+#ifdef MULTICAST_DEBUG
+	    rfbLog("MulticastVNC DEBUG: got update request from client %p\n", cl);
+#endif
         rfbStatRecordMessageRcvd(cl, msg.type, 
 				 sz_rfbMulticastFramebufferUpdateRequestMsg,
 				 sz_rfbMulticastFramebufferUpdateRequestMsg);
@@ -3100,7 +3102,8 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     rfbStatRecordMessageSent(cl, rfbMulticastFramebufferUpdate, 0, 0);
      
 #ifdef MULTICAST_DEBUG
-    rfbLog("MulticastVNC DEBUG: Region has %d rects\n", sraRgnCountRects(updateRegion) );
+    rfbLog("MulticastVNC DEBUG: Update %d: Region has %d rects:\n", 
+	   cl->screen->multicastWholeUpdId, sraRgnCountRects(updateRegion) );
     int nr_rect=0;
 #endif
    
@@ -3114,9 +3117,8 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	size_t rawSizeRect = w * h * cl->format.bitsPerPixel/8;
 
 #ifdef MULTICAST_DEBUG
-	rfbLog("MulticastVNC DEBUG: Rect %d, %d raw bytes\n", nr_rect, w*h * cl->format.bitsPerPixel/8);
-	rfbLog("MulticastVNC DEBUG: Rect %d, at %d,%d (%d*%d)\n", nr_rect, x,y,w,h);
-	++nr_rect;
+	rfbLog("MulticastVNC DEBUG:   Rect %d at %d,%d (%d*%d = %d raw bytes)\n",
+	       nr_rect++, x, y, w, h, w*h * cl->format.bitsPerPixel/8);
 #endif
 
 	if(cl->screen->mcublen + sz_rfbFramebufferUpdateRectHeader + rawSizeRect 
@@ -3127,12 +3129,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 
 #ifdef MULTICAST_DEBUG
 	    if(cl->screen->mcublen)
-	      {
-		rfbLog("MulticastVNC DEBUG: about to send %d bytes!\n", cl->screen->mcublen);
-		rfbLog("MulticastVNC DEBUG:   idwhole: %d\n", cl->screen->multicastWholeUpdId);
-		rfbLog("MulticastVNC DEBUG:   idpartial: %d\n", cl->screen->multicastPartialUpdId-1);	    
-		rfbLog("MulticastVNC DEBUG:   nrects: %d\n", nRects);	    
-	      }
+	      rfbLog("MulticastVNC DEBUG:   buffer(now %d) would overflow)\n", cl->screen->mcublen);
 #endif
 
 	    if(!rfbSendMulticastUpdateBuf(cl->screen))  /* flush buffer */
@@ -3181,12 +3178,8 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 		    mfu->nRects = Swap16IfLE(nRects);
 
 #ifdef MULTICAST_DEBUG
-		    rfbLog("MulticastVNC DEBUG:  about to send %d bytes! (rect splitted)\n", cl->screen->mcublen);
-		    rfbLog("MulticastVNC DEBUG:    idwhole: %d\n", cl->screen->multicastWholeUpdId);
-		    rfbLog("MulticastVNC DEBUG:    idpartial: %d\n", cl->screen->multicastPartialUpdId-1);
-		    rfbLog("MulticastVNC DEBUG:    nrects: %d\n", nRects);	    
+		    rfbLog("MulticastVNC DEBUG:   rect too large, splitted!\n");
 #endif
-		    
 		    if(!rfbSendMulticastUpdateBuf(cl->screen))
 		      {
 			result = FALSE;
@@ -3205,8 +3198,10 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 					  cl->screen->multicastWholeUpdId,
 					  cl->screen->multicastPartialUpdId++,
 					  0);
-
 	    nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
+#ifdef MULTICAST_DEBUG
+	    rfbLog("MulticastVNC DEBUG:   put rect into buffer(now %d), now %d in there\n", cl->screen->mcublen, nRects);
+#endif
 	  }
     }
     sraRgnReleaseIterator(i); i=NULL;
@@ -3215,16 +3210,23 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     /* if nothing was done above, at least send a heartbeat
        so that clients don't assume the connection is dead */
     if(sraRgnEmpty(updateRegion))
-      rfbPutMulticastHeader(cl,  
-			    cl->screen->multicastWholeUpdId,
-			    cl->screen->multicastPartialUpdId++,
-			    0);
+      {
+#ifdef MULTICAST_DEBUG
+	rfbLog("MulticastVNC DEBUG:   put heartbeat into buffer(now %d)\n", cl->screen->mcublen);
+#endif
+	rfbPutMulticastHeader(cl,  
+			      cl->screen->multicastWholeUpdId,
+			      cl->screen->multicastPartialUpdId++,
+			      0);
+      }
     
 
     /* flush buffer at the end */
-    if (!rfbSendMulticastUpdateBuf(cl->screen)) {
-	result = FALSE;
-    }
+    if(mfu)
+      mfu->nRects = Swap16IfLE(nRects);
+    if (!rfbSendMulticastUpdateBuf(cl->screen))
+      result = FALSE;
+
     
     /* increment sequence number no matter what */
     cl->screen->multicastWholeUpdId++;
@@ -3284,6 +3286,10 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
   mfu->nRects = Swap16IfLE(nRects);
 
   cl->screen->mcublen = sz_rfbMulticastFramebufferUpdateMsg;
+
+#ifdef MULTICAST_DEBUG
+  rfbLog("MulticastVNC DEBUG:   put header into buffer(now %d)\n", cl->screen->mcublen);
+#endif
 
   return mfu;
 }
@@ -3619,6 +3625,18 @@ rfbSendUpdateBuf(rfbClientPtr cl)
 rfbBool
 rfbSendMulticastUpdateBuf(rfbScreenInfoPtr rfbScreen)
 {
+#ifdef MULTICAST_DEBUG
+  if(rfbScreen->mcublen)
+    {
+      rfbLog("MulticastVNC DEBUG:     about to send message %d bytes big\n", rfbScreen->mcublen);
+      rfbMulticastFramebufferUpdateMsg *mfu =
+	(rfbMulticastFramebufferUpdateMsg *)rfbScreen->multicastUpdateBuf;
+      rfbLog("MulticastVNC DEBUG:        pixelformat: %d\n", Swap16IfLE(mfu->idPixelformat));
+      rfbLog("MulticastVNC DEBUG:        id whole:    %d\n", Swap16IfLE(mfu->idWholeUpd)); 
+      rfbLog("MulticastVNC DEBUG:        id partial:  %d\n", Swap32IfLE(mfu->idPartialUpd)); 
+      rfbLog("MulticastVNC DEBUG:        nrects:      %d\n", Swap16IfLE(mfu->nRects)); 
+    }
+#endif
   if (rfbWriteExactMulticast(rfbScreen, rfbScreen->multicastUpdateBuf, rfbScreen->mcublen) < 0) {
     rfbLogPerror("rfbSendMulticastUpdateBuf: write");
     return FALSE;
