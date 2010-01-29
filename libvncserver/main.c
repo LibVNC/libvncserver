@@ -1141,12 +1141,9 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 
       /* update pending for non-image data to be sent via unicast */
       rfbBool auxUpdPending =
-	(((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||       
-	 (((cl)->enableCursorShapeUpdates == FALSE &&                
-	   ((cl)->cursorX != (cl)->screen->cursorX ||
-	    (cl)->cursorY != (cl)->screen->cursorY))) ||             
-	 ((cl)->useNewFBSize && (cl)->newFBSizePending) ||                     
-	 ((cl)->enableCursorPosUpdates && (cl)->cursorWasMoved) ||
+	((cl->enableCursorShapeUpdates && cl->cursorWasChanged) ||       
+	 (cl->useNewFBSize && cl->newFBSizePending) ||                     
+	 (cl->enableCursorPosUpdates && cl->cursorWasMoved) ||
 	 !sraRgnEmpty(cl->copyRegion)); 
 
       result=TRUE;
