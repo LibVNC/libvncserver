@@ -1159,12 +1159,16 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	     so rfbSendFramebufferUpdate only sends CopyRect. 
 	  */
 	  if(screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion)) {
+	    LOCK(cl->updateMutex);
 	    sraRgnMakeEmpty(cl->modifiedRegion);
 	    sraRegionPtr tmp = sraRgnCreateRect(0, 0, screen->width, screen->height);
 	    sraRgnOr(cl->requestedRegion, tmp);
+	    UNLOCK(cl->updateMutex);
 	    sraRgnDestroy(tmp);
 	    /* subtract copyRegion from the region to be sent via multicast */
+	    LOCK(screen->multicastUpdateMutex);
 	    sraRgnSubtract(screen->multicastUpdateRegion, cl->copyRegion);
+	    UNLOCK(screen->multicastUpdateMutex);
 	  }
 	  /* if requestedRegion is empty, this only sends auxiliary data */
 	  rfbSendFramebufferUpdate(cl,cl->copyRegion); 
@@ -1190,12 +1194,16 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	       so rfbSendFramebufferUpdate only sends CopyRect. 
 	    */
 	    if(screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion)) {
+	      LOCK(cl->updateMutex);
 	      sraRgnMakeEmpty(cl->modifiedRegion);
 	      sraRegionPtr tmp = sraRgnCreateRect(0, 0, screen->width, screen->height);
 	      sraRgnOr(cl->requestedRegion, tmp);
+	      UNLOCK(cl->updateMutex);
 	      sraRgnDestroy(tmp);
 	      /* subtract copyRegion from the region to be sent via multicast */
+	      LOCK(screen->multicastUpdateMutex);
 	      sraRgnSubtract(screen->multicastUpdateRegion, cl->copyRegion);
+	      UNLOCK(screen->multicastUpdateMutex);
 	    }
 	    /* if requestedRegion is empty, this only sends auxiliary data */
 	    rfbSendFramebufferUpdate(cl,cl->copyRegion); 

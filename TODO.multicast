@@ -6,8 +6,6 @@
      running on same host...) on server side, address and port
      transmitted to client, then a connect() at client side.
 
-- add some locking to the multicast stuff in main.c
-
 - Implement other encodings than raw.
 
 - make the lossratio levels in rfbProcessServerMessage()
