@@ -193,7 +193,8 @@
  your rfbScreenInfoPtr to TRUE. That's all. If you want to, you can
  specify multicast address and port and TTL via the 'multicastAddr',
  'multicastPort' and 'multicastTTL' members. The defaults are
- 224.0.42.138, 5900 and 1.  
+ 224.0.42.138, 5900 and 1. 'multicastDeferUpdateTime' lets you set the
+ multicast update interval in milliseconds.
 
  See examples/multicast.c for a sample MulticastVNC server.
 
