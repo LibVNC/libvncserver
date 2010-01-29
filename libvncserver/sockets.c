@@ -180,7 +180,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
     }
 
     if (rfbScreen->multicastVNC) {
-        rfbLog("Enabling MulticastVNC on %s:%d with a TTL of %d, sending updates every %dms\n", 
+        rfbLog("Enabling MulticastVNC on %s:%d with a TTL of %d, update interval %dms\n", 
 	       rfbScreen->multicastAddr, rfbScreen->multicastPort,
 	       rfbScreen->multicastTTL, rfbScreen->multicastDeferUpdateTime);
 
