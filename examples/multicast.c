@@ -9,16 +9,15 @@
 #include <rfb/rfb.h>
 #include "radon.h"
 
-
-#define WIDTH  1280
-#define HEIGHT 1024
-#define BYTESPERPIXEL      4
-
-
-
+#define WIDTH  640
+#define HEIGHT 480
+#define BYTESPERPIXEL 4
 
 /* 15 frames per second (if we can) */
-#define PICTURE_TIMEOUT (1.0/15.0)
+#define FPS 15
+#define PICTURE_TIMEOUT (1.0/FPS)
+
+
 
 
 /*
@@ -48,15 +47,15 @@ int UpdateIntervalOver()
  */
 void UpdateFramebuffer(rfbScreenInfoPtr rfbScreen)
 {
-  static int last_line=0, fps=0, fcount=0;
+  static uint32_t last_line, fps, fcount;
+  static uint32_t fps_avg, fps_sum, fps_nr_samples; 
   int line=0;
   int i,j;
   struct timeval now;
   char fps_string[256];
   unsigned char* buffer = (unsigned char*)rfbScreen->frameBuffer;
   rfbClientIteratorPtr it;
-  int clients=0;
-  int mc_clients=0;
+  int clients=0, mc_clients=0;
   rfbClientPtr cl;
 
   /*
@@ -88,10 +87,14 @@ void UpdateFramebuffer(rfbScreenInfoPtr rfbScreen)
 
   /* frames per second (informational only) */
   ++fcount;
-  if(last_line > line) 
+  if(last_line > line) /* a new frame */
     {
       fps = fcount;
       fcount = 0;
+      /* now calculate the average */
+      ++fps_nr_samples;
+      fps_sum += fps;
+      fps_avg = fps_sum/fps_nr_samples;
     }
   last_line = line;
 
@@ -104,11 +107,11 @@ void UpdateFramebuffer(rfbScreenInfoPtr rfbScreen)
       else
 	++clients;
     }
-  
   rfbReleaseClientIterator(it);
 
-  snprintf(fps_string, 256, "Frame %04d of %04d (%03d fps on server side) - Clients: %d unicast, %d multicast\r", line, HEIGHT, fps, clients, mc_clients);
-  rfbDrawString(rfbScreen, &radonFont, 20, 100, fps_string, 0xffffff);
+  snprintf(fps_string, 256, "Frame %04d/%04d - Srv FPS: %03d now, %03d avg - Clients: %d unicast, %d multicast\r", 
+	   line, HEIGHT, fps, fps_avg, clients, mc_clients);
+  rfbDrawString(rfbScreen, &radonFont, 10, 100, fps_string, 0xffffff);
   fprintf(stderr, "%s", fps_string);
 }
 
@@ -143,6 +146,9 @@ int main(int argc,char** argv)
 
   /* Initialize the server */
   rfbInitServer(server);           
+
+  rfbLog("Doing %dx%d @%d FPS, sending %dkB/s (raw)\n",
+	 WIDTH, HEIGHT, FPS, (WIDTH*HEIGHT*BYTESPERPIXEL*FPS)/1024);
 
   /* Loop, updating framebuffer and processing clients */
   while(rfbIsActive(server)) 
