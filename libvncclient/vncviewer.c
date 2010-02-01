@@ -366,44 +366,37 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
 {
   int r;
 
-  if(client->multicastSock >= 0 && !client->multicastDisabled)
+  if(client->multicastSock >= 0 && !client->multicastDisabled) 
     {
       /* first, analyse multicast loss ratio and act accordingly */
       double lossrate = client->multicastLost/(double)(client->multicastRcvd+client->multicastLost);
-      if(lossrate > 0.2)
+      if(client->multicastLost > 100) 
 	{
-	  rfbClientLog("MulticastVNC: loss ratio > 0.2, requesting a full unicast framebuffer update\n");
-	  SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
-	  client->multicastLost -= client->multicastLost/10;
-	}
-      if(lossrate > 0.5)
-	{
-	  rfbClientLog("MulticastVNC: loss ratio > 0.5, falling back to unicast\n");
-	  client->multicastDisabled = TRUE;
-	  SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
-	}
-    }
+	  if(lossrate > 0.5) 
+	    {
+	    rfbClientLog("MulticastVNC: loss ratio > 0.5, falling back to unicast\n");
+	    client->multicastDisabled = TRUE;
+	    SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
+	    }
+	  else if(lossrate > 0.2) 
+	    {
+	      rfbClientLog("MulticastVNC: loss ratio > 0.2, requesting a full unicast framebuffer update\n");
+	      SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
+	      client->multicastLost -= client->multicastLost/10;
+	    }
+      }
+  }
 
   if(client->multicastSock >= 0 && !client->multicastDisabled) 
     { 
       struct timeval now;
-
-      if(client->multicastRequestTimestamp.tv_usec == 0) 
+      gettimeofday(&now, NULL);
+      if(((now.tv_sec - client->multicastRequestTimestamp.tv_sec)*1000
+	  +(now.tv_usec - client->multicastRequestTimestamp.tv_usec)/1000)
+	 > client->multicastUpdInterval) 
 	{
-	  gettimeofday(&client->multicastRequestTimestamp,NULL);
-	  if(client->multicastRequestTimestamp.tv_usec == 0)
-	    client->multicastRequestTimestamp.tv_usec++;
-	}
-      else 
-	{
-	  gettimeofday(&now, NULL);
-	  if(((now.tv_sec - client->multicastRequestTimestamp.tv_sec)*1000
-	     +(now.tv_usec - client->multicastRequestTimestamp.tv_usec)/1000)
-	     > client->multicastUpdInterval) 
-	    {
-	      client->multicastRequestTimestamp.tv_usec = 0;
-	      SendMulticastFramebufferUpdateRequest(client, TRUE);
-	    }
+	  client->multicastRequestTimestamp = now;
+	  SendMulticastFramebufferUpdateRequest(client, TRUE);
 	}
 
       r = WaitForMessage(client, 2*client->multicastUpdInterval*1000);
@@ -417,20 +410,20 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
   
   if(r==0) /* timeout */
     {
-#ifdef MULTICAST_DEBUG
       if(client->multicastSock >= 0 &&
 	 !client->multicastDisabled &&
 	 client->multicastRcvd > 0)
-	rfbClientLog("MulticastVNC DEBUG:   timeout, now %d!\n", client->multicastTimeouts);
-#endif
-      if(client->multicastSock >= 0 &&
-	 !client->multicastDisabled &&
-	 client->multicastRcvd > 0 &&
-	 ++client->multicastTimeouts > client->maxMulticastTimeouts)
 	{
-	  rfbClientLog("MulticastVNC: too many timeouts (%d), falling back to unicast\n", client->multicastTimeouts);
-	  client->multicastDisabled = TRUE;
-	  SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
+	  client->multicastTimeouts++;
+#ifdef MULTICAST_DEBUG
+	  rfbClientLog("MulticastVNC DEBUG:   timeout, now %d!\n", client->multicastTimeouts);
+#endif
+	  if(client->multicastTimeouts > client->maxMulticastTimeouts)
+	    {
+	      rfbClientLog("MulticastVNC: too many timeouts (%d), falling back to unicast\n", client->multicastTimeouts);
+	      client->multicastDisabled = TRUE;
+	      SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
+	    }
 	}
       return TRUE; 
     }
