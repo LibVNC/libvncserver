@@ -141,8 +141,8 @@ int main(int argc,char** argv)
   server->multicastAddr = "ff00::e000:2a8a"; 
   server->multicastPort = 5901;
   server->multicastTTL = 32;
-  server->deferMulticastUpdateTime = 50;
-  */ 
+  server->multicastDeferUpdateTime = 50;
+  */
 
   /* Initialize the server */
   rfbInitServer(server);           
