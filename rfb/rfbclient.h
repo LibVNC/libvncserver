@@ -315,15 +315,19 @@ typedef struct _rfbClient {
 	 * Set by function SetClientAuthSchemes() */
 	uint32_t *clientAuthSchemes;
 
+	/* When the server is a repeater, this specifies the final destination */
+	char *destHost;
+	int destPort;
+
         /* all the multicast stuff */
-	rfbBool canHandleMulticastVNC;
+        rfbBool canHandleMulticastVNC;
         int maxMulticastTimeouts;
         int multicastSock;
 #define MULTICAST_SO_RCVBUF 327675
 #define RFB_MULTICAST_BUF_SIZE 65507 /* max payload of one UDP packet */
         char multicastbuf[RFB_MULTICAST_BUF_SIZE];
-  	char *multicastbufoutptr;
-	int multicastbuffered;
+        char *multicastbufoutptr;
+        int multicastbuffered;
         int multicastUpdInterval;
         struct timeval multicastRequestTimestamp; /* gets set when multicast framebuffer update was requested */
         int multicastPixelformatId;
@@ -335,7 +339,6 @@ typedef struct _rfbClient {
         uint32_t multicastLost;     /* counts lost multicast packets */
         int multicastTimeouts;
         rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
-
 } rfbClient;
 
 /* cursor.c */
@@ -353,6 +356,7 @@ extern rfbBool rfbEnableClientLogging;
 typedef void (*rfbClientLogProc)(const char *format, ...);
 extern rfbClientLogProc rfbClientLog,rfbClientErr;
 extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
+extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
 extern void SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size);
 extern rfbBool InitialiseRFBConnection(rfbClient* client);
 extern rfbBool SetFormatAndEncodings(rfbClient* client);
