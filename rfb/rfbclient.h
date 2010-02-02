@@ -36,6 +36,11 @@
 #ifdef LIBVNCSERVER_WITH_CLIENT_TLS
 #include <gnutls/gnutls.h>
 #endif
+#ifdef __MINGW32__
+#undef SOCKET
+#undef socklen_t
+#include <ws2tcpip.h>
+#endif
 
 #define rfbClientSwap16IfLE(s) \
     (*(char *)&client->endianTest ? ((((s) & 0xff) << 8) | (((s) >> 8) & 0xff)) : (s))
