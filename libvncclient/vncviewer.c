@@ -201,6 +201,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->maxMulticastTimeouts = 100;
   client->multicastLastWholeUpd = -1;
   client->multicastLastPartialUpd = -1;
+  gettimeofday(&client->multicastRequestTimestamp, NULL); /* to avoid an overflow later on */
 
   client->clientAuthSchemes = NULL;
 
