@@ -322,8 +322,8 @@ typedef struct _rfbClient {
         /* all the multicast stuff */
         rfbBool canHandleMulticastVNC;
         int maxMulticastTimeouts;
+        int multicastRcvBufSize;
         int multicastSock;
-#define MULTICAST_SO_RCVBUF 327675
 #define RFB_MULTICAST_BUF_SIZE 65507 /* max payload of one UDP packet */
         char multicastbuf[RFB_MULTICAST_BUF_SIZE];
         char *multicastbufoutptr;
@@ -415,7 +415,7 @@ extern int ConnectClientToTcpAddr(unsigned int host, int port);
 extern int ConnectClientToUnixSock(const char *sockFile);
 extern int AcceptTcpConnection(int listenSock);
 extern rfbBool SetNonBlocking(int sock);
-extern int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr);
+extern int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recvbuf);
 
 extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
 extern rfbBool SameMachine(int sock);

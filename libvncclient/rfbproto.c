@@ -1828,7 +1828,7 @@ HandleRFBServerMessage(rfbClient* client)
 	rfbClientLog("MulticastVNC: received multicast update interval: %dms\n", rect.r.w);
 	rfbClientLog("MulticastVNC: received pixelformat identifier: %d\n", rect.r.x);
 
-	client->multicastSock = CreateMulticastSocket(multicastSockAddr);
+	client->multicastSock = CreateMulticastSocket(multicastSockAddr, client->multicastRcvBufSize);
 	client->multicastUpdInterval = rect.r.w;
   	client->multicastPixelformatId = rect.r.x;
 

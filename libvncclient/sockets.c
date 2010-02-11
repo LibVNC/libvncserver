@@ -703,7 +703,7 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 }
 
 
-int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr)
+int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recvbuf)
 {
   int sock; 
   struct sockaddr_storage localAddr;
@@ -752,7 +752,7 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr)
       return -1;
     } 
   dfltrcvbuf = optval;
-  optval = MULTICAST_SO_RCVBUF;
+  optval = so_recvbuf;
   if(setsockopt(sock,SOL_SOCKET,SO_RCVBUF,(char*)&optval,sizeof(optval)) < 0) 
     {
       rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
@@ -766,7 +766,7 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr)
       return -1;
     } 
   rfbClientLog("MulticastVNC: tried to set socket receive buffer from %d to %d, got %d\n",
-	       dfltrcvbuf, MULTICAST_SO_RCVBUF, optval);
+	       dfltrcvbuf, so_recvbuf, optval);
 
 
   if(bind(sock, (struct sockaddr*)&localAddr, sizeof(localAddr)) < 0)
