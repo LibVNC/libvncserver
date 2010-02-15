@@ -1519,7 +1519,7 @@ HandleRFBServerMessage(rfbClient* client)
 	      msg.mfu.idPartialUpd = rfbClientSwap32IfLE(msg.mfu.idPartialUpd);
 	      msg.mfu.nRects = rfbClientSwap16IfLE(msg.mfu.nRects);	      
 	      
-	      /* calculate lost packages from sequence numbers */
+	      /* calculate lost packets from sequence numbers */
 	      client->multicastRcvd++;
 	      if(client->multicastLastWholeUpd >= 0) /* only check on the second and later runs */
 		{
@@ -1529,8 +1529,16 @@ HandleRFBServerMessage(rfbClient* client)
 		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 0x0FFF0000)
 		    client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
 
+		  /* packets missing */
 		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1)
 		    client->multicastLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
+
+		  /* if a packet arrives out of order (with a lower sequence number than the last, 
+		     but not _much_ lower, as this would be a wrap-around), it was counted as lost 
+		     before, so revert this  */
+		  if(msg.mfu.idPartialUpd < client->multicastLastPartialUpd &&
+		     client->multicastLastPartialUpd - msg.mfu.idPartialUpd < 0x0FFF0000)
+		    client->multicastLost--;
 		}
 	      client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
 	      client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
@@ -1605,12 +1613,11 @@ HandleRFBServerMessage(rfbClient* client)
 		  /* Now we may discard "soft cursor locks". */
 		  client->SoftCursorUnlockScreen(client);
 
-		  /* FIXME well, it's a framebuffer update, but via multicast...*/
 		  client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 		}
 	    }
 
-	  /* FIXME well, it's a framebuffer update, but via multicast...*/
+	  /* FIXME this gets called after each partial update, not a whole one. Is this problematic? */
 	  if (client->FinishedFrameBufferUpdate)
 	    client->FinishedFrameBufferUpdate(client);
 	}
