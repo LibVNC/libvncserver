@@ -8,11 +8,11 @@
 
 - Implement other encodings than raw.
 
-- make the lossratio levels in rfbProcessServerMessage()
-  configurable like maxMulticastTimeouts? Shall we then provide
-  pluggable actions for each of these via function pointers. OTOH,
-  users still have every freedom if they just don't use 
-  rfbProcessServerMessage() and implement their own one...
+- As there are many different ways of computing lost packet stats 
+  (take a sample every time interval or every n packets or compute
+  global average), the loss-ratio handling is right now completely
+  left to the client app, the library just spits out some warnings.
+  Leave that so or provide someting in the library?
 
 - What about multicast specific stats? Right now it's still all
   per-client.

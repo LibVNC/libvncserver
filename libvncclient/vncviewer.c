@@ -394,29 +394,20 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
   int r;
 
   if(client->multicastSock >= 0 && !client->multicastDisabled) 
-    {
-      /* first, analyse multicast loss ratio and act accordingly */
-      double lossrate = client->multicastLost/(double)(client->multicastRcvd+client->multicastLost);
-      if(client->multicastLost > 100) 
-	{
-	  if(lossrate > 0.5) 
-	    {
-	    rfbClientLog("MulticastVNC: loss ratio > 0.5, falling back to unicast\n");
-	    client->multicastDisabled = TRUE;
-	    SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
-	    }
-	  else if(lossrate > 0.2) 
-	    {
-	      rfbClientLog("MulticastVNC: loss ratio > 0.2, requesting a full unicast framebuffer update\n");
-	      SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
-	      client->multicastLost -= client->multicastLost/10;
-	    }
-      }
-  }
-
-  if(client->multicastSock >= 0 && !client->multicastDisabled) 
     { 
       struct timeval now;
+
+      /* first, analyse multicast loss ratio and spit out some warnings */
+      double lossrate = 0;
+      if(client->multicastRcvd > 0)
+	lossrate = client->multicastLost/(double)(client->multicastRcvd+client->multicastLost);
+
+      if(lossrate > 0.5) 
+	rfbClientLog("MulticastVNC: ALERT: loss ratio > 0.5\n");
+      else if(lossrate > 0.2) 
+	rfbClientLog("MulticastVNC: Warning: loss ratio > 0.2\n");
+
+      /* then, see if it's time for a request */
       gettimeofday(&now, NULL);
       if(((now.tv_sec - client->multicastRequestTimestamp.tv_sec)*1000
 	  +(now.tv_usec - client->multicastRequestTimestamp.tv_usec)/1000)
