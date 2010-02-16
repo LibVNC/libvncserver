@@ -806,7 +806,7 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
 
 	multicastRequest.ipv6mr_interface = 0;
 
-	if(setsockopt(sock, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) < 0)
+	if(setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char*) &multicastRequest, sizeof(multicastRequest)) < 0)
 	  {
 	    rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
 	    close(sock);
