@@ -218,8 +218,13 @@ Both TightVNC and UltraVNC Java viewers:
 	yes/no, default: no
 	Automatically trust any cert that the web browsers has accepted.
 	E.g. the user said "Yes" or "Continue" to a web browser dialog
-	regarding a certificate.  If we get the same cert from the VNC
-	server we trust it without prompting the user.
+	regarding a certificate.  If we get the same cert (chain) from
+	the VNC server we trust it without prompting the user.
+
+  debugCerts
+	yes/no, default: no
+	Print out every cert in the Server, TrustUrl, TrustAll chains.
+
 
 TightVNC Java viewer only:
 

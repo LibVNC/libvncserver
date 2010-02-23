@@ -1753,14 +1753,14 @@ void print_help(int mode) {
 "                       ssh) and you do not want x11vnc waiting around for more\n"
 "                       connections, tying up ports, etc.\n"
 "\n"
-"-ssldir [dir]          Use [dir] as an alternate ssl certificate and key\n"
+"-ssldir dir            Use \"dir\" as an alternate ssl certificate and key\n"
 "                       management toplevel directory.  The default is\n"
 "                       ~/.vnc/certs\n"
 "\n"
 "                       This directory is used to store server and other\n"
 "                       certificates and keys and also other materials.  E.g. in\n"
 "                       the simplest case, \"-ssl SAVE\" will store the x11vnc\n"
-"                       server cert in [dir]/server.pem\n"
+"                       server cert in dir/server.pem\n"
 "\n"
 "                       Use of alternate directories via -ssldir allows you to\n"
 "                       manage multiple VNC Certificate Authority (CA) keys.\n"
@@ -1772,14 +1772,14 @@ void print_help(int mode) {
 "                       -ssldir affects nearly all of the other -ssl* options,\n"
 "                       e.g. -ssl SAVE, -sslGenCert, etc..\n"
 "\n"
-"-sslverify [path]      For either of the -ssl or -stunnel modes, use [path]\n"
+"-sslverify path        For either of the -ssl or -stunnel modes, use \"path\"\n"
 "                       to provide certificates to authenticate incoming VNC\n"
 "                       *Client* connections (normally only the server is\n"
 "                       authenticated in SSL.)  This can be used as a method\n"
 "                       to replace standard password authentication of clients.\n"
 "\n"
-"                       If [path] is a directory it contains the client (or CA)\n"
-"                       certificates in separate files.  If [path] is a file,\n"
+"                       If \"path\" is a directory it contains the client (or CA)\n"
+"                       certificates in separate files.  If path is a file,\n"
 "                       it contains one or more certificates. See special tokens\n"
 "                       below.  These correspond to the \"CApath = dir\" and\n"
 "                       \"CAfile = file\" stunnel options.  See the stunnel(8)\n"
@@ -1789,7 +1789,7 @@ void print_help(int mode) {
 "                              x11vnc -ssl -sslverify ~/my.crt\n"
 "                              x11vnc -ssl -sslverify ~/my_pem_dir/\n"
 "\n"
-"                       Note that if [path] is a directory, it must contain\n"
+"                       Note that if path is a directory, it must contain\n"
 "                       the certs in separate files named like <HASH>.0, where\n"
 "                       the value of <HASH> is found by running the command\n"
 "                       \"openssl x509 -hash -noout -in file.crt\". Evidently\n"
@@ -1801,7 +1801,7 @@ void print_help(int mode) {
 "                       subdirs it manages.  Then you can point -sslverify to\n"
 "                       the HASH subdir.\n"
 "\n"
-"                       Special tokens: in -ssl mode, if [path] is not a file or\n"
+"                       Special tokens: in -ssl mode, if \"path\" is not a file or\n"
 "                       a directory, it is taken as a comma separated list of\n"
 "                       tokens that are interpreted as follows:\n"
 "\n"
@@ -2090,7 +2090,7 @@ void print_help(int mode) {
 "                       REQ_ARGS='-days 1095' to bump up the expiration date\n"
 "                       (3 years in this case).\n"
 "\n"
-"-sslEncKey [pem]       Utility to encrypt an existing PEM file with a\n"
+"-sslEncKey pem         Utility to encrypt an existing PEM file with a\n"
 "                       passphrase you supply when prompted.  For that key to be\n"
 "                       used (e.g. by x11vnc) the passphrase must be supplied\n"
 "                       each time.\n"
@@ -2108,7 +2108,7 @@ void print_help(int mode) {
 "                               x11vnc -sslEncKey SAVE\n"
 "                               x11vnc -sslEncKey SAVE-charlie\n"
 "\n"
-"-sslCertInfo [pem]     Prints out information about an existing PEM file.\n"
+"-sslCertInfo pem       Prints out information about an existing PEM file.\n"
 "                       In addition the public certificate is also printed.\n"
 "                       The openssl(1) program must be in PATH. Basically the\n"
 "                       command \"openssl x509 -text\" is run on the pem.\n"
@@ -2137,9 +2137,14 @@ void print_help(int mode) {
 "                       The LIST, LISTL, LL, ALL, HASHON, HASHOFF words can\n"
 "                       also be lowercase, e.g. \"list\".\n"
 "\n"
-"-sslDelCert [pem]      Prompts you to delete all .crt .pem .key .req files\n"
+"-sslDelCert pem        Prompts you to delete all .crt .pem .key .req files\n"
 "                       associated with [pem].  \"SAVE\" and lookups as in\n"
 "                       -sslCertInfo apply as well.\n"
+"\n"
+"-sslScripts            Prints out both the 'genCA' and 'genCert' x11vnc\n"
+"                       openssl wrapper scripts for you to examine, modify, etc.\n"
+"                       The scripts are printed to stdout and then the program\n"
+"                       exits.\n"
 "\n"
 "\n"
 "-stunnel [pem]         Use the stunnel(8) (www.stunnel.org) to provide an\n"
@@ -5530,7 +5535,7 @@ void xopen_display_fail_message(char *disp) {
 	    " x11vnc.\n");
 	fprintf(stderr, " - Being root is usually not enough because the"
 	    " incorrect MIT-MAGIC-COOKIE\n");
-	fprintf(stderr, "   file will be accessed.  The cookie file contains"
+	fprintf(stderr, "   file may be accessed.  The cookie file contains"
 	    " the secret key that\n");
 	fprintf(stderr, "   allows x11vnc to connect to the desired"
 	    " X DISPLAY.\n");
@@ -5542,6 +5547,7 @@ void xopen_display_fail_message(char *disp) {
 	fprintf(stderr, "       x11vnc -auth /tmp/.gdmzndVlR"
 	    " -display :0\n");
 	fprintf(stderr, "   you must have read permission for the auth file.\n");
+	fprintf(stderr, "   See also '-auth guess' and '-findauth' discussed below.\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "** If NO ONE is logged into an X session yet, but"
 	    " there is a greeter login\n");
@@ -5560,6 +5566,12 @@ void xopen_display_fail_message(char *disp) {
 	fprintf(stderr, "\n");
 	fprintf(stderr, "   Sometimes the command \"ps wwwwaux | grep auth\""
 	    " can reveal the file location.\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "   Starting with x11vnc 0.9.9 you can have it try to guess by using:\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "              -auth guess\n");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "   (see also the x11vnc -findauth option.)\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "   Only root will have read permission for the"
 	    " file, and so x11vnc must be run\n");

@@ -40,6 +40,7 @@ extern int start_stunnel(int stunnel_port, int x11vnc_port, int hport, int x11vn
 extern void stop_stunnel(void);
 extern void setup_stunnel(int rport, int *argc, char **argv);
 extern char *get_Cert_dir(char *cdir_in, char **tmp_in);
+extern void sslScripts(void);
 extern void sslGenCA(char *cdir);
 extern void sslGenCert(char *ty, char *nm);
 extern void sslEncKey(char *path, int info_only);

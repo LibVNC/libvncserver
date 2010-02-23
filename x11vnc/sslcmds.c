@@ -53,6 +53,7 @@ int start_stunnel(int stunnel_port, int x11vnc_port, int hport, int x11vnc_hport
 void stop_stunnel(void);
 void setup_stunnel(int rport, int *argc, char **argv);
 char *get_Cert_dir(char *cdir_in, char **tmp_in);
+void sslScripts(void);
 void sslGenCA(char *cdir);
 void sslGenCert(char *ty, char *nm);
 void sslEncKey(char *path, int info_only);
@@ -556,6 +557,15 @@ static char *getsslscript(char *cdir, char *name, char *script) {
 	set_env("OPENSSL", openssl);
 
 	return scr;
+}
+
+void sslScripts(void) {
+	fprintf(stdout, "======================================================\n");
+	fprintf(stdout, "genCA script for '-sslGenCA':\n\n");
+	fprintf(stdout, "%s\n", genCA);
+	fprintf(stdout, "======================================================\n");
+	fprintf(stdout, "genCert script for '-sslGenCert', etc.:\n\n");
+	fprintf(stdout, "%s\n", genCert);
 }
 
 void sslGenCA(char *cdir) {
