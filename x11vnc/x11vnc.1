@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "January 2010" "x11vnc " "User Commands"
+.TH X11VNC "1" "February 2010" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.10, lastmod: 2010-01-07
+         version: 0.9.10, lastmod: 2010-02-21
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -1945,16 +1945,16 @@ scripting SSL connections (e.g. x11vnc is started via
 ssh) and you do not want x11vnc waiting around for more
 connections, tying up ports, etc.
 .PP
-\fB-ssldir\fR \fI[dir]\fR
+\fB-ssldir\fR \fIdir\fR
 .IP
-Use [dir] as an alternate ssl certificate and key
+Use \fIdir\fR as an alternate ssl certificate and key
 management toplevel directory.  The default is
 ~/.vnc/certs
 .IP
 This directory is used to store server and other
 certificates and keys and also other materials.  E.g. in
 the simplest case, "\fB-ssl\fR \fISAVE\fR" will store the x11vnc
-server cert in [dir]/server.pem
+server cert in dir/server.pem
 .IP
 Use of alternate directories via \fB-ssldir\fR allows you to
 manage multiple VNC Certificate Authority (CA) keys.
@@ -1966,16 +1966,16 @@ filesystem to prevent network snooping (for example
 \fB-ssldir\fR affects nearly all of the other \fB-ssl*\fR options,
 e.g. \fB-ssl\fR SAVE, \fB-sslGenCert,\fR etc..
 .PP
-\fB-sslverify\fR \fI[path]\fR
+\fB-sslverify\fR \fIpath\fR
 .IP
-For either of the \fB-ssl\fR or \fB-stunnel\fR modes, use [path]
+For either of the \fB-ssl\fR or \fB-stunnel\fR modes, use \fIpath\fR
 to provide certificates to authenticate incoming VNC
 *Client* connections (normally only the server is
 authenticated in SSL.)  This can be used as a method
 to replace standard password authentication of clients.
 .IP
-If [path] is a directory it contains the client (or CA)
-certificates in separate files.  If [path] is a file,
+If \fIpath\fR is a directory it contains the client (or CA)
+certificates in separate files.  If path is a file,
 it contains one or more certificates. See special tokens
 below.  These correspond to the "CApath = dir" and
 "CAfile = file" stunnel options.  See the 
@@ -1986,7 +1986,7 @@ Examples:
 x11vnc \fB-ssl\fR \fB-sslverify\fR ~/my.crt
 x11vnc \fB-ssl\fR \fB-sslverify\fR ~/my_pem_dir/
 .IP
-Note that if [path] is a directory, it must contain
+Note that if path is a directory, it must contain
 the certs in separate files named like <HASH>.0, where
 the value of <HASH> is found by running the command
 "openssl x509 \fB-hash\fR \fB-noout\fR \fB-in\fR file.crt". Evidently
@@ -1998,7 +1998,7 @@ hashes for you automatically (via symlink) in the HASH
 subdirs it manages.  Then you can point \fB-sslverify\fR to
 the HASH subdir.
 .IP
-Special tokens: in \fB-ssl\fR mode, if [path] is not a file or
+Special tokens: in \fB-ssl\fR mode, if \fIpath\fR is not a file or
 a directory, it is taken as a comma separated list of
 tokens that are interpreted as follows:
 .IP
@@ -2298,7 +2298,7 @@ A common use would be
 REQ_ARGS='-days 1095' to bump up the expiration date
 (3 years in this case).
 .PP
-\fB-sslEncKey\fR \fI[pem]\fR
+\fB-sslEncKey\fR \fIpem\fR
 .IP
 Utility to encrypt an existing PEM file with a
 passphrase you supply when prompted.  For that key to be
@@ -2320,7 +2320,7 @@ x11vnc \fB-sslEncKey\fR /path/to/foo.pem
 x11vnc \fB-sslEncKey\fR SAVE
 x11vnc \fB-sslEncKey\fR SAVE-charlie
 .PP
-\fB-sslCertInfo\fR \fI[pem]\fR
+\fB-sslCertInfo\fR \fIpem\fR
 .IP
 Prints out information about an existing PEM file.
 In addition the public certificate is also printed.
@@ -2353,11 +2353,18 @@ removes these HASH subdirs.
 The LIST, LISTL, LL, ALL, HASHON, HASHOFF words can
 also be lowercase, e.g. "list".
 .PP
-\fB-sslDelCert\fR \fI[pem]\fR
+\fB-sslDelCert\fR \fIpem\fR
 .IP
 Prompts you to delete all .crt .pem .key .req files
 associated with [pem].  "SAVE" and lookups as in
 \fB-sslCertInfo\fR apply as well.
+.PP
+\fB-sslScripts\fR
+.IP
+Prints out both the 'genCA' and 'genCert' x11vnc
+openssl wrapper scripts for you to examine, modify, etc.
+The scripts are printed to stdout and then the program
+exits.
 .PP
 \fB-stunnel\fR \fI[pem]\fR
 .IP

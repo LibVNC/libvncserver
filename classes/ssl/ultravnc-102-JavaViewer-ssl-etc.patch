@@ -2644,8 +2644,8 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  	//	}
 diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 --- JavaViewer.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ JavaViewer/SSLSocketToMe.java	2009-08-13 09:16:42.000000000 -0400
-@@ -0,0 +1,1727 @@
++++ JavaViewer/SSLSocketToMe.java	2010-02-22 20:03:11.000000000 -0500
+@@ -0,0 +1,1712 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -2722,6 +2722,7 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +
 +	boolean use_url_cert_for_auth = true;
 +	boolean user_wants_to_see_cert = true;
++	boolean debug_certs = false;
 +
 +	/* cert(s) we retrieve from VNC server */
 +	java.security.cert.Certificate[] trustallCerts = null;
@@ -2750,6 +2751,8 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +		host = h;
 +		port = p;
 +		viewer = v;
++
++		debug_certs = v.debugCerts;
 +
 +		/* we will first try default factory for certification: */
 +
@@ -2808,21 +2811,6 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +					throw new CertificateException(
 +					    "No Trust url Certs.");
 +				}
-+				if (trusturlCerts.length > 1) {
-+					int i;
-+					boolean ok = true;
-+					for (i = 0; i < trusturlCerts.length - 1; i++)  {
-+						if (! trusturlCerts[i].equals(trusturlCerts[i+1])) {
-+							ok = false;
-+						}
-+					}
-+					if (! ok) {
-+						throw new CertificateException(
-+						    "Too many Trust url Certs: "
-+						    + trusturlCerts.length
-+						);
-+					}
-+				}
 +				if (certs == null) {
 +					throw new CertificateException(
 +					    "No this-certs array.");
@@ -2831,26 +2819,32 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +					throw new CertificateException(
 +					    "No this-certs Certs.");
 +				}
-+				if (certs.length > 1) {
-+					int i;
-+					boolean ok = true;
-+					for (i = 0; i < certs.length - 1; i++)  {
-+						if (! certs[i].equals(certs[i+1])) {
-+							ok = false;
-+						}
-+					}
-+					if (! ok) {
-+						throw new CertificateException(
-+						    "Too many this-certs: "
-+						    + certs.length
-+						);
-+					}
-+				}
-+				if (! trusturlCerts[0].equals(certs[0])) {
++				if (certs.length != trusturlCerts.length) {
 +					throw new CertificateException(
-+					    "Server Cert Changed != URL.");
++					    "certs.length != trusturlCerts.length " + certs.length + " " + trusturlCerts.length);
 +				}
-+				dbg("URL: trusturlCerts[0] matches certs[0]");
++				boolean ok = true;
++				for (int i = 0; i < certs.length; i++)  {
++					if (! trusturlCerts[i].equals(certs[i])) {
++						ok = false;
++						dbg("URL: cert mismatch at i=" + i);
++						dbg("URL: cert mismatch cert" + certs[i]);
++						dbg("URL: cert mismatch  url" + trusturlCerts[i]);
++					}
++					if (debug_certs) {
++						dbg("\n***********************************************");
++						dbg("URL: cert info at i=" + i);
++						dbg("URL: cert info cert" + certs[i]);
++						dbg("===============================================");
++						dbg("URL: cert info  url" + trusturlCerts[i]);
++						dbg("***********************************************");
++					}
++				}
++				if (!ok) {
++					throw new CertificateException(
++					    "Server Cert Chain != URL Cert Chain.");
++				}
++				dbg("URL: trusturlCerts[i] matches certs[i] i=0:" + (certs.length-1));
 +			}
 +		    }
 +		};
@@ -2880,21 +2874,6 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +					throw new CertificateException(
 +					    "No Trust All Server Certs.");
 +				}
-+				if (trustallCerts.length > 1) {
-+					int i;
-+					boolean ok = true;
-+					for (i = 0; i < trustallCerts.length - 1; i++)  {
-+						if (! trustallCerts[i].equals(trustallCerts[i+1])) {
-+							ok = false;
-+						}
-+					}
-+					if (! ok) {
-+						throw new CertificateException(
-+						    "Too many Trust All Server Certs: "
-+						    + trustallCerts.length
-+						);
-+					}
-+				}
 +				if (certs == null) {
 +					throw new CertificateException(
 +					    "No this-certs array.");
@@ -2903,26 +2882,32 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +					throw new CertificateException(
 +					    "No this-certs Certs.");
 +				}
-+				if (certs.length > 1) {
-+					int i;
-+					boolean ok = true;
-+					for (i = 0; i < certs.length - 1; i++)  {
-+						if (! certs[i].equals(certs[i+1])) {
-+							ok = false;
-+						}
-+					}
-+					if (! ok) {
-+						throw new CertificateException(
-+						    "Too many this-certs: "
-+						    + certs.length
-+						);
-+					}
-+				}
-+				if (! trustallCerts[0].equals(certs[0])) {
++				if (certs.length != trustallCerts.length) {
 +					throw new CertificateException(
-+					    "Server Cert Changed != TRUSTALL.");
++					    "certs.length != trustallCerts.length " + certs.length + " " + trustallCerts.length);
 +				}
-+				dbg("ONE: trustallCerts[0] matches certs[0]");
++				boolean ok = true;
++				for (int i = 0; i < certs.length; i++)  {
++					if (! trustallCerts[i].equals(certs[i])) {
++						ok = false;
++						dbg("ONE: cert mismatch at i=" + i);
++						dbg("ONE: cert mismatch cert" + certs[i]);
++						dbg("ONE: cert mismatch  all" + trustallCerts[i]);
++					}
++					if (debug_certs) {
++						dbg("\n***********************************************");
++						dbg("ONE: cert info at i=" + i);
++						dbg("ONE: cert info cert" + certs[i]);
++						dbg("===============================================");
++						dbg("ONE: cert info  all" + trustallCerts[i]);
++						dbg("***********************************************");
++					}
++				}
++				if (!ok) {
++					throw new CertificateException(
++					    "Server Cert Chain != TRUSTALL Cert Chain.");
++				}
++				dbg("ONE: trustallCerts[i] matches certs[i] i=0:" + (certs.length-1));
 +			}
 +		    }
 +		};
@@ -4498,7 +4483,7 @@ diff -Naur JavaViewer.orig/VncCanvas.java JavaViewer/VncCanvas.java
  						result = 0; // Transparent pixel
 diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 --- JavaViewer.orig/VncViewer.java	2006-05-24 15:14:40.000000000 -0400
-+++ JavaViewer/VncViewer.java	2009-06-19 10:31:23.000000000 -0400
++++ JavaViewer/VncViewer.java	2010-02-22 21:58:51.000000000 -0500
 @@ -80,11 +80,11 @@
    GridBagLayout gridbag;
    ButtonPanel buttonPanel;
@@ -4522,7 +4507,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
    String passwordParam;
    String encPasswordParam;
    boolean showControls;
-@@ -115,28 +115,70 @@
+@@ -115,28 +115,71 @@
    int i;
    // mslogon support 2 end
  
@@ -4540,6 +4525,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 +boolean ignoreProxy;
 +boolean trustAllVncCerts;
 +boolean trustUrlVncCert;
++boolean debugCerts;
 +
 +boolean ignoreMSLogonCheck;
 +boolean delayAuthPanel;
@@ -4599,7 +4585,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      // authenticator = new AuthPanel(false);   // mslogon support : go to connectAndAuthenticate()
      if (RecordingFrame.checkSecurity())
        rec = new RecordingFrame(this);
-@@ -147,10 +189,11 @@
+@@ -147,10 +190,11 @@
      cursorUpdatesDef = null;
      eightBitColorsDef = null;
  
@@ -4613,7 +4599,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      rfbThread = new Thread(this);
      rfbThread.start();
    }
-@@ -186,6 +229,30 @@
+@@ -186,6 +230,30 @@
        gbc.weightx = 1.0;
        gbc.weighty = 1.0;
  
@@ -4644,7 +4630,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  	// Add ScrollPanel to applet mode
  
  	// Create a panel which itself is resizeable and can hold
-@@ -286,6 +353,24 @@
+@@ -286,6 +354,24 @@
  
    void connectAndAuthenticate() throws Exception {
  
@@ -4669,7 +4655,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      // If "ENCPASSWORD" parameter is set, decrypt the password into
      // the passwordParam string.
  
-@@ -336,7 +421,22 @@
+@@ -336,7 +422,22 @@
      //
  
      
@@ -4693,7 +4679,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      authenticator = new AuthPanel(mslogon);
      
-@@ -390,6 +490,10 @@
+@@ -390,6 +491,10 @@
  	break;
        //mslogon support end
  
@@ -4704,7 +4690,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
        // Retry on authentication failure.
        authenticator.retry();
      }
-@@ -405,9 +509,11 @@
+@@ -405,9 +510,11 @@
  
    void prologueDetectAuthProtocol() throws Exception {
  
@@ -4718,7 +4704,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      System.out.println("RFB server supports protocol version " +
  		       rfb.serverMajor + "." + rfb.serverMinor);
-@@ -431,16 +537,36 @@
+@@ -431,16 +538,36 @@
  
    boolean tryAuthenticate(String us, String pw) throws Exception {
      
@@ -4761,7 +4747,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      switch (authScheme) {
  
-@@ -629,6 +755,10 @@
+@@ -629,6 +756,10 @@
  
    void doProtocolInitialisation() throws IOException {
  
@@ -4772,7 +4758,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      rfb.writeClientInit();
  
      rfb.readServerInit();
-@@ -775,8 +905,25 @@
+@@ -775,8 +906,25 @@
        }
      }
  
@@ -4800,7 +4786,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      if (inAnApplet) {
        str = readParameter("Open New Window", false);
-@@ -804,6 +951,133 @@
+@@ -804,6 +952,138 @@
      deferScreenUpdates = readIntParameter("Defer screen updates", 20);
      deferCursorUpdates = readIntParameter("Defer cursor updates", 10);
      deferUpdateRequests = readIntParameter("Defer update requests", 50);
@@ -4904,6 +4890,11 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 +    str = readParameter("trustUrlVncCert", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +	trustUrlVncCert = true;
++    }
++    debugCerts = false;
++    str = readParameter("debugCerts", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	debugCerts = true;
 +    }
 +    ignoreMSLogonCheck = false;
 +    str = readParameter("ignoreMSLogonCheck", false);

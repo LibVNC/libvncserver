@@ -2844,6 +2844,11 @@ int main(int argc, char* argv[]) {
 			exit(0);
 			continue;
 		}
+		if (!strcmp(arg, "-sslScripts")) {
+			sslScripts();
+			exit(0);
+			continue;
+		}
 		if (!strcmp(arg, "-stunnel")) {
 			use_stunnel = 1;
 			got_tls = -1000;

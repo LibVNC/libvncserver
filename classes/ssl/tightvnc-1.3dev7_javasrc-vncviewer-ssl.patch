@@ -73,8 +73,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2009-08-13 09:16:42.000000000 -0400
-@@ -0,0 +1,1727 @@
++++ vnc_javasrc/SSLSocketToMe.java	2010-02-22 20:03:11.000000000 -0500
+@@ -0,0 +1,1712 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -151,6 +151,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +
 +	boolean use_url_cert_for_auth = true;
 +	boolean user_wants_to_see_cert = true;
++	boolean debug_certs = false;
 +
 +	/* cert(s) we retrieve from VNC server */
 +	java.security.cert.Certificate[] trustallCerts = null;
@@ -179,6 +180,8 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +		host = h;
 +		port = p;
 +		viewer = v;
++
++		debug_certs = v.debugCerts;
 +
 +		/* we will first try default factory for certification: */
 +
@@ -237,21 +240,6 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					throw new CertificateException(
 +					    "No Trust url Certs.");
 +				}
-+				if (trusturlCerts.length > 1) {
-+					int i;
-+					boolean ok = true;
-+					for (i = 0; i < trusturlCerts.length - 1; i++)  {
-+						if (! trusturlCerts[i].equals(trusturlCerts[i+1])) {
-+							ok = false;
-+						}
-+					}
-+					if (! ok) {
-+						throw new CertificateException(
-+						    "Too many Trust url Certs: "
-+						    + trusturlCerts.length
-+						);
-+					}
-+				}
 +				if (certs == null) {
 +					throw new CertificateException(
 +					    "No this-certs array.");
@@ -260,26 +248,32 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					throw new CertificateException(
 +					    "No this-certs Certs.");
 +				}
-+				if (certs.length > 1) {
-+					int i;
-+					boolean ok = true;
-+					for (i = 0; i < certs.length - 1; i++)  {
-+						if (! certs[i].equals(certs[i+1])) {
-+							ok = false;
-+						}
-+					}
-+					if (! ok) {
-+						throw new CertificateException(
-+						    "Too many this-certs: "
-+						    + certs.length
-+						);
-+					}
-+				}
-+				if (! trusturlCerts[0].equals(certs[0])) {
++				if (certs.length != trusturlCerts.length) {
 +					throw new CertificateException(
-+					    "Server Cert Changed != URL.");
++					    "certs.length != trusturlCerts.length " + certs.length + " " + trusturlCerts.length);
 +				}
-+				dbg("URL: trusturlCerts[0] matches certs[0]");
++				boolean ok = true;
++				for (int i = 0; i < certs.length; i++)  {
++					if (! trusturlCerts[i].equals(certs[i])) {
++						ok = false;
++						dbg("URL: cert mismatch at i=" + i);
++						dbg("URL: cert mismatch cert" + certs[i]);
++						dbg("URL: cert mismatch  url" + trusturlCerts[i]);
++					}
++					if (debug_certs) {
++						dbg("\n***********************************************");
++						dbg("URL: cert info at i=" + i);
++						dbg("URL: cert info cert" + certs[i]);
++						dbg("===============================================");
++						dbg("URL: cert info  url" + trusturlCerts[i]);
++						dbg("***********************************************");
++					}
++				}
++				if (!ok) {
++					throw new CertificateException(
++					    "Server Cert Chain != URL Cert Chain.");
++				}
++				dbg("URL: trusturlCerts[i] matches certs[i] i=0:" + (certs.length-1));
 +			}
 +		    }
 +		};
@@ -309,21 +303,6 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					throw new CertificateException(
 +					    "No Trust All Server Certs.");
 +				}
-+				if (trustallCerts.length > 1) {
-+					int i;
-+					boolean ok = true;
-+					for (i = 0; i < trustallCerts.length - 1; i++)  {
-+						if (! trustallCerts[i].equals(trustallCerts[i+1])) {
-+							ok = false;
-+						}
-+					}
-+					if (! ok) {
-+						throw new CertificateException(
-+						    "Too many Trust All Server Certs: "
-+						    + trustallCerts.length
-+						);
-+					}
-+				}
 +				if (certs == null) {
 +					throw new CertificateException(
 +					    "No this-certs array.");
@@ -332,26 +311,32 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +					throw new CertificateException(
 +					    "No this-certs Certs.");
 +				}
-+				if (certs.length > 1) {
-+					int i;
-+					boolean ok = true;
-+					for (i = 0; i < certs.length - 1; i++)  {
-+						if (! certs[i].equals(certs[i+1])) {
-+							ok = false;
-+						}
-+					}
-+					if (! ok) {
-+						throw new CertificateException(
-+						    "Too many this-certs: "
-+						    + certs.length
-+						);
-+					}
-+				}
-+				if (! trustallCerts[0].equals(certs[0])) {
++				if (certs.length != trustallCerts.length) {
 +					throw new CertificateException(
-+					    "Server Cert Changed != TRUSTALL.");
++					    "certs.length != trustallCerts.length " + certs.length + " " + trustallCerts.length);
 +				}
-+				dbg("ONE: trustallCerts[0] matches certs[0]");
++				boolean ok = true;
++				for (int i = 0; i < certs.length; i++)  {
++					if (! trustallCerts[i].equals(certs[i])) {
++						ok = false;
++						dbg("ONE: cert mismatch at i=" + i);
++						dbg("ONE: cert mismatch cert" + certs[i]);
++						dbg("ONE: cert mismatch  all" + trustallCerts[i]);
++					}
++					if (debug_certs) {
++						dbg("\n***********************************************");
++						dbg("ONE: cert info at i=" + i);
++						dbg("ONE: cert info cert" + certs[i]);
++						dbg("===============================================");
++						dbg("ONE: cert info  all" + trustallCerts[i]);
++						dbg("***********************************************");
++					}
++				}
++				if (!ok) {
++					throw new CertificateException(
++					    "Server Cert Chain != TRUSTALL Cert Chain.");
++				}
++				dbg("ONE: trustallCerts[i] matches certs[i] i=0:" + (certs.length-1));
 +			}
 +		    }
 +		};
@@ -1804,7 +1789,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +}
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
 --- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/VncViewer.java	2009-06-19 10:32:03.000000000 -0400
++++ vnc_javasrc/VncViewer.java	2010-02-22 19:25:19.000000000 -0500
 @@ -80,7 +80,7 @@
    // Variables read from parameter values.
    String socketFactory;
@@ -1814,7 +1799,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
    boolean showControls;
    boolean offerRelogin;
    boolean showOfflineDesktop;
-@@ -88,6 +88,19 @@
+@@ -88,6 +88,20 @@
    int deferCursorUpdates;
    int deferUpdateRequests;
  
@@ -1830,11 +1815,12 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +  boolean ignoreProxy;
 +  boolean trustAllVncCerts;
 +  boolean trustUrlVncCert;
++  boolean debugCerts;
 +
    // Reference to this applet for inter-applet communication.
    public static java.applet.Applet refApplet;
  
-@@ -591,8 +604,25 @@
+@@ -591,8 +605,25 @@
        }
      }
  
@@ -1862,7 +1848,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
  
      if (inAnApplet) {
        str = readParameter("Open New Window", false);
-@@ -626,6 +656,96 @@
+@@ -626,6 +657,101 @@
  
      // SocketFactory.
      socketFactory = readParameter("SocketFactory", false);
@@ -1955,6 +1941,11 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +    str = readParameter("trustUrlVncCert", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +	trustUrlVncCert = true;
++    }
++    debugCerts = false;
++    str = readParameter("debugCerts", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	debugCerts = true;
 +    }
    }
  

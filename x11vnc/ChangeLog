@@ -1,3 +1,10 @@
+2010-02-22  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: Java SSL applet viewer now works with certificate
+	  chains.
+	* x11vnc: Printout option -sslScripts.  Suggest -auth guess
+	  in error message.  Set fake_screen width and height.  Test
+	  for +kb in Xvfb.
+
 2010-01-02  Karl Runge <runge@karlrunge.com>
 	* x11vnc: small tweaks to Xdummy, rx11vnc*.  Apply
 	  SMALL_FOOTPRINT to -appshare text.  Copyright year change.
