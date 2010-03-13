@@ -358,7 +358,9 @@ void rfbClientCleanup(rfbClient* client) {
 #endif
 #endif
 
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
   FreeTLS(client);
+#endif
   if (client->sock >= 0)
     close(client->sock);
   if (client->listenSock >= 0)
