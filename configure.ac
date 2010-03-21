@@ -124,7 +124,7 @@ fi
 if test "x$with_x" = "xno"; then
 	HAVE_X11="false"
 elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
-	AC_CHECK_LIB(X11, XGetImage, [AC_DEFINE(HAVE_X11) HAVE_X="true"],
+	AC_CHECK_LIB(X11, XGetImage, [AC_DEFINE(HAVE_X11) HAVE_X11="true"],
 		HAVE_X11="false",
 		$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
@@ -248,7 +248,7 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 fi
 
 AC_SUBST(X_LIBS)
-AM_CONDITIONAL(HAVE_X11, test $HAVE_X != "false")
+AM_CONDITIONAL(HAVE_X11, test $HAVE_X11 != "false")
 
 # x11vnc only:
 if test "$build_x11vnc" = "yes"; then
