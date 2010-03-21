@@ -1,3 +1,16 @@
+2010-03-20  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: Many improvements to Java SSL applet, onetimekey
+	  serverCert param, debugging printout, user dialogs, catch
+	  socket exceptions, autodetect x11vnc for GET=1.
+	* x11vnc: misc/scripts: desktop.cgi, inet6to4, panner.pl.
+	  X11VNC_HTTPS_DOWNLOAD_WAIT_TIME, -unixpw %xxx documented, and
+	  can run user cmd in UNIXPW_CMD. FD_XDMCP_IF for create script,
+	  autodetect dm on udp6 only.  Queries: pointer_x, pointer_y,
+	  pointer_same, pointer_root.  Switch on -xkd if keysyms per key >
+	  4 in all cases.  daemon mode improvements for connect_switch,
+	  inet6to4, ultravnc_repeater.pl.  Dynamic change of -clip do
+	  not create new fb if WxH is unchanged.
+
 2010-02-22  Karl Runge <runge@karlrunge.com>
 	* classes/ssl: Java SSL applet viewer now works with certificate
 	  chains.

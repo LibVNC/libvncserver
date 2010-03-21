@@ -3460,6 +3460,7 @@ void accept_openssl(int mode, int presock) {
 				char reply[] = "HTTP/1.0 200 OK\r\n"
 				    "Content-Type: octet-stream\r\n"
 				    "Connection: Keep-Alive\r\n"
+				    "VNC-Server: x11vnc\r\n"
 				    "Pragma: no-cache\r\n\r\n";
 				/*
 				 * special case proxy coming thru https
@@ -3503,6 +3504,7 @@ void accept_openssl(int mode, int presock) {
 				char reply[] = "HTTP/1.0 200 OK\r\n"
 				    "Connection: close\r\n"
 				    "Content-Type: octet-stream\r\n"
+				    "VNC-Server: x11vnc\r\n"
 				    "Pragma: no-cache\r\n\r\n";
 
 				rfbLog("Handling Check HTTPS request via https GET. [%d]\n", getpid());
@@ -3782,14 +3784,14 @@ void accept_openssl(int mode, int presock) {
 			q = strstr(rcookie, "VENCRYPT=");
 			if (q && sscanf(q, "VENCRYPT=%d,", &vencrypt_sel) == 1) {
 				if (vencrypt_sel != 0) {
-					rfbLog("SSL: VENCRYPT mode=%d accepted.\n", vencrypt_sel);
+					rfbLog("SSL: VENCRYPT mode=%d accepted. helper[%d]\n", vencrypt_sel, pid);
 					goto accept_client;
 				}
 			}
 			q = strstr(rcookie, "ANONTLS=");
 			if (q && sscanf(q, "ANONTLS=%d,", &anontls_sel) == 1) {
 				if (anontls_sel != 0) {
-					rfbLog("SSL: ANONTLS mode=%d accepted.\n", anontls_sel);
+					rfbLog("SSL: ANONTLS mode=%d accepted. helper[%d]\n", anontls_sel, pid);
 					goto accept_client;
 				}
 			}
@@ -3803,6 +3805,12 @@ void accept_openssl(int mode, int presock) {
 
 		if (strstr(rcookie, uniq) == rcookie) {
 			int i;
+			double https_download_wait_time = 15.0;
+
+			if (getenv("X11VNC_HTTPS_DOWNLOAD_WAIT_TIME")) {
+				https_download_wait_time = atof(getenv("X11VNC_HTTPS_DOWNLOAD_WAIT_TIME"));
+			}
+
 			rfbLog("SSL: BUT WAIT! HTTPS for helper process[%d] succeeded. Good.\n", pid);
 			if (mode != OPENSSL_HTTPS) {
 				last_https = dnow();
@@ -3814,6 +3822,7 @@ void accept_openssl(int mode, int presock) {
 			}
 			if (rcookie && strstr(rcookie, "VncViewer.class")) {
 				rfbLog("\n");
+				rfbLog("helper[%d]:\n", pid);
 				rfbLog("***********************************************************\n");
 				rfbLog("SSL: WARNING CLIENT ASKED FOR NONEXISTENT 'VncViewer.class'\n");
 				rfbLog("SSL: USER NEEDS TO **RESTART** HIS WEB BROWSER.\n");
@@ -3841,31 +3850,34 @@ void accept_openssl(int mode, int presock) {
 				}
 				screen->port = useport;
 				if (origport != useport) {
-					rfbLog("SSL: -httpsredir guess port: %d\n", screen->port);
+					rfbLog("SSL: -httpsredir guess port: %d  helper[%d]\n", screen->port, pid);
 				}
 
 				start = dnow();
-				while (dnow() < start + 10.0) {
+				while (dnow() < start + https_download_wait_time) {
 					if (screen->httpSock >= 0) saw_httpsock = 1;
 					rfbPE(10000);
 					usleep(10000);
 					if (screen->httpSock >= 0) saw_httpsock = 1;
 					waitpid(pid, &status, WNOHANG); 
 					if (kill(pid, 0) != 0) {
-						rfbPE(10000);
-						rfbPE(10000);
+						rfbLog("SSL: helper[%d] pid finished\n", pid);
 						break;
 					}
-					if (saw_httpsock && screen->httpSock < 0) {
+					if (0 && saw_httpsock && screen->httpSock < 0) {
+						/* this check can kill the helper too soon. */
 						rfbLog("SSL: httpSock for helper[%d] went away\n", pid);
-						rfbPE(10000);
-						rfbPE(10000);
 						break;
 					}
 				}
-				screen->port = origport;
 				rfbLog("SSL: guessing child helper[%d] https finished. dt=%.6f\n",
 				    pid, dnow() - start);
+
+				rfbPE(10000);
+				rfbPE(10000);
+				rfbPE(10000);
+
+				screen->port = origport;
 				ssl_helper_pid(0, -2);
 				if (mode == OPENSSL_INETD) {
 					clean_up_exit(1);
@@ -3888,31 +3900,34 @@ void accept_openssl(int mode, int presock) {
 						}
 					}
 				}
-				rfbLog("SSL: screen->port %d\n", screen->port);
+				rfbLog("SSL: screen->port %d for helper[%d]\n", screen->port, pid);
 
 				/* kludge for https fetch via inetd */
 				start = dnow();
-				while (dnow() < start + 10.0) {
+				while (dnow() < start + https_download_wait_time) {
 					if (screen->httpSock >= 0) saw_httpsock = 1;
 					rfbPE(10000);
 					usleep(10000);
 					if (screen->httpSock >= 0) saw_httpsock = 1;
 					waitpid(pid, &status, WNOHANG); 
 					if (kill(pid, 0) != 0) {
-						rfbPE(10000);
-						rfbPE(10000);
+						rfbLog("SSL: helper[%d] pid finished\n", pid);
 						break;
 					}
-					if (saw_httpsock && screen->httpSock < 0) {
+					if (0 && saw_httpsock && screen->httpSock < 0) {
+						/* this check can kill the helper too soon. */
 						rfbLog("SSL: httpSock for helper[%d] went away\n", pid);
-						rfbPE(10000);
-						rfbPE(10000);
 						break;
 					}
 				}
 				rfbLog("SSL: OPENSSL_INETD guessing "
 				    "child helper[%d] https finished. dt=%.6f\n",
 				    pid, dnow() - start);
+
+				rfbPE(10000);
+				rfbPE(10000);
+				rfbPE(10000);
+
 				ssl_helper_pid(0, -2);
 				clean_up_exit(1);
 			}

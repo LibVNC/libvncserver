@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Copyright (c) 2006-2009 by Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2006-2010 by Karl J. Runge <runge@karlrunge.com>
 #
 # connect_switch is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -35,9 +35,13 @@
 # because the CONNECT request appears to be forwarded encrypted to
 # the remote host and so the SSL dies immediately. 
 #
+# It can also be used to redirect ANY protocol, e.g. SSH, not just VNC.
+# See CONNECT_SWITCH_APPLY_VNC_OFFSET=0 to disable VNC 5900 shift.
+#
 # Note: There is no need to use this script for a non-ssl apache webserver
 # port because mod_proxy works fine for doing the switching all inside
 # apache (see ProxyRequests and AllowCONNECT parameters).
+#
 #
 # Apache configuration:
 #
@@ -68,6 +72,126 @@
 # It is probably a good idea to set $listen_host below to the known
 # IP address you want the service to listen on (to avoid localhost where
 # apache is listening).
+#
+
+####################################################################
+# NOTE: For more info on configuration settings, read below for
+#       all of the CONNECT_SWITCH_* env. var. parameters.
+####################################################################
+
+
+####################################################################
+# Allow env vars to also be specified on cmdline:
+#
+foreach my $arg (@ARGV) {
+	if ($arg =~ /^(CONNECT_SWITCH.*?)=(.*)$/) {
+		$ENV{$1} = $2;
+	}
+}
+
+# Set up logging:
+#
+if (exists $ENV{CONNECT_SWITCH_LOGFILE}) {
+	close STDOUT;
+	if (!open(STDOUT, ">>$ENV{CONNECT_SWITCH_LOGFILE}")) {
+		die "connect_switch: $ENV{CONNECT_SWITCH_LOGFILE} $!\n";
+	}
+	close STDERR;
+	open(STDERR, ">&STDOUT");
+}
+select(STDERR); $| = 1;
+select(STDOUT); $| = 1;
+
+# interrupt handler:
+#
+my $looppid = '';
+my $pidfile = '';
+my $listen_sock = '';	# declared here for get_out()
+#
+sub get_out {
+	print STDERR "$_[0]:\t$$ looppid=$looppid\n";
+	close $listen_sock if $listen_sock;
+	if ($looppid) {
+		kill 'TERM', $looppid;
+		fsleep(0.2);
+	}
+	unlink $pidfile if $pidfile;
+	exit 0;
+}
+$SIG{INT}  = \&get_out;
+$SIG{TERM} = \&get_out;
+
+# pidfile:
+#
+sub open_pidfile {
+	if (exists $ENV{CONNECT_SWITCH_PIDFILE}) {
+		my $pf = $ENV{CONNECT_SWITCH_PIDFILE};
+		if (open(PID, ">$pf")) {
+			print PID "$$\n";
+			close PID;
+			$pidfile = $pf;
+		} else {
+			print STDERR "could not open pidfile: $pf - $! - continuing...\n";
+		}
+		delete $ENV{CONNECT_SWITCH_PIDFILE};
+	}
+}
+
+####################################################################
+# Set CONNECT_SWITCH_LOOP=1 to have this script create an outer loop
+# restarting itself if it ever exits.  Set CONNECT_SWITCH_LOOP=BG to
+# do this in the background as a daemon.
+
+if (exists $ENV{CONNECT_SWITCH_LOOP}) {
+	my $csl = $ENV{CONNECT_SWITCH_LOOP};
+	if ($csl ne 'BG' && $csl ne '1') {
+		die "connect_switch: invalid CONNECT_SWITCH_LOOP.\n";
+	}
+	if ($csl eq 'BG') {
+		# go into bg as "daemon":
+		setpgrp(0, 0);
+		my $pid = fork();
+		if (! defined $pid) {
+			die "connect_switch: $!\n";
+		} elsif ($pid) {
+			wait;
+			exit 0;
+		}
+		if (fork) {
+			exit 0;
+		}
+		setpgrp(0, 0);
+		close STDIN;
+		if (! $ENV{CONNECT_SWITCH_LOGFILE}) {
+			close STDOUT;
+			close STDERR;
+		}
+	}
+	delete $ENV{CONNECT_SWITCH_LOOP};
+
+	if (exists $ENV{CONNECT_SWITCH_PIDFILE}) {
+		open_pidfile();
+	}
+
+	print STDERR "connect_switch: starting service at ", scalar(localtime), " master-pid=$$\n";
+	while (1) {
+		$looppid = fork;
+		if (! defined $looppid) {
+			sleep 10;
+		} elsif ($looppid) {
+			wait;
+		} else {
+			exec $0;	
+			exit 1;
+		}
+		print STDERR "connect_switch: re-starting service at ", scalar(localtime), " master-pid=$$\n";
+		sleep 1;
+	}
+	exit 0;
+}
+if (exists $ENV{CONNECT_SWITCH_PIDFILE}) {
+	open_pidfile();
+}
 
 
 ############################################################################
@@ -83,15 +207,29 @@
 #	CONNECT_SWITCH_VERBOSE
 #	CONNECT_SWITCH_APPLY_VNC_OFFSET
 #	CONNECT_SWITCH_VNC_OFFSET
+#	CONNECT_SWITCH_LISTEN_IPV6
+#	CONNECT_SWITCH_BUFSIZE
+#	CONNECT_SWITCH_LOGFILE
+#	CONNECT_SWITCH_PIDFILE
+#
+# You can also set these on the cmdline:
+#      connect_switch CONNECT_SWITCH_LISTEN=X CONNECT_SWITCH_ALLOW_FILE=Y ...
+#
 
+# By default we will use hostname and assume it resolves:
+#
 my $hostname = `hostname`;
 chomp $hostname;
 
 my $listen_host = $hostname;	
 my $listen_port = 443;	
 
+# Let user override listening situation, e.g. multihomed:
+#
 if (exists $ENV{CONNECT_SWITCH_LISTEN}) {
+	#
 	# E.g. CONNECT_SWITCH_LISTEN=192.168.0.32:443
+	#
 	($listen_host, $listen_port) = split(/:/, $ENV{CONNECT_SWITCH_LISTEN});
 }
 
@@ -99,9 +237,20 @@ my $httpd_host = 'localhost';
 my $httpd_port = 443;	
 
 if (exists $ENV{CONNECT_SWITCH_HTTPD}) {
+	#
 	# E.g. CONNECT_SWITCH_HTTPD=127.0.0.1:443
+	#
 	($httpd_host, $httpd_port) = split(/:/, $ENV{CONNECT_SWITCH_HTTPD});
 }
+
+my $bufsize = 8192;
+if (exists $ENV{CONNECT_SWITCH_BUFSIZE}) {
+	#
+	# E.g. CONNECT_SWITCH_BUFSIZE=32768
+	#
+	$bufsize = $ENV{CONNECT_SWITCH_BUFSIZE};
+}
+
 
 ############################################################################
 # You can/should override the host/port settings here:
@@ -113,6 +262,9 @@ if (exists $ENV{CONNECT_SWITCH_HTTPD}) {
 
 # You must set the allowed host:port CONNECT redirection list.
 # Only these host:port pairs will be redirected to.
+# Port ranges are allowed too:  host:5900-5930.
+# If there is one entry named ALL all connections are allow.
+# You must supply something, default is deny.
 #
 my @allowed = qw(
 	machine1:5915
@@ -141,6 +293,8 @@ if (exists $ENV{CONNECT_SWITCH_ALLOWED}) {
 #     fredsbox 15 
 #     rupert    1 
 
+# For examply, mine is:
+#
 my $allow_file = '/dist/apache/2.0/conf/vnc.hosts';
 $allow_file = '';
 
@@ -158,25 +312,34 @@ my $apply_vnc_offset = 1;
 my $vnc_offset = 5900;
 
 if (exists $ENV{CONNECT_SWITCH_APPLY_VNC_OFFSET}) {
+	#
 	# E.g. CONNECT_SWITCH_APPLY_VNC_OFFSET=0
+	#
 	$apply_vnc_offset = $ENV{CONNECT_SWITCH_APPLY_VNC_OFFSET};
 }
 if (exists $ENV{CONNECT_SWITCH_VNC_OFFSET}) {
+	#
 	# E.g. CONNECT_SWITCH_VNC_OFFSET=6000
+	#
 	$vnc_offset = $ENV{CONNECT_SWITCH_VNC_OFFSET};
 }
 
-# Set to 1 for more debugging output:
+# Set to 1 or higher for more info output:
 #
 my $verbose = 0;
 
 if (exists $ENV{CONNECT_SWITCH_VERBOSE}) {
+	#
 	# E.g. CONNECT_SWITCH_VERBOSE=1
+	#
 	$verbose = $ENV{CONNECT_SWITCH_VERBOSE};
 }
 
-############################################################################
+
+
+#===========================================================================
 #  No need for any changes below here.
+#===========================================================================
 
 use IO::Socket::INET;
 use strict;
@@ -186,12 +349,29 @@ my $killpid = 1;
 
 setpgrp(0, 0);
 
-my $listen_sock = IO::Socket::INET->new(
-	Listen    => 10,
-	LocalAddr => $listen_host,
-	LocalPort => $listen_port,
-	Proto     => "tcp"
-);
+if (exists $ENV{CONNECT_SWITCH_LISTEN_IPV6}) {
+	# note we leave out LocalAddr.
+	my $cmd = '
+	use IO::Socket::INET6;
+	$listen_sock = IO::Socket::INET6->new(
+		Listen    => 10,
+		LocalPort => $listen_port,
+		ReuseAddr => 1,
+		Domain    => AF_INET6,
+		Proto     => "tcp"
+	);
+	';
+	eval $cmd;
+	die "$@\n" if $@;
+} else {
+	$listen_sock = IO::Socket::INET->new(
+		Listen    => 10,
+		LocalAddr => $listen_host,
+		LocalPort => $listen_port,
+		ReuseAddr => 1,
+		Proto     => "tcp"
+	);
+}
 
 if (! $listen_sock) {
 	die "connect_switch: $!\n";
@@ -210,7 +390,7 @@ while (1) {
 		fsleep(0.5);
 		next;
 	}
-	print STDERR "conn: $conn -- ", $client->peerhost(), "\n" if $verbose;
+	print STDERR "conn: $conn -- ", $client->peerhost(), " at ", scalar(localtime), "\n" if $verbose;
 
 	my $pid = fork();
 	if (! defined $pid) {
@@ -237,6 +417,10 @@ sub handle_conn {
 
 	my @allow = @allowed;
 
+	# read allow file.  Note we read it for every connection
+	# to allow the admin to modify it w/o restarting us.
+	# better way would be to read in parent and check mtime.
+	#
 	if ($allow_file && -f $allow_file) {
 		if (open(ALLOW, "<$allow_file")) {
 			while (<ALLOW>) {
@@ -259,6 +443,8 @@ sub handle_conn {
 		}
 	}
 
+	# Read the first 7 bytes of connection, see if it is 'CONNECT'
+	#
 	my $str = '';
 	my $N = 0;
 	my $isconn = 1;
@@ -267,7 +453,7 @@ sub handle_conn {
 		sysread($client, $b, 1);
 		$str .= $b;
 		$N++;
-		print STDERR "read: '$str'\n" if $verbose;
+		print STDERR "read: '$str'\n" if $verbose > 1;
 		my $cstr = substr('CONNECT', 0, $i+1);
 		if ($str ne $cstr) {
 			$isconn = 0;
@@ -276,28 +462,60 @@ sub handle_conn {
 	}
 
 	my $sock = '';
+
 	if ($isconn) {
+		# it is CONNECT, read rest of HTTP header:
+		#
 		while ($str !~ /\r\n\r\n/) {
 			my $b;
 			sysread($client, $b, 1);
 			$str .= $b;
 		}
-		print STDERR "read: $str\n" if $verbose;
+		print STDERR "read:  $str\n" if $verbose > 1;
 
+		# get http version and host:port
+		#
 		my $ok = 0;
 		my $hostport = '';
 		my $http_vers = '1.0';
 		if ($str =~ /^CONNECT\s+(\S+)\s+HTTP\/(\S+)/) {
 			$hostport = $1;
 			$http_vers = $2;
-			foreach my $hp (@allow) {
-				if ($hp eq $hostport) {
-					$ok = 1;
-					last;
+
+			my ($h, $p) = split(/:/, $hostport);
+			if ($p =~ /^\d+$/) {
+				# check allowed host list:
+				foreach my $hp (@allow) {
+					if ($hp eq 'ALL') {
+						$ok = 1;
+					}
+					if ($hp eq $hostport) {
+						$ok = 1;
+					}
+					if ($hp =~ /^(.*):(\d+)-(\d+)$/) {
+						my $ahost = $1;
+						my $pmin  = $2;
+						my $pmax  = $3;
+						if ($h eq $ahost) {
+							if ($p >= $pmin && $p <= $pmax) {
+								$ok = 1;
+							}
+						}
+					}
+					last if $ok;
 				}
 			}
 		}
+
+		my $msg_1 = "HTTP/$http_vers 200 Connection Established\r\n"
+		     . "Proxy-agent: connect_switch v0.2\r\n\r\n";
+		my $msg_2 = "HTTP/$http_vers 502 Bad Gateway\r\n"
+			     . "Connection: close\r\n\r\n";
+
 		if (! $ok) {
+			# disallowed. drop with message.
+			#
+			syswrite($client, $msg_2, length($msg_2));
 			close $client;
 			exit 0;
 		}
@@ -312,18 +530,20 @@ sub handle_conn {
 			Proto => "tcp"
 		);
 		my $msg;
+
+		# send the connect proxy reply:
+		#
 		if ($sock) {
-			$msg = "HTTP/$http_vers 200 Connection Established\r\n"
-			     . "Proxy-agent: connect_switch v0.2\r\n\r\n";
+			$msg = $msg_1;
 		} else {
-			$msg = "HTTP/$http_vers 502 Bad Gateway\r\n"
-			     . "Connection: close\r\n\r\n";
+			$msg = $msg_2;
 		}
 		syswrite($client, $msg, length($msg));
 		$str = '';
 	} else {
-		print STDERR "connecting to: $httpd_host:$httpd_port\n"
-		    if $verbose;
+		# otherwise, redirect to apache for normal https:
+		#
+		print STDERR "connecting to: $httpd_host:$httpd_port\n" if $verbose;
 		$sock = IO::Socket::INET->new(
 			PeerAddr => $httpd_host,
 			PeerPort => $httpd_port,
@@ -336,6 +556,8 @@ sub handle_conn {
 		die "connect_switch: $!\n";
 	}
 
+	# get ready for xfer phase:
+	#
 	$current_fh1 = $client;
 	$current_fh2 = $sock;
 
@@ -349,6 +571,8 @@ sub handle_conn {
 			kill 'TERM', $child;
 		}
 	} else {
+		# write those first bytes if not CONNECT:
+		#
 		if ($str ne '' && $N > 0) {
 			syswrite($sock, $str, $N);
 		}
@@ -358,9 +582,9 @@ sub handle_conn {
 			kill 'TERM', $parent;
 		}
 	}
-	if ($verbose) {
+	if ($verbose > 1) {
 		my $dt = time() - $start;
-		print STDERR "dt\[$$]: $dt\n";
+		print STDERR "duration\[$$]: $dt seconds. ", scalar(localtime), "\n";
 	}
 	exit 0;
 }
@@ -380,7 +604,7 @@ sub xfer {
 		while (! $nf) {
 			$nf = select($ROUT=$RIN, undef, undef, undef);
 		}
-		my $len = sysread($in, $buf, 8192);
+		my $len = sysread($in, $buf, $bufsize);
 		if (! defined($len)) {
 			next if $! =~ /^Interrupted/;
 			print STDERR "connect_switch\[$lab/$conn/$$]: $!\n";
@@ -392,7 +616,7 @@ sub xfer {
 		}
 
 		if (0) {
-			# verbose debugging of data:
+			# very verbose debugging of data:
 			syswrite(STDERR , "\n$lab: ", 6);
 			syswrite(STDERR , $buf, $len);
 		}

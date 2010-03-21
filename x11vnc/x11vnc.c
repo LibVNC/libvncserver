@@ -1321,10 +1321,10 @@ static void quick_pw(char *str) {
 	if (db) fprintf(stderr, "quick_pw: %s\n", str);
 
 	if (! str || str[0] == '\0') {
-		exit(1);
+		exit(2);
 	}
 	if (str[0] != '%') {
-		exit(1);
+		exit(2);
 	}
 	/*
 	 * "%-" or "%stdin" means read one line from stdin.
@@ -1339,19 +1339,19 @@ static void quick_pw(char *str) {
 	 */
 	if (!strcmp(str, "%-") || !strcmp(str, "%stdin")) {
 		if(fgets(tmp, 1024, stdin) == NULL) {
-			exit(1);
+			exit(2);
 		}
 		q = strdup(tmp);
 	} else if (!strcmp(str, "%env")) {
 		if (getenv("UNIXPW") == NULL) {
-			exit(1);
+			exit(2);
 		}
 		q = strdup(getenv("UNIXPW"));
 	} else if (!strcmp(str, "%%") || !strcmp(str, "%")) {
 		char *t, inp[1024];
 		fprintf(stdout, "username: ");
 		if(fgets(tmp, 128, stdin) == NULL) {
-			exit(1);
+			exit(2);
 		}
 		strcpy(inp, tmp);
 		t = strchr(inp, '\n');
@@ -1367,7 +1367,7 @@ static void quick_pw(char *str) {
 		if(fgets(tmp, 128, stdin) == NULL) {
 			fprintf(stdout, "\n");
 			system("stty echo");
-			exit(1);
+			exit(2);
 		}
 		system("stty echo");
 		fprintf(stdout, "\n");
@@ -1376,10 +1376,10 @@ static void quick_pw(char *str) {
 	} else if (str[1] == '/' || str[1] == '.') {
 		FILE *in = fopen(str+1, "r");
 		if (in == NULL) {
-			exit(1);
+			exit(2);
 		}
 		if(fgets(tmp, 1024, in) == NULL) {
-			exit(1);
+			exit(2);
 		}
 		q = strdup(tmp);
 	} else {
@@ -1392,7 +1392,7 @@ static void quick_pw(char *str) {
 	}
 
 	if ((q = strchr(p, ':')) == NULL) {
-		exit(1);
+		exit(2);
 	}
 	*q = '\0';
 	if (db) fprintf(stderr, "'%s' '%s'\n", p, q+1);
@@ -1413,7 +1413,8 @@ static void quick_pw(char *str) {
 			exit(1);
 		}
 	} else {
-		if (su_verify(p, q+1, NULL, NULL, NULL, 1)) {
+		char *ucmd = getenv("UNIXPW_CMD");
+		if (su_verify(p, q+1, ucmd, NULL, NULL, 1)) {
 			fprintf(stdout, "Y %s\n", p);
 			exit(0);
 		} else {
@@ -1422,7 +1423,7 @@ static void quick_pw(char *str) {
 		}
 	}
 	/* NOTREACHED */
-	exit(1);
+	exit(2);
 }
 
 static void print_settings(int try_http, int bg, char *gui_str) {
@@ -2629,7 +2630,7 @@ int main(int argc, char* argv[]) {
 				if (s[0] == '%') {
 					unixpw_list = NULL;
 					quick_pw(s);
-					exit(1);
+					exit(2);
 				}
 			}
 			if (strstr(arg, "_unsafe")) {

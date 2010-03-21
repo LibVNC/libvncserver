@@ -1191,7 +1191,23 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 		}
 		p += strlen("clip:");
-		if (clip_str) free(clip_str);
+		if (clip_str) {
+			int w, h, x, y;
+			free(clip_str);
+			/* try to handle easy case where WxH is unchanged: */
+			if (parse_geom(p, &w, &h, &x, &y, wdpy_x, wdpy_y)) {
+				if (cdpy_x == w && cdpy_y == h) {
+					if (x >= 0 && y >= 0) {
+						if (x + w <= wdpy_x && y + h <= wdpy_y) {
+							coff_x = x;
+							coff_y = y;
+							clip_str = strdup(p);
+							goto done;
+						}
+					}
+				}
+			}
+		}
 		clip_str = strdup(p);
 
 		/* OK, this requires a new fb... */
@@ -5925,15 +5941,25 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			}
 			goto qry;
 		}
-
-		if (!strcmp(p, "pointer_pos")) {
+		if (!strcmp(p, "pointer_pos") || !strcmp(p, "pointer_x") || !strcmp(p, "pointer_y") || !strcmp(p, "pointer_same") || !strcmp(p, "pointer_root")) {
 			int px = -1, py = -1; 
 			int wx, wy;
 			unsigned int m;
 			Window r, c;
+			Bool same_screen = True;
 			
 
-			snprintf(buf, bufn, "aro=%s:%d,%d", p, px, py);
+			if (!strcmp(p, "pointer_pos")) {			/* skip-cmd-list */
+				snprintf(buf, bufn, "aro=%s:%d,%d", p, px, py);
+			} else if (!strcmp(p, "pointer_x")) {			/* skip-cmd-list */
+				snprintf(buf, bufn, "aro=%s:%d", p, px);
+			} else if (!strcmp(p, "pointer_y")) {			/* skip-cmd-list */
+				snprintf(buf, bufn, "aro=%s:%d", p, py);
+			} else if (!strcmp(p, "pointer_same")) {		/* skip-cmd-list */
+				snprintf(buf, bufn, "aro=%s:%d", p, same_screen);
+			} else if (!strcmp(p, "pointer_root")) {		/* skip-cmd-list */
+				snprintf(buf, bufn, "aro=%s:0x%x", p, (unsigned int) rootwin);
+			} 
 			if (!dpy) {
 				goto qry;
 			}
@@ -5941,12 +5967,22 @@ char *process_remote_cmd(char *cmd, int stringonly) {
 			goto qry;
 #else
 			X_LOCK;
-			XQueryPointer_wr(dpy, rootwin, &r, &c, &px, &py, &wx, &wy, &m);
+			same_screen = XQueryPointer_wr(dpy, rootwin, &r, &c, &px, &py, &wx, &wy, &m);
 			X_UNLOCK;
 #endif
 
-			snprintf(buf, bufn, "aro=%s:%d,%d", p, px, py);
-			rfbLog("remote_cmd: pointer_pos: %s\n", buf);
+			if (!strcmp(p, "pointer_pos")) {			/* skip-cmd-list */
+				snprintf(buf, bufn, "aro=%s:%d,%d", p, px, py);
+			} else if (!strcmp(p, "pointer_x")) {			/* skip-cmd-list */
+				snprintf(buf, bufn, "aro=%s:%d", p, px);
+			} else if (!strcmp(p, "pointer_y")) {			/* skip-cmd-list */
+				snprintf(buf, bufn, "aro=%s:%d", p, py);
+			} else if (!strcmp(p, "pointer_same")) {		/* skip-cmd-list */
+				snprintf(buf, bufn, "aro=%s:%d", p, same_screen);
+			} else if (!strcmp(p, "pointer_root")) {		/* skip-cmd-list */
+				snprintf(buf, bufn, "aro=%s:0x%x", p, (unsigned int) r);
+			} 
+			rfbLog("remote_cmd: %s: %s\n", p, buf);
 			goto qry;
 		}
 		if (!strcmp(p, "bpp")) {

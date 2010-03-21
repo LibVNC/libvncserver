@@ -1956,7 +1956,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	char st[] = "";
 	char fdgeom[128], fdsess[128], fdopts[128], fdextra[256], fdprog[128];
 	char fdxsrv[128], fdxdum[128], fdcups[128], fdesd[128];
-	char fdnas[128], fdsmb[128], fdtag[128];
+	char fdnas[128], fdsmb[128], fdtag[128], fdxdmcpif[128];
 	char cdout[128];
 
 	if (opts) {
@@ -1980,6 +1980,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	fdnas[0]  = '\0';
 	fdsmb[0]  = '\0';
 	fdtag[0]  = '\0';
+	fdxdmcpif[0]  = '\0';
 	cdout[0]  = '\0';
 
 	if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
@@ -2122,6 +2123,9 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	if (fdtag[0] == '\0' && getenv("FD_TAG")) {
 		snprintf(fdtag, 120, "%s", getenv("FD_TAG"));
 	}
+	if (fdxdmcpif[0] == '\0' && getenv("FD_XDMCP_IF")) {
+		snprintf(fdxdmcpif,  120, "%s", getenv("FD_XDMCP_IF"));
+	}
 	if (fdxdum[0] == '\0' && getenv("FD_XDUMMY_RUN_AS_ROOT")) {
 		snprintf(fdxdum, 120, "%s", getenv("FD_XDUMMY_RUN_AS_ROOT"));
 	}
@@ -2139,6 +2143,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	if (strchr(fdnas, '\''))	fdnas[0] = '\0';
 	if (strchr(fdsmb, '\''))	fdsmb[0] = '\0';
 	if (strchr(fdtag, '\''))	fdtag[0] = '\0';
+	if (strchr(fdxdmcpif, '\''))	fdxdmcpif[0] = '\0';
 	if (strchr(fdxdum, '\''))	fdxdum[0] = '\0';
 	if (strchr(fdsess, '\''))	fdsess[0] = '\0';
 	if (strchr(cdout, '\''))	cdout[0] = '\0';
@@ -2153,6 +2158,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	set_env("FD_NAS",  fdnas);
 	set_env("FD_SMB",  fdsmb);
 	set_env("FD_TAG",  fdtag);
+	set_env("FD_XDMCP_IF",  fdxdmcpif);
 	set_env("FD_XDUMMY_RUN_AS_ROOT", fdxdum);
 	set_env("FD_SESS", fdsess);
 
@@ -2176,6 +2182,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		    + strlen("FD_NAS='' ")
 		    + strlen("FD_SMB='' ")
 		    + strlen("FD_TAG='' ")
+		    + strlen("FD_XDMCP_IF='' ")
 		    + strlen("FD_XDUMMY_RUN_AS_ROOT='' ")
 		    + strlen("FD_SESS='' /bin/sh ")
 		    + strlen(uu) + 1
@@ -2189,16 +2196,17 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		    + strlen(fdnas) + 1
 		    + strlen(fdsmb) + 1
 		    + strlen(fdtag) + 1
+		    + strlen(fdxdmcpif) + 1
 		    + strlen(fdxdum) + 1
 		    + strlen(fdsess) + 1
 		    + strlen(cdout) + 1
 		    + strlen(opts) + 1);
 		sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' "
 		    "FD_OPTS='%s' FD_EXTRA='%s' FD_PROG='%s' FD_XSRV='%s' FD_CUPS='%s' "
-		    "FD_ESD='%s' FD_NAS='%s' FD_SMB='%s' FD_TAG='%s' "
+		    "FD_ESD='%s' FD_NAS='%s' FD_SMB='%s' FD_TAG='%s' FD_XDMCP_IF='%s' "
 		    "FD_XDUMMY_RUN_AS_ROOT='%s' %s /bin/sh %s %s",
 		    uu, fdgeom, fdsess, fdopts, fdextra, fdprog, fdxsrv,
-		    fdcups, fdesd, fdnas, fdsmb, fdtag, fdxdum, cdout, tmp, opts);
+		    fdcups, fdesd, fdnas, fdsmb, fdtag, fdxdmcpif, fdxdum, cdout, tmp, opts);
 	} else {
 		create_cmd = (char *) malloc(strlen(tmp)
 		    + strlen("/bin/sh ") + 1 + strlen(opts) + 1);
