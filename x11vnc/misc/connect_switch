@@ -211,6 +211,7 @@ if (exists $ENV{CONNECT_SWITCH_PIDFILE}) {
 #	CONNECT_SWITCH_BUFSIZE
 #	CONNECT_SWITCH_LOGFILE
 #	CONNECT_SWITCH_PIDFILE
+#	CONNECT_SWITCH_MAX_CONNECTIONS
 #
 # You can also set these on the cmdline:
 #      connect_switch CONNECT_SWITCH_LISTEN=X CONNECT_SWITCH_ALLOW_FILE=Y ...
@@ -335,6 +336,13 @@ if (exists $ENV{CONNECT_SWITCH_VERBOSE}) {
 	$verbose = $ENV{CONNECT_SWITCH_VERBOSE};
 }
 
+# zero means loop forever, positive value means exit after handling that
+# many connections.
+#
+my $cmax = 0;
+if (exists $ENV{CONNECT_SWITCH_MAX_CONNECTIONS}) {
+	$cmax = $ENV{CONNECT_SWITCH_MAX_CONNECTIONS};
+}
 
 
 #===========================================================================
@@ -384,6 +392,10 @@ my $conn = 0;
 
 while (1) {
 	$conn++;
+	if ($cmax > 0 && $conn > $cmax) {
+		print STDERR "last connection ($cmax)\n" if $verbose; 
+		last;
+	}
 	print STDERR "listening for connection: $conn\n" if $verbose; 
 	my ($client, $ip) = $listen_sock->accept();
 	if (! $client) {

@@ -14,9 +14,10 @@
 # clients that need to connect to ipv6 servers.)  Reversing is the default
 # if this script is named 'inet4to6' (e.g. by a symlink.)
 #
-# Use Ctrl-C to stop this program.
+# Use Ctrl-C to stop this program.  You can also supply '-c n' as the
+# first option to only handle that many connections.
 #
-# You can also set env. vars INET6TO4_LOOP=1 or INET6TO4_LOOP=BG
+# Also set the env. vars INET6TO4_LOOP=1 or INET6TO4_LOOP=BG
 # to have an outer loop restarting this program (BG means do that
 # in the background), and INET6TO4_LOGFILE for a log file.
 # Also set INET6TO4_VERBOSE to verbosity level and INET6TO4_WAITTIME
@@ -42,12 +43,14 @@
 # or see <http://www.gnu.org/licenses/>.
 #-------------------------------------------------------------------------
 
+my $program = "inet6to4";
+
 # Set up logging:
 #
 if (exists $ENV{INET6TO4_LOGFILE}) {
 	close STDOUT;
 	if (!open(STDOUT, ">>$ENV{INET6TO4_LOGFILE}")) {
-	        die "inet6to4: $ENV{INET6TO4_LOGFILE} $!\n";
+	        die "$program: $ENV{INET6TO4_LOGFILE} $!\n";
 	}
 	close STDERR;
 	open(STDERR, ">&STDOUT");
@@ -98,14 +101,14 @@ sub open_pidfile {
 if (exists $ENV{INET6TO4_LOOP}) {
 	my $csl = $ENV{INET6TO4_LOOP};
 	if ($csl ne 'BG' && $csl ne '1') {
-		die "inet6to4: invalid INET6TO4_LOOP.\n";
+		die "$program: invalid INET6TO4_LOOP.\n";
 	}
 	if ($csl eq 'BG') {
 		# go into bg as "daemon":
 		setpgrp(0, 0);
 		my $pid = fork();
 		if (! defined $pid) {
-			die "inet6to4: $!\n";
+			die "$program: $!\n";
 		} elsif ($pid) {
 			wait;
 			exit 0;
@@ -126,7 +129,7 @@ if (exists $ENV{INET6TO4_LOOP}) {
 		open_pidfile();
 	}
 
-	print STDERR "inet6to4: starting service at ", scalar(localtime), " master-pid=$$\n";
+	print STDERR "$program: starting service at ", scalar(localtime), " master-pid=$$\n";
 	while (1) {
 		$looppid = fork;
 		if (! defined $looppid) {
@@ -137,7 +140,7 @@ if (exists $ENV{INET6TO4_LOOP}) {
 			exec $0, @ARGV;	
 			exit 1;
 		}
-		print STDERR "inet6to4: re-starting service at ", scalar(localtime), " master-pid=$$\n";
+		print STDERR "$program: re-starting service at ", scalar(localtime), " master-pid=$$\n";
 		sleep 1;
 	}
 	exit 0;
@@ -177,6 +180,12 @@ if (! @ARGV || $ARGV[0] =~ '^-+h') {	# -help
 	exit;
 }
 
+my $cmax = 0;
+if ($ARGV[0] eq '-c') {			# -c
+	shift;
+	$cmax = shift;
+}
+
 if ($ARGV[0] eq '-r') {			# -r
 	shift;
 	$reverse = 1;
@@ -203,24 +212,30 @@ setpgrp(0, 0);
 
 # create listening socket:
 #
+my %opts;
+$opts{Listen}    = 10;
+$opts{Proto}     = "tcp";
+$opts{ReuseAddr} = 1;
+if ($listen_port =~ /^(.*):(\d+)$/) {
+	$opts{LocalAddr} = $1;
+	$listen_port = $2;
+}
+$opts{LocalPort} = $listen_port;
+
 if (!$reverse) {
-	$listen_sock = IO::Socket::INET6->new(
-		Listen    => 10,
-		LocalPort => $listen_port,
-		Domain    => AF_INET6,
-		ReuseAddr => 1,
-		Proto     => "tcp"
-	);
+	# force ipv6 interface:
+	$opts{Domain} = AF_INET6;
+	$listen_sock = IO::Socket::INET6->new(%opts);
 } else {
-	$listen_sock = IO::Socket::INET->new(
-		Listen    => 10,
-		LocalPort => $listen_port,
-		ReuseAddr => 1,
-		Proto     => "tcp"
-	);
+	$listen_sock = IO::Socket::INET->new(%opts);
+	if (! $listen_sock && $! =~ /invalid/i) {
+		warn "$program: $!, retrying with AF_UNSPEC:\n";
+		$opts{Domain} = AF_UNSPEC;
+		$listen_sock = IO::Socket::INET6->new(%opts);
+	}
 }
 if (! $listen_sock) {
-	die "inet6to4: $!\n";
+	die "$program: $!\n";
 }
 
 # for use by the xfer helper processes' interrupt handlers:
@@ -236,6 +251,10 @@ my $conn = 0;
 #
 while (1) {
 	$conn++;
+	if ($cmax > 0 && $conn > $cmax) {
+		print STDERR "last connection ($cmax)\n" if $verbose; 
+		last;
+	}
 	print STDERR "listening for connection: $conn\n" if $verbose; 
 	my ($client, $ip) = $listen_sock->accept();
 
@@ -259,7 +278,7 @@ while (1) {
 	#
 	my $pid = fork();
 	if (! defined $pid) {
-		die "inet6to4: $!\n";
+		die "$program: $!\n";
 	} elsif ($pid) {
 		wait;
 		# to throttle runaways
@@ -286,24 +305,25 @@ sub handle_conn {
 	print STDERR "connecting to: $host:$port\n" if $verbose;
 
 	my $sock = '';
+	my %opts;
+	$opts{PeerAddr} = $host;
+	$opts{PeerPort} = $port;
+	$opts{Proto}    = "tcp";
 	if (!$reverse) {
-		$sock = IO::Socket::INET->new(
-			PeerAddr => $host,
-			PeerPort => $port,
-			Proto => "tcp"
-		);
+		$sock = IO::Socket::INET->new(%opts);
 	} else {
-		$sock = IO::Socket::INET6->new(
-			PeerAddr => $host,
-			PeerPort => $port,
-			Domain   => AF_INET6,
-			Proto => "tcp"
-		);
+		$opts{Domain} = AF_INET6;
+		$sock = IO::Socket::INET6->new(%opts);
+	}
+	if (! $sock) {
+		warn "$program: $!, retrying with AF_UNSPEC:\n";
+		$opts{Domain} = AF_UNSPEC;
+		$sock = IO::Socket::INET6->new(%opts);
 	}
 
 	if (! $sock) {
 		close $client;
-		die "inet6to4: $!\n";
+		die "$program: $!\n";
 	}
 
 	$current_fh1 = $client;
@@ -359,10 +379,10 @@ sub xfer {
 		my $len = sysread($in, $buf, 8192);
 		if (! defined($len)) {
 			next if $! =~ /^Interrupted/;
-			print STDERR "inet6to4\[$lab/$conn/$$]: $!\n";
+			print STDERR "$program\[$lab/$conn/$$]: $!\n";
 			last;
 		} elsif ($len == 0) {
-			print STDERR "inet6to4\[$lab/$conn/$$]: "
+			print STDERR "$program\[$lab/$conn/$$]: "
 			    . "Input is EOF.\n";
 			last;
 		}
@@ -378,7 +398,7 @@ sub xfer {
 		while ($len) {
 			my $written = syswrite($out, $buf, $len, $offset);
 			if (! defined $written) {
-				print STDERR "inet6to4\[$lab/$conn/$$]: "
+				print STDERR "$program\[$lab/$conn/$$]: "
 				    . "Output is EOF. $!\n";
 				$quit = 1;
 				last;
