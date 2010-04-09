@@ -1665,7 +1665,7 @@ diff -Naur JavaViewer.orig/OptionsFrame.java JavaViewer/OptionsFrame.java
      choices[shareDesktopIndex].select("Yes");
 diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
 --- JavaViewer.orig/RfbProto.java	2006-05-24 15:14:40.000000000 -0400
-+++ JavaViewer/RfbProto.java	2008-10-06 13:32:30.000000000 -0400
++++ JavaViewer/RfbProto.java	2010-03-27 17:59:56.000000000 -0400
 @@ -31,6 +31,7 @@
  import java.net.Socket;
  import java.util.*;
@@ -1909,8 +1909,8 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  		}
 -		
 +		return maxc;
-+	}
-+
+ 	}
+ 
 +	String guess_encoding(char[] chars) {
 +		boolean saw_high_char = false;
 +
@@ -1964,8 +1964,8 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
 +		} else {
 +			return "ISO-8859-1";
 +		}
- 	}
- 
++	}
++
 +
  	//Internally used. Write an rfb message to the server for sending files ONLY 
  	int writeRfbFileTransferMsgForSendFile(
@@ -2642,9 +2642,58 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  
  		os.write(b);
  	//	}
+@@ -1610,6 +1971,21 @@
+ 
+ 		boolean down = (evt.getID() == KeyEvent.KEY_PRESSED);
+ 
++		if (viewer.debugKeyboard) {
++			System.out.println("----------------------------------------");
++			System.out.println("evt.getKeyChar:      " + evt.getKeyChar());
++			System.out.println("getKeyText:          " + KeyEvent.getKeyText(evt.getKeyCode()));
++			System.out.println("evt.getKeyCode:      " + evt.getKeyCode());
++			System.out.println("evt.getID:           " + evt.getID());
++			System.out.println("evt.getKeyLocation:  " + evt.getKeyLocation());
++			System.out.println("evt.isActionKey:     " + evt.isActionKey());
++			System.out.println("evt.isControlDown:   " + evt.isControlDown());
++			System.out.println("evt.getModifiers:    " + evt.getModifiers());
++			System.out.println("getKeyModifiersText: " + KeyEvent.getKeyModifiersText(evt.getModifiers()));
++			System.out.println("evt.paramString:     " + evt.paramString());
++		}
++
++
+ 		int key;
+ 		if (evt.isActionKey()) {
+ 
+@@ -1685,6 +2061,9 @@
+ 				default :
+ 					return;
+ 			}
++			if (key == 0xffc2 && viewer.mapF5_to_atsign) {
++				key = 0x40;
++			}
+ 
+ 		} else {
+ 
+@@ -1794,6 +2173,16 @@
+ 	int oldModifiers = 0;
+ 
+ 	void writeModifierKeyEvents(int newModifiers) {
++		if(viewer.forbid_Ctrl_Alt) {
++			if ((newModifiers & CTRL_MASK) != 0 && (newModifiers & ALT_MASK) != 0) {
++				int orig = newModifiers;
++				newModifiers &= ~ALT_MASK;
++				newModifiers &= ~CTRL_MASK;
++				if (viewer.debugKeyboard) {
++					System.out.println("Ctrl+Alt modifiers: " + orig + " -> " + newModifiers);
++				}
++			}
++		}
+ 		if ((newModifiers & CTRL_MASK) != (oldModifiers & CTRL_MASK))
+ 			writeKeyEvent(0xffe3, (newModifiers & CTRL_MASK) != 0);
+ 
 diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 --- JavaViewer.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ JavaViewer/SSLSocketToMe.java	2010-03-19 12:52:08.000000000 -0400
++++ JavaViewer/SSLSocketToMe.java	2010-03-21 12:53:24.000000000 -0400
 @@ -0,0 +1,2055 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
@@ -3599,7 +3648,7 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +			str += "Pragma: No-Cache\r\n";
 +			str += "\r\n";
 +
-+			System.out.println("sending GET: " + str);
++			System.out.println("sending: " + str);
 +    			OutputStream os = socket.getOutputStream();
 +			String type = "os";
 +
@@ -4826,7 +4875,7 @@ diff -Naur JavaViewer.orig/VncCanvas.java JavaViewer/VncCanvas.java
  						result = 0; // Transparent pixel
 diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 --- JavaViewer.orig/VncViewer.java	2006-05-24 15:14:40.000000000 -0400
-+++ JavaViewer/VncViewer.java	2010-03-20 19:50:16.000000000 -0400
++++ JavaViewer/VncViewer.java	2010-03-27 18:00:28.000000000 -0400
 @@ -41,6 +41,7 @@
  import java.io.*;
  import java.net.*;
@@ -4858,7 +4907,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
    String passwordParam;
    String encPasswordParam;
    boolean showControls;
-@@ -115,28 +116,72 @@
+@@ -115,28 +116,75 @@
    int i;
    // mslogon support 2 end
  
@@ -4878,6 +4927,9 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 +boolean trustAllVncCerts;
 +boolean trustUrlVncCert;
 +boolean debugCerts;
++boolean debugKeyboard;
++boolean mapF5_to_atsign;
++boolean forbid_Ctrl_Alt;
 +
 +boolean ignoreMSLogonCheck;
 +boolean delayAuthPanel;
@@ -4937,7 +4989,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      // authenticator = new AuthPanel(false);   // mslogon support : go to connectAndAuthenticate()
      if (RecordingFrame.checkSecurity())
        rec = new RecordingFrame(this);
-@@ -147,10 +192,11 @@
+@@ -147,10 +195,11 @@
      cursorUpdatesDef = null;
      eightBitColorsDef = null;
  
@@ -4951,7 +5003,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      rfbThread = new Thread(this);
      rfbThread.start();
    }
-@@ -186,6 +232,30 @@
+@@ -186,6 +235,30 @@
        gbc.weightx = 1.0;
        gbc.weighty = 1.0;
  
@@ -4982,7 +5034,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  	// Add ScrollPanel to applet mode
  
  	// Create a panel which itself is resizeable and can hold
-@@ -286,6 +356,24 @@
+@@ -286,6 +359,24 @@
  
    void connectAndAuthenticate() throws Exception {
  
@@ -5007,7 +5059,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      // If "ENCPASSWORD" parameter is set, decrypt the password into
      // the passwordParam string.
  
-@@ -336,7 +424,22 @@
+@@ -336,7 +427,22 @@
      //
  
      
@@ -5031,18 +5083,29 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      authenticator = new AuthPanel(mslogon);
      
-@@ -390,6 +493,10 @@
+@@ -371,6 +477,7 @@
+      //mslogon support end
+     }
+ 
++    int tries = 0;
+     while (true) {
+       // Wait for user entering a password, or a username and a password
+       synchronized(authenticator) {
+@@ -390,6 +497,13 @@
  	break;
        //mslogon support end
  
 +// begin runge/x11vnc
-+	gotAuth = false;
++      gotAuth = false;
++      if (++tries > 2) {
++         throw new Exception("Incorrect password entered " + tries + " times.");
++      }
 +// end runge/x11vnc
 +
        // Retry on authentication failure.
        authenticator.retry();
      }
-@@ -405,9 +512,11 @@
+@@ -405,9 +519,11 @@
  
    void prologueDetectAuthProtocol() throws Exception {
  
@@ -5056,7 +5119,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      System.out.println("RFB server supports protocol version " +
  		       rfb.serverMajor + "." + rfb.serverMinor);
-@@ -431,16 +540,36 @@
+@@ -431,16 +547,36 @@
  
    boolean tryAuthenticate(String us, String pw) throws Exception {
      
@@ -5074,10 +5137,10 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 -    rfb.writeVersionMsg();
 +		System.out.println("RFB server supports protocol version: " +
 +			       rfb.serverMajor + "." + rfb.serverMinor);
-+
-+		rfb.writeVersionMsg();
  
 -    int authScheme = rfb.readAuthScheme();
++		rfb.writeVersionMsg();
++
 +		authScheme = rfb.readAuthScheme();
 +
 +		gotAuth = true;
@@ -5099,7 +5162,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      switch (authScheme) {
  
-@@ -629,6 +758,10 @@
+@@ -629,6 +765,10 @@
  
    void doProtocolInitialisation() throws IOException {
  
@@ -5110,7 +5173,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
      rfb.writeClientInit();
  
      rfb.readServerInit();
-@@ -774,9 +907,28 @@
+@@ -774,9 +914,28 @@
  	fatalError("HOST parameter not specified");
        }
      }
@@ -5141,7 +5204,7 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
  
      if (inAnApplet) {
        str = readParameter("Open New Window", false);
-@@ -804,6 +956,143 @@
+@@ -804,6 +963,158 @@
      deferScreenUpdates = readIntParameter("Defer screen updates", 20);
      deferCursorUpdates = readIntParameter("Defer cursor updates", 10);
      deferUpdateRequests = readIntParameter("Defer update requests", 50);
@@ -5255,6 +5318,21 @@ diff -Naur JavaViewer.orig/VncViewer.java JavaViewer/VncViewer.java
 +    str = readParameter("debugCerts", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +	debugCerts = true;
++    }
++    debugKeyboard = false;
++    str = readParameter("debugKeyboard", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	debugKeyboard = true;
++    }
++    mapF5_to_atsign = false;
++    str = readParameter("mapF5_to_atsign", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	mapF5_to_atsign = true;
++    }
++    forbid_Ctrl_Alt = false;
++    str = readParameter("forbid_Ctrl_Alt", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	forbid_Ctrl_Alt = true;
 +    }
 +    ignoreMSLogonCheck = false;
 +    str = readParameter("ignoreMSLogonCheck", false);

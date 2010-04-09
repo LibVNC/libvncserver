@@ -38,7 +38,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/Makefile vnc_javasrc/Makefile
  	@$(ExportJavaClasses)
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto.java
 --- vnc_javasrc.orig/RfbProto.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/RfbProto.java	2006-04-16 11:17:37.000000000 -0400
++++ vnc_javasrc/RfbProto.java	2010-03-27 17:58:37.000000000 -0400
 @@ -199,7 +199,21 @@
      host = h;
      port = p;
@@ -71,9 +71,68 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      }
  
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
+@@ -992,6 +1006,19 @@
+     boolean down = (evt.getID() == KeyEvent.KEY_PRESSED);
+ 
+     int key;
++	if (viewer.debugKeyboard) {
++		System.out.println("----------------------------------------");
++		System.out.println("evt.getKeyChar:      " + evt.getKeyChar());
++		System.out.println("getKeyText:          " + KeyEvent.getKeyText(evt.getKeyCode()));
++		System.out.println("evt.getKeyCode:      " + evt.getKeyCode());
++		System.out.println("evt.getID:           " + evt.getID());
++		System.out.println("evt.getKeyLocation:  " + evt.getKeyLocation());
++		System.out.println("evt.isActionKey:     " + evt.isActionKey());
++		System.out.println("evt.isControlDown:   " + evt.isControlDown());
++		System.out.println("evt.getModifiers:    " + evt.getModifiers());
++		System.out.println("getKeyModifiersText: " + KeyEvent.getKeyModifiersText(evt.getModifiers()));
++		System.out.println("evt.paramString:     " + evt.paramString());
++	}
+     if (evt.isActionKey()) {
+ 
+       //
+@@ -1025,6 +1052,13 @@
+         return;
+       }
+ 
++      if(key == 0xffc2 && viewer.mapF5_to_atsign) {
++	 if (viewer.debugKeyboard) {
++	    System.out.println("Mapping: F5 -> AT ");
++	 }
++      	 key = 0x40;
++      }
++
+     } else {
+ 
+       //
+@@ -1036,6 +1070,7 @@
+ 
+       key = keyChar;
+ 
++
+       if (key < 0x20) {
+         if (evt.isControlDown()) {
+           key += 0x60;
+@@ -1121,6 +1156,16 @@
+   int oldModifiers = 0;
+ 
+   void writeModifierKeyEvents(int newModifiers) {
++    if(viewer.forbid_Ctrl_Alt) {
++	if ((newModifiers & CTRL_MASK) != 0 && (newModifiers & ALT_MASK) != 0) {
++		int orig = newModifiers;
++		newModifiers &= ~ALT_MASK;
++		newModifiers &= ~CTRL_MASK;
++		if (viewer.debugKeyboard) {
++			System.out.println("Ctrl+Alt modifiers: " + orig + " -> " + newModifiers);
++		}
++	}
++    }
+     if ((newModifiers & CTRL_MASK) != (oldModifiers & CTRL_MASK))
+       writeKeyEvent(0xffe3, (newModifiers & CTRL_MASK) != 0);
+ 
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ vnc_javasrc/SSLSocketToMe.java	2010-03-19 12:52:08.000000000 -0400
++++ vnc_javasrc/SSLSocketToMe.java	2010-03-21 12:53:24.000000000 -0400
 @@ -0,0 +1,2055 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
@@ -1028,7 +1087,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +			str += "Pragma: No-Cache\r\n";
 +			str += "\r\n";
 +
-+			System.out.println("sending GET: " + str);
++			System.out.println("sending: " + str);
 +    			OutputStream os = socket.getOutputStream();
 +			String type = "os";
 +
@@ -2132,7 +2191,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +}
 diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
 --- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/VncViewer.java	2010-03-20 19:49:14.000000000 -0400
++++ vnc_javasrc/VncViewer.java	2010-03-27 17:57:04.000000000 -0400
 @@ -29,6 +29,7 @@
  import java.awt.event.*;
  import java.io.*;
@@ -2150,7 +2209,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
    boolean showControls;
    boolean offerRelogin;
    boolean showOfflineDesktop;
-@@ -88,6 +89,21 @@
+@@ -88,6 +89,24 @@
    int deferCursorUpdates;
    int deferUpdateRequests;
  
@@ -2168,11 +2227,54 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +  boolean trustAllVncCerts;
 +  boolean trustUrlVncCert;
 +  boolean debugCerts;
++  boolean debugKeyboard;
++  boolean mapF5_to_atsign;
++  boolean forbid_Ctrl_Alt;
 +
    // Reference to this applet for inter-applet communication.
    public static java.applet.Applet refApplet;
  
-@@ -590,9 +606,28 @@
+@@ -282,10 +301,24 @@
+       validate();
+     }
+ 
+-    while (!tryAuthenticate()) {
+-      authenticator.retry();
+-      authenticatorUnixLogin.retry();
+-    }
++	if (false) {
++		/* a bug on retries: 'Error: bad position: 8' sun.awt.X11.XTextFieldPeer.setCaretPosition(XTextFieldPeer.java:215) */
++		while (!tryAuthenticate()) {
++			authenticator.retry();
++			authenticatorUnixLogin.retry();
++		}
++	} else {
++		/* just try once and not forever... */
++		if (!tryAuthenticate()) {
++    			showConnectionStatus("Authentication Failed.");
++			showMessage("Authentication Failed.");
++			if (!offerRelogin) {
++				fatalError("auth failed.");
++			}
++		} else {
++			//showConnectionStatus("Authentication OK.");
++		}
++	}
+   }
+ 
+ 
+@@ -428,7 +461,10 @@
+     gbc.ipadx = 100;
+     gbc.ipady = 50;
+     gridbag.setConstraints(authPanel, gbc);
++    try {
+     vncContainer.add(authPanel);
++    } catch (Exception e) {
++    }
+ 
+     if (inSeparateFrame) {
+       vncFrame.pack();
+@@ -590,9 +626,28 @@
  	fatalError("HOST parameter not specified");
        }
      }
@@ -2203,7 +2305,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
  
      if (inAnApplet) {
        str = readParameter("Open New Window", false);
-@@ -626,6 +661,106 @@
+@@ -626,6 +681,121 @@
  
      // SocketFactory.
      socketFactory = readParameter("SocketFactory", false);
@@ -2306,6 +2408,21 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncView
 +    str = readParameter("debugCerts", false);
 +    if (str != null && str.equalsIgnoreCase("Yes")) {
 +	debugCerts = true;
++    }
++    debugKeyboard = false;
++    str = readParameter("debugKeyboard", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	debugKeyboard = true;
++    }
++    mapF5_to_atsign = false;
++    str = readParameter("mapF5_to_atsign", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	mapF5_to_atsign = true;
++    }
++    forbid_Ctrl_Alt = false;
++    str = readParameter("forbid_Ctrl_Alt", false);
++    if (str != null && str.equalsIgnoreCase("Yes")) {
++	forbid_Ctrl_Alt = true;
 +    }
    }
  
