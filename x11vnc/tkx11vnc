@@ -268,6 +268,10 @@ Misc
 	macmenu
 	=GAL LOFF
 	--
+	6
+	noipv6
+	noipv4
+	--
 	nofb
 	=D nobell
 	nolookup
@@ -2754,6 +2758,7 @@ proc update_menu_vars {{query ""}} {
 			set x11vnc_icon_mode 1
 			#puts stderr "x11vnc_icon_mode: $x11vnc_icon_mode"
 		}
+		# XXX ipv6
 		if {[regexp {^([^:][^:]*):(.*)$} $piece m0 item val]} {
 			if {[info exists menu_var($item)]} {
 				set old $menu_var($item)

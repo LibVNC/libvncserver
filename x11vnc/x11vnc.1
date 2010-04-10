@@ -1,8 +1,8 @@
 .\" This file was automatically generated from x11vnc -help output.
-.TH X11VNC "1" "March 2010" "x11vnc " "User Commands"
+.TH X11VNC "1" "April 2010" "x11vnc " "User Commands"
 .SH NAME
 x11vnc - allow VNC connections to real X11 displays
-         version: 0.9.10, lastmod: 2010-03-20
+         version: 0.9.10, lastmod: 2010-04-08
 .SH SYNOPSIS
 .B x11vnc
 [OPTION]...
@@ -109,6 +109,38 @@ The VNC port to listen on (a libvncserver option), e.g.
 5900, 5901, etc.  If specified as "\fB-rfbport\fR \fIPROMPT\fR"
 then the x11vnc \fB-gui\fR is used to prompt the user to
 enter the port number.
+.PP
+\fB-6\fR
+.IP
+IPv6 listening support.  In addition to IPv4, the
+IPv6 address is listened on for incoming connections.
+The same port as IPv4 is used to listen.  If you have
+trouble compiling for this mode, set \fB-DX11VNC_IPV6=0\fR
+in CPPFLAGS when configuring.
+.IP
+Currently, the machine may need to have some IPv4
+support, at the least for the loopback interface, for
+everything to work correctly.  However for most usage
+modes IPv4 support is not required.
+.IP
+The -6 mode works for both normal connections and
+\fB-ssl\fR encrypted ones.  Nearly everything is supported
+for the IPv6 case, but there are a few exceptions.
+See \fB-stunnel\fR for its IPv6 support.
+.PP
+\fB-noipv6\fR
+.IP
+Do not try to use IPv6 for any listening or connecting
+sockets.  This includes both the listening service
+port(s) and outgoing connections from \fB-connect,\fR
+\fB-connect_or_exit,\fR or \fB-proxy.\fR  Use this if you are having
+problems due to IPv6.
+.PP
+\fB-noipv4\fR
+.IP
+Do not try to use IPv4 for any listening or connecting
+sockets.  This is mainly for exploring the behavior of
+x11vnc on an IPv6-only system, but may have other uses.
 .PP
 \fB-reopen\fR
 .IP
@@ -651,6 +683,13 @@ newline and carriage return.  "\\c" is expanded to
 .IP
 See also the \fB-proxy\fR option below for additional ways
 to plumb reverse connections.
+.IP
+IPv6: as of x11vnc 0.9.10 the \fB-connect\fR option should
+connect to IPv6 hosts properly.  If there are problems
+you can disable IPv6 by setting \fB-DX11VNC_IPV6=0\fR
+in CPPFLAGS when configuring.  If there problems
+connecting to IPv6 hosts consider a relay like the
+included inet6to4 script or the \fB-proxy\fR option.
 .PP
 \fB-connect_or_exit\fR \fIstr\fR
 .IP
@@ -720,6 +759,13 @@ reach the VNC viewer.  Up to 3 may be chained, separate
 them by commas in the order they are to be connected to.
 E.g.:  http://host1:port1,socks5://host2:port2 or three
 like:  first,second,third
+.IP
+IPv6: as of x11vnc 0.9.10 the \fB-proxy\fR option should
+connect to IPv6 hosts properly.  If there are problems
+you can disable IPv6 by setting \fB-DX11VNC_IPV6=0\fR
+in CPPFLAGS when configuring.  If there problems
+connecting to IPv6 hosts consider a relay like the
+included inet6to4 script.
 .PP
 \fB-vncconnect,\fR \fB-novncconnect\fR
 .IP
@@ -757,6 +803,9 @@ re-read each time a new client connects.  Lines can be
 commented out with the "#" character in the usual way.
 .IP
 \fB-allow\fR applies in \fB-ssl\fR mode, but not in \fB-stunnel\fR mode.
+.IP
+IPv6: as of x11vnc 0.9.10 a host can be specified
+in IPv6 numerical format, e.g. 2001:4860:b009::93.
 .PP
 \fB-localhost\fR
 .IP
@@ -778,6 +827,16 @@ If you do not want x11vnc to listen on ANY interface
 (evidently you are using \fB-connect\fR or \fB-connect_or_exit,\fR
 or plan to use remote control: \fB-R\fR connect:host), use
 \fB-rfbport\fR 0
+.IP
+IPv6: if IPv6 is supported, this option automatically
+implies the IPv6 loopback address '::1' as well.
+.PP
+\fB-listen6\fR \fIstr\fR
+.IP
+When in IPv6 listen mode "-6", only listen on the
+network interface with address \fIstr\fR.  It currently
+does not work for link scope addresses or non-numeric
+hostname strings.
 .PP
 \fB-nolookup\fR
 .IP
@@ -1419,7 +1478,7 @@ can act as a replacement for
 .IP
 This mode only allows one redirected connection.
 The \fB-forever\fR option does not apply.  Use \fB-inetd\fR or
-\fB-loop\fR for persistant service.
+\fB-loop\fR for persistent service.
 .PP
 \fB-display\fR \fIWAIT:...\fR
 .IP
@@ -1513,6 +1572,10 @@ session tag described below.  Note: this option will
 be ignored if the FD_TAG env. var. is already set or
 if the viewer-side supplied value is not completely
 composed of alphanumeric or '_' or '-' characters.
+.IP
+To troubleshoot the FINDCREATEDISPLAY mechanism,
+set the following env. var. to an ouput log file,
+e.g \fB-env\fR CREATE_DISPLAY_OUTPUT=/tmp/mydebug.txt
 .IP
 To disable the option setting set the environment
 variable X11VNC_NO_UNIXPW_OPTS=1 before starting x11vnc.
@@ -2459,15 +2522,25 @@ requirement.
 .IP
 Set \fB-env\fR STUNNEL_DEBUG=1 for more debugging printout.
 .IP
+Set \fB-env\fR STUNNEL_PROG=xxx to the full path of stunnel
+program you want to be used (e.g. /usr/bin/stunnel4).
+.IP
+Set \fB-env\fR STUNNEL_LISTEN=xxx to the address of the
+network interface to listen on (the default is to listen
+on all interfaces), e.g. STUNNEL_LISTEN=192.168.1.100.
+.IP
+A simple way to add IPv6 support is STUNNEL_LISTEN=::
+.IP
 Your VNC viewer will also need to be able to connect
 via SSL.  Unfortunately not too many do this.  See the
 information about SSL viewers under the \fB-ssl\fR option.
+The x11vnc project's SSVNC is an option.
 .IP
 Also, in the x11vnc distribution, patched TightVNC
 and UltraVNC Java applet jar files are provided in
 the classes/ssl directory that do SSL connections.
-Enable serving them with the \fB-http,\fR \fB-http_ssl,\fR \fB-https,\fR
-or \fB-httpdir\fR (see the option descriptions for more info.)
+Enable serving them with the \fB-http,\fR \fB-http_ssl,\fR or
+\fB-httpdir\fR (see the option descriptions for more info.)
 .IP
 Note that for the Java viewer applet usage the
 "?PORT=xxxx" in the various URLs printed at startup
@@ -4310,6 +4383,11 @@ Default: 10
 Have x11vnc read and process all available client input
 before proceeding.
 .PP
+\fB-input_eagerly\fR
+.IP
+Similar to \fB-allinput\fR but use the handleEventsEagerly
+mechanism built into LibVNCServer.
+.PP
 \fB-speeds\fR \fIrd,bw,lat\fR
 .IP
 x11vnc tries to estimate some speed parameters that
@@ -5541,6 +5619,20 @@ nolocalhost     disable \fB-localhost\fR mode
 .IP
 listen:str      set \fB-listen\fR to str, empty to disable.
 .IP
+noipv6          enable  \fB-noipv6\fR mode.
+.IP
+ipv6            disable \fB-noipv6\fR mode.
+.IP
+noipv4          enable  \fB-noipv4\fR mode.
+.IP
+ipv4            disable \fB-noipv4\fR mode.
+.IP
+6               enable  -6 IPv6 listening mode.
+.IP
+no6             disable -6 IPv6 listening mode.
+.IP
+lookup          disable \fB-nolookup\fR mode.
+.IP
 nolookup        enable  \fB-nolookup\fR mode.
 .IP
 lookup          disable \fB-nolookup\fR mode.
@@ -5843,6 +5935,10 @@ input_skip:n    set \fB-input_skip\fR to n.
 allinput        enable  use of \fB-allinput\fR mode.
 .IP
 noallinput      disable use of \fB-allinput\fR mode.
+.IP
+input_eagerly   enable  use of \fB-input_eagerly\fR mode.
+.IP
+noinput_eagerly disable use of \fB-input_eagerly\fR mode.
 .IP
 ssltimeout:n    set \fB-ssltimeout\fR to n.
 .IP
@@ -6223,52 +6319,54 @@ nooverlay_yescursor overlay_nocursor 8to24 no8to24
 8to24_opts 24to32 no24to32 visual scale scale_cursor
 viewonly noviewonly shared noshared forever noforever
 once timeout tightfilexfer notightfilexfer ultrafilexfer
-noultrafilexfer rfbversion deny lock nodeny unlock
-avahi mdns zeroconf noavahi nomdns nozeroconf connect
-proxy allowonce allow localhost nolocalhost listen
-lookup nolookup accept afteraccept gone shm noshm
-flipbyteorder noflipbyteorder onetile noonetile
-solid_color solid nosolid blackout xinerama noxinerama
-xtrap noxtrap xrandr noxrandr xrandr_mode rotate padgeom
-quiet q noquiet modtweak nomodtweak xkb noxkb capslock
-nocapslock skip_lockkeys noskip_lockkeys skip_keycodes
-sloppy_keys nosloppy_keys skip_dups noskip_dups
-add_keysyms noadd_keysyms clear_mods noclear_mods
-clear_keys noclear_keys clear_all clear_locks keystate
-remap repeat norepeat fb nofb bell nobell sendbell
-sel nosel primary noprimary setprimary nosetprimary
-clipboard noclipboard setclipboard nosetclipboard
-seldir cursorshape nocursorshape cursorpos nocursorpos
-cursor_drag nocursor_drag cursor show_cursor
-noshow_cursor nocursor arrow xfixes noxfixes xdamage
-noxdamage xd_area xd_mem alphacut alphafrac alpharemove
-noalpharemove alphablend noalphablend xwarppointer
-xwarp noxwarppointer noxwarp buttonmap dragging
-nodragging ncache_cr noncache_cr ncache_no_moveraise
-noncache_no_moveraise ncache_no_dtchange
-noncache_no_dtchange ncache_no_rootpixmap
-noncache_no_rootpixmap ncache_reset_rootpixmap ncrp
-ncache_keep_anims noncache_keep_anims ncache_old_wm
-noncache_old_wm ncache_pad ncache noncache ncache_size
-debug_ncache nodebug_ncache wireframe_mode wireframe wf
-nowireframe nowf wireframelocal wfl nowireframelocal
-nowfl wirecopyrect wcr nowirecopyrect nowcr scr_area
+noultrafilexfer rfbversion deny lock nodeny unlock avahi
+mdns zeroconf noavahi nomdns nozeroconf connect proxy
+allowonce allow noipv6 ipv6 noipv4 ipv4 no6 6 localhost
+nolocalhost listen lookup nolookup accept afteraccept
+gone shm noshm flipbyteorder noflipbyteorder onetile
+noonetile solid_color solid nosolid blackout xinerama
+noxinerama xtrap noxtrap xrandr noxrandr xrandr_mode
+rotate padgeom quiet q noquiet modtweak nomodtweak xkb
+noxkb capslock nocapslock skip_lockkeys noskip_lockkeys
+skip_keycodes sloppy_keys nosloppy_keys skip_dups
+noskip_dups add_keysyms noadd_keysyms clear_mods
+noclear_mods clear_keys noclear_keys clear_all
+clear_locks keystate remap repeat norepeat fb nofb bell
+nobell sendbell sel nosel primary noprimary setprimary
+nosetprimary clipboard noclipboard setclipboard
+nosetclipboard seldir cursorshape nocursorshape
+cursorpos nocursorpos cursor_drag nocursor_drag cursor
+show_cursor noshow_cursor nocursor arrow xfixes
+noxfixes xdamage noxdamage xd_area xd_mem alphacut
+alphafrac alpharemove noalpharemove alphablend
+noalphablend xwarppointer xwarp noxwarppointer
+noxwarp buttonmap dragging nodragging ncache_cr
+noncache_cr ncache_no_moveraise noncache_no_moveraise
+ncache_no_dtchange noncache_no_dtchange
+ncache_no_rootpixmap noncache_no_rootpixmap
+ncache_reset_rootpixmap ncrp ncache_keep_anims
+noncache_keep_anims ncache_old_wm noncache_old_wm
+ncache_pad ncache noncache ncache_size debug_ncache
+nodebug_ncache wireframe_mode wireframe wf nowireframe
+nowf wireframelocal wfl nowireframelocal nowfl
+wirecopyrect wcr nowirecopyrect nowcr scr_area
 scr_skip scr_inc scr_keys scr_term scr_keyrepeat
 scr_parms scrollcopyrect scr noscrollcopyrect
 noscr fixscreen noxrecord xrecord reset_record
-pointer_mode pm input_skip allinput noallinput input
-grabkbd nograbkbd grabptr nograbptr grabalways
-nograbalways grablocal client_input ssltimeout
-speeds wmdt debug_pointer dp nodebug_pointer nodp
-debug_keyboard dk nodebug_keyboard nodk keycode keysym
-ptr fakebuttonevent sleep get_xprop set_xprop wininfo
-bcx_xattach deferupdate defer setdefer extra_fbur
-wait_ui wait_bog nowait_bog slow_fb xrefresh wait
-readtimeout nap nonap sb screen_blank fbpm nofbpm dpms
-nodpms clientdpms noclientdpms forcedpms noforcedpms
-noserverdpms serverdpms noultraext ultraext chatwindow
-nochatwindow chaton chatoff fs gaps grow fuzz snapfb
-nosnapfb rawfb uinput_accel uinput_thresh uinput_reset
+pointer_mode pm input_skip allinput noallinput
+input_eagerly noinput_eagerly input grabkbd nograbkbd
+grabptr nograbptr grabalways nograbalways grablocal
+client_input ssltimeout speeds wmdt debug_pointer dp
+nodebug_pointer nodp debug_keyboard dk nodebug_keyboard
+nodk keycode keysym ptr fakebuttonevent sleep get_xprop
+set_xprop wininfo bcx_xattach deferupdate defer
+setdefer extra_fbur wait_ui wait_bog nowait_bog
+slow_fb xrefresh wait readtimeout nap nonap sb
+screen_blank fbpm nofbpm dpms nodpms clientdpms
+noclientdpms forcedpms noforcedpms noserverdpms
+serverdpms noultraext ultraext chatwindow nochatwindow
+chaton chatoff fs gaps grow fuzz snapfb nosnapfb
+rawfb uinput_accel uinput_thresh uinput_reset
 uinput_always progressive rfbport http nohttp httpport
 httpdir enablehttpproxy noenablehttpproxy alwaysshared
 noalwaysshared nevershared noalwaysshared dontdisconnect
