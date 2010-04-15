@@ -51,6 +51,10 @@ int createMD(Display* dpy, char* name)
   int dev_id = -1;
   XErrorHandler old_handler;
   XIAddMasterInfo c;
+  XIDeviceInfo	*devinfo;
+  int		num_devices, i;
+  char handle[256]; /* device name */
+  snprintf(handle, 256, "%s pointer", name);
 
   c.type = XIAddMaster;
   c.name = name;
@@ -75,14 +79,7 @@ int createMD(Display* dpy, char* name)
 
   /* find newly created dev by name
      FIXME: better wait for XIHierarchy event here? */
-  char handle[256];
-  snprintf(handle, 256, "%s pointer", name);
-
-  XIDeviceInfo	*devinfo;
-  int		num_devices;
   devinfo = XIQueryDevice(dpy, XIAllMasterDevices, &num_devices);
-
-  int i;
   for(i = num_devices-1; i >= 0; --i) 
     if(strcmp(devinfo[i].name, handle) == 0)
       {
@@ -105,15 +102,14 @@ int removeMD(Display* dpy, int dev_id)
 {
   XIRemoveMasterInfo r;
   int found = 0;
+  XIDeviceInfo	*devinfo;
+  int		num_devices, i;
 
   if(dev_id < 0)
     return 0;
 
   /* see if this device exists */
-  XIDeviceInfo	*devinfo;
-  int		num_devices;
   devinfo = XIQueryDevice(dpy, XIAllMasterDevices, &num_devices);
-  int i;
   for(i = 0; i < num_devices; ++i)
     if(devinfo[i].deviceid == dev_id)
       found = 1;
@@ -148,7 +144,6 @@ int getPairedMD(Display* dpy, int dev_id)
 
   if(devicecount)
     paired = devinfo->attachment;
-
   
   XIFreeDeviceInfo(devinfo);
 
@@ -177,6 +172,12 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
   const size_t textsz = 64;
   char text[textsz];
   int total_width, total_height;
+  cairo_surface_t* main_surface;
+  cairo_surface_t* dummy_surface;
+  cairo_surface_t* barecursor_surface;
+  cairo_t* cr;
+  cairo_text_extents_t est;
+  Cursor cursor;
   XcursorImage *cursor_image = NULL;
   rfbCursorPtr rfbcursor = NULL;
 
@@ -188,12 +189,6 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
   else
     snprintf(text, textsz, "%i", (int) dev_id);
  
-  
-  cairo_surface_t* main_surface;
-  cairo_surface_t* dummy_surface;
-  cairo_surface_t* barecursor_surface;
-  cairo_t* cr;
-
   
   /* simple cursor w/o label */
   barecursor_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 24, 24);
@@ -210,7 +205,6 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
 
     
   /* get estimated text extents */
-  cairo_text_extents_t est;
   dummy_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 500, 10);/* ah well, but should fit */
   cr = cairo_create(dummy_surface);
   cairo_select_font_face (cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
@@ -249,14 +243,10 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
   
 
   /* and display  */
-  Cursor cursor = XcursorImageLoadCursor(dpy, cursor_image);
-
-  if(XIDefineCursor(dpy, dev_id, RootWindow(dpy, DefaultScreen(dpy)), cursor) != Success)
-    {
-      XcursorImageDestroy(cursor_image);
-      cursor_image = NULL;
-    }
-
+  cursor = XcursorImageLoadCursor(dpy, cursor_image);
+  XIDefineCursor(dpy, dev_id, RootWindow(dpy, DefaultScreen(dpy)), cursor);
+  XFreeCursor(dpy, cursor);
+  
 
   /* clean up */
   cairo_destroy(cr);
