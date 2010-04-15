@@ -900,13 +900,9 @@ void client_gone(rfbClientPtr client) {
 	}
 
 	/* remove clients XInput2 master device */
-        if(use_multipointer)
-          {
-            X_LOCK;
-            if(removeMD(dpy, cd->ptr_id))
-	      rfbLog("removed XInput2 MD for client %s.\n", client->host);
-            X_UNLOCK;
-          }
+        if(use_multipointer) 
+	  if(removeMD(dpy, cd->ptr_id))
+	    rfbLog("removed XInput2 MD for client %s.\n", client->host);
 
 	free_client_data(client);
 
@@ -3988,32 +3984,22 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
         if(use_multipointer)
           {
 	    char tmp[256];
-
-            X_LOCK;
+            snprintf(tmp, 256, "x11vnc %s", client->host);
 
             xi2_device_creation_in_progress = 1;
 
-            snprintf(tmp, 256, "x11vnc %s", client->host);
-
-            cd->ptr_id = createMD(dpy, tmp);
-
-	    if(cd->ptr_id < 0)
-	      {
-		rfbLog("ERROR creating XInput2 MD for client %s, denying client.\n", client->host);
-
-		free_client_data(client);
-		xi2_device_creation_in_progress = 0;
-		X_UNLOCK;
-
-		return(RFB_CLIENT_REFUSE);
-	      }
+	    if((cd->ptr_id = createMD(dpy, tmp)) < 0) {
+	      rfbLog("ERROR creating XInput2 MD for client %s, denying client.\n", client->host);
+	      free_client_data(client);
+	      xi2_device_creation_in_progress = 0;
+	      return(RFB_CLIENT_REFUSE);
+	    }
 
             cd->kbd_id = getPairedMD(dpy, cd->ptr_id);
 
             rfbLog("Created XInput2 MD %i %i for client %s.\n", cd->ptr_id, cd->kbd_id, client->host);
-            xi2_device_creation_in_progress = 0;
 
-            X_UNLOCK;
+            xi2_device_creation_in_progress = 0;
 
             snprintf(tmp, 256, "%i", cd->uid);
 	    cd->cursor = setClientCursor(dpy, cd->ptr_id, 0.4*(cd->uid%3), 0.2*(cd->uid%5), 1*(cd->uid%2), tmp);

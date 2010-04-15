@@ -150,16 +150,13 @@ static void clean_xi2_devices(void)
   if(use_multipointer) {
     rfbClientIteratorPtr iter = rfbGetClientIterator(screen);
     rfbClientPtr cl;
-    X_LOCK;
-    
+
     while((cl = rfbClientIteratorNext(iter))) {
       ClientData *cd = (ClientData *) cl->clientData;
       if(removeMD(dpy, cd->ptr_id))
 	rfbLog("removed XInput2 MD for client %s.\n", cl->host);
     }
     rfbReleaseClientIterator(iter);
-    
-    X_UNLOCK;
   }
 }
 

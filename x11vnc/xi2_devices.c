@@ -68,18 +68,20 @@ int createMD(Display* dpy, char* name)
   c.send_core = 1;
   c.enable = 1;
 
+  X_LOCK;
+
   trapped_xerror = 0;
   old_handler = XSetErrorHandler(trap_xerror);
 	
   XIChangeHierarchy(dpy, (XIAnyHierarchyChangeInfo*)&c, 1);
   
   XSync(dpy, False);
-  if(trapped_xerror)
-    {
-      XSetErrorHandler(old_handler);
-      trapped_xerror = 0;
-      return -1;
-    }
+  if(trapped_xerror) {
+    XSetErrorHandler(old_handler);
+    trapped_xerror = 0;
+    X_UNLOCK;
+    return -1;
+  }
 
   XSetErrorHandler(old_handler);
   trapped_xerror = 0;
@@ -95,7 +97,9 @@ int createMD(Display* dpy, char* name)
       }
  
   XIFreeDeviceInfo(devinfo);
-      
+
+  X_UNLOCK;
+
   return dev_id;
 #endif
 }
@@ -111,31 +115,35 @@ int removeMD(Display* dpy, int dev_id)
 #ifndef LIBVNCSERVER_HAVE_XI2
   return 0;
 #else
-  XIRemoveMasterInfo r;
-  int found = 0;
+  int found = 0, res = 0;
   XIDeviceInfo	*devinfo;
   int		num_devices, i;
 
   if(dev_id < 0)
     return 0;
 
+  X_LOCK;
+
   /* see if this device exists */
   devinfo = XIQueryDevice(dpy, XIAllMasterDevices, &num_devices);
   for(i = 0; i < num_devices; ++i)
     if(devinfo[i].deviceid == dev_id)
       found = 1;
- 
   XIFreeDeviceInfo(devinfo);
 
-  if(!found)
-    return 0;
+  if(found) {
+    XIRemoveMasterInfo r;
 
-  /* we can go on safely */
-  r.type = XIRemoveMaster;
-  r.deviceid = dev_id;
-  r.return_mode = XIFloating;
+    r.type = XIRemoveMaster;
+    r.deviceid = dev_id;
+    r.return_mode = XIFloating;
 
-  return (XIChangeHierarchy(dpy, (XIAnyHierarchyChangeInfo*)&r, 1) == Success) ? 1 : 0;
+    res = XIChangeHierarchy(dpy, (XIAnyHierarchyChangeInfo*)&r, 1) == Success ? 1 : 0;
+  }
+
+  X_UNLOCK;
+
+  return res;
 #endif
 }
 
@@ -155,12 +163,14 @@ int getPairedMD(Display* dpy, int dev_id)
   if(dev_id < 0)
     return paired;
 
-  devinfo = XIQueryDevice(dpy, dev_id, &devicecount);
+  X_LOCK;
 
+  devinfo = XIQueryDevice(dpy, dev_id, &devicecount);
   if(devicecount)
     paired = devinfo->attachment;
-  
   XIFreeDeviceInfo(devinfo);
+
+  X_UNLOCK;
 
   return paired;
 #endif
@@ -260,12 +270,10 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
 			  cursor_image->yhot,
 			  bpp/8);
   
-
   /* and display  */
   cursor = XcursorImageLoadCursor(dpy, cursor_image);
   XIDefineCursor(dpy, dev_id, RootWindow(dpy, DefaultScreen(dpy)), cursor);
   XFreeCursor(dpy, cursor);
-  
 
   /* clean up */
   cairo_destroy(cr);
