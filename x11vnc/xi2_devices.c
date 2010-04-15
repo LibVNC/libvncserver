@@ -23,7 +23,6 @@
 */
 
 #include <string.h>
-#include <cairo.h>
 #include <X11/Xproto.h> 
 #include <X11/keysym.h> 
 
@@ -34,7 +33,12 @@
 
 #ifdef LIBVNCSERVER_HAVE_LIBXCURSOR
 #include <X11/Xcursor/Xcursor.h> 
+#ifdef LIBVNCSERVER_HAVE_CAIRO
+#include <cairo.h>
 #endif
+#endif
+
+
 
 /* does the X version we're running on support XI2? */
 int xinput2_present;
@@ -48,6 +52,9 @@ int xi2_device_creation_in_progress;
 */
 int createMD(Display* dpy, char* name)
 {
+#ifndef LIBVNCSERVER_HAVE_XI2
+  return 0;
+#else
   int dev_id = -1;
   XErrorHandler old_handler;
   XIAddMasterInfo c;
@@ -90,6 +97,7 @@ int createMD(Display* dpy, char* name)
   XIFreeDeviceInfo(devinfo);
       
   return dev_id;
+#endif
 }
 
 
@@ -100,6 +108,9 @@ int createMD(Display* dpy, char* name)
 */
 int removeMD(Display* dpy, int dev_id)
 {
+#ifndef LIBVNCSERVER_HAVE_XI2
+  return 0;
+#else
   XIRemoveMasterInfo r;
   int found = 0;
   XIDeviceInfo	*devinfo;
@@ -125,6 +136,7 @@ int removeMD(Display* dpy, int dev_id)
   r.return_mode = XIFloating;
 
   return (XIChangeHierarchy(dpy, (XIAnyHierarchyChangeInfo*)&r, 1) == Success) ? 1 : 0;
+#endif
 }
 
 
@@ -133,6 +145,9 @@ int removeMD(Display* dpy, int dev_id)
 
 int getPairedMD(Display* dpy, int dev_id)
 {
+#ifndef LIBVNCSERVER_HAVE_XI2
+  return 0;
+#else
   int paired = -1;
   XIDeviceInfo* devinfo;
   int devicecount = 0;
@@ -148,6 +163,7 @@ int getPairedMD(Display* dpy, int dev_id)
   XIFreeDeviceInfo(devinfo);
 
   return paired;
+#endif
 }
 
 
@@ -164,6 +180,9 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
 #ifndef LIBVNCSERVER_HAVE_LIBXCURSOR
   return NULL;
 #else
+#ifndef LIBVNCSERVER_HAVE_CAIRO
+  return NULL;
+#endif
 
   /* label setup */
   const int idFontSize = 18;

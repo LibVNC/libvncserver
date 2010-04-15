@@ -3508,10 +3508,8 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		cmap8to24_fb = NULL;
 		rot_fb = NULL;
 
-#ifdef LIBVNCSERVER_HAVE_XI2
 		if (use_multipointer && use_threads) 
 		  screen->displayHook = multicursor_hook;
-#endif
 
 		if (cmap8to24) {
 			int n = main_bytes_per_line * fb->height;

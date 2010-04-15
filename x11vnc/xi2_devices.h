@@ -26,8 +26,8 @@
 #define _X11VNC_XI2_DEVICES
 
 #ifdef LIBVNCSERVER_HAVE_XI2
-
 #include <X11/extensions/XInput2.h> 
+#endif
 
 extern int xinput2_present;
 extern int use_multipointer;
@@ -59,7 +59,5 @@ extern int getPairedMD(Display* dpy, int dev_id);
 */
 extern rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b, char *label);
 
-
-#endif /* LIBVNCSERVER_HAVE_XI2 */
 
 #endif /* _X11VNC_XI2_DEVICES */

@@ -1910,7 +1910,6 @@ void cursor_position(int x, int y, rfbClientPtr client) {
        }
        else {
 	 /* if client is non-NULL, handle client cursor */
-#ifdef LIBVNCSERVER_HAVE_XI2
 	 if(use_multipointer) {
 	   ClientData *cd = (ClientData *) client->clientData;
 	   if (debug_pointer)
@@ -1918,7 +1917,6 @@ void cursor_position(int x, int y, rfbClientPtr client) {
 	   cd->cursor_x = x;
 	   cd->cursor_y = y;
 	 }
-#endif
        }
 }
 

@@ -581,7 +581,7 @@ int rfbPE(long usec) {
 		rfbBool r;
 		rfbClientIteratorPtr iter;
 		rfbClientPtr cl;
-#ifdef LIBVNCSERVER_HAVE_XI2
+
 		if(use_multipointer) {
 		  iter = rfbGetClientIterator(screen);
 		  while( (cl = rfbClientIteratorNext(iter)) )
@@ -593,20 +593,18 @@ int rfbPE(long usec) {
 		    draw_cursor(cl);
 		  rfbReleaseClientIterator(iter);
 		}
-#endif
+
 		r = rfbProcessEvents(screen, usec);
 		if (r) {
 			res = 1;
 		}
 
-#ifdef LIBVNCSERVER_HAVE_XI2
 		if(use_multipointer) {
 		  iter = rfbGetClientIterator(screen);
 		  while( (cl = rfbClientIteratorNext(iter)) )
 		    restore_under_cursor_buffer(cl);
 		  rfbReleaseClientIterator(iter);
 		}
-#endif
 	}
 
  	if (unixpw && unixpw_in_progress && !uip0) {

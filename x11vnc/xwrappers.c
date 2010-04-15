@@ -927,7 +927,6 @@ void XTestFakeKeyEvent_wr(Display* dpy, int dev_id, KeyCode key, Bool down,
 #ifdef LIBVNCSERVER_HAVE_XI2
         if(use_multipointer && dev_id >= 0)
           {
-	    //FIXME
 	    XDevice xdev;
 	    xdev.device_id = dev_id;
 	    XTestFakeDeviceKeyEvent(dpy, &xdev, key, down, NULL, 0, delay);
@@ -1009,7 +1008,6 @@ void XTestFakeButtonEvent_wr(Display* dpy, int dev_id, unsigned int button, Bool
 #ifdef LIBVNCSERVER_HAVE_XI2
         if(use_multipointer && dev_id >= 0)
           {
-	    //FIXME
 	    XDevice xdev;
 	    xdev.device_id = dev_id;
 	    XTestFakeDeviceButtonEvent(dpy, &xdev, button, is_press, NULL, 0, delay);
@@ -1081,7 +1079,6 @@ void XTestFakeMotionEvent_wr(Display* dpy, int dev_id, int screen, int x, int y,
         if(use_multipointer && dev_id >= 0)
           {
             int axes[] = {x, y};
-	    //FIXME
 	    XDevice xdev;
 	    xdev.device_id = dev_id;
             XTestFakeDeviceMotionEvent(dpy, &xdev, 0, 0, axes, 2, delay);

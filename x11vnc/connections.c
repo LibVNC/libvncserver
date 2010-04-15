@@ -899,16 +899,15 @@ void client_gone(rfbClientPtr client) {
 		}
 	}
 
-#ifdef LIBVNCSERVER_HAVE_XI2
 	/* remove clients XInput2 master device */
         if(use_multipointer)
           {
             X_LOCK;
-            removeMD(dpy, cd->ptr_id);
-            rfbLog("removed XInput2 MD for client %s.\n", client->host);
+            if(removeMD(dpy, cd->ptr_id))
+	      rfbLog("removed XInput2 MD for client %s.\n", client->host);
             X_UNLOCK;
           }
-#endif
+
 	free_client_data(client);
 
 	if (inetd && client == inetd_client) {
@@ -3926,15 +3925,12 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 		CLIENT_UNLOCK;
 		return(RFB_CLIENT_REFUSE);
 	}
-       
-#ifdef LIBVNCSERVER_HAVE_XI2
-        if(xi2_device_creation_in_progress && use_multipointer) 
-          {
+
+        if(use_multipointer && xi2_device_creation_in_progress) {
             rfbLog("denying additional client: %s during MD creation.\n", client->host);
             return(RFB_CLIENT_REFUSE);
-          }
-#endif
-        
+        }
+
 	client->clientData = (void *) calloc(sizeof(ClientData), 1);
 	cd = (ClientData *) client->clientData;
 
@@ -3986,7 +3982,6 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	cd->uid = clients_served;
 
-#ifdef LIBVNCSERVER_HAVE_XI2
         /*
 	  create new XInput2 master device and add it it to client
 	*/
@@ -3997,7 +3992,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
             X_LOCK;
 
             xi2_device_creation_in_progress = 1;
-	  
+
             snprintf(tmp, 256, "x11vnc %s", client->host);
 
             cd->ptr_id = createMD(dpy, tmp);
@@ -4005,7 +4000,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	    if(cd->ptr_id < 0)
 	      {
 		rfbLog("ERROR creating XInput2 MD for client %s, denying client.\n", client->host);
-	
+
 		free_client_data(client);
 		xi2_device_creation_in_progress = 0;
 		X_UNLOCK;
@@ -4027,7 +4022,6 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
 	    cd->cursor_region = sraRgnCreate();
           }
-#endif
 
 	client->clientGoneHook = client_gone;
 
