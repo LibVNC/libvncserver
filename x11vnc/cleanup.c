@@ -83,6 +83,7 @@ static int exit_flag = 0;
 static int exit_sig = 0;
 
 static void clean_icon_mode(void);
+static void clean_xi2_devices(void);
 static int Xerror(Display *d, XErrorEvent *error);
 static int XIOerr(Display *d);
 static void crash_shell_help(void);
@@ -144,6 +145,24 @@ static void clean_icon_mode(void) {
 	}
 }
 
+static void clean_xi2_devices(void) 
+{
+  if(use_multipointer) {
+    rfbClientIteratorPtr iter = rfbGetClientIterator(screen);
+    rfbClientPtr cl;
+    X_LOCK;
+    
+    while((cl = rfbClientIteratorNext(iter))) {
+      ClientData *cd = (ClientData *) cl->clientData;
+      if(removeMD(dpy, cd->ptr_id))
+	rfbLog("removed XInput2 MD for client %s.\n", cl->host);
+    }
+    rfbReleaseClientIterator(iter);
+    
+    X_UNLOCK;
+  }
+}
+
 /*
  * Normal exiting
  */
@@ -203,22 +222,8 @@ void clean_up_exit(int ret) {
 	/* X keyboard cleanups */
 	delete_added_keycodes(0);
 
-#ifdef LIBVNCSERVER_HAVE_XI2
-	/* remove created pointers */
-        if(use_multipointer)
-          {
-            X_LOCK;
-            rfbClientPtr c = screen->clientHead;
-            while(c)
-              {
-                ClientData *cd = (ClientData *) c->clientData;
-                removeMD(dpy, cd->ptr_id);
-                rfbLog("removed XInput2 MD for client %s.\n", c->host);
-                c = c->next;
-              }
-            X_UNLOCK;
-          }
-#endif
+	/* remove all created XInput2 devices */
+	clean_xi2_devices();
 
 	if (clear_mods == 1) {
 		clear_modifiers(0);
@@ -582,6 +587,9 @@ static void interrupted (int sig) {
 
 	/* X keyboard cleanups */
 	delete_added_keycodes(0);
+
+	/* remove all created XInput2 devices */
+	clean_xi2_devices();
 
 	if (clear_mods == 1) {
 		clear_modifiers(0);
