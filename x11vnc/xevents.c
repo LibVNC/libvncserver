@@ -1852,7 +1852,6 @@ void kbd_release_all_keys(rfbClientPtr cl) {
 }
 
 void set_single_window(rfbClientPtr cl, int x, int y) {
-        ClientData *cd = (ClientData *) cl->clientData;
 	int ok = 0;
 	if (no_ultra_ext) {
 		return;
@@ -1881,7 +1880,7 @@ void set_single_window(rfbClientPtr cl, int x, int y) {
 		int rootx, rooty, wx, wy;
 		unsigned int mask;
 
-		update_x11_pointer_position(x, y, cd->ptr_id);
+		update_x11_pointer_position(x, y, cl);
 		XSync(dpy, False);
 
 		if (XQueryPointer_wr(dpy, rootwin, &r, &c, &rootx, &rooty,

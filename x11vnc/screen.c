@@ -61,6 +61,7 @@ so, delete this exception statement from your version.
 #include "xrandr.h"
 #include "xrecord.h"
 #include "pm.h"
+#include "xi2_devices.h"
 
 #include <rfb/rfbclient.h>
 
@@ -92,6 +93,7 @@ rfbBool vnc_reflect_send_cuttext(char *str, int len);
 static void debug_colormap(XImage *fb);
 static void set_visual(char *str);
 static void nofb_hook(rfbClientPtr cl);
+static void multicursor_hook(rfbClientPtr cl);
 static void remove_fake_fb(void);
 static void install_fake_fb(int w, int h, int bpp);
 static void initialize_snap_fb(void);
@@ -785,6 +787,68 @@ static void nofb_hook(rfbClientPtr cl) {
 	screen->frameBuffer = rfb_fb;
 	screen->displayHook = NULL;
 }
+
+
+/*
+  hook to draw cursors when in threaded mode.
+  still a bit hacky because there is no 
+  DisplayFinishedHook.
+ */
+static void multicursor_hook(rfbClientPtr client)
+{
+  ClientData* cd = (ClientData*)client->clientData;
+
+  if(! cd->cursor_hook_lock) {
+    rfbClientIteratorPtr iter;
+    rfbClientPtr cl;
+
+    /* make sure this doesn't get called again in the
+       rfbSendFramebufferUpdate() call below */
+    cd->cursor_hook_lock = TRUE;
+
+    LOCK(multi_cursor_mutex);
+
+    /* restore modified regions we saved in a previous call */ 
+    LOCK(client->updateMutex);
+    sraRgnOr(client->modifiedRegion, cd->cursor_region);
+    sraRgnMakeEmpty(cd->cursor_region);
+    UNLOCK(client->updateMutex);
+
+    /* save fb */
+    iter = rfbGetClientIterator(screen);
+    while( (cl = rfbClientIteratorNext(iter)) ) 
+      save_under_cursor_buffer(cl);
+    rfbReleaseClientIterator(iter);
+
+    /* draw all cursors into fb */
+    iter = rfbGetClientIterator(screen);
+    while( (cl = rfbClientIteratorNext(iter)) ) 
+      draw_cursor(cl);
+    rfbReleaseClientIterator(iter);
+
+    /* send to this one client */
+    rfbSendFramebufferUpdate(client, client->modifiedRegion);
+
+    /* restore fb */
+    iter = rfbGetClientIterator(screen);
+    while( (cl = rfbClientIteratorNext(iter)) ) 
+      restore_under_cursor_buffer(cl);
+    rfbReleaseClientIterator(iter);
+
+    LOCK(client->updateMutex);
+    /* save where the hidden cursors are for later */
+    sraRgnOr(cd->cursor_region, client->modifiedRegion);
+    /* prevent the outer rfbSendFramebufferUpdate() call to send out
+       the regions where the hidden cursors are. Otherwise we'd have flicker */
+    sraRgnMakeEmpty(client->modifiedRegion);
+    UNLOCK(client->updateMutex);
+  
+    UNLOCK(multi_cursor_mutex);
+  
+    cd->cursor_hook_lock = FALSE;
+  }
+}
+
 
 void free_old_fb(void) {
 	char *fbs[16];
@@ -1485,7 +1549,7 @@ rfbBool vnc_reflect_send_pointer(int x, int y, int mask) {
 	cursor_y = y;
 
 	/* record the x, y position for the rfb screen as well. */
-	cursor_position(x, y);
+	cursor_position(x, y, NULL);
 
 	/* change the cursor shape if necessary */
 	rc = set_cursor(x, y, get_which_cursor());
@@ -3443,6 +3507,11 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		rfb_fb = NULL;
 		cmap8to24_fb = NULL;
 		rot_fb = NULL;
+
+#ifdef LIBVNCSERVER_HAVE_XI2
+		if (use_multipointer && use_threads) 
+		  screen->displayHook = multicursor_hook;
+#endif
 
 		if (cmap8to24) {
 			int n = main_bytes_per_line * fb->height;

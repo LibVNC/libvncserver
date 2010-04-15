@@ -28,11 +28,11 @@
 #ifdef LIBVNCSERVER_HAVE_XI2
 
 #include <X11/extensions/XInput2.h> 
-#include <X11/Xcursor/Xcursor.h> 
 
 extern int xinput2_present;
 extern int use_multipointer;
 extern int xi2_device_creation_in_progress;
+MUTEX(multi_cursor_mutex);
 
 
 /*
@@ -56,9 +56,8 @@ extern int getPairedMD(Display* dpy, int dev_id);
 
 /* 
    set cursor of pointer dev
-   return 1 on success, 0 on failure
 */
-extern XcursorImage* setPointerShape(Display *dpy, int dev_id, float r, float g, float b, char *label);
+extern rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b, char *label);
 
 
 #endif /* LIBVNCSERVER_HAVE_XI2 */

@@ -39,6 +39,7 @@ so, delete this exception statement from your version.
 #include "scan.h"
 #include "unixpw.h"
 #include "macosx.h"
+#include "xi2_devices.h"
 
 int xfixes_present = 0;
 int xfixes_first_initialized = 0;
@@ -62,14 +63,18 @@ void restore_cursor_shape_updates(rfbScreenInfoPtr s);
 void disable_cursor_shape_updates(rfbScreenInfoPtr s);
 int cursor_shape_updates_clients(rfbScreenInfoPtr s);
 int cursor_pos_updates_clients(rfbScreenInfoPtr s);
-void cursor_position(int x, int y);
+void cursor_position(int x, int y, rfbClientPtr client);
 void set_no_cursor(void);
 void set_warrow_cursor(void);
 int set_cursor(int x, int y, int which);
 int check_x11_pointer(void);
 int store_cursor(int serial, unsigned long *data, int w, int h, int cbpp, int xhot, int yhot);
 unsigned long get_cursor_serial(int mode);
-
+rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
+			 int xhot, int yhot, int Bpp);
+void save_under_cursor_buffer(rfbClientPtr cl);
+void draw_cursor(rfbClientPtr cl);
+void restore_under_cursor_buffer(rfbClientPtr cl);
 
 typedef struct win_str_info {
 	char *wm_name;
@@ -91,8 +96,6 @@ static void curs_copy(cursor_info_t *dest, cursor_info_t *src);
 static void setup_cursors(void);
 static void set_rfb_cursor(int which);
 static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo);
-static rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
-    int xhot, int yhot, int Bpp);
 static int get_exact_cursor(int init);
 static void set_cursor_was_changed(rfbScreenInfoPtr s);
 
@@ -1000,7 +1003,7 @@ void initialize_xfixes(void) {
 #endif
 }
 
-static rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
+rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
     int xhot, int yhot, int Bpp) {
 	rfbCursorPtr c;
 	static unsigned long black = 0, white = 1;
@@ -1825,7 +1828,7 @@ int cursor_pos_updates_clients(rfbScreenInfoPtr s) {
  * Then set up for sending rfbCursorPosUpdates back
  * to clients that understand them.  This seems to be TightVNC specific.
  */
-void cursor_position(int x, int y) {
+void cursor_position(int x, int y, rfbClientPtr client) {
 	rfbClientIteratorPtr iter;
 	rfbClientPtr cl;
 	int cnt = 0, nonCursorPosUpdates_clients = 0;
@@ -1850,6 +1853,11 @@ void cursor_position(int x, int y) {
 		if (y >= dpy_y) y = dpy_y-1;
 	}
 
+
+	if(client == NULL) {
+	/* handle screen's master cursor */
+        if (debug_pointer)
+	  rfbLog("cursor_position: set screen pos x=%3d y=%d\n", x, y);
 	if (x == screen->cursorX && y == screen->cursorY) {
 		return;
 	}
@@ -1896,6 +1904,19 @@ void cursor_position(int x, int y) {
 		rfbLog("cursor_position: sent position x=%3d y=%3d to %d"
 		    " clients\n", x, y, cnt);
 	}
+       }
+       else {
+	 /* if client is non-NULL, handle client cursor */
+#ifdef LIBVNCSERVER_HAVE_XI2
+	 if(use_multipointer) {
+	   ClientData *cd = (ClientData *) client->clientData;
+	   if (debug_pointer)
+	     rfbLog("cursor_position: set client pos x=%3d y=%d\n", x, y);
+	   cd->cursor_x = x;
+	   cd->cursor_y = y;
+	 }
+#endif
+       }
 }
 
 static void set_rfb_cursor(int which) {
@@ -1970,12 +1991,63 @@ int check_x11_pointer(void) {
 
 #endif
 
+#ifdef LIBVNCSERVER_HAVE_XI2
+#if ! NO_X11
+	/* if we are in multipointer mode,
+	   check the position of all client pointers here */
+	if(use_multipointer && screen) {
+	  rfbClientIteratorPtr iter;
+	  rfbClientPtr cl;
+	  double root_x, root_y, win_x, win_y;
+	  XIButtonState buttons_return;
+	  XIModifierState modifiers_return;
+	  XIGroupState group_return;
+
+	  iter = rfbGetClientIterator(screen);
+	  while( (cl = rfbClientIteratorNext(iter)) ) {
+	    if (dpy) {
+	      X_LOCK;
+	      ret = XIQueryPointer(dpy, ((ClientData*)cl->clientData)->ptr_id, rootwin, &root_w, &child_w,
+				   &root_x, &root_y, &win_x, &win_y,
+				   &buttons_return, &modifiers_return, &group_return);
+	      X_UNLOCK;
+	    }
+
+	    if(!ret)
+	      continue;
+
+	    if (debug_pointer)
+	      rfbLog("XIQueryPointer:     x:%4d, y:%4d)\n", root_x, root_y);
+
+	    /* offset subtracted since XIQueryPointer relative to rootwin */
+	    x = root_x - off_x - coff_x;
+	    y = root_y - off_y - coff_y;
+
+	    if (clipshift) {
+	      static int cnt = 0;
+	      if (x < 0 || y < 0 || x >= dpy_x || y >= dpy_y)  {
+		if (cnt++ % 4 != 0) {
+		  if (debug_pointer)
+		    rfbLog("Skipping cursor_position() outside our clipshift\n");
+		  continue;
+		}
+	      }
+	    }
+
+	    /* record the cursor position in the rfb screen */
+	    cursor_position(x, y, cl);
+	  }
+	  rfbReleaseClientIterator(iter);
+	}
+#endif
+#endif
+
 
 #if ! NO_X11
 	if (dpy) {
 		X_LOCK;
 		ret = XQueryPointer_wr(dpy, rootwin, &root_w, &child_w, &root_x, &root_y,
-		    &win_x, &win_y, &mask);
+                   &win_x, &win_y, &mask);
 		X_UNLOCK;
 	}
 #else
@@ -2013,10 +2085,254 @@ if (0) fprintf(stderr, "check_x11_pointer %d %d\n", root_x, root_y);
 	}
 
 	/* record the cursor position in the rfb screen */
-	cursor_position(x, y);
+	cursor_position(x, y, NULL);
 
 	/* change the cursor shape if necessary */
 	rint = set_cursor(x, y, get_which_cursor());
 	return rint;
+}
+
+
+
+/*
+  the following routines save what's under a cursor, draw a cursor into 
+  the framebuffer and  restore the saved framebuffer region. most of 
+  the code stolen from libvncserver.
+  this is mostly used in multi-pointer mode: because RFB only has the 
+  notion of a single cursor, we draw the extra client cursor directly 
+  into the framebuffer to provide some visual feedback to the user. 
+*/
+void save_under_cursor_buffer(rfbClientPtr cl)
+{
+  ClientData *cd = (ClientData *) cl->clientData;
+  rfbCursorPtr c = cd->cursor;
+  int j,x1,x2,y1,y2,bpp=screen->serverFormat.bitsPerPixel/8,
+    rowstride=screen->paddedWidthInBytes,
+    bufsize;  
+  rfbBool wasChanged=FALSE;
+
+  if(!c)
+    return;
+
+  bufsize = c->width * c->height * bpp;
+
+  /* make sure the buffer is big enough */
+  if(cd->under_cursor_buffer_len < bufsize) {
+    LOCK(cl->updateMutex);
+    cd->under_cursor_buffer = realloc(cd->under_cursor_buffer, bufsize);
+    cd->under_cursor_buffer_len = bufsize;
+    UNLOCK(cl->updateMutex);
+  }
+
+  /* sanity checks */ 
+  x1 = cd->cursor_x - c->xhot;
+  x2 = x1 + c->width;
+  if(x1<0) { x1=0; }
+  if(x2 >= screen->width) x2= screen->width-1;
+  x2 -= x1; /* width */
+  if(x2<=0) 
+    return; /* nothing to do */
+
+  y1 = cd->cursor_y - c->yhot;
+  y2 = y1 + c->height;
+  if(y1<0) { y1=0; }
+  if(y2>=screen->height) y2=screen->height-1;
+  y2 -= y1; /* height */
+  if(y2<=0) 
+    return; /* nothing to do */
+
+  LOCK(cl->updateMutex);
+  /* save what's under the cursor now */
+  for(j=0;j<y2;j++) {
+    char* dest = cd->under_cursor_buffer+j*x2*bpp;
+    const char* src = screen->frameBuffer+(y1+j)*rowstride+x1*bpp;
+    unsigned int count=x2*bpp;
+    if(wasChanged || memcmp(dest,src,count)) {
+       wasChanged=TRUE;
+       memcpy(dest,src,count);
+    }
+  }
+  UNLOCK(cl->updateMutex);
+}
+
+void draw_cursor(rfbClientPtr cl)
+{
+  ClientData *cd = (ClientData *) cl->clientData;
+  rfbCursorPtr c = cd->cursor;
+  int i,j,x1,x2,y1,y2,i1,j1,bpp=screen->serverFormat.bitsPerPixel/8,
+    rowstride=screen->paddedWidthInBytes, w;  
+ 
+  if(!c)
+    return;
+
+  w = (c->width+7)/8;
+ 
+  /* sanity checks */ 
+  i1=j1=0; 
+
+  x1 = cd->cursor_x - c->xhot;
+  x2 = x1 + c->width;
+  if(x1<0) { i1=-x1; x1=0; }
+  if(x2 >= screen->width) x2= screen->width-1;
+  x2 -= x1; /* width */
+  if(x2<=0) 
+    return; /* nothing to do */
+
+  y1 = cd->cursor_y - c->yhot;
+  y2 = y1 + c->height;
+  if(y1<0) { j1=-y1; y1=0; }
+  if(y2>=screen->height) y2=screen->height-1;
+  y2 -= y1; /* height */
+  if(y2<=0) 
+    return; /* nothing to do */
+
+  LOCK(cl->screen->cursorMutex);
+
+  if (c->alphaSource) {
+    int rmax, rshift;
+    int gmax, gshift;
+    int bmax, bshift;
+    int amax = 255;	/* alphaSource is always 8bits of info per pixel */
+    unsigned int rmask, gmask, bmask;
+
+    rmax   = screen->serverFormat.redMax;
+    gmax   = screen->serverFormat.greenMax;
+    bmax   = screen->serverFormat.blueMax;
+    rshift = screen->serverFormat.redShift;
+    gshift = screen->serverFormat.greenShift;
+    bshift = screen->serverFormat.blueShift;
+
+    rmask = (rmax << rshift);
+    gmask = (gmax << gshift);
+    bmask = (bmax << bshift);
+
+    for(j=0;j<y2;j++) {
+      for(i=0;i<x2;i++) {
+	/*
+	 * we loop over the whole cursor ignoring c->mask[],
+	 * using the extracted alpha value instead.
+	 */
+	char *dest;
+	unsigned char *src, *aptr;
+	unsigned int val, dval, sval;
+	int rdst, gdst, bdst;		/* fb RGB */
+	int asrc, rsrc, gsrc, bsrc;	/* rich source ARGB */
+
+	dest = screen->frameBuffer + (j+y1)*rowstride + (i+x1)*bpp;
+	src  = c->richSource  + (j+j1)*c->width*bpp + (i+i1)*bpp;
+	aptr = c->alphaSource + (j+j1)*c->width + (i+i1);
+
+	asrc = *aptr;
+	if (!asrc) {
+	  continue;
+	}
+
+	if (bpp == 1) {
+	  dval = *((unsigned char*) dest);
+	  sval = *((unsigned char*) src);
+	} else if (bpp == 2) {
+	  dval = *((unsigned short*) dest);
+	  sval = *((unsigned short*) src);
+	} else if (bpp == 3) {
+	  unsigned char *dst = (unsigned char *) dest;
+	  dval = 0;
+	  dval |= ((*(dst+0)) << 0);
+	  dval |= ((*(dst+1)) << 8);
+	  dval |= ((*(dst+2)) << 16);
+	  sval = 0;
+	  sval |= ((*(src+0)) << 0);
+	  sval |= ((*(src+1)) << 8);
+	  sval |= ((*(src+2)) << 16);
+	} else if (bpp == 4) {
+	  dval = *((unsigned int*) dest);
+	  sval = *((unsigned int*) src);
+	} else {
+	  continue;
+	}
+
+	/* extract dest and src RGB */
+	rdst = (dval & rmask) >> rshift;	/* fb */
+	gdst = (dval & gmask) >> gshift;
+	bdst = (dval & bmask) >> bshift;
+
+	rsrc = (sval & rmask) >> rshift;	/* richcursor */
+	gsrc = (sval & gmask) >> gshift;
+	bsrc = (sval & bmask) >> bshift;
+
+	/* blend in fb data. */
+	if (! c->alphaPreMultiplied) {
+	  rsrc = (asrc * rsrc)/amax;
+	  gsrc = (asrc * gsrc)/amax;
+	  bsrc = (asrc * bsrc)/amax;
+	}
+	rdst = rsrc + ((amax - asrc) * rdst)/amax;
+	gdst = gsrc + ((amax - asrc) * gdst)/amax;
+	bdst = bsrc + ((amax - asrc) * bdst)/amax;
+
+	val = 0;
+	val |= (rdst << rshift);
+	val |= (gdst << gshift);
+	val |= (bdst << bshift);
+
+	/* insert the cooked pixel into the fb */
+	memcpy(dest, &val, bpp);
+      }
+    }
+  }
+  else {
+    /* no alpha  */
+    for(j=0;j<y2;j++)
+      for(i=0;i<x2;i++)
+	if((c->mask[(j+j1)*w+(i+i1)/8]<<((i+i1)&7))&0x80)
+	  memcpy(screen->frameBuffer+(j+y1)*rowstride+(i+x1)*bpp,
+		 c->richSource+(j+j1)*c->width*bpp+(i+i1)*bpp,bpp);
+  }
+
+  mark_rect_as_modified(x1, y1, x1+x2, y1+y2, 1);
+
+  UNLOCK(cl->screen->cursorMutex);
+}
+
+
+/* this restores the under cursor buffer we saved in
+   draw_cursor to the framebuffer */
+void restore_under_cursor_buffer(rfbClientPtr cl)
+{
+  ClientData *cd = (ClientData *) cl->clientData;
+  rfbCursorPtr c=cd->cursor;
+  int j,x1,x2,y1,y2,bpp=screen->serverFormat.bitsPerPixel/8,
+    rowstride=screen->paddedWidthInBytes;
+
+  if(!c) 
+    return;
+
+  /* sanity checks */
+  x1 = cd->cursor_x - c->xhot;
+  x2 = x1 + c->width;
+  if(x1<0) { x1=0; }
+  if(x2 >= screen->width) x2= screen->width-1;
+  x2 -= x1; /* width */
+  if(x2<=0)
+    return; /* nothing to do */
+
+  y1 = cd->cursor_y - c->yhot;
+  y2 = y1 + c->height;
+  if(y1<0) { y1=0; }
+  if(y2>=screen->height) y2=screen->height-1;
+  y2 -= y1; /* height */
+  if(y2<=0)
+    return; /* nothing to do */
+
+  LOCK(cl->screen->cursorMutex);
+  /* restore framebuffer from saved data */
+  if(cd->under_cursor_buffer_len > 0) {
+    for(j=0;j<y2;j++)
+      memcpy(screen->frameBuffer+(y1+j)*rowstride+x1*bpp,
+	     cd->under_cursor_buffer+j*x2*bpp,
+	     x2*bpp);
+
+    mark_rect_as_modified(x1, y1, x1+x2, y1+y2, 1);
+  }
+  UNLOCK(cl->screen->cursorMutex);
 }
 

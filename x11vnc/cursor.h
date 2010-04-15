@@ -59,12 +59,17 @@ extern void disable_cursor_shape_updates(rfbScreenInfoPtr s);
 extern int cursor_shape_updates_clients(rfbScreenInfoPtr s);
 extern int cursor_noshape_updates_clients(rfbScreenInfoPtr s);
 extern int cursor_pos_updates_clients(rfbScreenInfoPtr s);
-extern void cursor_position(int x, int y);
+extern void cursor_position(int x, int y, rfbClientPtr client);
 extern void set_no_cursor(void);
 extern void set_warrow_cursor(void);
 extern int set_cursor(int x, int y, int which);
 extern int check_x11_pointer(void);
 extern int store_cursor(int serial, unsigned long *data, int w, int h, int cbpp, int xhot, int yhot);
 extern unsigned long get_cursor_serial(int mode);
+extern rfbCursorPtr pixels2curs(unsigned long *pixels, int w, int h,
+				int xhot, int yhot, int Bpp);
+extern void save_under_cursor_buffer(rfbClientPtr cl);
+extern void draw_cursor(rfbClientPtr cl);
+extern void restore_under_cursor_buffer(rfbClientPtr cl);
 
 #endif /* _X11VNC_CURSOR_H */

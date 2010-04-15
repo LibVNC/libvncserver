@@ -28,8 +28,13 @@
 #include <X11/keysym.h> 
 
 #include "x11vnc.h" 
+#include "cursor.h"
 #include "cleanup.h"
 #include "xi2_devices.h" 
+
+#ifdef LIBVNCSERVER_HAVE_LIBXCURSOR
+#include <X11/Xcursor/Xcursor.h> 
+#endif
 
 /* does the X version we're running on support XI2? */
 int xinput2_present;
@@ -156,11 +161,15 @@ int getPairedMD(Display* dpy, int dev_id)
 
 
 /*
-  set cursor of pointer dev
-  returns the shape as an XCursorImage 
+  set cursor of pointer dev.
+  returns the cursor shape as an rfbCursorPtr
 */
-XcursorImage *setPointerShape(Display *dpy, int dev_id, float r, float g, float b, char *label)
+rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b, char *label)
 {
+#ifndef LIBVNCSERVER_HAVE_LIBXCURSOR
+  return NULL;
+#else
+
   /* label setup */
   const int idFontSize = 18;
   const int idXOffset = 11;
@@ -169,6 +178,7 @@ XcursorImage *setPointerShape(Display *dpy, int dev_id, float r, float g, float 
   char text[textsz];
   int total_width, total_height;
   XcursorImage *cursor_image = NULL;
+  rfbCursorPtr rfbcursor = NULL;
 
   if(dev_id < 0)
     return NULL;
@@ -228,7 +238,15 @@ XcursorImage *setPointerShape(Display *dpy, int dev_id, float r, float g, float 
   /* this is important! otherwise we get badmatch, badcursor xerrrors galore... */
   cursor_image->xhot = cursor_image->yhot = 0; 
   memcpy(cursor_image->pixels, cairo_image_surface_get_data (main_surface), sizeof(CARD32) * total_width * total_height);
- 
+
+  /* convert to rfb cursor which we return later */
+  rfbcursor = pixels2curs((unsigned long*)cursor_image->pixels,
+			  cursor_image->width,
+			  cursor_image->height,
+			  cursor_image->xhot,
+			  cursor_image->yhot,
+			  bpp/8);
+  
 
   /* and display  */
   Cursor cursor = XcursorImageLoadCursor(dpy, cursor_image);
@@ -245,7 +263,9 @@ XcursorImage *setPointerShape(Display *dpy, int dev_id, float r, float g, float 
   cairo_surface_destroy(dummy_surface);
   cairo_surface_destroy(main_surface);
   cairo_surface_destroy(barecursor_surface);
-  
-  return cursor_image;
+  XcursorImageDestroy(cursor_image);
+
+  return rfbcursor;
+#endif
 }
 

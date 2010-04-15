@@ -5210,7 +5210,8 @@ int main(int argc, char* argv[]) {
             rfbLog("Disabled XFIXES while using multiple pointer support.\n");
             /* disable these as most clients expect only a single cursor */
             cursor_shape_updates = 0;
-            rfbLog("Drawing cursors into framebuffer while using multiple pointer support.\n");
+              rfbLog("Drawing cursors into framebuffer while using multiple pointer support.\n");
+	    INIT_MUTEX(multi_cursor_mutex);
           }      
 #endif
 

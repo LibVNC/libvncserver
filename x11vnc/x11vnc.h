@@ -627,8 +627,15 @@ typedef struct _ClientData {
 	int cmp_bytes_sent;
 	int raw_bytes_sent;
 
-	int ptr_id;
-	int kbd_id;
+        int ptr_id; /* pointer and keyboard device ids used in multipointer mode */ 
+        int kbd_id;
+        int cursor_x; /* these are used in multipointer mode to draw  */
+        int cursor_y; /* client cursors directly into the framebuffer */
+        rfbCursorPtr cursor;
+        char* under_cursor_buffer;
+        int under_cursor_buffer_len;
+        sraRegionPtr cursor_region;
+        rfbBool cursor_hook_lock;
 } ClientData;
 
 extern void nox11_exit(int rc);

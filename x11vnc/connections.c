@@ -768,6 +768,18 @@ static void free_client_data(rfbClientPtr client) {
 				free(cd->unixname);
 				cd->unixname = NULL;
 			}
+			if (cd->cursor) {
+			        rfbFreeCursor(cd->cursor);
+			        cd->cursor = NULL;
+			}
+			if (cd->under_cursor_buffer) {
+			        free(cd->under_cursor_buffer);
+			        cd->under_cursor_buffer = NULL;
+			}
+			if (cd->cursor_region) {
+				sraRgnDestroy(cd->cursor_region);
+				cd->cursor_region = NULL;
+			}
 		}
 		free(client->clientData);
 		client->clientData = NULL;
@@ -3822,18 +3834,17 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
             cd->kbd_id = getPairedMD(dpy, cd->ptr_id);
 
-            snprintf(tmp, 256, "%i", cd->uid);
-	    /* maybe we can use the returned shape later on when reworking the libvncserver interna */
-            XcursorImage *ci = setPointerShape(dpy, cd->ptr_id, 0.4*(cd->uid%3), 0.2*(cd->uid%5), 1*(cd->uid%2), tmp);
-	    if(!ci)
-              rfbLog("setting pointer shape for client %s failed.\n", client->host); 
-            else
-              XcursorImageDestroy(ci); /* we dont use it for now, so clean up immediatly */
-
-            rfbLog("created XInput2 MD %i %i for client %s.\n", cd->ptr_id, cd->kbd_id, client->host);
+            rfbLog("Created XInput2 MD %i %i for client %s.\n", cd->ptr_id, cd->kbd_id, client->host);
             xi2_device_creation_in_progress = 0;
 
             X_UNLOCK;
+
+            snprintf(tmp, 256, "%i", cd->uid);
+	    cd->cursor = setClientCursor(dpy, cd->ptr_id, 0.4*(cd->uid%3), 0.2*(cd->uid%5), 1*(cd->uid%2), tmp);
+	    if(!cd->cursor)
+              rfbLog("Setting cursor for client %s failed.\n", client->host);
+
+	    cd->cursor_region = sraRgnCreate();
           }
 #endif
 
