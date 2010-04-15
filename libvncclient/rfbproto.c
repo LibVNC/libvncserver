@@ -915,6 +915,10 @@ InitialiseRFBConnection(rfbClient* client)
     break;
 
   case rfbTLS:
+#ifndef LIBVNCSERVER_WITH_CLIENT_TLS
+    rfbClientLog("TLS support was not compiled in\n");
+    return FALSE;
+#else
     if (!HandleAnonTLSAuth(client)) return FALSE;
     /* After the TLS session is established, sub auth types are expected.
      * Note that all following reading/writing are through the TLS session from here.
@@ -944,10 +948,15 @@ InitialiseRFBConnection(rfbClient* client)
             (int)subAuthScheme);
         return FALSE;
     }
+#endif
 
     break;
 
   case rfbVeNCrypt:
+#ifndef LIBVNCSERVER_WITH_CLIENT_TLS
+    rfbClientLog("TLS support was not compiled in\n");
+    return FALSE;
+#else
     if (!HandleVeNCryptAuth(client)) return FALSE;
 
     switch (client->subAuthScheme) {
@@ -973,7 +982,7 @@ InitialiseRFBConnection(rfbClient* client)
             client->subAuthScheme);
         return FALSE;
     }
-
+#endif
     break;
 
   default:

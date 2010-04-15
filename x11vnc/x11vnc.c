@@ -1,7 +1,7 @@
 /*
  * x11vnc: a VNC server for X displays.
  *
- * Copyright (C) 2002-2009 Karl J. Runge <runge@karlrunge.com>
+ * Copyright (C) 2002-2010 Karl J. Runge <runge@karlrunge.com>
  * All rights reserved.
  *
  *  This file is part of x11vnc.
@@ -217,9 +217,9 @@ int tsdo(int port, int lsock, int *conn) {
 		if (db) rfbLog("tsdo: using existing csock: %d, port: %d\n", csock, port);
 	}
 
-	rsock = rfbConnectToTcpAddr("127.0.0.1", port);
+	rsock = connect_tcp("127.0.0.1", port);
 	if (rsock < 0) {
-		if (db) rfbLog("tsdo: rfbConnectToTcpAddr(port=%d) failed.\n", port);
+		if (db) rfbLog("tsdo: connect_tcp(port=%d) failed.\n", port);
 		close(csock);
 		return 2;
 	}
@@ -392,7 +392,8 @@ void terminal_services(char *list) {
 		XSync(dpy, False);
 
 		for (k=1; k <= 5; k++) {
-			socks[i] = rfbListenOnTCPPort(listen[i], htonl(INADDR_LOOPBACK));
+			/* XXX ::1 fallback? */
+			socks[i] = listen_tcp(listen[i], htonl(INADDR_LOOPBACK), 1);
 			if (socks[i] >= 0) {
 				if (db) fprintf(stderr, "     listen succeeded: %d\n", listen[i]);
 				break;
@@ -602,7 +603,7 @@ if (tstk[j] != 0) fprintf(stderr, "B redir[%d][%d] = %d  %s\n", i, j, tstk[j], t
 						redir[i][j] = 0;
 						continue;
 					}
-					s = rfbConnectToTcpAddr("127.0.0.1", p);
+					s = connect_tcp("127.0.0.1", p);
 					if (s < 0) {
 						redir[i][j] = 0;
 						if (db) fprintf(stderr, "tsdo[%d][%d] clean: connect failed: %d\n", i, j, p);
@@ -647,6 +648,7 @@ void do_tsd(void) {
 	char *cmd;
 	int n, sz = 0;
 	char *disp = DisplayString(dpy);
+	char *logfile = getenv("TS_REDIR_LOGFILE");
 	int db = 0;
 
 	if (getenv("TS_REDIR_DEBUG")) {
@@ -676,6 +678,12 @@ void do_tsd(void) {
 	sz += strlen("-env TSD_RESTART=1") + 1;
 	sz += strlen("</dev/null 1>/dev/null 2>&1") + 1;
 	sz += strlen(" &") + 1;
+	if (logfile) {
+		sz += strlen(logfile);
+	}
+	if (ipv6_listen) {
+		sz += strlen("-6") + 1;
+	}
 
 	cmd = (char *) malloc(sz);
 
@@ -685,7 +693,9 @@ void do_tsd(void) {
 			*(xauth-2) = '_';	/* yow */
 		}
 	}
-	sprintf(cmd, "%s -display %s -tsd '%s' -env TSD_RESTART=1 </dev/null 1>/dev/null 2>&1 &", program_name, disp, prop); 
+	sprintf(cmd, "%s -display %s -tsd '%s' -env TSD_RESTART=1 %s </dev/null 1>%s 2>&1 &",
+	    program_name, disp, prop, ipv6_listen ? "-6" : "",
+	    logfile ? logfile : "/dev/null" ); 
 	rfbLog("running: %s\n", cmd);
 
 #if LIBVNCSERVER_HAVE_FORK && LIBVNCSERVER_HAVE_SETSID
@@ -1322,10 +1332,10 @@ static void quick_pw(char *str) {
 	if (db) fprintf(stderr, "quick_pw: %s\n", str);
 
 	if (! str || str[0] == '\0') {
-		exit(1);
+		exit(2);
 	}
 	if (str[0] != '%') {
-		exit(1);
+		exit(2);
 	}
 	/*
 	 * "%-" or "%stdin" means read one line from stdin.
@@ -1340,19 +1350,19 @@ static void quick_pw(char *str) {
 	 */
 	if (!strcmp(str, "%-") || !strcmp(str, "%stdin")) {
 		if(fgets(tmp, 1024, stdin) == NULL) {
-			exit(1);
+			exit(2);
 		}
 		q = strdup(tmp);
 	} else if (!strcmp(str, "%env")) {
 		if (getenv("UNIXPW") == NULL) {
-			exit(1);
+			exit(2);
 		}
 		q = strdup(getenv("UNIXPW"));
 	} else if (!strcmp(str, "%%") || !strcmp(str, "%")) {
 		char *t, inp[1024];
 		fprintf(stdout, "username: ");
 		if(fgets(tmp, 128, stdin) == NULL) {
-			exit(1);
+			exit(2);
 		}
 		strcpy(inp, tmp);
 		t = strchr(inp, '\n');
@@ -1368,7 +1378,7 @@ static void quick_pw(char *str) {
 		if(fgets(tmp, 128, stdin) == NULL) {
 			fprintf(stdout, "\n");
 			system("stty echo");
-			exit(1);
+			exit(2);
 		}
 		system("stty echo");
 		fprintf(stdout, "\n");
@@ -1377,10 +1387,10 @@ static void quick_pw(char *str) {
 	} else if (str[1] == '/' || str[1] == '.') {
 		FILE *in = fopen(str+1, "r");
 		if (in == NULL) {
-			exit(1);
+			exit(2);
 		}
 		if(fgets(tmp, 1024, in) == NULL) {
-			exit(1);
+			exit(2);
 		}
 		q = strdup(tmp);
 	} else {
@@ -1393,7 +1403,7 @@ static void quick_pw(char *str) {
 	}
 
 	if ((q = strchr(p, ':')) == NULL) {
-		exit(1);
+		exit(2);
 	}
 	*q = '\0';
 	if (db) fprintf(stderr, "'%s' '%s'\n", p, q+1);
@@ -1414,7 +1424,8 @@ static void quick_pw(char *str) {
 			exit(1);
 		}
 	} else {
-		if (su_verify(p, q+1, NULL, NULL, NULL, 1)) {
+		char *ucmd = getenv("UNIXPW_CMD");
+		if (su_verify(p, q+1, ucmd, NULL, NULL, 1)) {
 			fprintf(stdout, "Y %s\n", p);
 			exit(0);
 		} else {
@@ -1423,7 +1434,7 @@ static void quick_pw(char *str) {
 		}
 	}
 	/* NOTREACHED */
-	exit(1);
+	exit(2);
 }
 
 static void print_settings(int try_http, int bg, char *gui_str) {
@@ -2514,10 +2525,32 @@ int main(int argc, char* argv[]) {
 			got_localhost = 1;
 			continue;
 		}
+		if (!strcmp(arg, "-listen6")) {
+			listen_str6 = strdup(argv[++i]);
+			continue;
+		}
 		if (!strcmp(arg, "-nolookup")) {
 			host_lookup = 0;
 			continue;
 		}
+#if X11VNC_IPV6
+		if (!strcmp(arg, "-6")) {
+			ipv6_listen = 1;
+			continue;
+		}
+		if (!strcmp(arg, "-no6")) {
+			ipv6_listen = 0;
+			continue;
+		}
+		if (!strcmp(arg, "-noipv6")) {
+			noipv6 = 1;
+			continue;
+		}
+		if (!strcmp(arg, "-noipv4")) {
+			noipv4 = 1;
+			continue;
+		}
+#endif
 		if (!strcmp(arg, "-input")) {
 			CHECK_ARGC
 			allowed_input_str = strdup(argv[++i]);
@@ -2633,7 +2666,7 @@ int main(int argc, char* argv[]) {
 				if (s[0] == '%') {
 					unixpw_list = NULL;
 					quick_pw(s);
-					exit(1);
+					exit(2);
 				}
 			}
 			if (strstr(arg, "_unsafe")) {
@@ -2845,6 +2878,11 @@ int main(int argc, char* argv[]) {
 				char *s = argv[i+1];
 				sslEncKey(s, 2);
 			}
+			exit(0);
+			continue;
+		}
+		if (!strcmp(arg, "-sslScripts")) {
+			sslScripts();
 			exit(0);
 			continue;
 		}
@@ -3554,6 +3592,14 @@ int main(int argc, char* argv[]) {
 		}
 		if (!strcmp(arg, "-noallinput")) {
 			all_input = 0;
+			continue;
+		}
+		if (!strcmp(arg, "-input_eagerly")) {
+			handle_events_eagerly = 1;
+			continue;
+		}
+		if (!strcmp(arg, "-noinput_eagerly")) {
+			handle_events_eagerly = 0;
 			continue;
 		}
 		if (!strcmp(arg, "-speeds")) {
@@ -4313,6 +4359,11 @@ int main(int argc, char* argv[]) {
 		}
 		if (n > 2) {
 			close(n);
+		}
+	}
+	if (ipv6_listen) {
+		if (inetd) {
+			ipv6_listen = 0;
 		}
 	}
 	if (inetd && quiet && !logfile) {
@@ -5772,9 +5823,14 @@ int main(int argc, char* argv[]) {
 		if (! screen->port || screen->listenSock < 0) {
 			if (got_rfbport && got_rfbport_val == 0) {
 				;
+			} else if (ipv6_listen && ipv6_listen_fd >= 0) {
+				rfbLog("Info: listening only on IPv6 interface.\n");
 			} else {
 				rfbLogEnable(1);
 				rfbLog("Error: could not obtain listening port.\n");
+				if (!got_rfbport) {
+					rfbLog("If this system is IPv6-only, use the -6 option.\n");
+				}
 				clean_up_exit(1);
 			}
 		}
@@ -5813,7 +5869,6 @@ int main(int argc, char* argv[]) {
 			}
 			if (screen && screen->httpListenSock >= 0) {
 				close(screen->httpListenSock);
-				FD_CLR(screen->httpListenSock,&screen->allFds);
 				screen->httpListenSock = -1;
 			}
 			if (openssl_sock >= 0) {
@@ -5823,6 +5878,22 @@ int main(int argc, char* argv[]) {
 			if (https_sock >= 0) {
 				close(https_sock);
 				https_sock = -1;
+			}
+			if (openssl_sock6 >= 0) {
+				close(openssl_sock6);
+				openssl_sock6 = -1;
+			}
+			if (https_sock6 >= 0) {
+				close(https_sock6);
+				https_sock6 = -1;
+			}
+			if (ipv6_listen_fd >= 0) {
+				close(ipv6_listen_fd);
+				ipv6_listen_fd = -1;
+			}
+			if (ipv6_http_fd >= 0) {
+				close(ipv6_http_fd);
+				ipv6_http_fd = -1;
 			}
 		}
 		/* fork into the background now */

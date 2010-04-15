@@ -1,6 +1,7 @@
 #!/bin/sh
 #
 # usage: onetimekey path/to/mycert.pem
+#        onetimekey -certonly path/to/mycert.pem
 #
 # Takes an openssl cert+key pem file and turns into a long string
 # for the x11vnc SSL VNC Java Viewer.
@@ -14,6 +15,19 @@
 # in it.  Also, as the name implies, an HTTPS server can create
 # a one time key to send to the applet (the user has already
 # logged in via password to the HTTPS server).
+#
+# Note oneTimeKey is to provide a CLIENT Certificate for the viewer
+# to authenticate itself to the VNC Server.
+#
+# There is also the serverCert=<str> Applet parameter.  This is
+# a cert to authenticate the VNC server against.  To create that
+# string with this tool specify -certonly as the first argument.
+
+certonly=""
+if [ "X$1" = "X-certonly" ]; then
+	shift
+	certonly=1
+fi
 
 in=$1
 der=/tmp/1time$$.der
@@ -43,5 +57,9 @@ rm -f "$der"
 
 n=`grep -n 'BEGIN CERTIFICATE' $in | awk -F: '{print $1}' | head -1`
 str2=`tail +$n $in | $pbinhex`
-echo "$str1,$str2"
+if [ "X$certonly" = "X1" ]; then
+	echo "$str2"
+else
+	echo "$str1,$str2"
+fi
 rm -f $pbinhex

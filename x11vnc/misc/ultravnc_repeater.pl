@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 #
-# Copyright (c) 2009 by Karl J. Runge <runge@karlrunge.com>
+# Copyright (c) 2009-2010 by Karl J. Runge <runge@karlrunge.com>
 #
 # ultravnc_repeater.pl is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -41,17 +41,137 @@ usage:  ultravnc_repeater.pl [-r] [client_port [server_port]]
 Use -r to refuse new server/client connections with an existing
 server/client ID.  The default is to close the previous one.
 
+To write to a log file set the env. var ULTRAVNC_REPEATER_LOGFILE.
+
+To run in a loop restarting the server if it exits set the env. var.
+ULTRAVNC_REPEATER_LOOP=1 or ULTRAVNC_REPEATER_LOOP=BG, the latter
+forks into the background.  Set ULTRAVNC_REPEATER_PIDFILE to a file
+to store the master pid in.
+
+
 Examples:
 
+	ultravnc_repeater.pl
 	ultravnc_repeater.pl -r
 	ultravnc_repeater.pl 5901
 	ultravnc_repeater.pl 5901 5501
 
+	env ULTRAVNC_REPEATER_LOOP=BG ULTRAVNC_REPEATER_LOGFILE=/tmp/u.log ultravnc_repeater.pl ...
+
 ';
 
-use warnings;
 use strict;
 
+# Set up logging:
+#
+if (exists $ENV{ULTRAVNC_REPEATER_LOGFILE}) {
+	close STDOUT;
+	if (!open(STDOUT, ">>$ENV{ULTRAVNC_REPEATER_LOGFILE}")) {
+	        die "ultravnc_repeater.pl: $ENV{ULTRAVNC_REPEATER_LOGFILE} $!\n";
+	}
+	close STDERR;
+	open(STDERR, ">&STDOUT");
+}
+select(STDERR); $| = 1;
+select(STDOUT); $| = 1;
+
+# interrupt handler:
+#
+my $looppid = '';
+my $pidfile = '';
+#
+sub get_out {
+	print STDERR "$_[0]:\t$$ looppid=$looppid\n";
+	if ($looppid) {
+		kill 'TERM', $looppid;
+		fsleep(0.2);
+	}
+	unlink $pidfile if $pidfile;
+	cleanup();
+	exit 0;
+}
+
+# These are overridden in actual server thread:
+#
+$SIG{INT}  = \&get_out;
+$SIG{TERM} = \&get_out;
+
+# pidfile:
+#
+sub open_pidfile {
+	if (exists $ENV{ULTRAVNC_REPEATER_PIDFILE}) {
+		my $pf = $ENV{ULTRAVNC_REPEATER_PIDFILE};
+		if (open(PID, ">$pf")) {
+			print PID "$$\n";
+			close PID;
+			$pidfile = $pf;
+		} else {
+			print STDERR "could not open pidfile: $pf - $! - continuing...\n";
+		}
+		delete $ENV{ULTRAVNC_REPEATER_PIDFILE};
+	}
+}
+
+####################################################################
+# Set ULTRAVNC_REPEATER_LOOP=1 to have this script create an outer loop
+# restarting itself if it ever exits.  Set ULTRAVNC_REPEATER_LOOP=BG to
+# do this in the background as a daemon.
+
+if (exists $ENV{ULTRAVNC_REPEATER_LOOP}) {
+	my $csl = $ENV{ULTRAVNC_REPEATER_LOOP};
+	if ($csl ne 'BG' && $csl ne '1') {
+		die "ultravnc_repeater.pl: invalid ULTRAVNC_REPEATER_LOOP.\n";
+	}
+	if ($csl eq 'BG') {
+		# go into bg as "daemon":
+		setpgrp(0, 0);
+		my $pid = fork();
+		if (! defined $pid) {
+			die "ultravnc_repeater.pl: $!\n";
+		} elsif ($pid) {
+			wait;
+			exit 0;
+		}
+		if (fork) {
+			exit 0;
+		}
+		setpgrp(0, 0);
+		close STDIN;
+		if (! $ENV{ULTRAVNC_REPEATER_LOGFILE}) {
+			close STDOUT;
+			close STDERR;
+		}
+	}
+	delete $ENV{ULTRAVNC_REPEATER_LOOP};
+
+	if (exists $ENV{ULTRAVNC_REPEATER_PIDFILE}) {
+		open_pidfile();
+	}
+
+	print STDERR "ultravnc_repeater.pl: starting service at ", scalar(localtime), " master-pid=$$\n";
+	while (1) {
+		$looppid = fork;
+		if (! defined $looppid) {
+			sleep 10;
+		} elsif ($looppid) {
+			wait;
+		} else {
+			exec $0, @ARGV;	
+			exit 1;
+		}
+		print STDERR "ultravnc_repeater.pl: re-starting service at ", scalar(localtime), " master-pid=$$\n";
+		sleep 1;
+	}
+	exit 0;
+}
+if (exists $ENV{ULTRAVNC_REPEATER_PIDFILE}) {
+	open_pidfile();
+}
+
+# End of background/daemon stuff.
+####################################################################
+
+use warnings;
 use IO::Socket::INET;
 use IO::Select;
 
@@ -85,6 +205,7 @@ my ($RIN, $WIN, $EIN, $ROUT);
 my $client_listen = IO::Socket::INET->new(
 	Listen    => 10,
 	LocalPort => $client_port, 
+	ReuseAddr => 1,
 	Proto => "tcp"
 );
 if (! $client_listen) {
@@ -95,6 +216,7 @@ if (! $client_listen) {
 my $server_listen = IO::Socket::INET->new(
 	Listen    => 10,
 	LocalPort => $server_port, 
+	ReuseAddr => 1,
 	Proto => "tcp"
 );
 if (! $server_listen) {
@@ -103,7 +225,7 @@ if (! $server_listen) {
 }
 
 my $select = new IO::Select();
-if (! select) {
+if (! $select) {
 	cleanup();
 	die "$prog: select $!\n";
 }
@@ -119,9 +241,6 @@ my $SOCK2 = '';
 my $CURR = '';
 
 print "watching for connections on ports $server_port/server and $client_port/client\n";
-
-select(STDERR); $| = 1;
-select(STDOUT); $| = 1;
 
 my $alarm_sock = '';
 my $got_alarm = 0;

@@ -1180,9 +1180,11 @@ static void handle_one_http_request(void) {
 	screen->port = 0;
 
 	http_connections(1);
+
 	rfbInitServer(screen);
 
 	if (!inetd) {
+		/* XXX ipv6 */
 		int conn = 0;
 		while (1) {
 			if (0) fprintf(stderr, "%d %d %d  %d\n", conn, screen->listenSock, screen->httpSock, screen->httpListenSock);
@@ -1234,8 +1236,7 @@ static void handle_one_http_request(void) {
 			rfbLog("handle_one_http_request: finished.\n");
 			return;
 		} else {
-			int sock = rfbConnectToTcpAddr("127.0.0.1",
-			    screen->httpPort);
+			int sock = connect_tcp("127.0.0.1", screen->httpPort);
 			if (sock < 0) {
 				exit(1);
 			}
@@ -1703,6 +1704,7 @@ static void vnc_redirect_loop(char *vnc_redirect_test, int *vnc_redirect_cnt) {
 		}
 	} else {
 		pid_t pid = 0;
+		/* XXX ipv6 */
 		if (screen->httpListenSock >= 0) {
 #if LIBVNCSERVER_HAVE_FORK
 			if ((pid = fork()) > 0) {
@@ -1817,7 +1819,7 @@ static void vnc_redirect_loop(char *vnc_redirect_test, int *vnc_redirect_cnt) {
 
 static void do_vnc_redirect(int created_disp, char *vnc_redirect_host, int vnc_redirect_port,
     int vnc_redirect_cnt, char *vnc_redirect_test) {
-	char *q = strchr(use_dpy, ':');
+	char *q = strrchr(use_dpy, ':');
 	int vdpy = -1, sock = -1;
 	int s_in, s_out, i;
 	if (vnc_redirect == 2) {
@@ -1850,7 +1852,7 @@ static void do_vnc_redirect(int created_disp, char *vnc_redirect_host, int vnc_r
 		usleep(1000*1000);
 	}
 	for (i=0; i < 20; i++) {
-		sock = rfbConnectToTcpAddr(vnc_redirect_host, vdpy);
+		sock = connect_tcp(vnc_redirect_host, vdpy);
 		if (sock >= 0) {
 			break;
 		}
@@ -1956,7 +1958,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	char st[] = "";
 	char fdgeom[128], fdsess[128], fdopts[128], fdextra[256], fdprog[128];
 	char fdxsrv[128], fdxdum[128], fdcups[128], fdesd[128];
-	char fdnas[128], fdsmb[128], fdtag[128];
+	char fdnas[128], fdsmb[128], fdtag[128], fdxdmcpif[128];
 	char cdout[128];
 
 	if (opts) {
@@ -1980,6 +1982,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	fdnas[0]  = '\0';
 	fdsmb[0]  = '\0';
 	fdtag[0]  = '\0';
+	fdxdmcpif[0]  = '\0';
 	cdout[0]  = '\0';
 
 	if (unixpw && keep_unixpw_opts && keep_unixpw_opts[0] != '\0') {
@@ -2122,6 +2125,9 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	if (fdtag[0] == '\0' && getenv("FD_TAG")) {
 		snprintf(fdtag, 120, "%s", getenv("FD_TAG"));
 	}
+	if (fdxdmcpif[0] == '\0' && getenv("FD_XDMCP_IF")) {
+		snprintf(fdxdmcpif,  120, "%s", getenv("FD_XDMCP_IF"));
+	}
 	if (fdxdum[0] == '\0' && getenv("FD_XDUMMY_RUN_AS_ROOT")) {
 		snprintf(fdxdum, 120, "%s", getenv("FD_XDUMMY_RUN_AS_ROOT"));
 	}
@@ -2139,6 +2145,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	if (strchr(fdnas, '\''))	fdnas[0] = '\0';
 	if (strchr(fdsmb, '\''))	fdsmb[0] = '\0';
 	if (strchr(fdtag, '\''))	fdtag[0] = '\0';
+	if (strchr(fdxdmcpif, '\''))	fdxdmcpif[0] = '\0';
 	if (strchr(fdxdum, '\''))	fdxdum[0] = '\0';
 	if (strchr(fdsess, '\''))	fdsess[0] = '\0';
 	if (strchr(cdout, '\''))	cdout[0] = '\0';
@@ -2153,6 +2160,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 	set_env("FD_NAS",  fdnas);
 	set_env("FD_SMB",  fdsmb);
 	set_env("FD_TAG",  fdtag);
+	set_env("FD_XDMCP_IF",  fdxdmcpif);
 	set_env("FD_XDUMMY_RUN_AS_ROOT", fdxdum);
 	set_env("FD_SESS", fdsess);
 
@@ -2176,6 +2184,7 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		    + strlen("FD_NAS='' ")
 		    + strlen("FD_SMB='' ")
 		    + strlen("FD_TAG='' ")
+		    + strlen("FD_XDMCP_IF='' ")
 		    + strlen("FD_XDUMMY_RUN_AS_ROOT='' ")
 		    + strlen("FD_SESS='' /bin/sh ")
 		    + strlen(uu) + 1
@@ -2189,16 +2198,17 @@ static char *build_create_cmd(char *cmd, int *saw_xdmcp, char *usslpeer, char *t
 		    + strlen(fdnas) + 1
 		    + strlen(fdsmb) + 1
 		    + strlen(fdtag) + 1
+		    + strlen(fdxdmcpif) + 1
 		    + strlen(fdxdum) + 1
 		    + strlen(fdsess) + 1
 		    + strlen(cdout) + 1
 		    + strlen(opts) + 1);
 		sprintf(create_cmd, "env USER='%s' FD_GEOM='%s' FD_SESS='%s' "
 		    "FD_OPTS='%s' FD_EXTRA='%s' FD_PROG='%s' FD_XSRV='%s' FD_CUPS='%s' "
-		    "FD_ESD='%s' FD_NAS='%s' FD_SMB='%s' FD_TAG='%s' "
+		    "FD_ESD='%s' FD_NAS='%s' FD_SMB='%s' FD_TAG='%s' FD_XDMCP_IF='%s' "
 		    "FD_XDUMMY_RUN_AS_ROOT='%s' %s /bin/sh %s %s",
 		    uu, fdgeom, fdsess, fdopts, fdextra, fdprog, fdxsrv,
-		    fdcups, fdesd, fdnas, fdsmb, fdtag, fdxdum, cdout, tmp, opts);
+		    fdcups, fdesd, fdnas, fdsmb, fdtag, fdxdmcpif, fdxdum, cdout, tmp, opts);
 	} else {
 		create_cmd = (char *) malloc(strlen(tmp)
 		    + strlen("/bin/sh ") + 1 + strlen(opts) + 1);
@@ -2985,9 +2995,14 @@ int wait_for_client(int *argc, char** argv, int http) {
 		if (! screen->port || screen->listenSock < 0) {
 			if (got_rfbport && got_rfbport_val == 0) {
 				;
+			} else if (ipv6_listen && ipv6_listen_fd >= 0) {
+				rfbLog("Info: listening only on IPv6 interface.\n");
 			} else {
 				rfbLogEnable(1);
 				rfbLog("Error: could not obtain listening port.\n");
+				if (!got_rfbport) {
+					rfbLog("If this system is IPv6-only, use the -6 option.\n");
+				}
 				clean_up_exit(1);
 			}
 		}

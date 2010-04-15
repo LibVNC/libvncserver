@@ -1,3 +1,31 @@
+2010-04-09  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: debugging and workarounds for java viewer
+	* x11vnc/misc: sync ssvnc, improve util scripts.
+	* x11vnc: exit(1) for -connect_or_exit failure, quiet query
+	  mode for grab_state, etc. ipv6 support. STUNNEL_LISTEN for
+	  particular interface. -input_eagerly in addition to -allinput.
+	  quiet Xinerama message.
+
+2010-03-20  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: Many improvements to Java SSL applet, onetimekey
+	  serverCert param, debugging printout, user dialogs, catch
+	  socket exceptions, autodetect x11vnc for GET=1.
+	* x11vnc: misc/scripts: desktop.cgi, inet6to4, panner.pl.
+	  X11VNC_HTTPS_DOWNLOAD_WAIT_TIME, -unixpw %xxx documented, and
+	  can run user cmd in UNIXPW_CMD. FD_XDMCP_IF for create script,
+	  autodetect dm on udp6 only.  Queries: pointer_x, pointer_y,
+	  pointer_same, pointer_root.  Switch on -xkd if keysyms per key >
+	  4 in all cases.  daemon mode improvements for connect_switch,
+	  inet6to4, ultravnc_repeater.pl.  Dynamic change of -clip do
+	  not create new fb if WxH is unchanged.
+
+2010-02-22  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: Java SSL applet viewer now works with certificate
+	  chains.
+	* x11vnc: Printout option -sslScripts.  Suggest -auth guess
+	  in error message.  Set fake_screen width and height.  Test
+	  for +kb in Xvfb.
+
 2010-01-02  Karl Runge <runge@karlrunge.com>
 	* x11vnc: small tweaks to Xdummy, rx11vnc*.  Apply
 	  SMALL_FOOTPRINT to -appshare text.  Copyright year change.

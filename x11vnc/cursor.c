@@ -911,6 +911,9 @@ static void tree_descend_cursor(int *depth, Window *w, win_str_info_t *winfo) {
 	*(winfo->res_name)  = '\0';
 	*(winfo->res_class) = '\0';
 
+	for (i=0; i < maxtries; i++) {
+		wins[i] = None;
+	}
 
 	/* some times a window can go away before we get to it */
 	trapped_xerror = 0;

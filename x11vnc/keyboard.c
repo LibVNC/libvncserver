@@ -1116,7 +1116,8 @@ void switch_to_xkb_if_better(void) {
 	n = k;
 
 	XFree_wr(keymap);
-	if (missing_noxkb == 0 && syms_gt_4 >= 8) {
+	if (missing_noxkb == 0 && syms_per_keycode > 4 && syms_gt_4 >= 0) {
+		/* we used to have syms_gt_4 >= 8, now always on. */
 		if (! raw_fb_str) {
 			rfbLog("\n");
 			rfbLog("XKEYBOARD: number of keysyms per keycode %d is greater\n", syms_per_keycode);
@@ -1125,6 +1126,7 @@ void switch_to_xkb_if_better(void) {
 			rfbLog("  If this makes the key mapping worse you can\n");
 			rfbLog("  disable it with the \"-noxkb\" option.\n");
 			rfbLog("  Also, remember \"-remap DEAD\" for accenting characters.\n");
+			rfbLog("\n");
 		}
 
 		use_xkb_modtweak = 1;
@@ -1137,6 +1139,7 @@ void switch_to_xkb_if_better(void) {
 			rfbLog("  Not automatically switching to -xkb mode.\n");
 			rfbLog("  If some keys still cannot be typed, try using -xkb.\n");
 			rfbLog("  Also, remember \"-remap DEAD\" for accenting characters.\n");
+			rfbLog("\n");
 		}
 		return;
 	}
@@ -1219,6 +1222,7 @@ void switch_to_xkb_if_better(void) {
 		rfbLog("  Also, remember \"-remap DEAD\" for accenting"
 		    " characters.\n");
 	}
+	rfbLog("\n");
 }
 
 /* sets up all the keymapping info via Xkb API */

@@ -1,0 +1,420 @@
+#!/usr/bin/perl
+#
+# inet6to4:  Act as an ipv6-to-ipv4 relay for tcp applications that
+#            do not support ipv6.
+#
+# Usage:     inet6to4    <ipv6-listen-port> <ipv4-host:port>
+#            inet6to4 -r <ipv4-listen-port> <ipv6-host:port>
+#
+# Examples:  inet6to4 5900 localhost:5900
+#            inet6to4 8080 web1:80
+#            inet6to4 -r 5900 fe80::217:f2ff:fee6:6f5a%eth0:5900
+#
+# The -r option reverses the direction of translation (e.g. for ipv4
+# clients that need to connect to ipv6 servers.)  Reversing is the default
+# if this script is named 'inet4to6' (e.g. by a symlink.)
+#
+# Use Ctrl-C to stop this program.  You can also supply '-c n' as the
+# first option to only handle that many connections.
+#
+# Also set the env. vars INET6TO4_LOOP=1 or INET6TO4_LOOP=BG
+# to have an outer loop restarting this program (BG means do that
+# in the background), and INET6TO4_LOGFILE for a log file.
+# Also set INET6TO4_VERBOSE to verbosity level and INET6TO4_WAITTIME
+# and INET6TO4_PIDFILE (see below.)
+#
+
+#-------------------------------------------------------------------------
+# Copyright (c) 2010 by Karl J. Runge <runge@karlrunge.com>
+#
+# inet6to4 is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or (at
+# your option) any later version.
+# 
+# inet6to4 is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with inet6to4; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA
+# or see <http://www.gnu.org/licenses/>.
+#-------------------------------------------------------------------------
+
+my $program = "inet6to4";
+
+# Set up logging:
+#
+if (exists $ENV{INET6TO4_LOGFILE}) {
+	close STDOUT;
+	if (!open(STDOUT, ">>$ENV{INET6TO4_LOGFILE}")) {
+	        die "$program: $ENV{INET6TO4_LOGFILE} $!\n";
+	}
+	close STDERR;
+	open(STDERR, ">&STDOUT");
+}
+select(STDERR); $| = 1;
+select(STDOUT); $| = 1;
+
+# interrupt handler:
+#
+my $looppid = '';
+my $pidfile = '';
+my $listen_sock = '';	# declared here for get_out()
+#
+sub get_out {
+	print STDERR "$_[0]:\t$$ looppid=$looppid\n";
+	close $listen_sock if $listen_sock;
+	if ($looppid) {
+		kill 'TERM', $looppid;
+		fsleep(0.2);
+	}
+	unlink $pidfile if $pidfile;
+	exit 0;
+}
+$SIG{INT}  = \&get_out;
+$SIG{TERM} = \&get_out;
+
+# pidfile:
+#
+sub open_pidfile {
+	if (exists $ENV{INET6TO4_PIDFILE}) {
+		my $pf = $ENV{INET6TO4_PIDFILE};
+		if (open(PID, ">$pf")) {
+			print PID "$$\n";
+			close PID;
+			$pidfile = $pf;
+		} else {
+			print STDERR "could not open pidfile: $pf - $! - continuing...\n";
+		}
+		delete $ENV{INET6TO4_PIDFILE};
+	}
+}
+
+####################################################################
+# Set INET6TO4_LOOP=1 to have this script create an outer loop
+# restarting itself if it ever exits.  Set INET6TO4_LOOP=BG to
+# do this in the background as a daemon.
+
+if (exists $ENV{INET6TO4_LOOP}) {
+	my $csl = $ENV{INET6TO4_LOOP};
+	if ($csl ne 'BG' && $csl ne '1') {
+		die "$program: invalid INET6TO4_LOOP.\n";
+	}
+	if ($csl eq 'BG') {
+		# go into bg as "daemon":
+		setpgrp(0, 0);
+		my $pid = fork();
+		if (! defined $pid) {
+			die "$program: $!\n";
+		} elsif ($pid) {
+			wait;
+			exit 0;
+		}
+		if (fork) {
+			exit 0;
+		}
+		setpgrp(0, 0);
+		close STDIN;
+		if (! $ENV{INET6TO4_LOGFILE}) {
+			close STDOUT;
+			close STDERR;
+		}
+	}
+	delete $ENV{INET6TO4_LOOP};
+
+	if (exists $ENV{INET6TO4_PIDFILE}) {
+		open_pidfile();
+	}
+
+	print STDERR "$program: starting service at ", scalar(localtime), " master-pid=$$\n";
+	while (1) {
+		$looppid = fork;
+		if (! defined $looppid) {
+			sleep 10;
+		} elsif ($looppid) {
+			wait;
+		} else {
+			exec $0, @ARGV;	
+			exit 1;
+		}
+		print STDERR "$program: re-starting service at ", scalar(localtime), " master-pid=$$\n";
+		sleep 1;
+	}
+	exit 0;
+}
+if (exists $ENV{INET6TO4_PIDFILE}) {
+	open_pidfile();
+}
+
+use IO::Socket::INET6;
+use strict;
+use warnings;
+
+# some settings:
+#
+my $verbose = 1;	# set to 0 for no messages, 2 for more.
+my $killpid = 1;	# does kill(2) at end of connection. 
+my $waittime = 0.25;	# time to wait between connections.
+my $reverse = 0;	# -r switch (or file named inet4to6)
+
+if (exists $ENV{INET6TO4_VERBOSE}) {
+	$verbose = $ENV{INET6TO4_VERBOSE};
+}
+if (exists $ENV{INET6TO4_WAITTIME}) {
+	$waittime = $ENV{INET6TO4_WAITTIME};
+}
+
+# process command line args:
+
+if (! @ARGV || $ARGV[0] =~ '^-+h') {	# -help
+	open(ME, "<$0");
+	while (<ME>) {
+		last unless /^#/;
+		next if /usr.bin.perl/;
+		$_ =~ s/# ?//;
+		print;
+	}
+	exit;
+}
+
+my $cmax = 0;
+if ($ARGV[0] eq '-c') {			# -c
+	shift;
+	$cmax = shift;
+}
+
+if ($ARGV[0] eq '-r') {			# -r
+	shift;
+	$reverse = 1;
+} elsif ($0 =~ /inet4to6$/) {
+	$reverse = 1;
+}
+
+my $listen_port = shift;		# ipv6-listen-port
+my $connect_to  = shift;		# ipv4-host:port
+
+die "no listen port or connect-to-host:port\n" if ! $listen_port || ! $connect_to;
+
+# connect to host:
+#
+my $host = '';
+my $port = '';
+if ($connect_to =~ /^(.*):(\d+)$/) {
+	$host = $1;
+	$port = $2;
+}
+die "invalid connect-to-host:port\n" if ! $host || ! $port;
+
+setpgrp(0, 0);
+
+# create listening socket:
+#
+my %opts;
+$opts{Listen}    = 10;
+$opts{Proto}     = "tcp";
+$opts{ReuseAddr} = 1;
+if ($listen_port =~ /^(.*):(\d+)$/) {
+	$opts{LocalAddr} = $1;
+	$listen_port = $2;
+}
+$opts{LocalPort} = $listen_port;
+
+if (!$reverse) {
+	# force ipv6 interface:
+	$opts{Domain} = AF_INET6;
+	$listen_sock = IO::Socket::INET6->new(%opts);
+} else {
+	$listen_sock = IO::Socket::INET->new(%opts);
+	if (! $listen_sock && $! =~ /invalid/i) {
+		warn "$program: $!, retrying with AF_UNSPEC:\n";
+		$opts{Domain} = AF_UNSPEC;
+		$listen_sock = IO::Socket::INET6->new(%opts);
+	}
+}
+if (! $listen_sock) {
+	die "$program: $!\n";
+}
+
+# for use by the xfer helper processes' interrupt handlers:
+#
+my $current_fh1 = '';
+my $current_fh2 = '';
+
+# connection counter:
+#
+my $conn = 0;
+
+# loop forever waiting for connections:
+#
+while (1) {
+	$conn++;
+	if ($cmax > 0 && $conn > $cmax) {
+		print STDERR "last connection ($cmax)\n" if $verbose; 
+		last;
+	}
+	print STDERR "listening for connection: $conn\n" if $verbose; 
+	my ($client, $ip) = $listen_sock->accept();
+
+	if ($client && !$reverse && $port == $listen_port) {
+		# This happens on Darwin 'tcp46'
+		if ($client->peerhost() =~ /^::ffff:/) {
+			print STDERR "closing client we think is actually us: ",
+			    $client->peerhost(), "\n";
+			close $client;
+			$client = undef;
+		}
+	}
+	if (! $client) {
+		# to throttle runaways
+		fsleep(2 * $waittime);
+		next;
+	}
+	print STDERR "conn: $conn -- ", $client->peerhost(), " at ", scalar(localtime), "\n" if $verbose;
+
+	# spawn helper:
+	#
+	my $pid = fork();
+	if (! defined $pid) {
+		die "$program: $!\n";
+	} elsif ($pid) {
+		wait;
+		# to throttle runaways
+		fsleep($waittime);
+		next;
+	} else {
+		# this is to avoid zombies:
+		close $listen_sock;
+		if (fork) {
+			exit 0;
+		}
+		setpgrp(0, 0);
+		handle_conn($client);
+	}
+}
+
+exit 0;
+
+sub handle_conn {
+	my $client = shift;
+
+	my $start = time();
+
+	print STDERR "connecting to: $host:$port\n" if $verbose;
+
+	my $sock = '';
+	my %opts;
+	$opts{PeerAddr} = $host;
+	$opts{PeerPort} = $port;
+	$opts{Proto}    = "tcp";
+	if (!$reverse) {
+		$sock = IO::Socket::INET->new(%opts);
+	} else {
+		$opts{Domain} = AF_INET6;
+		$sock = IO::Socket::INET6->new(%opts);
+	}
+	if (! $sock) {
+		warn "$program: $!, retrying with AF_UNSPEC:\n";
+		$opts{Domain} = AF_UNSPEC;
+		$sock = IO::Socket::INET6->new(%opts);
+	}
+
+	if (! $sock) {
+		close $client;
+		die "$program: $!\n";
+	}
+
+	$current_fh1 = $client;
+	$current_fh2 = $sock;
+
+	# interrupt handler:
+	#
+	$SIG{TERM} = sub {print STDERR "got sigterm\[$$]\n" if $verbose; close $current_fh1; close $current_fh2; exit 0};
+
+	# spawn another helper and transfer the data:
+	#
+	my $parent = $$;
+	if (my $child = fork()) {
+		xfer($sock, $client, 'S->C');
+		if ($killpid) {
+			fsleep(0.5);
+			kill 'TERM', $child;
+		}
+	} else {
+		xfer($client, $sock, 'C->S');
+		if ($killpid) {
+			fsleep(0.75);
+			kill 'TERM', $parent;
+		}
+	}
+
+	# done.
+	#
+	if ($verbose > 1) {
+		my $dt = time() - $start;
+		print STDERR "dt\[$$]: $dt\n";
+	}
+	exit 0;
+}
+
+# transfers data in one direction:
+#
+sub xfer {
+	my($in, $out, $lab) = @_;
+	my ($RIN, $WIN, $EIN, $ROUT);
+	$RIN = $WIN = $EIN = "";
+	$ROUT = "";
+	vec($RIN, fileno($in), 1) = 1;
+	vec($WIN, fileno($in), 1) = 1;
+	$EIN = $RIN | $WIN;
+	my $buf;
+
+	while (1) {
+		my $nf = 0;
+		while (! $nf) {
+			$nf = select($ROUT=$RIN, undef, undef, undef);
+		}
+		my $len = sysread($in, $buf, 8192);
+		if (! defined($len)) {
+			next if $! =~ /^Interrupted/;
+			print STDERR "$program\[$lab/$conn/$$]: $!\n";
+			last;
+		} elsif ($len == 0) {
+			print STDERR "$program\[$lab/$conn/$$]: "
+			    . "Input is EOF.\n";
+			last;
+		}
+
+		if ($verbose > 4) {
+			# verbose debugging of data:
+			syswrite(STDERR , "\n$lab: ", 6);
+			syswrite(STDERR , $buf, $len);
+		}
+
+		my $offset = 0;
+		my $quit = 0;
+		while ($len) {
+			my $written = syswrite($out, $buf, $len, $offset);
+			if (! defined $written) {
+				print STDERR "$program\[$lab/$conn/$$]: "
+				    . "Output is EOF. $!\n";
+				$quit = 1;
+				last;
+			}
+			$len -= $written;
+			$offset += $written;
+		}
+		last if $quit;
+	}
+	close($in);
+	close($out);
+}
+
+# sleep a fraction of a second:
+#
+sub fsleep {
+	my ($time) = @_;
+	select(undef, undef, undef, $time) if $time;
+}
