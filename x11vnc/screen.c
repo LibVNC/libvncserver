@@ -3508,8 +3508,13 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		cmap8to24_fb = NULL;
 		rot_fb = NULL;
 
-		if (use_multipointer && use_threads) 
-		  screen->displayHook = multicursor_hook;
+		if (use_multipointer) {
+		  /* needed to allow multiple dragging actions at once */
+		  screen->deferPtrUpdateTime = 0; 
+		  /* this draws cursors into the framebuffer */
+		  if(use_threads) 
+		    screen->displayHook = multicursor_hook;
+		}
 
 		if (cmap8to24) {
 			int n = main_bytes_per_line * fb->height;

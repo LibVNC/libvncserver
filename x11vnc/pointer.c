@@ -684,6 +684,10 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	if(client)
 	  cd = (ClientData *) client->clientData;
 
+	/* needed to allow multiple dragging actions at once */
+        if(client && use_multipointer) 
+          client->screen->pointerClient = NULL;
+
 	if (threads_drop_input) {
 		return;
 	}

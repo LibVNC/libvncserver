@@ -2184,6 +2184,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbPointerEventMsg, sz_rfbPointerEventMsg);
 	
+	if (cl->screen->pointerClient && cl->screen->pointerClient != cl)
+	    return;
+
 	if (msg.pe.buttonMask == 0)
 	    cl->screen->pointerClient = NULL;
 	else
