@@ -2018,7 +2018,7 @@ int check_x11_pointer(void) {
 	      continue;
 
 	    if (debug_pointer)
-	      rfbLog("XIQueryPointer:     x:%4d, y:%4d)\n", root_x, root_y);
+	      rfbLog("XIQueryPointer:     x:%4f, y:%4f)\n", root_x, root_y);
 
 	    /* offset subtracted since XIQueryPointer relative to rootwin */
 	    x = root_x - off_x - coff_x;
