@@ -218,8 +218,6 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
   else
     snprintf(text, textsz, "%i", (int) dev_id);
  
-  X_LOCK;
-  
   /* simple cursor w/o label */
   barecursor_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 24, 24);
   cr = cairo_create(barecursor_surface);
@@ -256,12 +254,13 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
   cairo_move_to(cr, idXOffset, idYOffset);
   cairo_show_text(cr,text);
     
- 
+  X_LOCK;
   /* copy cairo surface to cursor image */
   cursor_image = XcursorImageCreate(total_width, total_height);
   /* this is important! otherwise we get badmatch, badcursor xerrrors galore... */
   cursor_image->xhot = cursor_image->yhot = 0; 
   memcpy(cursor_image->pixels, cairo_image_surface_get_data (main_surface), sizeof(CARD32) * total_width * total_height);
+  X_UNLOCK;
 
   /* convert to rfb cursor which we return later */
   rfbcursor = pixels2curs((unsigned long*)cursor_image->pixels,
@@ -271,6 +270,8 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
 			  cursor_image->yhot,
 			  bpp/8);
   
+  X_LOCK;
+
   /* and display  */
   cursor = XcursorImageLoadCursor(dpy, cursor_image);
   XIDefineCursor(dpy, dev_id, RootWindow(dpy, DefaultScreen(dpy)), cursor);
