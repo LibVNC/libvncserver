@@ -218,6 +218,7 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
   else
     snprintf(text, textsz, "%i", (int) dev_id);
  
+  X_LOCK;
   
   /* simple cursor w/o label */
   barecursor_surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 24, 24);
@@ -281,6 +282,8 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
   cairo_surface_destroy(main_surface);
   cairo_surface_destroy(barecursor_surface);
   XcursorImageDestroy(cursor_image);
+
+  X_UNLOCK;
 
   return rfbcursor;
 #endif
