@@ -806,7 +806,24 @@ static void multicursor_hook(rfbClientPtr client)
        rfbSendFramebufferUpdate() call below */
     cd->cursor_hook_lock = TRUE;
 
+    /* maybe this is not needed */
     LOCK(multi_cursor_mutex);
+
+
+    /* disable cursor shape/position updates for this client */
+    if (client->enableCursorShapeUpdates) {
+      cd->had_cursor_shape_updates = 1;
+      client->enableCursorShapeUpdates = FALSE;
+      if (debug_pointer) 
+	rfbLog("%s disable HCSU\n", client->host);
+    }
+    if (client->enableCursorPosUpdates) {
+      cd->had_cursor_pos_updates = 1;
+      client->enableCursorPosUpdates = FALSE;
+      if (debug_pointer) 
+	rfbLog("%s disable HCPU\n", client->host);
+    }
+    client->cursorWasChanged = FALSE;
 
     /* restore modified regions we saved in a previous call */ 
     LOCK(client->updateMutex);
