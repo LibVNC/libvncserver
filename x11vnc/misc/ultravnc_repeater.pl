@@ -28,17 +28,19 @@ protocol: Listen on one port for vnc clients (default 5900.)
           Read 250 bytes from connecting vnc client or server.
           Accept ID:<string> from clients and servers, connect them
           together once both are present.
+
           The string "RFB 000.000\n" is sent to the client (the client
           must understand this means send ID:... or host:port.)
           Also accept <host>:<port> from clients and make the
           connection to the vnc server immediately. 
+
           Note there is no authentication or security WRT ID names or
-          identities; it us up to the client and server to manage that
-          and whether to encrypt the session, etc.
+          identities; it is up to the client and server to completely
+          manage that aspect and whether to encrypt the session, etc.
 
 usage:  ultravnc_repeater.pl [-r] [client_port [server_port]]
 
-Use -r to refuse new server/client connections with an existing
+Use -r to refuse new server/client connections when there is an existing
 server/client ID.  The default is to close the previous one.
 
 To write to a log file set the env. var ULTRAVNC_REPEATER_LOGFILE.
@@ -175,11 +177,18 @@ use warnings;
 use IO::Socket::INET;
 use IO::Select;
 
+# Test for INET6 support:
+#
+my $have_inet6 = 0;
+eval "use IO::Socket::INET6;";
+$have_inet6 = 1 if $@ eq "";
+print "perl module IO::Socket::INET6 not available: no IPv6 support.\n" if ! $have_inet6;
+
 my $prog = 'ultravnc_repeater.pl';
 my %ID;
 
 my $refuse = 0;
-my $init_timeout = 3;
+my $init_timeout = 5;
 
 if (@ARGV && $ARGV[0] =~ /-h/) {
 	print $usage;
@@ -187,6 +196,7 @@ if (@ARGV && $ARGV[0] =~ /-h/) {
 }
 if (@ARGV && $ARGV[0] eq '-r') {
 	$refuse = 1;
+	print "enabling refuse mode (-r).\n";
 	shift;
 }
 
@@ -196,6 +206,7 @@ my $server_port = shift;
 $client_port = 5900 unless $client_port;
 $server_port = 5500 unless $server_port;
 
+my $uname = `uname`;
 
 my $repeater_bufsize = 250;
 $repeater_bufsize = $ENV{BUFSIZE} if exists $ENV{BUFSIZE};
@@ -208,9 +219,25 @@ my $client_listen = IO::Socket::INET->new(
 	ReuseAddr => 1,
 	Proto => "tcp"
 );
-if (! $client_listen) {
+my $err1 = $!;
+my $err2 = '';
+$client_listen = '' if ! $client_listen;
+
+my $client_listen6 = '';
+if ($have_inet6) {
+	eval {$client_listen6 = IO::Socket::INET6->new(
+		Listen    => 10,
+		LocalPort => $client_port,
+		ReuseAddr => 1,
+		Domain    => AF_INET6,
+		LocalAddr => "::",
+		Proto     => "tcp"
+	);};
+	$err2 = $!;
+}
+if (! $client_listen && ! $client_listen6) {
 	cleanup();
-	die "$prog: error: client listen on port $client_port: $!\n";
+	die "$prog: error: client listen on port $client_port: $err1 - $err2\n";
 }
 
 my $server_listen = IO::Socket::INET->new(
@@ -219,9 +246,25 @@ my $server_listen = IO::Socket::INET->new(
 	ReuseAddr => 1,
 	Proto => "tcp"
 );
-if (! $server_listen) {
+$err1 = $!;
+$err2 = '';
+$server_listen = '' if ! $server_listen;
+
+my $server_listen6 = '';
+if ($have_inet6) {
+	eval {$server_listen6 = IO::Socket::INET6->new(
+		Listen    => 10,
+		LocalPort => $server_port,
+		ReuseAddr => 1,
+		Domain    => AF_INET6,
+		LocalAddr => "::",
+		Proto     => "tcp"
+	);};
+	$err2 = $!;
+}
+if (! $server_listen && ! $server_listen6) {
 	cleanup();
-	die "$prog: error: server listen on port $server_port: $!\n";
+	die "$prog: error: server listen on port $server_port: $err1 - $err2\n";
 }
 
 my $select = new IO::Select();
@@ -230,8 +273,10 @@ if (! $select) {
 	die "$prog: select $!\n";
 }
 
-$select->add($client_listen);
-$select->add($server_listen);
+$select->add($client_listen)  if $client_listen;
+$select->add($client_listen6) if $client_listen6;
+$select->add($server_listen)  if $server_listen;
+$select->add($server_listen6) if $server_listen6;
 
 $SIG{INT}  = sub {cleanup(); exit;};
 $SIG{TERM} = sub {cleanup(); exit;};
@@ -240,7 +285,10 @@ my $SOCK1 = '';
 my $SOCK2 = '';
 my $CURR = '';
 
-print "watching for connections on ports $server_port/server and $client_port/client\n";
+print "watching for IPv4 connections on $client_port/client\n" if $client_listen;
+print "watching for IPv4 connections on $server_port/server\n" if $server_listen;
+print "watching for IPv6 connections on $client_port/client\n" if $client_listen6;
+print "watching for IPv6 connections on $server_port/server\n" if $server_listen6;
 
 my $alarm_sock = '';
 my $got_alarm = 0;
@@ -255,9 +303,9 @@ sub alarm_handler {
 
 while (my @ready = $select->can_read()) {
 	foreach my $fh (@ready) {
-		if ($fh == $client_listen) {
+		if ($fh == $client_listen || $fh == $client_listen6) {
 			print "new vnc client connecting at ", scalar(localtime), "\n"; 
-		} elsif ($fh == $server_listen) {
+		} elsif ($fh == $server_listen || $fh == $server_listen6) {
 			print "new vnc server connecting at ", scalar(localtime), "\n"; 
 		}
 		my $sock = $fh->accept();
@@ -266,7 +314,7 @@ while (my @ready = $select->can_read()) {
 			next;
 		}
 
-		if ($fh == $client_listen) {
+		if ($fh == $client_listen || $fh == $client_listen6) {
 			my $str = "RFB 000.000\n";
 			my $len = length $str;
 			my $n = syswrite($sock, $str, $len, 0);
@@ -294,9 +342,9 @@ while (my @ready = $select->can_read()) {
 		} elsif ($repeater_bufsize > 0 && $n != $size) {
 			print "$prog: short read $n != $size $!\n";
 			close $sock;
-		} elsif ($fh == $client_listen) {
+		} elsif ($fh == $client_listen || $fh == $client_listen6) {
 			do_new_client($sock, $buf);
-		} elsif ($fh == $server_listen) {
+		} elsif ($fh == $server_listen || $fh == $server_listen6) {
 			do_new_server($sock, $buf);
 		}
 	}
@@ -309,10 +357,12 @@ sub do_new_client {
 		my $id = $1;
 		if (exists $ID{$id}) {
 			if ($ID{$id}{client}) {
-				print "refusing extra vnc client for ID:$id\n";
-				close $sock;
-				return;
-				if ($refuse) {
+				my $ref = $refuse;
+				if ($ref && !established($ID{$id}{sock})) {
+					print "socket for ID:$id is no longer established, closing it.\n";
+					$ref = 0;
+				}
+				if ($ref) {
 					print "refusing extra vnc client for ID:$id\n";
 					close $sock;
 					return;
@@ -337,9 +387,11 @@ sub do_new_client {
 		}
 	} else {
 		my $str = sprintf("%s", $buf);
+		$str =~ s/\s*$//g;
+		$str =~ s/\0*$//g;
 		my $host = '';
 		my $port = '';
-		if ($str =~ /^(.+):(\d+)/) {
+		if ($str =~ /^(.+):(\d+)$/) {
 			$host = $1;
 			$port = $2;
 		} else {
@@ -355,12 +407,23 @@ sub do_new_client {
 			print "resetting port from $port to $pnew\n";
 			$port = $pnew;
 		}
-		print "making vnc client connection directly to vnc server $host:$port\n";
+		print "making vnc client connection directly to vnc server host='$host' port='$port'\n";
 		my $sock2 =  IO::Socket::INET->new(
 			PeerAddr => $host,
 			PeerPort => $port,
 			Proto => "tcp"
 		);
+		if (! $sock2 && $have_inet6) {
+			print "IPv4 connect error: $!, trying IPv6 ...\n";
+			eval{$sock2 = IO::Socket::INET6->new(
+				PeerAddr => $host,
+				PeerPort => $port,
+				Proto => "tcp"
+			);};
+			print "IPv6 connect error: $!\n" if !$sock2;
+		} else {
+			print "IPv4 connect error: $!\n" if !$sock2;
+		}
 		if (!$sock2) {
 			print "failed to connect to $host:$port\n";
 			close $sock;
@@ -378,7 +441,12 @@ sub do_new_server {
 		my $store = 1;
 		if (exists $ID{$id}) {
 			if (! $ID{$id}{client}) {
-				if ($refuse) {
+				my $ref = $refuse;
+				if ($ref && !established($ID{$id}{sock})) {
+					print "socket for ID:$id is no longer established, closing it.\n";
+					$ref = 0;
+				}
+				if ($ref) {
 					print "refusing extra vnc server for ID:$id\n";
 					close $sock;
 					return;
@@ -406,6 +474,78 @@ sub do_new_server {
 		close $sock;
 		return;
 	}
+}
+
+sub established {
+	# hack for Linux to see if remote side has gone away:
+	my $fh = shift;
+
+	# if we can't figure things out, we return true.
+	if ($uname !~ /Linux/) {
+		return 1;
+	}
+
+	my @proc_net_tcp = ();
+	if (-e "/proc/net/tcp") {
+		push @proc_net_tcp, "/proc/net/tcp";
+	}
+	if (-e "/proc/net/tcp6") {
+		push @proc_net_tcp, "/proc/net/tcp6";
+	}
+	if (! @proc_net_tcp) {
+		return 1;
+	}
+
+	my $n = fileno($fh);
+	if (!defined($n)) {
+		return 1;
+	}
+
+	my $proc_fd = "/proc/$$/fd/$n";
+	if (! -e $proc_fd) {
+		return 1;
+	}
+
+	my $val = readlink($proc_fd);
+	if (! defined $val || $val !~ /socket:\[(\d+)\]/) {
+		return 1;
+	}
+	my $num = $1;
+
+	my $st = '';
+
+	foreach my $tcp (@proc_net_tcp) {
+		if (! open(TCP, "<$tcp")) {
+			next;
+		}
+		while (<TCP>) {
+			next if /^\s*[A-z]/;
+			chomp;
+			#  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode                                                     
+			# 170: 0102000A:170C FE02000A:87FA 01 00000000:00000000 00:00000000 00000000  1001        0 423294766 1 f6fa4100 21 4 4 2 -1
+			# 172: 0102000A:170C FE02000A:87FA 08 00000000:00000001 00:00000000 00000000  1001        0 423294766 1 f6fa4100 21 4 4 2 -1
+			my @items = split(' ', $_);
+			my $state = $items[3];
+			my $inode = $items[9];
+			if (!defined $state || $state !~ /^\d+$/) {
+				next;
+			}
+			if (!defined $inode || $inode !~ /^\d+$/) {
+				next;
+			}
+			if ($inode == $num) {
+				$st = $state;
+				last;
+			}
+		}
+		close TCP;
+		last if $st ne '';
+	}
+
+	if ($st ne '' && $st != 1) {
+		return 0;
+	}
+	return 1;
 }
 
 sub handler {
@@ -535,8 +675,10 @@ sub xfer_both {
 }
 
 sub cleanup {
-	close $client_listen if defined $client_listen;
-	close $server_listen if defined $server_listen;
+	close $client_listen  if $client_listen;
+	close $client_listen6 if $client_listen6;
+	close $server_listen  if $server_listen;
+	close $server_listen6 if $server_listen6;
 	foreach my $id (keys %ID) {
 		close $ID{$id}{sock};
 	}

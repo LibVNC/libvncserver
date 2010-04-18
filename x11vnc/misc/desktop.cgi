@@ -218,6 +218,11 @@
 use strict;
 use IO::Socket::INET;
 
+# Test for INET6 support:
+#
+my $have_inet6 = 0;
+eval "use IO::Socket::INET6;";
+$have_inet6 = 1 if $@ eq "";
 
 ##########################################################################
 # Path to the x11vnc program:
@@ -260,6 +265,10 @@ my $find_free_port = 0;
 # autoselection:
 #
 my $starting_port = 7000;
+
+# Listen on AF_INET6 if IO::Socket::INET6 is available.
+#
+my $listen_on_ipv6 = 0;
 
 
 ##########################################################################
@@ -978,12 +987,24 @@ sub auto_select_port {
 	# Now try to find a free one:
 	#
 	for (my $p = $pmin; $p <= $pmax; $p++) {
-		my $sock = IO::Socket::INET->new(
-			Listen	  => 1,
-			LocalPort => $p,
-			ReuseAddr => 1,
-			Proto     => "tcp"
-		);
+		my $sock = '';
+		if ($have_inet6 && $listen_on_ipv6) {
+			eval {$sock = IO::Socket::INET6->new(
+				Listen    => 1,
+				LocalPort => $p,
+				ReuseAddr => 1,
+				Domain    => AF_INET6,
+				LocalAddr => "::",
+				Proto     => "tcp"
+			);};
+		} else {
+			$sock = IO::Socket::INET->new(
+				Listen	  => 1,
+				LocalPort => $p,
+				ReuseAddr => 1,
+				Proto     => "tcp"
+			);
+		}
 		if ($sock) {
 			# we will keep this open until we call x11vnc:
 			$find_free_port = $sock;
@@ -1159,12 +1180,23 @@ sub lock_fixed_port {
 			$reason = 'locked';
 		} else {
 			# unlocked, try to listen on port:
-			$sock = IO::Socket::INET->new(
-				Listen	  => 1,
-				LocalPort => $vnc_port,
-				ReuseAddr => 1,
-				Proto     => "tcp"
-			);
+			if ($have_inet6 && $listen_on_ipv6) {
+				eval {$sock = IO::Socket::INET6->new(
+					Listen    => 1,
+					LocalPort => $vnc_port,
+					ReuseAddr => 1,
+					Domain    => AF_INET6,
+					LocalAddr => "::",
+					Proto     => "tcp"
+				);};
+			} else {
+				$sock = IO::Socket::INET->new(
+					Listen	  => 1,
+					LocalPort => $vnc_port,
+					ReuseAddr => 1,
+					Proto     => "tcp"
+				);
+			}
 			if ($sock) {
 				# we got it, now try to lock:
 				my $str = "$$:" . time();
@@ -1266,12 +1298,23 @@ sub port_redir {
 		$rmlock = lock_fixed_port(90, 60);
 
 	} elsif ($find_free_port eq '0') {
-		$find_free_port = IO::Socket::INET->new(
-			Listen	  => 1,
-			LocalPort => $vnc_port,
-			ReuseAddr => 1,
-			Proto     => "tcp"
-		);
+		if ($have_inet6 && $listen_on_ipv6) {
+			eval {$find_free_port = IO::Socket::INET6->new(
+				Listen    => 1,
+				LocalPort => $vnc_port,
+				ReuseAddr => 1,
+				Domain    => AF_INET6,
+				LocalAddr => "::",
+				Proto     => "tcp"
+			);};
+		} else {
+			$find_free_port = IO::Socket::INET->new(
+				Listen	  => 1,
+				LocalPort => $vnc_port,
+				ReuseAddr => 1,
+				Proto     => "tcp"
+			);
+		}
 	}
 	# In all cases, at this point $find_free_port is the listening
 	# socket.
@@ -1409,13 +1452,24 @@ sub handle_conn {
 		exit 1;
 	}
 
-	my ($host, $port) = split(/:/, $redirect_host);
+	my $host = '';
+	my $port = '';
+	if ($redirect_host =~ /^(.*):(\d+)$/) {
+		($host, $port) = ($1, $2);
+	}
 
 	my $sock = IO::Socket::INET->new(
 		PeerAddr => $host,
 		PeerPort => $port,
 		Proto => "tcp"
 	);
+	if (! $sock && $have_inet6) {
+		eval {$sock = IO::Socket::INET6->new(
+			PeerAddr => $host,
+			PeerPort => $port,
+			Proto => "tcp"
+		);};
+	}
 
 	if (! $sock) {
 		close $client;
