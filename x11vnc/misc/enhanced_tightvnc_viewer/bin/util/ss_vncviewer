@@ -586,9 +586,12 @@ elif echo "$host" | grep '^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' 
 	:
 else
 	# regular hostname, can't be sure...
-	host "$host" >/dev/null 2>&1
-	host "$host" >/dev/null 2>&1
-	hout=`host "$host" 2>/dev/null`
+	hout=""
+	if type host > /dev/null 2>/dev/null; then
+		host "$host" >/dev/null 2>&1
+		host "$host" >/dev/null 2>&1
+		hout=`host "$host" 2>/dev/null`
+	fi
 	if echo "$hout" | grep -i 'has ipv6 address' > /dev/null; then
 		if echo "$hout" | grep -i 'has address' > /dev/null; then
 			:
@@ -598,7 +601,10 @@ else
 		fi
 	fi
 	if [ "X$ipv6" = "X0" ]; then
+		dout=""
+		if type dig > /dev/null 2>/dev/null; then
 		dout=`dig -t any "$host" 2>/dev/null`
+		fi
 		if echo "$dout" | grep -i "^$host" | grep '[ 	]AAAA[ 	]' > /dev/null; then
 			if echo "$dout" | grep -i "^$host" | grep '[ 	]A[ 	]' > /dev/null; then
 				:
@@ -3024,8 +3030,10 @@ if [ "X$showcert" = "X1" ]; then
 	fi
 	#echo "openssl s_client $cipher_args -connect $host:$port" 
 	if [ "X$reverse" = "X" ]; then
-		host $host >/dev/null 2>&1
-		host $host >/dev/null 2>&1
+		if type host > /dev/null 2>/dev/null; then
+			host $host >/dev/null 2>&1
+			host $host >/dev/null 2>&1
+		fi
 		timeout=15
 		if [ "X$SSVNC_FETCH_TIMEOUT" != "X" ]; then
 			timeout=$SSVNC_FETCH_TIMEOUT

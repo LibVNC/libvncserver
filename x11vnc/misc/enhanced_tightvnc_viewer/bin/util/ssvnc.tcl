@@ -439,8 +439,9 @@ proc help {} {
     Options -> Help), the port mapping is similar, except "listening
     display :0" corresponds to port 5500, :1 to 5501, etc.
     Specify a specific interface, e.g. 192.168.1.1:0 to have stunnel
-    only listen on that interface.  IPv6 also works, e.g. :::0 or ::1:0
-    This also works for UN-encrypted reverse connections as well ('None').
+    listen on that interface only.  Listening on IPv6 can also be done, use
+    e.g. :::0 or ::1:0  This listening on IPv6 (:::0) works for UN-encrypted
+    reverse connections as well (mode 'None').
 
 
  Zeroconf/Bonjour:
@@ -3455,6 +3456,9 @@ proc do_viewer_windows {n} {
 			set nn [expr "$nn + 5500"] 
 		}
 		global direct_connect_reverse_host_orig is_win9x
+		if {![info exists direct_connect_reverse_host_orig]} {
+			set direct_connect_reverse_host_orig ""
+		}
 		if {$direct_connect_reverse_host_orig != "" && !$is_win9x} {
 			set nn2 [expr $nn + 15]
 			set h0 $direct_connect_reverse_host_orig
@@ -8627,11 +8631,15 @@ proc launch {{hp ""}} {
 	set ipv6_pid ""
 	global have_ipv6
 	if {$have_ipv6} {
-		set res [ipv6_proxy $proxy $host $port]
-		set proxy    [lindex $res 0]
-		set host     [lindex $res 1]
-		set port     [lindex $res 2]
-		set ipv6_pid [lindex $res 3]
+		if {$proxy == "" && $use_ssl} {
+			# stunnel can handle ipv6
+		} else {
+			set res [ipv6_proxy $proxy $host $port]
+			set proxy    [lindex $res 0]
+			set host     [lindex $res 1]
+			set port     [lindex $res 2]
+			set ipv6_pid [lindex $res 3]
+		}
 	}
 
 	if {$proxy != ""} {
