@@ -3394,9 +3394,9 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			t[1] = '\0';
 			if (sscanf(t, "%d", &butt) == 1) {
 				mask = 1<<(butt-1);
-				do_button_mask_change(mask, butt, cd->ptr_id, cd->kbd_id);	/* down */
+				do_button_mask_change(mask, butt, client);	/* down */
 				mask = 0;
-				do_button_mask_change(mask, butt, cd->ptr_id, cd->kbd_id);	/* up */
+				do_button_mask_change(mask, butt, client);	/* up */
 			}
 			b++;
 		}
