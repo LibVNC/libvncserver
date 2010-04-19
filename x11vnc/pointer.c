@@ -422,7 +422,7 @@ void do_button_mask_change(int mask, int button, rfbClientPtr cl) {
 			if ((num_buttons && mb > num_buttons) || mb < 1) {
 				rfbLog("ignoring mouse button out of "
 				    "bounds: %d>%d mask: 0x%x -> 0x%x\n",
-				    mb, num_buttons, button_mask, mask);
+				    mb, num_buttons, cd->ptr_buttonmask, mask);
 				continue;
 			}
 			if (debug_pointer) {
@@ -476,11 +476,12 @@ static void update_x11_pointer_mask(int mask, rfbClientPtr cl) {
 	return;
 #else
 	int snapped = 0, xr_mouse = 1, i;
+	ClientData *cd = (ClientData *) cl->clientData;
 	last_event = last_input = last_pointer_input = time(NULL);
 
 	RAWFB_RET_VOID
 
-	if (mask != button_mask) {
+	if (mask != cd->ptr_buttonmask) {
 		last_pointer_click_time = dnow();
 	}
 
@@ -492,7 +493,7 @@ static void update_x11_pointer_mask(int mask, rfbClientPtr cl) {
 		xr_mouse = 0;
 	} else if (skip_cr_when_scaling("scroll")) {
 		xr_mouse = 0;
-	} else if (xrecord_skip_button(mask, button_mask)) {
+	} else if (xrecord_skip_button(mask, cd->ptr_buttonmask)) {
 		xr_mouse = 0;
 	}
 
@@ -502,7 +503,7 @@ static void update_x11_pointer_mask(int mask, rfbClientPtr cl) {
 		Window frame = None, mwin = None;
 		int skip = 0;
 
-		if (!button_mask) {
+		if (!cd->ptr_buttonmask) {
 			X_LOCK;
 			if (get_wm_frame_pos(&px, &py, &x, &y, &w, &h,
 			    &frame, &mwin)) {
@@ -553,7 +554,7 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 			xrecord_watch(1, SCR_MOUSE);
 			snapshot_stack_list(0, 0.50);
 			snapped = 1;
-			if (button_mask) {
+			if (cd->ptr_buttonmask) {
 				xrecord_set_by_mouse = 1;
 			} else {
 				update_stack_list();
@@ -562,7 +563,7 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 		}
 	}
 
-	if (mask && !button_mask) {
+	if (mask && !cd->ptr_buttonmask) {
 		/* button down, snapshot the stacking list before flushing */
 		if (wireframe && !wireframe_in_progress &&
 		    strcmp(wireframe_copyrect, "never")) {
@@ -576,10 +577,10 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 
 	/* look for buttons that have be clicked or released: */
 	for (i=0; i < MAX_BUTTONS; i++) {
-	    if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
+	    if ( (cd->ptr_buttonmask & (1<<i)) != (mask & (1<<i)) ) {
 		if (debug_pointer) {
 			rfbLog("pointer(): mask change: mask: 0x%x -> "
-			    "0x%x button: %d\n", button_mask, mask,i+1);
+			    "0x%x button: %d\n", cd->ptr_buttonmask, mask,i+1);
 		}
 		do_button_mask_change(mask, i+1, cl);	/* button # is i+1 */
 	    }
@@ -593,6 +594,7 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 	 */
 	button_mask_prev = button_mask;
 	button_mask = mask;
+	cd->ptr_buttonmask = mask;
 #endif	/* NO_X11 */
 }
 
@@ -635,14 +637,14 @@ static void pipe_pointer(int mask, int x, int y, rfbClientPtr client) {
 	}
 
 	hint[0] = '\0';
-	if (mask == button_mask) {
+	if (mask == cd->ptr_buttonmask) {
 		strcat(hint, "None");
 	} else {
 		int i, old, new, m = 1, cnt = 0;
 		for (i=0; i<MAX_BUTTONS; i++) {
 			char s[20];
 
-			old = button_mask & m;
+			old = cd->ptr_buttonmask & m;
 			new = mask & m;
 			m = m << 1;
 
@@ -681,6 +683,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	allowed_input_t input;
 	int sent = 0, buffer_it = 0;
 	double now;
+	ClientData *cd = (ClientData *) client->clientData;
 	
 	/* needed to allow multiple dragging actions at once */
         if(client && use_multipointer) 
@@ -753,6 +756,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 				/* raw_fb hack track button state */
 				button_mask_prev = button_mask;
 				button_mask = mask;
+				cd->ptr_buttonmask = mask;
 			}
 			if (!view_only && (input.motion || input.button)) {
 				last_rfb_ptr_injected = dnow();
@@ -946,7 +950,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
                 sent = 1;
 	}
 	if (input.button) {
-		if (mask != button_mask) {
+		if (mask != button_mask) {   /*FIXME multipointer?*/
 			button_change_x = cursor_x;
 			button_change_y = cursor_y;
 		}

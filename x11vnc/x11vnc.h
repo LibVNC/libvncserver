@@ -658,6 +658,7 @@ typedef struct _ClientData {
 
         int ptr_id; /* pointer and keyboard device ids used in multipointer mode */ 
         int kbd_id;
+        int ptr_buttonmask;
         int cursor_x; /* these are used in multipointer mode to draw  */
         int cursor_y; /* client cursors directly into the framebuffer */
         rfbCursorPtr cursor;
