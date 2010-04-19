@@ -683,7 +683,10 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	allowed_input_t input;
 	int sent = 0, buffer_it = 0;
 	double now;
-	ClientData *cd = (ClientData *) client->clientData;
+	ClientData *cd = NULL;
+        
+	if(client)
+	  cd = (ClientData *) client->clientData;
 	
 	/* needed to allow multiple dragging actions at once */
         if(client && use_multipointer) 
@@ -756,7 +759,8 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 				/* raw_fb hack track button state */
 				button_mask_prev = button_mask;
 				button_mask = mask;
-				cd->ptr_buttonmask = mask;
+				if(cd)
+				  cd->ptr_buttonmask = mask;
 			}
 			if (!view_only && (input.motion || input.button)) {
 				last_rfb_ptr_injected = dnow();
