@@ -231,7 +231,11 @@ if (exists $ENV{CONNECT_SWITCH_LISTEN}) {
 	#
 	# E.g. CONNECT_SWITCH_LISTEN=192.168.0.32:443
 	#
-	($listen_host, $listen_port) = split(/:/, $ENV{CONNECT_SWITCH_LISTEN});
+	$listen_host = '';
+	$listen_port = '';
+	if ($ENV{CONNECT_SWITCH_LISTEN} =~ /^(.*):(\d+)$/) {
+		($listen_host, $listen_port) = ($1, $2);
+	}
 }
 
 my $httpd_host = 'localhost';	
@@ -241,7 +245,11 @@ if (exists $ENV{CONNECT_SWITCH_HTTPD}) {
 	#
 	# E.g. CONNECT_SWITCH_HTTPD=127.0.0.1:443
 	#
-	($httpd_host, $httpd_port) = split(/:/, $ENV{CONNECT_SWITCH_HTTPD});
+	$httpd_host = '';
+	$httpd_port = '';
+	if ($ENV{CONNECT_SWITCH_HTTPD} =~ /^(.*):(\d+)$/) {
+		($httpd_host, $httpd_port) = ($1, $2);
+	}
 }
 
 my $bufsize = 8192;
@@ -353,6 +361,12 @@ use IO::Socket::INET;
 use strict;
 use warnings;
 
+# Test for INET6 support:
+#
+my $have_inet6 = 0;
+eval "use IO::Socket::INET6;";
+$have_inet6 = 1 if $@ eq "";
+
 my $killpid = 1;
 
 setpgrp(0, 0);
@@ -360,14 +374,13 @@ setpgrp(0, 0);
 if (exists $ENV{CONNECT_SWITCH_LISTEN_IPV6}) {
 	# note we leave out LocalAddr.
 	my $cmd = '
-	use IO::Socket::INET6;
-	$listen_sock = IO::Socket::INET6->new(
-		Listen    => 10,
-		LocalPort => $listen_port,
-		ReuseAddr => 1,
-		Domain    => AF_INET6,
-		Proto     => "tcp"
-	);
+		$listen_sock = IO::Socket::INET6->new(
+			Listen    => 10,
+			LocalPort => $listen_port,
+			ReuseAddr => 1,
+			Domain    => AF_INET6,
+			Proto     => "tcp"
+		);
 	';
 	eval $cmd;
 	die "$@\n" if $@;
@@ -493,8 +506,12 @@ sub handle_conn {
 		if ($str =~ /^CONNECT\s+(\S+)\s+HTTP\/(\S+)/) {
 			$hostport = $1;
 			$http_vers = $2;
+			my $h = '';
+			my $p = '';
 
-			my ($h, $p) = split(/:/, $hostport);
+			if ($hostport =~ /^(.*):(\d+)$/) {
+				($h, $p) = ($1, $2);
+			}
 			if ($p =~ /^\d+$/) {
 				# check allowed host list:
 				foreach my $hp (@allow) {
@@ -532,7 +549,12 @@ sub handle_conn {
 			exit 0;
 		}
 
-		my ($host, $port) = split(/:/, $hostport);
+		my $host = '';
+		my $port = '';
+
+		if ($hostport =~ /^(.*):(\d+)$/) {
+			($host, $port) = ($1, $2);
+		}
 
 		print STDERR "connecting to: $host:$port\n" if $verbose;
 
@@ -541,6 +563,15 @@ sub handle_conn {
 			PeerPort => $port,
 			Proto => "tcp"
 		);
+		print STDERR "connect to host='$host' port='$port' failed: $!\n" if !$sock;
+		if (! $sock && $have_inet6) {
+			eval {$sock = IO::Socket::INET6->new(
+				PeerAddr => $host,
+				PeerPort => $port,
+				Proto => "tcp"
+			);};
+			print STDERR "connect to host='$host' port='$port' failed: $! (ipv6)\n" if !$sock;
+		}
 		my $msg;
 
 		# send the connect proxy reply:
@@ -561,6 +592,13 @@ sub handle_conn {
 			PeerPort => $httpd_port,
 			Proto => "tcp"
 		);
+		if (! $sock && $have_inet6) {
+			eval {$sock = IO::Socket::INET6->new(
+				PeerAddr => $httpd_host,
+				PeerPort => $httpd_port,
+				Proto => "tcp"
+			);};
+		}
 	}
 
 	if (! $sock) {

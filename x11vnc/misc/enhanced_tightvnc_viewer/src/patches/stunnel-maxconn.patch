@@ -1,56 +1,44 @@
 diff -Naur stunnel.orig/src/client.c stunnel/src/client.c
---- stunnel.orig/src/client.c	2008-03-27 04:35:27.000000000 -0400
-+++ stunnel/src/client.c	2008-11-19 21:40:00.000000000 -0500
-@@ -191,6 +191,7 @@
+--- stunnel.orig/src/client.c	2010-04-04 17:00:29.000000000 -0400
++++ stunnel/src/client.c	2010-04-12 17:12:47.000000000 -0400
+@@ -187,6 +187,7 @@
      enter_critical_section(CRIT_CLIENTS); /* for multi-cpu machines */
-     s_log(LOG_DEBUG, "%s finished (%d left)", c->opt->servname,
+     s_log(LOG_DEBUG, "Service %s finished (%d left)", c->opt->servname,
          --num_clients);
-+	if (getenv("STUNNEL_ONCE")) {fprintf(stderr, "stunnel: exiting.\n"); exit(0);}
++    if (getenv("STUNNEL_ONCE")) {fprintf(stderr, "stunnel: exiting.\n"); exit(0);}
      leave_critical_section(CRIT_CLIENTS);
  #endif
  }
 diff -Naur stunnel.orig/src/network.c stunnel/src/network.c
---- stunnel.orig/src/network.c	2008-03-27 05:28:16.000000000 -0400
-+++ stunnel/src/network.c	2008-11-19 21:39:41.000000000 -0500
-@@ -346,6 +346,7 @@
-         /* no logging is possible in a signal handler */
- #ifdef USE_FORK
-         --num_clients; /* one client less */
-+	if (getenv("STUNNEL_ONCE")) exit(0);
- #endif /* USE_FORK */
-     }
- #else /* __sgi */
-@@ -432,9 +433,11 @@
- #ifdef HAVE_WAIT_FOR_PID
-     while((pid=wait_for_pid(-1, &status, WNOHANG))>0) {
-         --num_clients; /* one client less */
-+	if (getenv("STUNNEL_ONCE")) exit(0);
- #else
+--- stunnel.orig/src/network.c	2010-02-04 05:31:45.000000000 -0500
++++ stunnel/src/network.c	2010-04-12 17:13:53.000000000 -0400
+@@ -437,6 +437,7 @@
      if((pid=wait(&status))>0) {
          --num_clients; /* one client less */
-+	if (getenv("STUNNEL_ONCE")) exit(0);
  #endif
++    if (getenv("STUNNEL_ONCE")) exit(0);
  #ifdef WIFSIGNALED
          if(WIFSIGNALED(status)) {
+             s_log(LOG_DEBUG, "Process %d terminated on signal %d (%d left)",
 diff -Naur stunnel.orig/src/options.c stunnel/src/options.c
---- stunnel.orig/src/options.c	2008-06-21 17:18:23.000000000 -0400
-+++ stunnel/src/options.c	2008-11-19 21:15:01.000000000 -0500
-@@ -465,6 +465,7 @@
+--- stunnel.orig/src/options.c	2010-04-05 14:44:43.000000000 -0400
++++ stunnel/src/options.c	2010-04-12 17:19:18.000000000 -0400
+@@ -470,6 +470,7 @@
      switch(cmd) {
      case CMD_INIT:
-         options.option.syslog=1;
-+	if (getenv("STUNNEL_NO_SYSLOG")) options.option.syslog=0;
+         new_global_options.option.syslog=1;
++        if (getenv("STUNNEL_NO_SYSLOG")) new_global_options.option.syslog=0;
          break;
      case CMD_EXEC:
          if(strcasecmp(opt, "syslog"))
 diff -Naur stunnel.orig/src/stunnel.c stunnel/src/stunnel.c
---- stunnel.orig/src/stunnel.c	2008-06-21 17:32:45.000000000 -0400
-+++ stunnel/src/stunnel.c	2008-11-19 21:14:28.000000000 -0500
-@@ -301,6 +301,7 @@
+--- stunnel.orig/src/stunnel.c	2010-02-25 04:57:11.000000000 -0500
++++ stunnel/src/stunnel.c	2010-04-12 17:16:33.000000000 -0400
+@@ -306,6 +306,7 @@
+         max_clients=0;
+         s_log(LOG_NOTICE, "No limit detected for the number of clients");
      }
- #endif
- #endif
-+	if (getenv("STUNNEL_MAX_CLIENTS")) max_clients = atoi(getenv("STUNNEL_MAX_CLIENTS"));
++    if (getenv("STUNNEL_MAX_CLIENTS")) max_clients = atoi(getenv("STUNNEL_MAX_CLIENTS"));
  }
  
- #if !defined (USE_WIN32) && !defined (__vms) && !defined(USE_OS2)
+ #ifdef HAVE_CHROOT
