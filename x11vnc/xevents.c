@@ -1880,8 +1880,9 @@ void set_single_window(rfbClientPtr cl, int x, int y) {
 		Window r, c;
 		int rootx, rooty, wx, wy;
 		unsigned int mask;
-
-		update_x11_pointer_position(x, y, cl);
+		ClientData *cd = (ClientData *) cl->clientData;
+	
+		update_x11_pointer_position(x, y, cd->ptr_id);
 		XSync(dpy, False);
 
 		if (XQueryPointer_wr(dpy, rootwin, &r, &c, &rootx, &rooty,
