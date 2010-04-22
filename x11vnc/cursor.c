@@ -40,6 +40,7 @@ so, delete this exception statement from your version.
 #include "unixpw.h"
 #include "macosx.h"
 #include "xi2_devices.h"
+#include "rates.h"
 
 int xfixes_present = 0;
 int xfixes_first_initialized = 0;
@@ -2112,7 +2113,7 @@ void save_under_cursor_buffer(rfbClientPtr cl)
     bufsize;  
   rfbBool wasChanged=FALSE;
 
-  if(!c)
+  if(!c || (!cd->send_cmp_rate && !speeds_net_rate)) 
     return;
 
   bufsize = c->width * c->height * bpp;
@@ -2163,7 +2164,7 @@ void draw_cursor(rfbClientPtr cl)
   int i,j,x1,x2,y1,y2,i1,j1,bpp=screen->serverFormat.bitsPerPixel/8,
     rowstride=screen->paddedWidthInBytes, w;  
  
-  if(!c)
+  if(!c || (!cd->send_cmp_rate && !speeds_net_rate)) 
     return;
 
   w = (c->width+7)/8;
@@ -2304,7 +2305,7 @@ void restore_under_cursor_buffer(rfbClientPtr cl)
   int j,x1,x2,y1,y2,bpp=screen->serverFormat.bitsPerPixel/8,
     rowstride=screen->paddedWidthInBytes;
 
-  if(!c) 
+  if(!c || (!cd->send_cmp_rate && !speeds_net_rate)) 
     return;
 
   /* sanity checks */
@@ -2324,16 +2325,16 @@ void restore_under_cursor_buffer(rfbClientPtr cl)
   if(y2<=0)
     return; /* nothing to do */
 
-  LOCK(cl->screen->cursorMutex);
   /* restore framebuffer from saved data */
   if(cd->under_cursor_buffer_len > 0) {
+    LOCK(cl->screen->cursorMutex);
     for(j=0;j<y2;j++)
       memcpy(screen->frameBuffer+(y1+j)*rowstride+x1*bpp,
 	     cd->under_cursor_buffer+j*x2*bpp,
 	     x2*bpp);
-
+    
     mark_rect_as_modified(x1, y1, x1+x2, y1+y2, 1);
+    UNLOCK(cl->screen->cursorMutex);
   }
-  UNLOCK(cl->screen->cursorMutex);
 }
 
