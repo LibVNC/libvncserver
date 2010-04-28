@@ -19,8 +19,6 @@ SDLVIEWER=SDLvncviewer
 
 SDLvncviewer_CFLAGS=$(SDL_CFLAGS)
 
-SDLvncviewer_SOURCES=SDLvncviewer.c
-
 if HAVE_X11
 X11_LIB=-lX11
 endif
