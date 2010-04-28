@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 2.6)
+
 project(LibVNCServer)
 include(CheckFunctionExists)
 include(CheckIncludeFile)
@@ -14,6 +16,7 @@ include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/
 find_package(ZLIB)
 find_package(JPEG)
 find_package(SDL)
+find_package(GnuTLS)
 
 if(SDL_FOUND)   # == pthread.h available
   option(TIGHTVNC_FILETRANSFER "Enable filetransfer" ON)
@@ -25,6 +28,9 @@ if(JPEG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBJPEG 1)
 endif(JPEG_FOUND)
 option(LIBVNCSERVER_ALLOW24BPP "Allow 24 bpp" ON)
+if(GNUTLS_FOUND)
+  set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
+endif(GNUTLS_FOUND)
 
 check_include_file("fcntl.h"       LIBVNCSERVER_HAVE_FCNTL_H)
 check_include_file("netinet/in.h"  LIBVNCSERVER_HAVE_NETINET_IN_H)
@@ -107,6 +113,7 @@ set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
     ${LIBVNCCLIENT_DIR}/minilzo.c
+    ${LIBVNCCLIENT_DIR}/tls.c
 )
 
 if(ZLIB_FOUND)
@@ -227,7 +234,7 @@ endforeach(test ${LIBVNCSERVER_TESTS})
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/client_examples)
 foreach(test ${LIBVNCCLIENT_TESTS})
   add_executable(client_examples/${test} ${LIBVNCCLITEST_DIR}/${test}.c)
-  target_link_libraries(client_examples/${test} vncclient ${SDL_LIBRARIES} ${FFMPEG_LIBRARIES})
+  target_link_libraries(client_examples/${test} vncclient ${GNUTLS_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
 endforeach(test ${LIBVNCCLIENT_TESTS})
 
 install_targets(/lib vncserver)
