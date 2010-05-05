@@ -24,5 +24,5 @@ $USER's $DESKTOP desktop ($DISPLAY)
 $PARAMS
 </APPLET>
 <BR>
-<A href="http://www.ultravnc.com/">UltraVNC site</A>
+<A href="http://www.karlrunge.com/x11vnc">x11vnc site</A>
 </HTML>
