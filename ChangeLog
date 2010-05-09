@@ -1,3 +1,7 @@
+2010-05-08  Karl Runge <runge@karlrunge.com>
+	* libvncclient/rfbproto.c: rfbResizeFrameBuffer should also set
+	  updateRect.
+
 2010-01-02  Karl Runge <runge@karlrunge.com>
 	* tightvnc-filetransfer/rfbtightserver.c: enabled fix
 	  for tight security type for RFB 3.8 (debian bug 517422.)
