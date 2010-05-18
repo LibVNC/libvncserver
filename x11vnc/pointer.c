@@ -345,9 +345,12 @@ void update_x11_pointer_position(int x, int y, rfbClientPtr client) {
 #else
 	int rc;
 	static int watch_dx_dy = -1;
-	ClientData *cd = (ClientData *) client->clientData;
+	int ptr_id = -1;
 
 	RAWFB_RET_VOID
+
+	if(client)
+	  ptr_id = ((ClientData*)client->clientData)->ptr_id;
 
 	if (watch_dx_dy == -1) {
 		if (getenv("X11VNC_WATCH_DX_DY")) {
@@ -366,13 +369,13 @@ void update_x11_pointer_position(int x, int y, rfbClientPtr client) {
 		 * window is used:
 		 */
 #ifdef LIBVNCSERVER_HAVE_XI2
-                if(use_multipointer)
-                  XIWarpPointer(dpy, cd->ptr_id, None, window, 0, 0, 0, 0, x + coff_x, y + coff_y);
+                if(use_multipointer && ptr_id >= 0)
+                  XIWarpPointer(dpy, ptr_id, None, window, 0, 0, 0, 0, x + coff_x, y + coff_y);
                 else
 #endif
                   XWarpPointer(dpy, None, window, 0, 0, 0, 0, x + coff_x, y + coff_y);
 	} else {
-                XTestFakeMotionEvent_wr(dpy, cd->ptr_id, scr, x + off_x + coff_x, y + off_y + coff_y, CurrentTime);
+	         XTestFakeMotionEvent_wr(dpy, ptr_id, scr, x + off_x + coff_x, y + off_y + coff_y, CurrentTime);
 	}
 	X_UNLOCK;
 
@@ -395,13 +398,21 @@ void update_x11_pointer_position(int x, int y, rfbClientPtr client) {
 #endif	/* NO_X11 */
 }
 
-void do_button_mask_change(int mask, int button, rfbClientPtr cl) {
+void do_button_mask_change(int mask, int button, rfbClientPtr client) {
 #if NO_X11
 	if (!mask || !button) {}
 	return;
 #else
 	int mb, k, i = button-1;
-	ClientData *cd = (ClientData *) cl->clientData;
+	int ptr_buttonmask = button_mask;
+	int ptr_id = -1, kbd_id = -1;
+
+	if(client) {
+	  ClientData *cd = (ClientData*)client->clientData;
+	  ptr_buttonmask  = cd->ptr_buttonmask;
+	  ptr_id = cd->ptr_id;
+	  kbd_id = cd->kbd_id;
+	}
 
 	/*
 	 * this expands to any pointer_map button -> keystrokes
@@ -422,7 +433,7 @@ void do_button_mask_change(int mask, int button, rfbClientPtr cl) {
 			if ((num_buttons && mb > num_buttons) || mb < 1) {
 				rfbLog("ignoring mouse button out of "
 				    "bounds: %d>%d mask: 0x%x -> 0x%x\n",
-				    mb, num_buttons, cd->ptr_buttonmask, mask);
+				    mb, num_buttons, ptr_buttonmask, mask);
 				continue;
 			}
 			if (debug_pointer) {
@@ -430,7 +441,7 @@ void do_button_mask_change(int mask, int button, rfbClientPtr cl) {
 				    " %s (event %d)\n", mb, bmask
 				    ? "down" : "up", k+1);
 			}
-			XTestFakeButtonEvent_wr(dpy, cd->ptr_id, mb, (mask & (1<<i))
+			XTestFakeButtonEvent_wr(dpy, ptr_id, mb, (mask & (1<<i))
 			    ? True : False, CurrentTime);
 		} else {
 			/* send keysym up or down */
@@ -452,11 +463,11 @@ void do_button_mask_change(int mask, int button, rfbClientPtr cl) {
 				    "%s\n", down, up, str ? str : "null");
 			}
 			if (down) {
-                                    XTestFakeKeyEvent_wr(dpy, cd->kbd_id, key, True,
+                                    XTestFakeKeyEvent_wr(dpy, kbd_id, key, True,
 				    CurrentTime);
 			}
 			if (up) {
-                                    XTestFakeKeyEvent_wr(dpy, cd->kbd_id, key, False,
+                                    XTestFakeKeyEvent_wr(dpy, kbd_id, key, False,
 				    CurrentTime);
 			}
 		}
@@ -467,7 +478,7 @@ void do_button_mask_change(int mask, int button, rfbClientPtr cl) {
 /*
  * Send a pointer button event to the X server.
  */
-static void update_x11_pointer_mask(int mask, rfbClientPtr cl) {
+static void update_x11_pointer_mask(int mask, rfbClientPtr client) {
 #if NO_X11
 	last_event = last_input = last_pointer_input = time(NULL);
 
@@ -476,13 +487,16 @@ static void update_x11_pointer_mask(int mask, rfbClientPtr cl) {
 	return;
 #else
 	int snapped = 0, xr_mouse = 1, i;
-	ClientData *cd = (ClientData *) cl->clientData;
+	int ptr_buttonmask = button_mask;
 	last_event = last_input = last_pointer_input = time(NULL);
 
 	RAWFB_RET_VOID
 
-	if (mask != cd->ptr_buttonmask) {
-		last_pointer_click_time = dnow();
+        if(client)  
+	  ptr_buttonmask = ((ClientData*)client->clientData)->ptr_buttonmask;
+
+	if (mask != ptr_buttonmask) {
+	        last_pointer_click_time = dnow();
 	}
 
 	if (nofb) {
@@ -493,7 +507,7 @@ static void update_x11_pointer_mask(int mask, rfbClientPtr cl) {
 		xr_mouse = 0;
 	} else if (skip_cr_when_scaling("scroll")) {
 		xr_mouse = 0;
-	} else if (xrecord_skip_button(mask, cd->ptr_buttonmask)) {
+	} else if (xrecord_skip_button(mask, ptr_buttonmask)) {
 		xr_mouse = 0;
 	}
 
@@ -503,7 +517,7 @@ static void update_x11_pointer_mask(int mask, rfbClientPtr cl) {
 		Window frame = None, mwin = None;
 		int skip = 0;
 
-		if (!cd->ptr_buttonmask) {
+		if (!ptr_buttonmask) {
 			X_LOCK;
 			if (get_wm_frame_pos(&px, &py, &x, &y, &w, &h,
 			    &frame, &mwin)) {
@@ -554,7 +568,7 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 			xrecord_watch(1, SCR_MOUSE);
 			snapshot_stack_list(0, 0.50);
 			snapped = 1;
-			if (cd->ptr_buttonmask) {
+			if (ptr_buttonmask) {
 				xrecord_set_by_mouse = 1;
 			} else {
 				update_stack_list();
@@ -563,7 +577,7 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 		}
 	}
 
-	if (mask && !cd->ptr_buttonmask) {
+	if (mask && !ptr_buttonmask) {
 		/* button down, snapshot the stacking list before flushing */
 		if (wireframe && !wireframe_in_progress &&
 		    strcmp(wireframe_copyrect, "never")) {
@@ -577,12 +591,12 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 
 	/* look for buttons that have be clicked or released: */
 	for (i=0; i < MAX_BUTTONS; i++) {
-	    if ( (cd->ptr_buttonmask & (1<<i)) != (mask & (1<<i)) ) {
+	    if ( (ptr_buttonmask & (1<<i)) != (mask & (1<<i)) ) {
 		if (debug_pointer) {
 			rfbLog("pointer(): mask change: mask: 0x%x -> "
-			    "0x%x button: %d\n", cd->ptr_buttonmask, mask,i+1);
+			    "0x%x button: %d\n", ptr_buttonmask, mask,i+1);
 		}
-		do_button_mask_change(mask, i+1, cl);	/* button # is i+1 */
+		do_button_mask_change(mask, i+1, client);	/* button # is i+1 */
 	    }
 	}
 
@@ -594,7 +608,8 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 	 */
 	button_mask_prev = button_mask;
 	button_mask = mask;
-	cd->ptr_buttonmask = mask;
+	if(client)
+	  ((ClientData*)client->clientData)->ptr_buttonmask = mask;
 #endif	/* NO_X11 */
 }
 
