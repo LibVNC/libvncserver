@@ -162,9 +162,9 @@ char *list_clients(void) {
          * <id>:<ip>:<port>:<user>:<unix>:<hostname>:<input>:<loginview>:<time>,
 	 * 8+1+64+1+5+1+24+1+24+1+256+1+5+1+1+1+10+1
 	 * 123.123.123.123:60000/0x11111111-rw,
-	 * so count+1 * 500 must cover it.
+	 * so count+1 * 1000 must cover it.
 	 */
-	list = (char *) malloc((count+1)*500);
+	list = (char *) malloc((count+1)*1000);
 	
 	list[0] = '\0';
 
@@ -2663,7 +2663,9 @@ static int do_reverse_connect(char *str_in) {
 		}
 /* XXX use header */
 #define OPENSSL_REVERSE 6
-		openssl_init(1);
+		if (!getenv("X11VNC_DISABLE_SSL_CLIENT_MODE")) {
+			openssl_init(1);
+		}
 
 		if (first_conn_timeout > 0) {
 			set_alarm = 1;

@@ -8,7 +8,7 @@ exec wish "$0" "$@"
 # ssvnc.tcl: gui wrapper to the programs in this
 # package. Also sets up service port forwarding.
 #
-set version 1.0.27
+set version 1.0.28
 
 set buck_zero $argv0
 
@@ -194,6 +194,11 @@ proc ts_help {} {
 
     (unlike SSVNC mode, the number is the SSH port, not the VNC display)
 
+    If you find yourself in the unfortunate circumstance that your ssh 
+    username has a space in it, use %SPACE (or %TAB) like this:
+
+           fred%SPACEflintstone@xyzzy.net
+
 
  Zeroconf/Bonjour:
 
@@ -221,6 +226,7 @@ proc ts_help {} {
     use things like: 
 
          tsvnc profile1
+         tsvnc /path/to/profile1.vnc
          tsvnc hostname
          tsvnc user@hostname
 
@@ -280,6 +286,9 @@ proc ts_help {} {
     use socks5://... to force the SOCKS5 version.  For a non-standard
     port the above would be, e.g., fred@someplace.no:2222
 
+    As with a username that contains a space, use %SPACE (or %TAB) to
+    indicate it in the SSH proxies, e.g. john%SPACEsmith@ssh.company.com
+
     One can also chain proxies and other things.  See the section
     "SSH Proxies/Gateways" in the Main SSVNC Help for full details.
 
@@ -310,6 +319,9 @@ proc ts_help {} {
            - Client-Side Caching (experimental x11vnc speedup)
            - X11VNC Options      (set any extra x11vnc options)
            - Extra Sleep         (delay a bit before starting viewer)
+           - Putty Args          (Windows: string for plink/putty cmd)
+           - Putty Agent         (Windows: launch pageant)
+           - Putty Key-Gen       (Windows: launch puttygen)
            - SSH Local Protections  (a bit of safety on local side)
            - SSH KnownHosts file (to avoid SSH 'localhost' collisions)
            - SSVNC Mode          (Return to full SSVNC mode)
@@ -487,11 +499,16 @@ proc help {} {
     by invoking it something like this:
 
         ssvnc profile1              (launches profile named "profile1")
+        ssvnc /path/to/profile.vnc  (loads the profile file, no launching)
         ssvnc hostname:0            (connect to hostname VNC disp 0 via SSL)
         ssvnc vnc+ssl://hostname:0  (same)
         ssvnc vnc+ssh://hostname:0  (connect to hostname VNC disp 0 via SSH)
 
     see the Tips 5 and 7 for more about the URL-like syntax.
+
+    If you don't want "ssvnc profile1" to immediately launch the connection
+    to the VNC server set the SSVNC_PROFILE_LOADONLY env. var. to 1.
+    (or specify the full path to the profile.vnc as shown above.)
 
 
  SSL Certificate Verification:
@@ -502,6 +519,17 @@ proc help {} {
     sniffing attacks will be guaranteed to be prevented.  There are hacker
     tools like dsniff/webmitm and cain that implement SSL Man-In-The-Middle
     attacks.  They rely on the client user not bothering to check the cert.
+
+    Some people may be confused by the above because they are familiar with
+    their Web Browser using SSL (i.e. https://... websites) and those sites
+    are authenticated securely without the user's need to verify anything
+    manually.  The reason why this happens automatically is because 1) their
+    web browser comes with a bundle of Certificate Authority certificates
+    and 2) the https sites have paid money to the Certificate Authorities to
+    have their website certificate signed by them.  When using SSL in VNC we
+    normally do not do something this sophisticated, and so we have to verify
+    the certificates manually.  However, it is possible to use Certificate
+    Authorities with SSVNC; that method is described below.
 
     You can use the "Fetch Cert" button to retrieve the Cert and then
     after you check it is OK (say, via comparing the MD5 or other info)
@@ -681,12 +709,16 @@ proc help {} {
     See Tip 8) for how to make this application be SSH-only with the -ssh
     command line option or "sshvnc".
 
+    If you find yourself in the unfortunate circumstance that your ssh 
+    username has a space in it, use %SPACE (or %TAB) like this:
+
+           fred%SPACEflintstone@xyzzy.net:0
 
  Remote SSH Command:
 
     In SSH or SSH + SSL mode you can also specify a remote command to run
     on the remote ssh host in the "Remote SSH Command" entry.  The default
-    is just to sleep a bit (e.g. sleep 30) to make sure the tunnel ports
+    is just to sleep a bit (e.g. sleep 15) to make sure the tunnel ports
     are established.  Alternatively you could have the remote command start
     the VNC server, e.g.
 
@@ -694,7 +726,7 @@ proc help {} {
 
     When starting the VNC server this way, note that sometimes you will need
     to correlate the VNC Display number with the "-rfbport" (or similar)
-    option of the server.  E.g.:
+    option of the server.  E.g. for VNC display :2
 
          VNC Host:Display       username@somehost.com:2
          Remote SSH Command:    x11vnc -find -rfbport 5902 -nopw
@@ -702,6 +734,11 @@ proc help {} {
     See the Tip 18) for using x11vnc PORT=NNNN feature (or vncserver(1)
     output) to not need to specify the VNC display number or the x11vnc
     -rfbport option.
+
+    Windows SSH SERVER: if you are ssh'ing INTO Windows (e.g. CYGWIN SSHD
+    server) there may be no "sleep" command so put in something like
+    "ping localhost" or "ping -n 10 -w 1000 localhost" to set a short
+    delay to let the tunnel ports get established.
 
 
  SSL Certificates:
@@ -1070,12 +1107,21 @@ proc help {} {
     gateway (but is still vulnerable there when NoHostAuthenticationForLocalhost
     is used.)
 
+    As with a username that contains a space, use %SPACE (or %TAB) to
+    indicate it in the SSH proxies, e.g. john%SPACEsmith@ssh.company.com
 
  UltraVNC Proxies/Gateways:
 
     UltraVNC has a "repeater" tool (http://www.uvnc.com/addons/repeater.html
     and http://koti.mbnet.fi/jtko/) that acts as a VNC proxy.  SSVNC can
     work with both mode I and mode II schemes of this repeater.
+
+    For Unix and MacOS X there is another re-implementation of the
+    UltraVNC repeater:
+
+        http://www.karlrunge.com/x11vnc/ultravnc_repeater.pl
+
+    So one does not need to run the repeater on a Windows machine.
 
     Note that even though the UltraVNC repeater tool is NOT SSL enabled,
     it can nevertheless act as a proxy for SSVNC SSL connections.
@@ -1090,9 +1136,13 @@ proc help {} {
     Unencrypted (aka Direct) SSVNC VNC connections (Vnc:// prefix in
     'VNC Host:Display'; see Tip 5) also work with the UltraVNC repeater.
 
-    For the mode I repeater the viewer initiates the connection and
-    passes a string that is the VNC server's IP address (or hostname)
-    and port or display:
+    MODE I REPEATER:
+
+    For the mode I UltraVNC repeater the Viewer initiates the connection
+    and passes a string that is the VNC server's IP address (or hostname)
+    and port or display to the repeater (the repeater then makes the
+    connection to the server host and then exchanges data back and forth.)
+    To do this in SSVNC:
 
            VNC Host:Display:   :0
            Proxy/Gateway:      repeater://myuvncrep.west:5900+joes-pc:1
@@ -1101,7 +1151,7 @@ proc help {} {
     "joes-pc:1" is the VNC server the repeater will connect us to.
 
     Note here that the VNC Host:Display can be anything because it is
-    not used; we choose :0.
+    not used; we choose :0.  You cannot leave VNC Host:Display empty.
 
     The Proxy/Gateway format is repeater://proxy:port+vncserver:display.
     The string after the "+" sign is passed to the repeater server for
@@ -1111,66 +1161,120 @@ proc help {} {
     192.168.1.4:5901, etc.
 
     If you do not supply a proxy port, then the default 5900 is assumed,
-    e.g. use repeater://myuvncrep.west+joes-pc:1 for port 5901.
+    e.g. use repeater://myuvncrep.west+joes-pc:1 for port 5900 on
+    myuvncrep.west then connecting to port 5901 on joes-pc.
 
-
-    For the mode II repeater both the VNC viewer and VNC server initiate
-    connections to the repeater proxy.  In this case they pass a string
-    that identifies their mutual connection via "ID:XYZ":
-
-           VNC Host:Display:   :0
-           Proxy/Gateway:      repeater://myuvncrep.west:5900+ID:1234
-
-    again, the default proxy port is 5900 if not supplied.
-
-    In this case, mode II, you MUST set Options -> Reverse VNC Connection.
-    That is to say a "Listening Connection".  The reason for this is that
-    the VNC server acts as a SSL *client* and so requires the Viewer end
-    to have the SSL cert, (which it does in Listen mode).
-
-    Note that in Listening SSL mode you must supply a MyCert or use the 
-    "listen.pem" one you are prompted to create.
-
-    We have also found that usually the Listening viewer must be started
-    BEFORE the VNC Server connects to the proxy.  This bug may be in
-    SSVNC, x11vnc, or the repeater tool.
-
-    Set REPEATER_FORCE=1 in the Host:Display (then hit Enter, and then
-    clear it, and reenter host:disp) to force SSVNC to try a forward
-    connection in this situation.
-
-    Note that for unencrypted (i.e. direct) SSVNC connections (see vnc://
-    in Tip 5) there is no need to use a reverse "Listening connection"
-    and so you might as well use a forward connection.
-
-    For mode II when tunnelling via SSL, you probably should also disable
-    "Verify All Certs" unless you have taken the steps beforehand to
-    import the VNC server's certificate, or have previously accepted
-    it using another method.  With the mode II proxying scheme, there
-    is no way to do the initial "Fetch Cert" and check if it has been
-    previously accepted.
-
-    Even when you disable "Verify All Certs", you are of course free to
-    set a ServerCert or CertsDir under "Certs ..." to authenticate the
-    VNC Server against.
-
-    Also, after the connection you MUST terminate the listening VNC Viewer
-    (Ctrl-C) and connect again (the proxy only runs once.)  In Windows,
-    go to the System Tray and terminate the Listening VNC Viewer.
-    Subsequent connection attempts after the first one will fail unless
-    you return to the GUI and restart listening.
-
-    BTW, the x11vnc VNC server command for the mode II case would be
-    something like:
-
-       x11vnc -ssl SAVE -connect repeater=ID:1234+myuvncrep.west:5500 ...
-
-    x11vnc also supports -connect repeater://myuvncrep.west:5500+ID:1234
-    URL-like notation.
-
-    For mode I operation x11vnc simply runs as a normal SSL/VNC server
+    X11VNC: For mode I operation the VNC server x11vnc simply runs as
+    a normal SSL/VNC server:
 
        x11vnc -ssl SAVE
+
+    because the repeater will connect to it as a VNC client would.
+    For mode II operation additional options are needed (see below.)
+
+
+    MODE II REPEATER:
+
+    For the mode II repeater both the VNC viewer and VNC server initiate
+    TCP connections to the repeater proxy.  In this case they pass a string
+    that identifies their mutual connection via "ID:NNNN", for example:
+
+           VNC Host:Display:   :0
+           Proxy/Gateway:      repeater://myuvncrep.west:5900+ID:2345
+
+    again, the default proxy port is 5900 if not supplied.  And we need
+    to supply a placeholder display ":0".
+
+    The fact that BOTH the VNC viewer and VNC server initiate outgoing
+    TCP connections to the repeater makes some things tricky, especially
+    for the SSL aspect.  In SSL one side takes the 'client' role and
+    the other side must take the 'server' role.  These roles must be
+    coordinated correctly or otherwise the SSL handshake will fail.
+
+    We now describe two scenarios: 1) SSVNC in Listening mode with STUNNEL
+    in 'SSL server' role; and 2) SSVNC in Forward mode with STUNNEL in
+    'SSL client' role.  For both cases we show how the corresponding
+    VNC server x11vnc would be run.
+
+    SSVNC Listening mode / STUNNEL 'SSL server' role:
+
+      By default, when using SSL over a reverse connection the x11vnc VNC
+      server will take the 'SSL client' role.  This way it can connect to a
+      standard STUNNEL (SSL server) redirecting connections to a VNC viewer
+      in Listen mode.  This is how SSVNC with SSL is normally intended to
+      be used for reverse connections (i.e. without the UltraVNC Repeater.)
+
+      To do it this way with the mode II UltraVNC Repeater; you set
+      Options -> Reverse VNC Connection, i.e. a "Listening Connection".
+      You should disable 'Verify All Certs' unless you have already
+      saved the VNC Server's certificate to Accepted Certs.  Or you can
+      set ServerCert to the saved certificate.  Then click 'Listen'.
+      In this case an outgoing connection is made to the UltraVNC
+      repeater, but everything else is as for a Reverse connection.
+
+      Note that in Listening SSL mode you must supply a MyCert or use the
+      "listen.pem" one you are prompted by SSVNC to create.
+
+      X11VNC command:
+
+        x11vnc -ssl -connect_or_exit repeater://myuvncrep.west+ID:2345
+
+
+    SSVNC Forward mode / STUNNEL 'SSL client' role:
+
+      x11vnc 0.9.10 and later can act in the 'SSL server' role for Reverse
+      connections (i.e. as it does for forward connections.)  Set these
+      x11vnc options: '-env X11VNC_DISABLE_SSL_CLIENT_MODE=1 -sslonly'
+
+      The -sslonly option is to prevent x11vnc from thinking the delay in
+      connection implies VeNCrypt instead of VNC over SSL.  With x11vnc
+      in X11VNC_DISABLE_SSL_CLIENT_MODE mode, you can then have SSVNC make
+      a regular forward connection to the UltraVNC repeater.
+
+      Note that SSVNC may attempt to do a 'Fetch Cert' action in forward
+      connection mode to either retrieve the certificate or probe for
+      VeNCrypt and/or ANONDH.  After that 'Fetch Cert' is done the
+      connection to the UltraVNC repeater will be dropped.  This is a
+      problem for the subsequent real VNC connection.  You can disable
+      'Verify All Certs' AND also set 'Do not Probe for VeNCrypt'
+      to avoid the 'Fetch Cert' action.  Or, perhaps better, add to
+      x11vnc command line '-connect_or_exit repeater://... -loop300,2'
+      (in addition to the options in the previous paragraphs.)  That way
+      x11vnc will reconnect once to the Repeater after the 'Fetch Cert'
+      action.  Then things should act pretty much as a normal forward
+      SSL connection.
+
+      X11VNC 0.9.10 command (split into two lines):
+
+        x11vnc -ssl -connect_or_exit repeater://myuvncrep.west+ID:2345 \ 
+             -env X11VNC_DISABLE_SSL_CLIENT_MODE=1 -loop300,2 -sslonly
+
+    We recommend using "SSVNC Forward mode / STUNNEL 'SSL client' role"
+    if you are connecting to x11vnc 0.9.10 or later.  Since this does
+    not use Listen mode it should be less error prone and less confusing
+    and more compatible with other features.  Be sure to use all of
+    the x11vnc options in the above command line.  To enable VeNCrypt,
+    replace '-sslonly' with '-vencrypt force'.  If you do not indicate
+    them explicitly to SSVNC, SSVNC may have to probe multiple times for
+    VeNCrypt and/or ANONDH.  So you may need '-loop300,4' on the x11vnc
+    cmdline so it will reconnect to the UltraVNC repeater 3 times.
+
+
+    Note that for UNENCRYPTED (i.e. direct) SSVNC connections (see vnc://
+    in Tip 5) using the UltraVNC Repeater mode II there is no need to
+    use a reverse "Listening connection" and so you might as well use
+    a forward connection.
+
+    For Listening connections, on Windows after the VNC connection you
+    MUST manually terminate the listening VNC Viewer (and connect again
+    if desired.)  Do this by going to the System Tray and terminating
+    the Listening VNC Viewer.  Subsequent connection attempts using the
+    repeater will fail unless you do this and restart the Listen.
+
+    On Unix and MacOS X after the VNC connection the UltraVNC repeater
+    proxy script will automatically restart and reconnect to the repeater
+    for another connection.  So you do not need to manually restart it.
+    To stop the listening, kill the listening VNC Viewer with Ctrl-C.
 
     In the previous sections it was mentioned one can chain up to 3
     proxies together by separating them with commas: proxy1,proxy2,proxy3.
@@ -1234,7 +1338,7 @@ proc help {} {
     user run your Single Click III EXE.
 
     Note that in Listening SSL mode you MUST supply a MyCert or use the 
-    "listen.pem" one you are prompted to create.
+    "listen.pem" one you are prompted by SSVNC to create.
 
 
  UltraVNC repeater_SSL.exe proxy:
@@ -1247,7 +1351,7 @@ proc help {} {
     Proxies/Gateways'.  In this case do something like this:
 
            VNC Host:Display:   :0
-           Proxy/Gateway:      sslrepeater://myuvncrep.west:443+ID:1234
+           Proxy/Gateway:      sslrepeater://myuvncrep.west:443+ID:2345
 
     The sslrepeater:// part indicates the entire ID:XYZ negotiation must
     occur inside the SSL tunnel.  Listening mode is not required in this
@@ -1263,7 +1367,7 @@ proc help {} {
     sslrepeater:// only works on Unix or MacOSX using the provided
     SSVNC vncviewer.  The modified viewer is needed; stock VNC viewers
     will not work.  Also, proxy chaining (bouncing off of more than one
-    proxy) currently does not work.
+    proxy) currently does not work for repeater_SSL.exe.
 
 
  VeNCrypt is treated as a proxy:
@@ -1289,7 +1393,7 @@ proc help {} {
     In short, because stunnel and ssh support IPv6 hostnames and
     addresses, SSVNC does too without you needing to do anything.
 
-    However, in some usages modes you will need to specify the IPv6
+    However, in some rare usage modes you will need to specify the IPv6
     server destination in the Proxy/Gateway entry box.  The only case
     this appears to be needed is when making an un-encrypted connection
     to an IPv6 VNC server.  In this case neither stunnel nor ssh are
@@ -1302,8 +1406,8 @@ proc help {} {
     'localhost:0' setting can be anything; it is basically ignored.
 
     Note that on Unix, MacOSX, and Windows un-encrypted ipv6 connections
-    are AUTODETECTED and so you likely never need to supply ipv6://
-    Only try it if there are problems.  Also note that the ipv6://
+    are AUTODETECTED and so you likely NEVER need to supply ipv6://
+    Only try it if you encounter problems.  Also note that the ipv6://
     proxy type does not work on Windows, so only the autodetection is
     available there.
 
@@ -1645,6 +1749,15 @@ proc help {} {
         bat files on Windows (for debugging); BAT_SLEEP: sleep this many
         seconds at the end of each Windows bat file (for debugging.) 
 
+        You can also set any environment variable by entering in something
+        like ENV=VAR=VAL  e.g. ENV=SSH_AUTH_SOCK=/tmp/ssh-BF2297/agent.2297
+        Use an empty VAL to unset the variable.
+
+        There are also a HUGE number of env. vars. that apply to the Unix
+        and MacOS X wrapper script 'ss_vncviewer' and/or the ssvncviewer
+        binary.  See Options -> Advanced -> Unix ssvncviewer -> Help for
+        all of them.
+
     16) On Unix you can make the "Open File" and "Save File" dialogs
         bigger by setting the env. var. SSVNC_BIGGER_DIALOG=1 or
         supplying the -bigger option.  If you set it to a Width x Height,
@@ -1936,6 +2049,17 @@ proc help_certs {} {
     There are hacker tools like dsniff/webmitm and cain that implement SSL
     Man-In-The-Middle attacks.  They rely on the client user not bothering to
     check the cert.
+
+    Some people may be confused by the above because they are familiar with
+    their Web Browser using SSL (i.e. https://... websites) and those sites
+    are authenticated securely without the user's need to verify anything
+    manually.  The reason why this happens automatically is because 1) their
+    web browser comes with a bundle of Certificate Authority certificates
+    and 2) the https sites have paid money to the Certificate Authorities to
+    have their website certificate signed by them.  When using SSL in VNC we
+    normally do not do something this sophisticated, and so we have to verify
+    the certificates manually.  However, it is possible to use Certificate
+    Authorities with SSVNC; that method is described below.
 
     The SSL Certificate files described below may have been created externally
     (e.g. by x11vnc or openssl): you can import them via "Import Certificate".
@@ -2433,9 +2557,17 @@ set msg {
 
             Remote Command:  In the "Remote SSH Command" entry you can to
             indicate that a remote command to be run.  The default is
-            "sleep 15".  For example, to run x11vnc for your X :0 display:
+            "sleep 15" to make sure port redirections get established. But you
+            can run anything else, for example, to run x11vnc on your X :0
+            workstation display:
 
                 x11vnc -display :0 -nopw
+
+
+            Windows SSH SERVER: if you are ssh'ing INTO Windows (e.g. CYGWIN
+            SSHD server) there may be no "sleep" command so put in something
+            like "ping localhost" or "ping -n 10 -w 1000 localhost" to 
+            set a short delay to let the port redir get established.
 
 
             Trick:  If you use "SHELL" asl the "Remote SSH Command" then
@@ -2655,10 +2787,10 @@ set msg {
              when 'Save' is performed.  This feature is useful when
              options under "Advanced" are set that require TWO SSH's:
              you just have to type the password once in this entry box.
-             The bundled pagent.exe and puttygen.exe programs can also
+             The bundled pageant.exe and puttygen.exe programs can also
              be used to avoid repeatedly entering passwords (note this
              requires setting up and distributing SSH keys).  Start up
-             pagent.exe or puttygen.exe and read the instructions there.
+             pageant.exe or puttygen.exe and read the instructions there.
 
              Note, that there is a small exposure to someone seeing the
              putty password on the plink command line.
@@ -3169,7 +3301,7 @@ proc set_defaults {} {
 	global sound_daemon_remote_cmd sound_daemon_remote_port sound_daemon_kill sound_daemon_restart
 	global sound_daemon_local_cmd sound_daemon_local_port sound_daemon_local_kill sound_daemon_x11vnc sound_daemon_local_start 
 	global smb_su_mode smb_mount_list
-	global use_port_knocking port_knocking_list port_slot
+	global use_port_knocking port_knocking_list port_slot putty_args
 	global ycrop_string ssvnc_scale ssvnc_escape sbwid_string rfbversion ssvnc_encodings ssvnc_extra_opts use_x11cursor use_nobell use_rawlocal use_notty use_popupfix extra_sleep use_listen use_unixpw use_x11vnc_find unixpw_username
 	global disable_ssl_workarounds disable_ssl_workarounds_type
 	global no_probe_vencrypt server_vencrypt server_anondh
@@ -3270,6 +3402,7 @@ proc set_defaults {} {
 	set defs(ultra_dsm_salt) ""
 
 	set defs(port_slot) ""
+	set defs(putty_args) ""
 
 	set defs(cups_local_server) ""
 	set defs(cups_remote_port) ""
@@ -3379,12 +3512,79 @@ proc set_defaults {} {
 	set last_load ""
 }
 
-proc do_viewer_windows {n} {
-	global use_alpha use_grab use_x11cursor use_nobell use_ssh use_sshssl use_viewonly use_fullscreen use_bgr233
+proc windows_listening_message {n} {
+	global did_listening_message
+
+	global extra_cmd
+	set extra_cmd ""
+	set cmd [get_cmd $n]
+	
+	if {$did_listening_message < 2} {
+		incr did_listening_message
+		global listening_name
+
+		set ln $listening_name
+		if {$ln == ""} {
+			set ln "this-computer:$n"
+		}
+
+		set msg "
+   About to start the Listening VNC Viewer (Reverse Connection).
+
+   The VNC Viewer command to be run is:
+
+       $cmd
+
+   After the Viewer starts listening, the VNC server should
+   then Reverse connect to:
+
+       $ln
+
+   When the VNC Connection has ended **YOU MUST MANUALLY STOP**
+   the Listening VNC Viewer.
+
+   To stop the Listening Viewer: right click on the VNC Icon in
+   the tray and select 'Close listening daemon' (or similar).
+
+   ONLY AFTER THAT will you return to the SSVNC GUI.
+
+   Click OK now to start the Listening VNC Viewer.$extra_cmd
+"
+		global use_ssh use_sshssl
+		if {$use_ssh || $use_sshssl} {
+			set msg "${msg}   NOTE: You will probably also need to kill the SSH in the\n   terminal via Ctrl-C" 
+		}
+
+		global help_font is_windows system_button_face
+		toplev .wll
+		global wll_done
+
+		set wll_done 0
+
+		eval text .wll.t -width 64 -height 22 $help_font
+		button .wll.d -text "OK" -command {destroy .wll; set wll_done 1}
+		pack .wll.t .wll.d -side top -fill x
+
+		apply_bg .wll.t
+
+		center_win .wll
+		wm resizable .wll 1 0
+
+		wm title .wll "SSL/SSH Viewer: Listening VNC Info"
+
+		.wll.t insert end $msg
+
+		vwait wll_done
+	}
+}
+
+proc get_cmd {n} {
+	global use_alpha use_grab use_x11cursor use_nobell use_ssh
+	global use_sshssl use_viewonly use_fullscreen use_bgr233
 	global use_nojpeg use_raise_on_beep use_compresslevel use_quality
-	global use_send_clipboard use_send_always
-	global change_vncviewer change_vncviewer_path vncviewer_realvnc4
-	global use_listen disable_ssl_workarounds disable_ssl_workarounds_type env
+	global use_send_clipboard use_send_always change_vncviewer
+	global change_vncviewer_path vncviewer_realvnc4 use_listen
+	global disable_ssl_workarounds disable_ssl_workarounds_type env
 
 	set cmd "vncviewer"
 	if {$change_vncviewer && $change_vncviewer_path != ""} {
@@ -3443,8 +3643,8 @@ proc do_viewer_windows {n} {
 		}
 	}
 
-	set ipv6_pid2 ""
-	set extra  ""
+	global extra_cmd
+	set extra_cmd ""
 	if {$use_listen} {
 		if {$vncviewer_realvnc4} {
 			append cmd " listen=1"
@@ -3463,77 +3663,44 @@ proc do_viewer_windows {n} {
 			set nn2 [expr $nn + 15]
 			set h0 $direct_connect_reverse_host_orig
 			global win_localhost
-			set extra "\n\n   relay6.exe $nn $win_localhost $nn2 /b:$h0"
-			set ipv6_pid2 [exec relay6.exe $nn $win_localhost $nn2 /b:$h0 &]
+			set extra_cmd "\n\nrelay6.exe $nn $win_localhost $nn2 /b:$h0"
 			set nn $nn2
 		}
 
 		append cmd " $nn"
 
-		global did_listening_message
-		if {$did_listening_message < 3} {
-			incr did_listening_message
-			global listening_name
-
-			set ln $listening_name
-			if {$ln == ""} {
-				set ln "this-computer:$n"
-			}
-
-			set msg "
-   About to start the Listening VNC Viewer (Reverse Connection).
-
-   The VNC Viewer command to be run is:
-
-       $cmd
-
-   After the Viewer starts listening, the VNC server should
-   then Reverse connect to:
-
-       $ln
-
-   When the VNC Connection has ended **YOU MUST MANUALLY STOP**
-   the Listening VNC Viewer.
-
-   To stop the Listening Viewer: right click on the VNC Icon in
-   the tray and select 'Close listening daemon' (or similar).
-
-   ONLY AFTER THAT will you return to the SSVNC GUI.
-
-   Click OK now to start the Listening VNC Viewer.$extra
-"
-			global use_ssh use_sshssl
-			if {$use_ssh || $use_sshssl} {
-				set msg "${msg}   NOTE: You will probably also need to kill the SSH in the\n   terminal via Ctrl-C" 
-			}
-
-			global help_font is_windows system_button_face
-			toplev .wll
-			global wll_done
-
-			set wll_done 0
-
-			eval text .wll.t -width 64 -height 22 $help_font
-			button .wll.d -text "OK" -command {destroy .wll; set wll_done 1}
-			pack .wll.t .wll.d -side top -fill x
-
-			apply_bg .wll.t
-
-			center_win .wll
-			wm resizable .wll 1 0
-
-			wm title .wll "SSL/SSH Viewer: Listening VNC Info"
-
-			.wll.t insert end $msg
-
-			vwait wll_done
-		}
 	} else {
 		if [regexp {^[0-9][0-9]*$} $n] {
 			global win_localhost
 			append cmd " $win_localhost:$n"
 		} else {
 			append cmd " $n"
+		}
+	}
+	return $cmd
+}
+
+proc do_viewer_windows {n} {
+	global use_listen env
+
+	set cmd [get_cmd $n]
+
+	set ipv6_pid2 ""
+	if {$use_listen} {
+		set nn $n
+		if {$nn < 100} {
+			set nn [expr "$nn + 5500"] 
+		}
+		global direct_connect_reverse_host_orig is_win9x
+		if {![info exists direct_connect_reverse_host_orig]} {
+			set direct_connect_reverse_host_orig ""
+		}
+		if {$direct_connect_reverse_host_orig != "" && !$is_win9x} {
+			set nn2 [expr $nn + 15]
+			set h0 $direct_connect_reverse_host_orig
+			global win_localhost
+			set ipv6_pid2 [exec relay6.exe $nn $win_localhost $nn2 /b:$h0 &]
+			set nn $nn2
 		}
 	}
 
@@ -3923,7 +4090,7 @@ proc check_debug_netstat {port str wn} {
 
 proc launch_windows_ssh {hp file n} {
 	global is_win9x env
-	global use_sshssl use_ssh putty_pw
+	global use_sshssl use_ssh putty_pw putty_args
 	global port_knocking_list
 	global use_listen listening_name
 	global disable_ssl_workarounds disable_ssl_workarounds_type
@@ -3964,9 +4131,14 @@ proc launch_windows_ssh {hp file n} {
 			;
 		} else {
 			# XXX add :0 instead?
-			mesg "Bad vncdisp, missing :0 ?, $vnc_disp"
-			bell
-			return 0
+			if {1} {
+				set vnc_disp "vnc_disp:0"
+				mesg "Added :0 to $vnc_disp"
+			} else {
+				mesg "Bad vncdisp, missing :0 ?, $vnc_disp"
+				bell
+				return 0
+			}
 		}
 	}
 
@@ -4242,13 +4414,23 @@ proc launch_windows_ssh {hp file n} {
 			regsub {\.bat} $file "pre.bat" file_pre
 			set fh [open $file_pre "w"]
 			set plink_str "plink.exe -ssh -C -P $ssh_port -m $file_pre_cmd $verb -t" 
+			if {$putty_args != ""} {
+				append plink_str " $putty_args"
+			}
 
 			global smb_redir_0
 			if {$smb_redir_0 != ""} {
 				append plink_str " $smb_redir_0"
 			}
 
-			append plink_str "$pw $ssh_host" 
+			if [regexp {%} $ssh_host] {
+				set uath ""
+				regsub -all {%SPACE} $ssh_host " " uath
+				regsub -all {%TAB} $uath "	" uath
+				append plink_str "$pw \"$uath\"" 
+			} else {
+				append plink_str "$pw $ssh_host" 
+			}
 
 			if {$pw != ""} {
 				puts $fh "echo off"
@@ -4386,6 +4568,9 @@ proc launch_windows_ssh {hp file n} {
 	}
 
 	set plink_str "plink.exe -ssh -P $ssh_port $verb $redir $extra_redirs -t" 
+	if {$putty_args != ""} {
+		append plink_str " $putty_args"
+	}
 	if {$extra_redirs != ""} {
 		regsub {exe} $plink_str "exe -C" plink_str
 	} else {
@@ -4393,24 +4578,34 @@ proc launch_windows_ssh {hp file n} {
 		# ssh typing response?
 		regsub {exe} $plink_str "exe -C" plink_str
 	}
+	set uath $ssh_host
+	if [regexp {%} $uath] {
+		regsub -all {%SPACE} $uath " " uath
+		regsub -all {%TAB} $uath "	" uath
+		set uath "\"$uath\""
+	}
 	if {$do_shell} {
 		if {$sshcmd == "PUTTY"} {
+		    if [regexp {^".*@} $uath] { #"
+			    regsub {@} $uath {" "} uath
+			    set uath "-l $uath"
+		    }
 		    if {$is_win9x} {
-			set plink_str "putty.exe -ssh -C -P $ssh_port $extra_redirs -t $pw $ssh_host" 
+			set plink_str "putty.exe -ssh -C -P $ssh_port $extra_redirs $putty_args -t $pw $uath" 
 		    } else {
-			set plink_str "start \"putty $ssh_host\" putty.exe -ssh -C -P $ssh_port $extra_redirs -t $pw $ssh_host" 
+			set plink_str "start \"putty $ssh_host\" putty.exe -ssh -C -P $ssh_port $extra_redirs $putty_args -t $pw $uath" 
 			if [regexp {FINISH} $port_knocking_list] {
 				regsub {start} $plink_str "start /wait" plink_str
 			}
 		    }
 		} else {
-			set plink_str "plink.exe -ssh -C -P $ssh_port $extra_redirs -t $pw $ssh_host" 
+			set plink_str "plink.exe -ssh -C -P $ssh_port $extra_redirs $putty_args -t $pw $uath" 
 			append plink_str { "$SHELL"}
 		}
 	} elseif {$file_cmd != ""} {
-		append plink_str " -m $file_cmd$pw $ssh_host"
+		append plink_str " -m $file_cmd$pw $uath"
 	} else {
-		append plink_str "$pw $ssh_host \"$sshcmd\""
+		append plink_str "$pw $uath \"$sshcmd\""
 	}
 
 	if {$pw != ""} {
@@ -4420,7 +4615,7 @@ proc launch_windows_ssh {hp file n} {
 		puts $fh "echo \" \""
 		puts $fh "echo \"Doing Initial SSH with sudo id to prime sudo...\""
 		puts $fh "echo \" \""
-		puts $fh "plink.exe -ssh -t $ssh_host \"sudo id; tty\""
+		puts $fh "plink.exe -ssh $putty_args -t $uath \"sudo id; tty\""
 		puts $fh "echo \" \""
 	}
 	puts $fh $plink_str
@@ -4454,7 +4649,7 @@ proc launch_windows_ssh {hp file n} {
 	}
 
 	if {$double_ssh != ""} {
-		set plink_str_double_ssh "plink.exe -ssh -t $pw $double_ssh \"echo sleep 60 ...; sleep 60; echo done.\"" 
+		set plink_str_double_ssh "plink.exe -ssh $putty_args -t $pw $double_ssh \"echo sleep 60 ...; sleep 60; echo done.\"" 
 
 		# VF
 		regsub {\.bat} $file "dob.bat" file_double
@@ -5378,6 +5573,9 @@ proc fetch_cert {save} {
 			if [regexp -nocase -line {GET_SERVER_HELLO.*unknown protocol} $cert_text] {
 				set m 1
 			}
+			if {![regexp -nocase {show_cert: SSL_connect failed} $cert_text]} {
+				set m 1
+			}
 			if {!$m && $is_windows} {
 				if [regexp -nocase {write:errno} $cert_text] {
 					if [regexp -nocase {no peer certificate} $cert_text] {
@@ -5408,6 +5606,9 @@ proc fetch_cert {save} {
 				set m 1
 			}
 			if [regexp -nocase -line {error.*unknown protocol} $cert_text] {
+				set m 1
+			}
+			if {![regexp -nocase {show_cert: SSL_connect failed} $cert_text]} {
 				set m 1
 			}
 			if {!$m && $is_windows} {
@@ -5814,8 +6015,15 @@ proc ipv6_proxy {proxy host port} {
 			for {set i 0} {$i < $n} {incr i} {
 				set part [lindex $parts $i]
 				set prefix ""
+				set repeater 0
 				regexp -nocase {^[a-z0-9+]*://} $part prefix
 				regsub -nocase {^[a-z0-9+]*://}	$part "" part
+				if [regexp {^repeater://} $prefix] {
+					regsub {\+.*$} $part "" part
+					if {![regexp {:([0-9][0-9]*)$} $part]} {
+						set part "$part:5900"
+					}
+				}
 				set modit 0
 				set h1 ""
 				set p1 ""
@@ -6184,6 +6392,7 @@ proc check_accepted_certs {{probe_only 0}} {
 	regsub -all {[\\/=]} $fingerprint "_" fingerprint
 
 	set from [string tolower $from]
+	regsub -all {[\[\]]} $from "" from
 	regsub -all {^[+a-z]*://} $from "" from
 	regsub -all {:} $from "-" from
 	regsub -all {[\\/=]} $from "_" from
@@ -6591,33 +6800,53 @@ proc tpid {} {
 
 proc repeater_proxy_check {proxy} {
 	if [regexp {^repeater://.*\+ID:[0-9]} $proxy] {
-		global env
+		global env rpc_m1 rpc_m2 
+		if {![info exists rpc_m1]} {
+			set rpc_m1 0
+			set rpc_m2 0
+		}
 		set force 0
 		if [info exists env(REPEATER_FORCE)] {
 			if {$env(REPEATER_FORCE) != "" && $env(REPEATER_FORCE) != "0"} {
+				# no longer makes a difference.
 				set force 1
 			}
 		}
 		global use_listen ultra_dsm
 		if {! $use_listen} {
-			if {$ultra_dsm != ""} {
+			if {$ultra_dsm} {
 				return 1;
-			} elseif {$force} {
-				mesg "WARNING: repeater:// ID:nnn proxy must use Listen Mode"
-				after 1000
 			} else {
-				bell
-				mesg "ERROR: repeater:// ID:nnn proxy must use Listen Mode"
-				after 1000
-				return 0
+				if {0} {
+					mesg "WARNING: repeater:// ID:nnn proxy might need Listen Mode"
+					incr rpc_m1
+					if {$rpc_m1 <= 2} {
+						after 1000
+					} else {
+						after 200
+					}
+				}
+				if {0} {
+					# no longer required by x11vnc (X11VNC_DISABLE_SSL_CLIENT_MODE)
+					bell
+					mesg "ERROR: repeater:// ID:nnn proxy must use Listen Mode"
+					after 1000
+					return 0
+				}
 			}
 		}
 		global always_verify_ssl
 		if [info exists always_verify_ssl] {
 			if {$always_verify_ssl} {
-				bell
 				mesg "WARNING: repeater:// ID:nnn Verify All Certs may fail"
-				after 2500
+				incr rpc_m2
+				if {$rpc_m2 == 1} {
+					after 1500
+				} elseif {$rpc_m2 == 2} {
+					after 500
+				} else {
+					after 200
+				}
 			}
 		}
 	}
@@ -6870,6 +7099,7 @@ proc maybe_add_vencrypt {proxy hp} {
 		set vpd [get_vencrypt_proxy $hp]
 	}
 	if {$vpd != ""} {
+		mesg "vencrypt proxy: $vpd"
 		if {$proxy != ""} {
 			set proxy "$proxy,$vpd"
 		} else {
@@ -7341,7 +7571,7 @@ proc launch_unix {hp} {
 		set hpnew  [get_ssh_hp $hp]
 		set proxy  [get_ssh_proxy $hp]
 
-		if {!$do_direct && ! [repeater_proxy_check $proxy]} {
+		if {!$do_direct && ![repeater_proxy_check $proxy]} {
 			reset_stunnel_extra_opts
 			return
 		}
@@ -8228,7 +8458,18 @@ proc launch {{hp ""}} {
 		set vncdisplay ""
 		return 0
 	}
-
+	if {[regexp {^ENV=([A-z0-9][A-z0-9]*)=(.*)$} $hpt mv var val]} {
+		global env
+		if {$val == ""} {
+			catch {unset env($var)}
+			mesg "Unset $var"
+		} else {
+			set env($var) "$val"
+			mesg "Set $var to $val"
+		}
+		set vncdisplay ""
+		return 0
+	}
 
 	regsub {[ 	]*cmd=.*$} $hp "" tt
 
@@ -8642,6 +8883,8 @@ proc launch {{hp ""}} {
 		}
 	}
 
+	set p_reverse 0
+
 	if {$proxy != ""} {
 		if {$use_sshssl} {
 			;
@@ -8655,11 +8898,20 @@ proc launch {{hp ""}} {
 		set env(SSVNC_DEST) "$host:$port"
 		if {$use_listen} {
 			set env(SSVNC_REVERSE) "$win_localhost:$port"
+			set env(CONNECT_BR_SLEEP) 3
+			set p_reverse 1
 		} else {
 			if {$use_sshssl && [regexp {vencrypt:} $proxy]} {
 				set env(SSVNC_LISTEN) [expr "$n4 + 5900"]
 			} else {
 				set env(SSVNC_LISTEN) [expr "$n2 + 5900"]
+			}
+		}
+		if {[info exists env(PROXY_DEBUG)]} {
+			foreach var [list SSVNC_PROXY SSVNC_DEST SSVNC_REVERSE CONNECT_BR_SLEEP SSVNC_LISTEN] {
+				if [info exists env($var)] {
+					mesg "$var $env($var)"; after 2500;
+				}
 			}
 		}
 	}
@@ -8734,6 +8986,7 @@ proc launch {{hp ""}} {
 		catch { unset env(SSVNC_REVERSE) }
 		catch { unset env(SSVNC_DEST) }
 		catch { unset env(SSVNC_PREDIGESTED_HANDSHAKE) }
+		catch { unset env(CONNECT_BR_SLEEP) }
 		winkill $ipv6_pid
 		winkill $ssh_ipv6_pid
 		set ssh_ipv6_pid ""
@@ -8744,6 +8997,10 @@ proc launch {{hp ""}} {
 
 	set proxy_pid ""
 	set proxy_pid2 ""
+
+	if {$use_listen} {
+		windows_listening_message $n1
+	}
 
 	if {$proxy != ""} {
 		if [regexp {vencrypt:} $proxy] {
@@ -8767,6 +9024,7 @@ proc launch {{hp ""}} {
 		catch { unset env(SSVNC_REVERSE) }
 		catch { unset env(SSVNC_DEST) }
 		catch { unset env(SSVNC_PREDIGESTED_HANDSHAKE) }
+		catch { unset env(CONNECT_BR_SLEEP) }
 	}
 
 	mesg "Starting STUNNEL on port $port2 ..."
@@ -8774,10 +9032,12 @@ proc launch {{hp ""}} {
 
 	set pids [exec stunnel $file1 &]
 
-	after 300
-	set vtm [vencrypt_tutorial_mesg]
-	if {$vtm == ""} {
-		after 1000
+	if {! $p_reverse} {
+		after 300
+		set vtm [vencrypt_tutorial_mesg]
+		if {$vtm == ""} {
+			after 300
+		}
 	}
 
 	note_stunnel_pids "after"
@@ -11023,6 +11283,7 @@ proc save_profile {{parent "."}} {
 	} else {
 		regsub -all {:} $dispf "-" dispf
 	}
+	regsub -all {[\[\]]} $dispf "" dispf
 	if {$ts_only && ![regexp {^TS-} $dispf]} {
 		set dispf "TS-$dispf"
 	}
@@ -12258,6 +12519,45 @@ proc ts_sleep_dialog {} {
 
 	center_win .eslp
 	focus .eslp.c.e 
+}
+
+proc ts_putty_args_dialog {} {
+
+	toplev .parg
+	wm title .parg "Putty Args"
+
+	scroll_text .parg.f 80 5
+
+	global putty_args
+
+	set msg {
+    Putty Args: Enter a string to be added to every plink.exe and putty.exe
+    command line.  For example: -i C:\mykey.ppk
+}
+	.parg.f.t insert end $msg
+
+	frame .parg.c
+	label .parg.c.l -anchor w -text "Putty Args:"
+	entry .parg.c.e -width 20 -textvariable putty_args
+	pack .parg.c.l -side left
+	pack .parg.c.e -side left -expand 1 -fill x
+
+	button .parg.cancel -text "Cancel" -command {destroy .parg; set choose_parg 0}
+	bind .parg <Escape> {destroy .parg; set choose_parg 0}
+	wm protocol .parg WM_DELETE_WINDOW {destroy .parg; set choose_parg 0}
+	button .parg.done -text "Done" -command {destroy .parg; set choose_parg 1}
+	bind .parg.c.e <Return> {destroy .parg; set choose_parg 1}
+
+	global choose_parg
+	if {! $choose_parg} {
+		set putty_args ""
+	}
+
+	pack .parg.done .parg.cancel .parg.c -side bottom -fill x
+	pack .parg.f -side top -fill both -expand 1
+
+	center_win .parg
+	focus .parg.c.e 
 }
 
 proc ts_ncache_dialog {} {
@@ -14158,6 +14458,21 @@ proc help_advanced_opts {} {
          while waiting for the VNC viewer to start up.  On Windows this
          can give extra time to enter the Putty/Plink password, etc.
 
+      Putty Args:
+
+         Windows only, supply a string to be added to all plink.exe
+         and putty.exe commands.  Example: -i C:\mykey.ppk
+
+      Launch Putty Pagent:
+
+         Windows only, launch the Putty key agent tool (pageant) to hold
+         your SSH private keys for automatic logging in by putty/plink.
+
+      Launch Putty Key-Gen:
+
+         Windows only, launch the Putty key generation tool (puttygen)
+         to create new SSH private keys.
+
       Unix ssvncviewer:
 
          Display a popup menu with options that apply to the special 
@@ -14372,7 +14687,8 @@ proc help_ssvncviewer_opts {} {
 
 
     These are environment variables one may set to affect the options
-    of the SSVNC vncviewer:
+    of the SSVNC vncviewer and also the ss_vncviewer wrapper script
+    (and hence may apply to 3rd party vncviewers too)
 
          VNCVIEWER_ALPHABLEND     (-alpha, see Cursor Alphablending above)
          VNCVIEWER_POPUP_FIX      (-popupfix, warp popup to mouse location)
@@ -14387,17 +14703,36 @@ proc help_ssvncviewer_opts {} {
          VNCVIEWER_NOTTY          (-notty, see Avoid Using Terminal above)
          VNCVIEWER_ESCAPE         (-escape, see Escape Keys above)
          VNCVIEWER_ULTRADSM       (-ultradsm)
+         VNCVIEWER_PIPELINE_UPDATES (-pipeline, see above)
          VNCVIEWER_SEND_CLIPBOARD (-sendclipboard)
          VNCVIEWER_SEND_ALWAYS    (-sendalways)
          VNCVIEWER_RECV_TEXT      (-recvtext clipboard/primary/both)
          VNCVIEWER_NO_CUTBUFFER   (do not send CUTBUFFER0 as fallback)
          VNCVIEWER_NO_PIPELINE_UPDATES (-nopipeline)
+         VNCVIEWER_ALWAYS_RECENTER (set to avoid(?) recentering on resize)
+         VNCVIEWER_IS_REALVNC4    (indicate vncviewer is realvnc4 flavor.)
+         VNCVIEWER_NO_IPV4        (-noipv4)
+         VNCVIEWER_NO_IPV6        (-noipv6)
+         VNCVIEWER_FORCE_UP       (force raise on fullscreen graball)
+         VNCVIEWER_PASSWORD       (danger: set vnc passwd via env. var.)
+         VNCVIEWER_MIN_TITLE      (minimum window title (appshare))
 
          VNCVIEWERCMD             (unix viewer command, default vncviewer)
          VNCVIEWERCMD_OVERRIDE    (force override of VNCVIEWERCMD)
          VNCVIEWERCMD_EXTRA_OPTS  (extra options to pass to VNCVIEWERCMD)
          VNCVIEWER_LISTEN_LOCALHOST (force ssvncviewer to -listen on localhost)
          VNCVIEWER_NO_SEC_TYPE_TIGHT(force ssvncviewer to skip rfbSecTypeTight)
+         HEXTILE_YCROP_TOO        (testing: nosync_ycrop for hextile updates.)
+
+         SS_DEBUG                 (very verbose debug printout by script.)
+         SS_VNCVIEWER_LISTEN_PORT (force listen port.)
+         SS_VNCVIEWER_NO_F        (no -f for SSH.)
+         SS_VNCVIEWER_NO_T        (no -t for SSH.)
+         SS_VNCVIEWER_USE_C       (force -C compression for SSH.)
+         SS_VNCVIEWER_SSH_CMD     (override SSH command to run.)
+         SS_VNCVIEWER_NO_MAXCONN  (no maxconn for stunnel (obsolete))
+         SS_VNCVIEWER_RM          (file containing vnc passwd to remove.)
+         SS_VNCVIEWER_SSH_ONLY    (run the SSH command, then exit.)
 
          SSVNC_MULTIPLE_LISTEN    (-multilisten, see Multiple LISTEN above)
          SSVNC_ACCEPT_POPUP       (-acceptpopup, see Accept Popup Dialog)
@@ -14415,36 +14750,58 @@ proc help_ssvncviewer_opts {} {
          Misc (special usage or debugging or ss_vncviewer settings):
 
          SSVNC_MESG_DELAY         (sleep this many millisec between messages)
+         SSVNC_NO_ENC_WARN        (do not print out a NO ENCRYPTION warning)
          SSVNC_EXTRA_SLEEP        (same as Sleep: window)
          SSVNC_NO_ULTRA_DSM       (disable ultravnc dsm encryption)
+         SSVNC_ULTRA_DSM          (the ultravnc_dsm_helper command)
          SSVNC_ULTRA_FTP_JAR      (file location of ultraftp.jar jar file)
          SSVNC_KNOWN_HOSTS_FILE   (file for per-connection ssh known hosts)
-         SSVNC_SCALE_STATS
-         SSVNC_DEBUG_RELEASE
-         SSVNC_DEBUG_ESCAPE_KEYS
-         SSVNC_NO_MAYBE_SYNC
+         SSVNC_SCALE_STATS        (print scaling stats)
+         SSVNC_NOSOLID            (disable solid special case while scaling)
+         SSVNC_DEBUG_RELEASE      (debug printout for keyboard modifiers.)
+         SSVNC_DEBUG_ESCAPE_KEYS  (debug printout for escape keys)
+         SSVNC_NO_MAYBE_SYNC      (skip XSync() calls in certain painting)
          SSVNC_MAX_LISTEN         (number of time to listen for reverse conn.)
          SSVNC_LISTEN_ONCE        (listen for reverse conn. only once)
          STUNNEL_LISTEN           (stunnel interface for reverse conn.
-         SSVNC_EXIT_DEBUG
-         SSVNC_DEBUG_CHAT
-         SSVNC_NO_MESSAGE_POPUP
-         SSVNC_SET_SECURITY_TYPE
-         SSVNC_PREDIGESTED_HANDSHAKE
-         SSVNC_SKIP_RFB_PROTOCOL_VERSION
-         SSVNC_DEBUG_SEC_TYPES
-         SSVNC_DEBUG_MSLOGON
-         SSVNC_DEBUG_RECTS
-         SSVNC_DEBUG_CHAT
-         SSVNC_DELAY_SYNC
-         SSVNC_DEBUG_SELECTION
-         SSVNC_REPEATER
-         SSVNC_VENCRYPT_DEBUG
-         SSVNC_STUNNEL_DEBUG
-         SSVNC_TEST_SEC_TYPE
-         SSVNC_LIM_ACCEPT_PRELOAD
-         SSVNC_SOCKS5
+         SSVNC_NO_MESSAGE_POPUP   (do not place info messages in popup.)
+         SSVNC_SET_SECURITY_TYPE  (force VeNCrypt security type)
+         SSVNC_PREDIGESTED_HANDSHAKE (string used for VeNCrypt, etc. connect)
+         SSVNC_SKIP_RFB_PROTOCOL_VERSION (force viewer to be RFB 3.8)
+         SSVNC_DEBUG_SEC_TYPES    (debug security types for VeNCrypt)
+         SSVNC_DEBUG_MSLOGON      (extra printout for ultravnc mslogon proto)
+         SSVNC_DEBUG_RECTS        (printout debug for RFB rectangles.)
+         SSVNC_DEBUG_CHAT         (printout debug info for chat mode.)
+         SSVNC_DELAY_SYNC         (faster local drawing delaying XSync)
+         SSVNC_DEBUG_SELECTION    (printout debug for selection/clipboard)
+         SSVNC_REPEATER           (URL-ish sslrepeater:// thing for UltraVNC)
+         SSVNC_VENCRYPT_DEBUG     (debug printout for VeNCrypt mode.)
+         SSVNC_VENCRYPT_USERPASS  (force VeNCrypt user:pass)
+         SSVNC_STUNNEL_DEBUG      (increase stunnel debugging printout)
+         SSVNC_STUNNEL_VERIFY3    (increase stunnel verify from 2 to 3)
+         SSVNC_LIM_ACCEPT_PRELOAD (preload library to limit accept(2))
+         SSVNC_SOCKS5             (socks5 for x11vnc PORT= mode, default)
+         SSVNC_SOCKS4		  (socks4 for x11vnc PORT= mode)
+         SSVNC_NO_IPV6_PROXY      (do not setup a ipv6:// proxy)
+         SSVNC_NO_IPV6_PROXY_DIRECT (do not setup a ipv6:// proxy unencrypted)
+         SSVNC_PORT_IPV6          (x11vnc PORT= mode is to ipv6-only)
          SSVNC_IPV6               (0 to disable ss_vncviewer ipv6 check)
+         SSVNC_FETCH_TIMEOUT      (ss_vncviewer cert fetch timeout)
+         SSVNC_USE_S_CLIENT       (force cert fetch to be 'openssl s_client')
+         SSVNC_SHOWCERT_EXIT_0    (force showcert to exit with success)
+         SSVNC_SSH_LOCALHOST_AUTH (force SSH localhost auth check.)
+         SSVNC_TEST_SEC_TYPE      (force PPROXY VeNCrypt type; testing)
+         SSVNC_TEST_SEC_SUBTYPE   (force PPROXY VeNCrypt subtype; testing)
+         SSVNC_EXIT_DEBUG         (testing: prompt to exit at end.)
+         SSVNC_UP_DEBUG           (gui user/passwd debug mode.)
+         SSVNC_UP_FILE            (gui user/passwd file.)
+
+         STUNNEL_EXTRA_OPTS       (extra options for stunnel.)
+
+         X11VNC_APPSHARE_DEBUG    (for debugging -appshare mode.)
+         NO_X11VNC_APPSHARE       (shift down for escape keys.)
+         DEBUG_HandleFileXfer     (ultravnc filexfer)
+         DEBUG_RFB_SMSG           (RFB server message debug.)
 }
 
 	.av.f.t insert end $msg
@@ -15956,7 +16313,7 @@ proc choose_xserver_dialog {} {
 proc set_ts_options {} {
 	global use_cups use_sound use_smbmnt
 	global change_vncviewer choose_xserver
-	global ts_only
+	global ts_only is_windows
 	global darwin_cotvnc use_x11_macosx uname
 	if {! $ts_only} {
 		return
@@ -16011,11 +16368,12 @@ proc set_ts_options {} {
 		-command change_vncviewer_dialog_wrap
 	incr i
 
-	checkbutton .ot.b$i -anchor w -variable use_x11_macosx -text \
-		"X11 viewer MacOSX" \
-		-command {if {$use_x11_macosx} {set darwin_cotvnc 0} else {set darwin_cotvnc 1}; set_darwin_cotvnc_buttons}
-	if {$uname != "Darwin"} {.ot.b$i configure -state disabled}
-	incr i
+	if {!$is_windows && $uname == "Darwin"} {
+		checkbutton .ot.b$i -anchor w -variable use_x11_macosx -text \
+			"X11 viewer MacOSX" \
+			-command {if {$use_x11_macosx} {set darwin_cotvnc 0} else {set darwin_cotvnc 1}; set_darwin_cotvnc_buttons}
+		incr i
+	}
 
 	button .ot.b$i -anchor w -text "   Delete Profile..." \
 		-command {destroy .ot; delete_profile}
@@ -16105,17 +16463,36 @@ proc set_ts_adv_options {} {
 		-command {if {$choose_sleep} {ts_sleep_dialog}}
 	incr i
 
-	checkbutton .ot2.b$i -anchor w -variable ssh_local_protection -text \
-		"SSH Local Protections" \
-		-command {if {$ssh_local_protection} {ssh_sec_dialog}}
-	if {$is_windows} {.ot2.b$i configure -state disabled}
-	incr i
+        if {$is_windows} {
+		checkbutton .ot2.b$i -anchor w -variable choose_parg -text \
+			"Putty Args" \
+			-command {if {$choose_parg} {ts_putty_args_dialog}}
+		incr i
+        }
 
-	checkbutton .ot2.b$i -anchor w -variable ssh_known_hosts -text \
-		"SSH KnownHosts file" \
-		-command {if {$ssh_known_hosts} {ssh_known_hosts_dialog}}
-	if {$is_windows} {.ot2.b$i configure -state disabled}
-	incr i
+	if {!$is_windows} {
+		checkbutton .ot2.b$i -anchor w -variable ssh_local_protection -text \
+			"SSH Local Protections" \
+			-command {if {$ssh_local_protection} {ssh_sec_dialog}}
+		if {$is_windows} {.ot2.b$i configure -state disabled}
+		incr i
+
+		checkbutton .ot2.b$i -anchor w -variable ssh_known_hosts -text \
+			"SSH KnownHosts file" \
+			-command {if {$ssh_known_hosts} {ssh_known_hosts_dialog}}
+		if {$is_windows} {.ot2.b$i configure -state disabled}
+		incr i
+	}
+
+	if {$is_windows} {
+		button .ot2.b$i -anchor w -text "   Putty Agent" \
+			-command {catch {exec pageant.exe &}}
+		incr i
+
+		button .ot2.b$i -anchor w -text "   Putty Key-Gen" \
+			-command {catch {exec puttygen.exe &}}
+		incr i
+	}
 
 	global env
 	if {![info exists env(SSVNC_TS_ALWAYS)]} {
@@ -16123,18 +16500,21 @@ proc set_ts_adv_options {} {
 			-command {destroy .ot2; to_ssvnc}
 		incr i
 	}
-	button .ot2.b$i -anchor w -text "   Unix ssvncviewer ..." \
-		-command {set_ssvncviewer_options}
-	if {$is_windows} {
-		.ot2.b$i configure -state disabled
+
+	if {!$is_windows} {
+		button .ot2.b$i -anchor w -text "   Unix ssvncviewer ..." \
+			-command {set_ssvncviewer_options}
+		if {$is_windows} {
+			.ot2.b$i configure -state disabled
+		}
+		global change_vncviewer
+		if {$change_vncviewer} {
+			.ot2.b$i configure -state disabled
+		}
+		global ts_uss_button
+		set ts_uss_button .ot2.b$i
+		incr i
 	}
-	global change_vncviewer
-	if {$change_vncviewer} {
-		.ot2.b$i configure -state disabled
-	}
-	global ts_uss_button
-	set ts_uss_button .ot2.b$i
-	incr i
 
 	for {set j 1} {$j < $i} {incr j} {
 		pack .ot2.b$j -side top -fill x
@@ -16228,33 +16608,37 @@ proc set_advanced_options {} {
 
 	global use_ssl use_ssh use_sshssl
 
-	checkbutton .oa.b$i -anchor w -variable ssh_known_hosts -text \
-		"Private SSH KnownHosts file" \
-		-command {if {$ssh_known_hosts} {ssh_known_hosts_dialog}}
-	set adv_ssh(knownhosts) .oa.b$i
-	if {$use_ssl}    {.oa.b$i configure -state disabled}
-	if {$is_windows} {.oa.b$i configure -state disabled}
-	incr i
+	if {!$is_windows} {
+		checkbutton .oa.b$i -anchor w -variable ssh_known_hosts -text \
+			"Private SSH KnownHosts file" \
+			-command {if {$ssh_known_hosts} {ssh_known_hosts_dialog}}
+		set adv_ssh(knownhosts) .oa.b$i
+		if {$use_ssl}    {.oa.b$i configure -state disabled}
+		if {$is_windows} {.oa.b$i configure -state disabled}
+		incr i
 
-	checkbutton .oa.b$i -anchor w -variable ssh_local_protection -text \
-		"SSH Local Port Protections" \
-		-command {if {$ssh_local_protection} {ssh_sec_dialog}}
-	global ssh_local_protection_button
-	set ssh_local_protection_button .oa.b$i
-	if {$use_ssl}    {.oa.b$i configure -state disabled}
-	if {$is_windows} {.oa.b$i configure -state disabled}
-	incr i
+		checkbutton .oa.b$i -anchor w -variable ssh_local_protection -text \
+			"SSH Local Port Protections" \
+			-command {if {$ssh_local_protection} {ssh_sec_dialog}}
+		global ssh_local_protection_button
+		set ssh_local_protection_button .oa.b$i
+		if {$use_ssl}    {.oa.b$i configure -state disabled}
+		if {$is_windows} {.oa.b$i configure -state disabled}
+		incr i
+	}
 
    global ssh_only
    if {!$ssh_only} {
-	checkbutton .oa.b$i -anchor w -variable stunnel_local_protection -text \
-		"STUNNEL Local Port Protections" \
-		-command {if {$stunnel_local_protection} {stunnel_sec_dialog}}
-	global stunnel_local_protection_button
-	set stunnel_local_protection_button .oa.b$i
-	if {$use_ssh}    {.oa.b$i configure -state disabled}
-	if {$is_windows} {.oa.b$i configure -state disabled}
-	incr i
+	if {!$is_windows} {
+		checkbutton .oa.b$i -anchor w -variable stunnel_local_protection -text \
+			"STUNNEL Local Port Protections" \
+			-command {if {$stunnel_local_protection} {stunnel_sec_dialog}}
+		global stunnel_local_protection_button
+		set stunnel_local_protection_button .oa.b$i
+		if {$use_ssh}    {.oa.b$i configure -state disabled}
+		if {$is_windows} {.oa.b$i configure -state disabled}
+		incr i
+	}
 
 	checkbutton .oa.b$i -anchor w -variable disable_ssl_workarounds -text \
 		"Disable SSL Workarounds" \
@@ -16264,14 +16648,16 @@ proc set_advanced_options {} {
 	if {$use_ssh}    {.oa.b$i configure -state disabled}
 	incr i
 
-	checkbutton .oa.b$i -anchor w -variable ultra_dsm -text \
-		"UltraVNC DSM Encryption Plugin" \
-		-command {if {$ultra_dsm} {ultra_dsm_dialog}}
-	global ultra_dsm_button
-	set ultra_dsm_button .oa.b$i
-	if {$is_windows} {.oa.b$i configure -state disabled}
-	if {$use_ssh}    {.oa.b$i configure -state disabled}
-	incr i
+	if {!$is_windows} {
+		checkbutton .oa.b$i -anchor w -variable ultra_dsm -text \
+			"UltraVNC DSM Encryption Plugin" \
+			-command {if {$ultra_dsm} {ultra_dsm_dialog}}
+		global ultra_dsm_button
+		set ultra_dsm_button .oa.b$i
+		if {$is_windows} {.oa.b$i configure -state disabled}
+		if {$use_ssh}    {.oa.b$i configure -state disabled}
+		incr i
+	}
 
 	checkbutton .oa.b$i -anchor w -variable no_probe_vencrypt -text \
 		"Do not Probe for VeNCrypt"
@@ -16315,37 +16701,58 @@ proc set_advanced_options {} {
 	frame .oa.fis.fR
 	label .oa.fis.fL.la -anchor w -text "Include:"
 	label .oa.fis.fL.lb -anchor w -text "Sleep:"
-	pack .oa.fis.fL.la .oa.fis.fL.lb -side top -fill x
+	if {$is_windows} {
+		label .oa.fis.fL.lc -anchor w -text "Putty Args:"
+		pack .oa.fis.fL.la .oa.fis.fL.lb .oa.fis.fL.lc -side top -fill x
+	} else {
+		pack .oa.fis.fL.la .oa.fis.fL.lb -side top -fill x
+	}
 
 	entry .oa.fis.fR.ea -width 10 -textvariable include_list
 	entry .oa.fis.fR.eb -width 10 -textvariable extra_sleep
-	pack .oa.fis.fR.ea .oa.fis.fR.eb -side top -fill x
+	if {$is_windows} {
+		entry .oa.fis.fR.ec -width 10 -textvariable putty_args
+		pack .oa.fis.fR.ea .oa.fis.fR.eb .oa.fis.fR.ec -side top -fill x
+	} else {
+		pack .oa.fis.fR.ea .oa.fis.fR.eb -side top -fill x
+	}
 
 	pack .oa.fis.fL -side left
 	pack .oa.fis.fR -side right -expand 1 -fill x
 
 	pack .oa.fis -side top -fill x
 
-	global uname
-	set t1 "         Unix ssvncviewer ..."
-	if {$uname == "Darwin" } { regsub {^ *} $t1 "" t1 }
-	button .oa.ss -anchor w -text $t1 -command set_ssvncviewer_options
-	pack   .oa.ss -side top -fill x
-	if {$is_windows} {
-		.oa.ss configure -state disabled
-	}
-	global change_vncviewer
-	if {$change_vncviewer} {
-		.oa.ss configure -state disabled
-	}
 
-	set t2 "         Use ssh-agent"
-	if {$uname == "Darwin" } { regsub {^ *} $t2 "" t2 }
+	if {!$is_windows} {
+		global uname
+		set t1 "         Unix ssvncviewer ..."
+		if {$uname == "Darwin" } { regsub {^ *} $t1 "" t1 }
+		button .oa.ss -anchor w -text $t1 -command set_ssvncviewer_options
+		pack   .oa.ss -side top -fill x
+		if {$is_windows} {
+			.oa.ss configure -state disabled
+		}
+		global change_vncviewer
+		if {$change_vncviewer} {
+			.oa.ss configure -state disabled
+		}
 
-	button .oa.sa -anchor w -text $t2 -command ssh_agent_restart
-	pack .oa.sa -side top -fill x
-	if {$is_windows} {
-		.oa.sa configure -state disabled
+		set t2 "         Use ssh-agent"
+		if {$uname == "Darwin" } { regsub {^ *} $t2 "" t2 }
+
+		button .oa.sa -anchor w -text $t2 -command ssh_agent_restart
+		pack .oa.sa -side top -fill x
+		if {$is_windows} {
+			.oa.sa configure -state disabled
+		}
+	} else {
+		set t1 "         Launch Putty Agent"
+		button .oa.pa -anchor w -text $t1 -command {catch {exec pageant.exe &}}
+		pack   .oa.pa -side top -fill x
+
+		set t2 "         Launch Putty Key-Gen"
+		button .oa.pg -anchor w -text $t2 -command {catch {exec puttygen.exe &}}
+		pack   .oa.pg -side top -fill x
 	}
 
 	frame .oa.b
@@ -18619,8 +19026,15 @@ for {set i 0} {$i < $argc} {incr i} {
 			if {$ok} {
 				update 
 				set didload 1
-				after 750
-				launch
+				if [info exists env(SSVNC_PROFILE_LOADONLY)] {
+					if {$env(SSVNC_PROFILE_LOADONLY) == "1"} {
+						set ok 0
+					}
+				}
+				if {$ok} {
+					after 750
+					launch
+				}
 			}
 		}
 	}

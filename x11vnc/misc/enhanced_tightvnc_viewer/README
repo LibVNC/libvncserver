@@ -255,7 +255,7 @@ Unix and Mac OS X:
 
     Unpack the archive:
 
-        % gzip -dc ssvnc-1.0.27.tar.gz | tar xvf -
+        % gzip -dc ssvnc-1.0.28.tar.gz | tar xvf -
 
     Run the GUI:
 
@@ -263,7 +263,7 @@ Unix and Mac OS X:
 
         % ./ssvnc/MacOSX/ssvnc             (for Mac OS X)
 
-    The smaller file "ssvnc_no_windows-1.0.27.tar.gz"
+    The smaller file "ssvnc_no_windows-1.0.28.tar.gz"
     could have been used as well.
 
     On MacOSX you could also click on the SSVNC app icon in the Finder.
@@ -309,8 +309,8 @@ Unix/MacOSX Install:
 
     For the conventional source tarball it will compile and install, e.g.:
 
-       gzip -dc ssvnc-1.0.27.src.tar.gz | tar xvf -
-       cd ssvnc-1.0.27
+       gzip -dc ssvnc-1.0.28.src.tar.gz | tar xvf -
+       cd ssvnc-1.0.28
        make config
        make all
        make PREFIX=/my/install/dir install
@@ -322,7 +322,7 @@ Windows:
 
     Unzip, using WinZip or a similar utility, the zip file:
 
-        ssvnc-1.0.27.zip
+        ssvnc-1.0.28.zip
 
     Run the GUI, e.g.:
 
@@ -334,7 +334,7 @@ Windows:
 
     select Open, and then OK to launch it.
 
-    The smaller file "ssvnc_windows_only-1.0.27.zip"
+    The smaller file "ssvnc_windows_only-1.0.28.zip"
     could have been used as well.
 
     You can make a Windows shortcut to this program if you want to.

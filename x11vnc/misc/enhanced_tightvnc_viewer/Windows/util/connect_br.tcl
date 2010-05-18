@@ -1086,9 +1086,23 @@ proc proxy_hostport {proxy} {
 
 proc setb {} {
 	wm withdraw .
+	catch {destroy .b}
 	button .b -text "CONNECT_BR" -command {destroy .}
 	pack .b
 	after 1000 check_callback 
+}
+
+proc connect_br_sleep {} {
+	global env
+	if [info exists env(CONNECT_BR_SLEEP)] {
+		if [regexp {^[0-9][0-9]*$} $env(CONNECT_BR_SLEEP)] {
+			setb
+			for {set i 0} {$i < $env(CONNECT_BR_SLEEP)} {incr i} {
+				bmesg "$i sleep"	
+				after 1000
+			}
+		}
+	}
 }
 
 global env
@@ -1220,16 +1234,32 @@ if {$do_bridge} {
 			destroy .
 			exit 1
 		}
+		setb
 		set rc [catch {set lsock [socket $rhost $rport]}]
 		if {$rc != 0} {
 			puts stderr "error reversing"	
+			bmesg "1 error reversing"	
+			after 2000
+			set rc [catch {set lsock [socket $rhost $rport]}]
+		}
+		if {$rc != 0} {
+			puts stderr "error reversing"	
+			bmesg "2 error reversing"	
+			after 2000
+			set rc [catch {set lsock [socket $rhost $rport]}]
+		}
+		if {$rc != 0} {
+			puts stderr "error reversing"	
+			bmesg "3 error reversing"	
 			destroy .; exit 1
 		}
 		puts stderr "SSVNC_REVERSE to $rhost $rport OK";
-		setb
+		bmesg "SSVNC_REVERSE to $rhost $rport OK";
+		connect_br_sleep
 		handle_connection $lsock $rhost $rport
 	} else {
 		set lport $env(SSVNC_LISTEN)
+		connect_br_sleep
 		set rc [catch {set lsock [socket -myaddr 127.0.0.1 -server handle_connection $lport]}]
 		if {$rc != 0} {
 			puts stderr "error listening"	

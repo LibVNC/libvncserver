@@ -50,6 +50,8 @@ ULTRAVNC_REPEATER_LOOP=1 or ULTRAVNC_REPEATER_LOOP=BG, the latter
 forks into the background.  Set ULTRAVNC_REPEATER_PIDFILE to a file
 to store the master pid in.
 
+Set ULTRAVNC_REPEATER_NO_RFB=1 to disable sending "RFB 000.000" to
+the client.  Then this program acts as general TCP rendezvous tool.
 
 Examples:
 
@@ -83,7 +85,7 @@ my $looppid = '';
 my $pidfile = '';
 #
 sub get_out {
-	print STDERR "$_[0]:\t$$ looppid=$looppid\n";
+	lprint("$_[0]:\t$$ looppid=$looppid");
 	if ($looppid) {
 		kill 'TERM', $looppid;
 		fsleep(0.2);
@@ -91,6 +93,10 @@ sub get_out {
 	unlink $pidfile if $pidfile;
 	cleanup();
 	exit 0;
+}
+
+sub lprint {
+	print STDERR scalar(localtime), ": ", @_, "\n";
 }
 
 # These are overridden in actual server thread:
@@ -108,7 +114,7 @@ sub open_pidfile {
 			close PID;
 			$pidfile = $pf;
 		} else {
-			print STDERR "could not open pidfile: $pf - $! - continuing...\n";
+			lprint("could not open pidfile: $pf - $! - continuing...");
 		}
 		delete $ENV{ULTRAVNC_REPEATER_PIDFILE};
 	}
@@ -150,7 +156,7 @@ if (exists $ENV{ULTRAVNC_REPEATER_LOOP}) {
 		open_pidfile();
 	}
 
-	print STDERR "ultravnc_repeater.pl: starting service at ", scalar(localtime), " master-pid=$$\n";
+	lprint("ultravnc_repeater.pl: starting service. master-pid=$$");
 	while (1) {
 		$looppid = fork;
 		if (! defined $looppid) {
@@ -161,7 +167,7 @@ if (exists $ENV{ULTRAVNC_REPEATER_LOOP}) {
 			exec $0, @ARGV;	
 			exit 1;
 		}
-		print STDERR "ultravnc_repeater.pl: re-starting service at ", scalar(localtime), " master-pid=$$\n";
+		lprint("ultravnc_repeater.pl: re-starting service.  master-pid=$$");
 		sleep 1;
 	}
 	exit 0;
@@ -184,7 +190,7 @@ eval "use IO::Socket::INET6;";
 $have_inet6 = 1 if $@ eq "";
 print "perl module IO::Socket::INET6 not available: no IPv6 support.\n" if ! $have_inet6;
 
-my $prog = 'ultravnc_repeater.pl';
+my $prog = 'ultravnc_repeater';
 my %ID;
 
 my $refuse = 0;
@@ -196,7 +202,7 @@ if (@ARGV && $ARGV[0] =~ /-h/) {
 }
 if (@ARGV && $ARGV[0] eq '-r') {
 	$refuse = 1;
-	print "enabling refuse mode (-r).\n";
+	lprint("enabling refuse mode (-r).");
 	shift;
 }
 
@@ -285,15 +291,16 @@ my $SOCK1 = '';
 my $SOCK2 = '';
 my $CURR = '';
 
-print "watching for IPv4 connections on $client_port/client\n" if $client_listen;
-print "watching for IPv4 connections on $server_port/server\n" if $server_listen;
-print "watching for IPv6 connections on $client_port/client\n" if $client_listen6;
-print "watching for IPv6 connections on $server_port/server\n" if $server_listen6;
+lprint("$prog: starting up.  pid: $$");
+lprint("watching for IPv4 connections on $client_port/client.") if $client_listen;
+lprint("watching for IPv4 connections on $server_port/server.") if $server_listen;
+lprint("watching for IPv6 connections on $client_port/client.") if $client_listen6;
+lprint("watching for IPv6 connections on $server_port/server.") if $server_listen6;
 
 my $alarm_sock = '';
 my $got_alarm = 0;
 sub alarm_handler {
-	print "$prog: got sig alarm.\n";
+	lprint("$prog: got sig alarm.");
 	if ($alarm_sock ne '') {
 		close $alarm_sock;
 	}
@@ -303,24 +310,28 @@ sub alarm_handler {
 
 while (my @ready = $select->can_read()) {
 	foreach my $fh (@ready) {
-		if ($fh == $client_listen || $fh == $client_listen6) {
-			print "new vnc client connecting at ", scalar(localtime), "\n"; 
-		} elsif ($fh == $server_listen || $fh == $server_listen6) {
-			print "new vnc server connecting at ", scalar(localtime), "\n"; 
+		if (($client_listen && $fh == $client_listen) || ($client_listen6 && $fh == $client_listen6)) {
+			lprint("new vnc client connecting."); 
+		} elsif (($server_listen && $fh == $server_listen) || ($server_listen6 && $fh == $server_listen6)) {
+			lprint("new vnc server connecting."); 
 		}
 		my $sock = $fh->accept();
 		if (! $sock) {
-			print "$prog: accept $!\n";
+			lprint("$prog: accept $!");
 			next;
 		}
 
-		if ($fh == $client_listen || $fh == $client_listen6) {
-			my $str = "RFB 000.000\n";
-			my $len = length $str;
-			my $n = syswrite($sock, $str, $len, 0);
-			if ($n != $len) {
-				print "$prog: bad $str write: $n != $len $!\n";
-				close $sock;
+		if (($client_listen && $fh == $client_listen) || ($client_listen6 && $fh == $client_listen6)) {
+			if (exists $ENV{ULTRAVNC_REPEATER_NO_RFB} && $ENV{ULTRAVNC_REPEATER_NO_RFB}) {
+				lprint("ULTRAVNC_REPEATER_NO_RFB: not sending RFB 000.000"); 
+			} else {
+				my $str = "RFB 000.000\n";
+				my $len = length $str;
+				my $n = syswrite($sock, $str, $len, 0);
+				if ($n != $len) {
+					lprint("$prog: bad $str write: $n != $len $!");
+					close $sock;
+				}
 			}
 		}
 
@@ -336,15 +347,15 @@ while (my @ready = $select->can_read()) {
 		alarm(0);
 
 		if ($got_alarm) {
-			print "$prog: read timed out: $!\n";
+			lprint("$prog: read timed out: $!");
 		} elsif (! defined $n) {
-			print "$prog: read error: $!\n";
+			lprint("$prog: read error: $!");
 		} elsif ($repeater_bufsize > 0 && $n != $size) {
-			print "$prog: short read $n != $size $!\n";
+			lprint("$prog: short read $n != $size $!");
 			close $sock;
-		} elsif ($fh == $client_listen || $fh == $client_listen6) {
+		} elsif (($client_listen && $fh == $client_listen) || ($client_listen6 && $fh == $client_listen6)) {
 			do_new_client($sock, $buf);
-		} elsif ($fh == $server_listen || $fh == $server_listen6) {
+		} elsif (($server_listen && $fh == $server_listen) || ($server_listen6 && $fh == $server_listen6)) {
 			do_new_server($sock, $buf);
 		}
 	}
@@ -355,33 +366,42 @@ sub do_new_client {
 
 	if ($buf =~ /^ID:(\w+)/) {
 		my $id = $1;
+		if (exists $ID{$id} && exists $ID{$id}{client} && $ID{$id}{client} eq "0") {
+			if (!established($ID{$id}{sock})) {
+				lprint("server socket for ID:$id is no longer established, closing it.");
+				close $ID{$id}{sock};
+				delete $ID{$id};
+			} else {
+				lprint("server socket for ID:$id is still established.");
+			}
+		}
 		if (exists $ID{$id}) {
 			if ($ID{$id}{client}) {
 				my $ref = $refuse;
 				if ($ref && !established($ID{$id}{sock})) {
-					print "socket for ID:$id is no longer established, closing it.\n";
+					lprint("socket for ID:$id is no longer established, closing it.");
 					$ref = 0;
 				}
 				if ($ref) {
-					print "refusing extra vnc client for ID:$id\n";
+					lprint("refusing extra vnc client for ID:$id.");
 					close $sock;
 					return;
 				} else {
-					print "closing and deleting previous vnc client with ID:$id\n";
+					lprint("closing and deleting previous vnc client with ID:$id.");
 					close $ID{$id}{sock};
 
-					print "storing new vnc client with ID:$id\n";
+					lprint("storing new vnc client with ID:$id.");
 					$ID{$id}{client} = 1;
 					$ID{$id}{sock} = $sock;
 				}
 			} else {
-				print "hooking up new vnc client with existing vnc server for ID:$id\n";
+				lprint("hooking up new vnc client with existing vnc server for ID:$id.");
 				my $sock2 = $ID{$id}{sock};
 				delete $ID{$id};
 				hookup($sock, $sock2, "ID:$id"); 
 			}
 		} else {
-			print "storing new vnc client with ID:$id\n";
+			lprint("storing new vnc client with ID:$id.");
 			$ID{$id}{client} = 1;
 			$ID{$id}{sock} = $sock;
 		}
@@ -400,32 +420,32 @@ sub do_new_client {
 		}
 		if ($port < 0) {
 			my $pnew = -$port;
-			print "resetting port from $port to $pnew\n";
+			lprint("resetting port from $port to $pnew.");
 			$port = $pnew;
 		} elsif ($port < 200) {
 			my $pnew = $port + 5900;
-			print "resetting port from $port to $pnew\n";
+			lprint("resetting port from $port to $pnew.");
 			$port = $pnew;
 		}
-		print "making vnc client connection directly to vnc server host='$host' port='$port'\n";
+		lprint("making vnc client connection directly to vnc server host='$host' port='$port'.");
 		my $sock2 =  IO::Socket::INET->new(
 			PeerAddr => $host,
 			PeerPort => $port,
 			Proto => "tcp"
 		);
 		if (! $sock2 && $have_inet6) {
-			print "IPv4 connect error: $!, trying IPv6 ...\n";
+			lprint("IPv4 connect error: $!, trying IPv6 ...");
 			eval{$sock2 = IO::Socket::INET6->new(
 				PeerAddr => $host,
 				PeerPort => $port,
 				Proto => "tcp"
 			);};
-			print "IPv6 connect error: $!\n" if !$sock2;
+			lprint("IPv6 connect error: $!") if !$sock2;
 		} else {
-			print "IPv4 connect error: $!\n" if !$sock2;
+			lprint("IPv4 connect error: $!") if !$sock2;
 		}
 		if (!$sock2) {
-			print "failed to connect to $host:$port\n";
+			lprint("failed to connect to $host:$port.");
 			close $sock;
 			return;
 		}
@@ -439,48 +459,79 @@ sub do_new_server {
 	if ($buf =~ /^ID:(\w+)/) {
 		my $id = $1;
 		my $store = 1;
+		if (exists $ID{$id} && exists $ID{$id}{client} && $ID{$id}{client} eq "1") {
+			if (!established($ID{$id}{sock})) {
+				lprint("client socket for ID:$id is no longer established, closing it.");
+				close $ID{$id}{sock};
+				delete $ID{$id};
+			} else {
+				lprint("client socket for ID:$id is still established.");
+			}
+		}
 		if (exists $ID{$id}) {
 			if (! $ID{$id}{client}) {
 				my $ref = $refuse;
 				if ($ref && !established($ID{$id}{sock})) {
-					print "socket for ID:$id is no longer established, closing it.\n";
+					lprint("socket for ID:$id is no longer established, closing it.");
 					$ref = 0;
 				}
 				if ($ref) {
-					print "refusing extra vnc server for ID:$id\n";
+					lprint("refusing extra vnc server for ID:$id.");
 					close $sock;
 					return;
 				} else {
-					print "closing and deleting previous vnc server with ID:$id\n";
+					lprint("closing and deleting previous vnc server with ID:$id.");
 					close $ID{$id}{sock};
 
-					print "storing new vnc server with ID:$id\n";
+					lprint("storing new vnc server with ID:$id.");
 					$ID{$id}{client} = 0;
 					$ID{$id}{sock} = $sock;
 				}
 			} else {
-				print "hooking up new vnc server with existing vnc client for ID:$id\n";
+				lprint("hooking up new vnc server with existing vnc client for ID:$id.");
 				my $sock2 = $ID{$id}{sock};
 				delete $ID{$id};
 				hookup($sock, $sock2, "ID:$id"); 
 			}
 		} else {
-			print "storing new vnc server with ID:$id\n";
+			lprint("storing new vnc server with ID:$id.");
 			$ID{$id}{client} = 0;
 			$ID{$id}{sock} = $sock;
 		}
 	} else {
-		print "invalid ID:NNNNN string for vnc server: $buf\n";
+		lprint("invalid ID:NNNNN string for vnc server: $buf");
 		close $sock;
 		return;
 	}
 }
 
 sub established {
+	my $fh = shift;
+
+	return established_linux_proc($fh);
+
+	# not working:
+	my $est = 1;
+	my $str = "Z";
+	my $res;
+	#$res = recv($fh, $str, 1, MSG_PEEK | MSG_DONTWAIT);
+	if (defined($res)) {
+		lprint("established OK:  $! '$str'.");
+		$est = 1;
+	} else {
+		# would check for EAGAIN here to decide ...
+		lprint("established err: $! '$str'.");
+		$est = 1;
+	}
+	return $est;
+}
+
+
+sub established_linux_proc {
 	# hack for Linux to see if remote side has gone away:
 	my $fh = shift;
 
-	# if we can't figure things out, we return true.
+	# if we can't figure things out, we must return true.
 	if ($uname !~ /Linux/) {
 		return 1;
 	}
@@ -549,7 +600,7 @@ sub established {
 }
 
 sub handler {
-	print STDERR "$prog\[$$/$CURR]: got SIGTERM.\n";
+	lprint("\[$$/$CURR] got SIGTERM.");
 	close $SOCK1 if $SOCK1;
 	close $SOCK2 if $SOCK2;
 	exit;
@@ -561,7 +612,7 @@ sub hookup {
 	my $worker = fork();
 
 	if (! defined $worker) {
-		print "failed to fork worker: $!\n";
+		lprint("failed to fork worker: $!");
 		close $sock1;
 		close $sock2;
 		return;
@@ -604,10 +655,10 @@ sub xfer {
 		my $len = sysread($in, $buf, 8192);
 		if (! defined($len)) {
 			next if $! =~ /^Interrupted/;
-			print STDERR "$prog\[$$/$CURR]: $!\n";
+			lprint("\[$$/$CURR] $!");
 			last;
 		} elsif ($len == 0) {
-			print STDERR "$prog\[$$/$CURR]: Input is EOF.\n";
+			lprint("\[$$/$CURR] Input is EOF.");
 			last;
 		}
 		my $offset = 0;
@@ -615,7 +666,7 @@ sub xfer {
 		while ($len) {
 			my $written = syswrite($out, $buf, $len, $offset);
 			if (! defined $written) {
-				print STDERR "$prog\[$$/$CURR]: Output is EOF. $!\n";
+				lprint("\[$$/$CURR] Output is EOF. $!");
 				$quit = 1;
 				last;
 			}
@@ -626,7 +677,7 @@ sub xfer {
 	}
 	close($out);
 	close($in);
-	print STDERR "$prog\[$$/$CURR]: finished xfer.\n";
+	lprint("\[$$/$CURR] finished xfer.");
 }
 
 sub xfer_both {
@@ -637,7 +688,7 @@ sub xfer_both {
 	my $child = fork();
 
 	if (! defined $child) {
-		print STDERR "$prog\[$$/$CURR] failed to fork: $!\n";
+		lprint("$prog\[$$/$CURR] failed to fork: $!");
 		return;
 	}
 
@@ -645,30 +696,30 @@ sub xfer_both {
 	$SIG{INT}  = "handler";
 
 	if ($child) {
-		print STDERR "$prog parent[$$/$CURR]  1 -> 2\n";
+		lprint("[$$/$CURR] parent 1 -> 2.");
 		xfer($sock1, $sock2);
 		select(undef, undef, undef, 0.25);
 		if (kill 0, $child) {
 			select(undef, undef, undef, 0.9);
 			if (kill 0, $child) {
-				print STDERR "$prog\[$$/$CURR]: kill TERM child $child\n";
+				lprint("\[$$/$CURR] kill TERM child $child");
 				kill "TERM", $child;
 			} else {
-				print STDERR "$prog\[$$/$CURR]: child  $child gone.\n";
+				lprint("\[$$/$CURR] child  $child gone.");
 			}
 		}
 	} else {
 		select(undef, undef, undef, 0.05);
-		print STDERR "$prog child [$$/$CURR]  2 -> 1\n";
+		lprint("[$$/$CURR] child  2 -> 1.");
 		xfer($sock2, $sock1);
 		select(undef, undef, undef, 0.25);
 		if (kill 0, $parent) {
 			select(undef, undef, undef, 0.8);
 			if (kill 0, $parent) {
-				print STDERR "$prog\[$$/$CURR]: kill TERM parent $parent\n";
+				lprint("\[$$/$CURR] kill TERM parent $parent.");
 				kill "TERM", $parent;
 			} else {
-				print STDERR "$prog\[$$/$CURR]: parent $parent gone.\n";
+				lprint("\[$$/$CURR] parent $parent gone.");
 			}
 		}
 	}
