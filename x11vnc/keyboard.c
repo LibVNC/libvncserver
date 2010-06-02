@@ -3149,16 +3149,6 @@ void keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 		}
 	}
 
-        /* GROMIT HACK */
-        if(use_multipointer && keysym == XK_Pause)
-          {
-            char cmd[256];
-            snprintf(cmd, 256, "gromit-mpx -t %i", (int)cd->ptr_id);
-            if(down)
-               system(cmd);
-            return;
-          }
-
 	INPUT_LOCK;
 
 	last_down = down;
