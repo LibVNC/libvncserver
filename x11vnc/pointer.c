@@ -847,6 +847,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		/* storage for the event queue */
 		static int nevents = 0;
 		static int ev[NEV][3];
+		static rfbClientPtr ev_cl[NEV];
 		int i;
 		/* timer things */
 		static double dt = 0.0, tmr = 0.0, maxwait = 0.4;
@@ -888,6 +889,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 				ev[i][0] = mask;
 				ev[i][1] = x;
 				ev[i][2] = y;
+				ev_cl[i] = client;
 				if (! input.button) {
 					ev[i][0] = -1;
 				}
@@ -923,11 +925,11 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 				    i+1, dnowx());
 			}
 			if (ev[i][1] >= 0) {
-				update_x11_pointer_position(ev[i][1], ev[i][2], client);
+				update_x11_pointer_position(ev[i][1], ev[i][2], ev_cl[i]);
 				sent = 1;
 			}
 			if (ev[i][0] >= 0) {
-         		        update_x11_pointer_mask(ev[i][0], client);
+			        update_x11_pointer_mask(ev[i][0], ev_cl[i]);
 				sent = 1;
 			}
 

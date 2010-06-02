@@ -5472,6 +5472,9 @@ int main(int argc, char* argv[]) {
 		}
 	} else {
 		xinput2_present = 1;
+		/* set the virtual core pointer (id 2) as client pointer so 
+		   that ambigious calls like XQueryPointer() get this one */
+		XISetClientPointer(dpy, None, 2);
 	}
         
         if(!xinput2_present)
