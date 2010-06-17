@@ -37,7 +37,7 @@
  encoding (-832) are used by a client to indicate that it is able to
  receive multicast framebuffer updates. The server responds by sending
  multicast address plus port and also its multicast update interval
- and an ID assigned to the client's pixelformat (see below).
+ and an ID assigned to the client's pixel-format (see below).
  
  Clients then ask for multicast framebuffer updates by issuing
  'MulticastFramebufferUpdateRequest' client to server messages
@@ -53,9 +53,9 @@
  If the multicast update interval has expired and there were multicast
  framebuffer update requests, the server sends out the update via UDP
  multicast. To keep the client implementation as simple as possible,
- the server sends one such update for each combination of pixelformat
+ the server sends one such update for each combination of pixel-format
  and encoding it has to provide. Thus, each multicast framebuffer
- update carries a pixelformat ID of which the client was told when
+ update carries a pixel-format ID of which the client was told when
  sending the multicast address (see above). Furthermore, since UDP is
  based on datagrams with a fixed maximum size, the whole update may
  have to be packed into several UDP packets. Therefore the framebuffer
@@ -87,15 +87,15 @@
  If the server supports the requested feature, it tells the client
  about the multicast address and port to listen on for framebuffer
  updates and also adds its multicast update interval and a unique ID
- bigger than 0 assigned to the pixelformat the client requested (if
+ bigger than 0 assigned to the pixel-format the client requested (if
  any) or 0 if the client was content with the server's default
- pixelformat.
+ pixel-format.
 
  So, the server sends back a 'FramebufferUpdate' message consisting of
  one rectangle with:
 
     * 'encoding-type' set to MulticastVNC (or IPv6MulticastVNC)
-    * 'x-position' set to the pixelformat identifier
+    * 'x-position' set to the pixel-format identifier
     * 'y-position' set to the UDP port to listen on
     * 'width' set to the multicast update interval in milliseconds
     * the pixel data set to an IPv4 address (or IPv6 address) in
@@ -149,11 +149,11 @@
 
  To allow any kind of multicast client and to be as flexible as
  possible, the server is required to keep track of which combinations
- of pixelformat and encoding it has to provide. For each registered
+ of pixel-format and encoding it has to provide. For each registered
  combination, it sends out a whole multicast framebuffer update. 
  Therefore, 'MulticastFramebufferUpdate' messages have a field
- identifying the pixelformat of the pixel data sent. This id gets
- assigned to the client's wanted pixelformat at multicast session
+ identifying the pixel-format of the pixel data sent. This id gets
+ assigned to the client's wanted pixel-format at multicast session
  setup, see 2.2. Note that the encoding of the pixel data is specified
  in each of the update's rectangles.
 
