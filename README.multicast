@@ -30,8 +30,8 @@
  2.1 Synopsis
 
  The MulticastVNC Extension to the RFB protocol introduces two new
- pseudo-encodings and one new client to server message and one new
- server to client message, respectively:
+ pseudo-encodings as well as one new client to server message and one
+ new server to client message, respectively:
 
  MulticastVNC pseudo encoding (-831) or IPv6MulticastVNC pseudo
  encoding (-832) are used by a client to indicate that it is able to
