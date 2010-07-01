@@ -52,17 +52,21 @@
 
  If the multicast update interval has expired and there were multicast
  framebuffer update requests, the server sends out the update via UDP
- multicast. To keep the client implementation as simple as possible,
- the server sends one such update for each combination of pixel-format
- and encoding it has to provide. Thus, each multicast framebuffer
- update carries a pixel-format ID of which the client was told when
- sending the multicast address (see above). Furthermore, since UDP is
- based on datagrams with a fixed maximum size, the whole update may
- have to be packed into several UDP packets. Therefore the framebuffer
- contents are sent using (maybe several) 'MulticastFramebufferUpdate'
- server to client messages (message type 248). These contain sequence
- numbers identifying the update as a whole and also the individual
- partial updates.
+ multicast. If at this point no updates were pending because the
+ server's framebuffer did not change, it sends an empty
+ MulticastFramebufferUpdate heartbeat message instead so that clients
+ do not assume that the connection has died when there simply are no
+ updates to send. To keep the client implementation as simple as
+ possible, the server sends one framebuffer update for each
+ combination of pixel-format and encoding it has to provide. Thus,
+ each multicast framebuffer update carries a pixel-format ID of which
+ the client was told when sending the multicast address (see
+ above). Furthermore, since UDP is based on datagrams with a fixed
+ maximum size, the whole update may have to be packed into several UDP
+ packets. Therefore the framebuffer contents are sent using (maybe
+ several) 'MulticastFramebufferUpdate' server to client messages
+ (message type 248). These contain sequence numbers identifying the
+ update as a whole and also the individual partial updates.
 
  Using these sequence numbers and the server's multicast update
  interval mentioned above, it is possible for clients to reorder
