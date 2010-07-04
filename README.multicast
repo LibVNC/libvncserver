@@ -30,8 +30,8 @@
  2.1 Synopsis
 
  The MulticastVNC Extension to the RFB protocol introduces two new
- pseudo-encodings as well as one new client to server message and one
- new server to client message, respectively:
+ pseudo-encodings as well as one new client-to-server message and one
+ new server-to-client message, respectively:
 
  MulticastVNC pseudo encoding (-831) or IPv6MulticastVNC pseudo
  encoding (-832) are used by a client to indicate that it is able to
@@ -40,7 +40,7 @@
  and an ID assigned to the client's pixel-format (see below).
  
  Clients then ask for multicast framebuffer updates by issuing
- 'MulticastFramebufferUpdateRequest' client to server messages
+ 'MulticastFramebufferUpdateRequest' client-to-server messages
  (message type 249).
 
  When the VNC server receives such a request, it does not reply
@@ -55,7 +55,7 @@
  multicast. If at this point no updates were pending because the
  server's framebuffer did not change, it sends an empty
  MulticastFramebufferUpdate heartbeat message instead so that clients
- do not assume that the connection has died when there simply are no
+ do not assume that the connection has died when there simply were no
  updates to send. To keep the client implementation as simple as
  possible, the server sends one framebuffer update for each
  combination of pixel-format and encoding it has to provide. Thus,
@@ -64,7 +64,7 @@
  above). Furthermore, since UDP is based on datagrams with a fixed
  maximum size, the whole update may have to be packed into several UDP
  packets. Therefore the framebuffer contents are sent using (maybe
- several) 'MulticastFramebufferUpdate' server to client messages
+ several) 'MulticastFramebufferUpdate' server-to-client messages
  (message type 248). These contain sequence numbers identifying the
  update as a whole and also the individual partial updates.
 
@@ -73,11 +73,12 @@
  incoming messages and detect loss of parts of a multicast framebuffer
  update or of the update as a whole. They can then resort to whatever
  strategy they think is best, i.e. ignore the loss and wait for the
- next update or request a conventional framebuffer update via TCP.
+ next update or request a full non-incremental multicast framebuffer 
+ update.
 
- Note that 'MulticastFramebufferUpdate's are the the only messages
- sent via multicast. Handshaking messages, client to server messages
- and all other server to client messages are sent via the traditional
+ Note that 'MulticastFramebufferUpdate's are the only messages sent
+ via multicast. Handshaking messages, client-to-server messages and
+ all other server-to-client messages are sent via the traditional
  unicast way!
 
 
@@ -118,7 +119,7 @@
 
  After successful session setup, the client(s) ask for a multicast
  framebuffer update by sending a 'MulticastFramebufferUpdateRequest'
- client to server message (message type 249). This exists so clients
+ client-to-server message (message type 249). This exists so clients
  can explicitly ask for multicast framebuffer updates or for normal
  framebuffer updates via TCP using 'FramebufferUpdateRequest'.
 
@@ -143,13 +144,14 @@
 
  2.3.2 MulticastFramebufferUpdate
 
- If the multicast update interval has expired and there were multicast
- framebuffer update requests, the server sends out the update via UDP
- multicast to the multicast destination it has notified the client
- about. 
-
  Like conventional framebuffer updates, a multicast framebuffer update
- consists of a sequence of rectangles of pixel data.
+ consists of a sequence of rectangles of pixel data. If the multicast
+ update interval has expired and there were multicast framebuffer
+ update requests, the server sends out the update via UDP multicast to
+ the multicast destination it has notified the client about. If at
+ this point no updates were pending because the server's framebuffer
+ did not change, it instead sends an empty MulticastFramebufferUpdate
+ heartbeat message containing no rectangles.
 
  To allow any kind of multicast client and to be as flexible as
  possible, the server is required to keep track of which combinations
@@ -162,9 +164,9 @@
  in each of the update's rectangles.
 
  Since multicast is based on UDP datagrams with a fixed maximum size,
- the whole update may have to be packed into several UDP packets.
+ the whole update may have to be packed into several UDP datagrams.
  Therefore the framebuffer contents are sent using (maybe several)
- 'MulticastFramebufferUpdate' server to client messages (message type
+ 'MulticastFramebufferUpdate' server-to-client messages (message type
  248). These contain consecutive sequence numbers (starting with 0)
  identifying whole and partial updates. A whole update number
  identifies a response to a 'MulticastFramebufferUpdateRequest', which
