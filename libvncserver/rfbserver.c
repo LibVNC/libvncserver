@@ -3073,6 +3073,8 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     uint16_t nRects = 0;
     rfbBool otherUpdatesPending = FALSE;
     rfbBool result = TRUE;
+    uint32_t partialUpdIdSave = cl->screen->multicastPartialUpdId;
+    uint16_t wholeUpdIdSave = cl->screen->multicastWholeUpdId;
 
     /* FIXME call this here as well? */
     if(cl->screen->displayHook)
@@ -3114,14 +3116,14 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
         int y = rect.y1;
         int w = rect.x2 - x;
         int h = rect.y2 - y;
-	size_t rawSizeRect = w * h * cl->format.bitsPerPixel/8;
+	size_t maxSizeRect = w * h * 4;
 
 #ifdef MULTICAST_DEBUG
 	rfbLog("MulticastVNC DEBUG:   Rect %d at %d,%d (%d*%d = %d raw bytes)\n",
 	       nr_rect++, x, y, w, h, w*h * cl->format.bitsPerPixel/8);
 #endif
 
-	if(cl->screen->mcublen + sz_rfbFramebufferUpdateRectHeader + rawSizeRect 
+	if(cl->screen->mcublen + sz_rfbFramebufferUpdateRectHeader + maxSizeRect 
 	   > MULTICAST_UPDATE_BUF_SIZE)                 /* would overflow */
 	  {
 	    if(mfu)
@@ -3139,7 +3141,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	      }
 	    nRects = 0;
 	 
-	    if(sz_rfbMulticastFramebufferUpdateMsg + sz_rfbFramebufferUpdateRectHeader + rawSizeRect 
+	    if(sz_rfbMulticastFramebufferUpdateMsg + sz_rfbFramebufferUpdateRectHeader + maxSizeRect 
 	       <= MULTICAST_UPDATE_BUF_SIZE)            /* headers + rect fit into now empty buffer */
 	      {                                        
 		mfu = rfbPutMulticastHeader(cl, 
@@ -3252,18 +3254,21 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 		otherUpdatesPending = TRUE;
 		break;
 	      } 
-	if(!otherUpdatesPending)
+	if(otherUpdatesPending) {
+	  /* reset sequence numbers */
+	  cl->screen->multicastWholeUpdId = wholeUpdIdSave;
+	  cl->screen->multicastPartialUpdId = partialUpdIdSave;
+	}
+	else /* all done */
 	  sraRgnMakeEmpty(cl->screen->multicastUpdateRegion);
       }
 
     UNLOCK(cl->screen->multicastUpdateMutex);
 
-  
     if (!cl->enableCursorShapeUpdates) {
       rfbHideCursor(cl);
     }
   
- 
     sraRgnDestroy(updateRegion);
 
     return result;
