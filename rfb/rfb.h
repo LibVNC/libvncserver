@@ -373,7 +373,7 @@ typedef struct _rfbScreenInfo
     SOCKET  multicastSock;
     struct sockaddr_storage multicastSockAddr;
     /*
-     * the constraints for MULTICAT_UPDATE_BUF_SIZE are the same as for UPDATE_BUF_SIZE 
+     * the constraints for MULTICAST_UPDATE_BUF_SIZE are the same as for UPDATE_BUF_SIZE 
      * (see comment there), additionally, it _must_ fit into a UDP packet
      */
 #define MULTICAST_UPDATE_BUF_SIZE 60000
@@ -381,9 +381,9 @@ typedef struct _rfbScreenInfo
     int  mcublen;
     uint16_t multicastWholeUpdId;
     uint32_t multicastPartialUpdId;
-#define MULTICAST_MAX_CONCURRENT_PIXELFORMATS 256 /* could be up to 65535 */
+#define MULTICAST_MAX_CONCURRENT_PIXELFORMATS 256 
     char multicastUpdPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
-    char multicastUpdPendingForEncoding[1]; /* since non-pseudo encodings are < 256 */
+    char multicastUpdPendingForEncoding[32]; /* since non-pseudo encodings are all < 256 */
     rfbBool multicastUseCopyRect;  /* all multicast clients support CopyRect */
     sraRegionPtr multicastUpdateRegion;
 #define MULTICAST_PART_UPD_RGN_BUF_SIZE 10000
