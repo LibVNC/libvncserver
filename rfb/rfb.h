@@ -363,6 +363,7 @@ typedef struct _rfbScreenInfo
     
     /* multicast stuff */
     rfbBool multicastVNC;
+    rfbBool multicastVNCdoNACK;
     char*   multicastAddr;
     int     multicastPort;
     char    multicastTTL;
@@ -382,6 +383,8 @@ typedef struct _rfbScreenInfo
     char multicastUpdPendingForEncoding[1]; /* since non-pseudo encodings are < 256 */
     rfbBool multicastUseCopyRect;  /* all multicast clients support CopyRect */
     sraRegionPtr multicastUpdateRegion;
+#define MULTICAST_PART_UPD_RGN_BUF_SIZE 10000
+    void* multicastPartUpdRgnBuf;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     MUTEX(multicastOutputMutex);
     MUTEX(multicastUpdateMutex);

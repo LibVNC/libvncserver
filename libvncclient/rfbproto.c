@@ -355,6 +355,7 @@ DefaultSupportedMessagesMulticastVNC(rfbClient* client)
 {
     DefaultSupportedMessages(client);
     SetClient2Server(client, rfbMulticastFramebufferUpdateRequest);
+    SetClient2Server(client, rfbMulticastFramebufferUpdateNACK);
     /* technically, we only care what we can *send* to the server */
     SetServer2Client(client, rfbMulticastFramebufferUpdate);
 }
@@ -1305,6 +1306,28 @@ SendMulticastFramebufferUpdateRequest(rfbClient* client, rfbBool incremental)
 }
 
 
+/*
+ * SendMulticastFramebufferUpdateNACK.
+ */
+
+rfbBool
+SendMulticastFramebufferUpdateNACK(rfbClient* client, uint32_t idPartialUpd, uint16_t nPartialUpds)
+{
+  rfbMulticastFramebufferUpdateNACKMsg mfun;
+
+  if (!SupportsClient2Server(client, rfbMulticastFramebufferUpdateNACK)) return TRUE;
+
+  mfun.type = rfbMulticastFramebufferUpdateNACK;
+  mfun.idPartialUpd = rfbClientSwap32IfLE(idPartialUpd);
+  mfun.nPartialUpds = rfbClientSwap16IfLE(nPartialUpds);
+
+  if (!WriteToRFBServer(client, (char *)&mfun, sz_rfbMulticastFramebufferUpdateNACKMsg))
+    return FALSE;
+
+  return TRUE;
+}
+
+
 
 /*
  * SendScaleSetting.
@@ -1519,23 +1542,30 @@ HandleRFBServerMessage(rfbClient* client)
 	      msg.mfu.idPartialUpd = rfbClientSwap32IfLE(msg.mfu.idPartialUpd);
 	      msg.mfu.nRects = rfbClientSwap16IfLE(msg.mfu.nRects);	      
 	      
-	      /* calculate lost packets from sequence numbers */
+	      /* calculate lost partial updates from sequence numbers */
 	      client->multicastRcvd++;
 	      if(client->multicastLastWholeUpd >= 0) /* only check on the second and later runs */
 		{
-		  /* it can happen that we get a mis-ordered packet 
+		  /* it can happen that we get a mis-ordered partial update 
 		     with a sequence number near to overflow, consider a succession of
 		     (1021, 0, 1022, 1) in a [0...1023] example seq.no. range */
 		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 0x0FFF0000)
 		    client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
 
-		  /* packets missing */
-		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1)
+		  /* partial update missing */
+		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1) {
 		    client->multicastLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
 
-		  /* if a packet arrives out of order (with a lower sequence number than the last, 
-		     but not _much_ lower, as this would be a wrap-around), it was counted as lost 
-		     before, so revert this  */
+		    /* tell server about missing partial updates */
+		    if(client->multicastVNCdoNACK) 
+		      SendMulticastFramebufferUpdateNACK(client, 
+							 client->multicastLastPartialUpd+1,
+							 msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1));
+		  }
+
+		  /* if a partial update arrives out of order (with a lower sequence number than the 
+		     last, but not _much_ lower, as this would be a wrap-around), it was counted as 
+		     lost before, so revert this  */
 		  if(msg.mfu.idPartialUpd < client->multicastLastPartialUpd &&
 		     client->multicastLastPartialUpd - msg.mfu.idPartialUpd < 0x0FFF0000)
 		    client->multicastLost--;

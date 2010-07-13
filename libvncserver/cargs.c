@@ -100,6 +100,7 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	    rfbScreen->permitFileTransfer = TRUE;
 	} else if (strcmp(argv[i], "-multicast") == 0) {   /* -multicast */
 	    rfbScreen->multicastVNC = TRUE;
+	    rfbScreen->multicastVNCdoNACK = TRUE;
         } else if (strcmp(argv[i], "-rfbversion") == 0) {  /* -rfbversion 3.6  */
             if (i + 1 >= *argc) {
 		rfbUsage();

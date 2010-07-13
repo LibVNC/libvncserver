@@ -15,6 +15,7 @@
 #endif
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
+#include "partialupdateregionbuf.h"
 #include "private.h"
 
 #include <stdarg.h>
@@ -819,6 +820,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->udpClient=NULL;
 
    screen->multicastVNC=FALSE;
+   screen->multicastVNCdoNACK=FALSE;
    screen->multicastSock=-1;
    /* next one is some random default out of the AD-HOC Block (224.0.2.0/24 - 224.0.255.0/24) see RFC 3171 */
    screen->multicastAddr="224.0.42.138";
@@ -829,6 +831,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    INIT_MUTEX(screen->multicastOutputMutex);
    INIT_MUTEX(screen->multicastUpdateMutex);
    screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
+   screen->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE);
    screen->multicastUseCopyRect = TRUE;  
 
    screen->maxFd=0;
@@ -952,6 +955,9 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
   sraRgnDestroy(screen->multicastUpdateRegion);  
   screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
 
+  partUpdRgnBufDestroy(screen->multicastPartUpdRgnBuf);
+  screen->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE);
+
   rfbInitServerFormat(screen, bitsPerSample);
 
   if (memcmp(&screen->serverFormat, &old_format,
@@ -1019,6 +1025,7 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   TINI_MUTEX(screen->multicastOutputMutex);
   TINI_MUTEX(screen->multicastUpdateMutex);
   sraRgnDestroy(screen->multicastUpdateRegion);  
+  partUpdRgnBufDestroy(screen->multicastPartUpdRgnBuf);
 
   rfbRRECleanup(screen);
   rfbCoRRECleanup(screen);

@@ -31,7 +31,9 @@
 #include <string.h>
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
+#include "partialupdateregionbuf.h"
 #include "private.h"
+
 
 #ifdef LIBVNCSERVER_HAVE_FCNTL_H
 #include <fcntl.h>
@@ -899,6 +901,7 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     /*rfbSetBit(msgs.client2server, rfbKeyFrameRequest); */
     rfbSetBit(msgs.client2server, rfbPalmVNCSetScaleFactor);
     rfbSetBit(msgs.client2server, rfbMulticastFramebufferUpdateRequest);
+    rfbSetBit(msgs.client2server, rfbMulticastFramebufferUpdateNACK);
 
     rfbSetBit(msgs.server2client, rfbFramebufferUpdate);
     rfbSetBit(msgs.server2client, rfbSetColourMapEntries);
@@ -2336,6 +2339,60 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	return;
     }
 
+    case rfbMulticastFramebufferUpdateNACK:
+    {
+	partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
+	uint32_t firstInBuf = partUpdRgnBufAt(buf, 0)->idPartial;
+
+        if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
+			      sz_rfbMulticastFramebufferUpdateNACKMsg-1)) <= 0) {
+            if (n != 0)
+                rfbLogPerror("rfbProcessClientNormalMessage: read");
+            rfbCloseClient(cl);
+            return;
+        }
+
+	msg.mfun.idPartialUpd = Swap32IfLE(msg.mfun.idPartialUpd);
+	msg.mfun.nPartialUpds = Swap16IfLE(msg.mfun.nPartialUpds);
+
+#ifdef MULTICAST_DEBUG
+	rfbLog("MulticastVNC DEBUG: got NACK from client %p: %d and %d more missing\n",
+	       cl, msg.mfun.idPartialUpd, msg.mfun.nPartialUpds);
+#endif
+
+        rfbStatRecordMessageRcvd(cl, msg.type, 
+				 sz_rfbMulticastFramebufferUpdateNACKMsg,
+				 sz_rfbMulticastFramebufferUpdateNACKMsg);
+
+	/* if NACK is disabled, process the msg, but do not act upon it */
+	if(!cl->screen->multicastVNCdoNACK)
+	  return;
+
+	LOCK(cl->screen->multicastUpdateMutex);
+
+	/* check if this partial update is in the buffer */
+	if(msg.mfun.idPartialUpd >= firstInBuf && msg.mfun.idPartialUpd < firstInBuf + buf->len) {
+	  uint32_t pos = msg.mfun.idPartialUpd - firstInBuf;
+	  uint32_t i;
+
+	  /* mark the lost partial updates's regions as modified */
+	  for(i = pos; i < pos+msg.mfun.nPartialUpds && i < buf->len; ++i) 
+	    sraRgnOr(cl->screen->multicastUpdateRegion, partUpdRgnBufAt(buf, i)->region);
+
+	  /* mark this pixelformat and encoding as requested */
+	  rfbSetBit(cl->screen->multicastUpdPendingForPixelformat, cl->multicastPixelformatId);
+	  rfbSetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredEncoding);
+	}
+#ifdef MULTICAST_DEBUG
+	else
+	  rfbLog("MulticastVNC DEBUG: NACKed region not in buffer!\n");
+#endif	
+
+	UNLOCK(cl->screen->multicastUpdateMutex);
+	
+	return;
+    }
+
     case rfbKeyEvent:
 
 	if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
@@ -3057,7 +3114,7 @@ updateFailed:
 
 /*
  * rfbSendMulticastFramebufferUpdate - send the currently pending framebuffer update to
- * the RFB client via multicast.
+ * the RFB clients via multicast.
  * givenUpdateRegion is not changed.
  */
 
@@ -3143,7 +3200,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	 
 	    if(sz_rfbMulticastFramebufferUpdateMsg + sz_rfbFramebufferUpdateRectHeader + maxSizeRect 
 	       <= MULTICAST_UPDATE_BUF_SIZE)            /* headers + rect fit into now empty buffer */
-	      {                                        
+	      {  
 		mfu = rfbPutMulticastHeader(cl, 
 					    cl->screen->multicastWholeUpdId,
 					    cl->screen->multicastPartialUpdId++,
@@ -3170,13 +3227,10 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 						0);
 		   
 		    if(offs*linesPerUpd + linesPerUpd <= h)
-		      {
 			nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+offs*linesPerUpd, w, linesPerUpd);
-		      }
 		    else
-		      {
 			nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+offs*linesPerUpd, w, h - offs*linesPerUpd);
-		      }
+
 		    mfu->nRects = Swap16IfLE(nRects);
 
 #ifdef MULTICAST_DEBUG
@@ -3200,6 +3254,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 					  cl->screen->multicastWholeUpdId,
 					  cl->screen->multicastPartialUpdId++,
 					  0);
+	    
 	    nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
 #ifdef MULTICAST_DEBUG
 	    rfbLog("MulticastVNC DEBUG:   put rect into buffer(now %d), now %d in there\n", cl->screen->mcublen, nRects);
@@ -3281,6 +3336,14 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 rfbMulticastFramebufferUpdateMsg *
 rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUpd, uint16_t nRects)
 {
+  if(cl->screen->multicastVNCdoNACK) {
+    partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
+    partialUpdRegion tmp;
+    tmp.idPartial = idPartialUpd;
+    tmp.region = sraRgnCreate();
+    partUpdRgnBufInsert(buf, tmp);
+  }
+
   rfbMulticastFramebufferUpdateMsg *mfu =
     (rfbMulticastFramebufferUpdateMsg *)cl->screen->multicastUpdateBuf;
 
@@ -3309,6 +3372,14 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
 int 
 rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h)
 {
+  if(cl->screen->multicastVNCdoNACK) {
+    partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
+    sraRegionPtr tmp = sraRgnCreateRect(x, y, x+w, y+h);
+    partialUpdRegion* lastone = partUpdRgnBufAt(buf, partUpdRgnBufCount(buf)-1); 
+    sraRgnOr(lastone->region, tmp);
+    sraRgnDestroy(tmp);
+  }
+
   switch (cl->preferredEncoding) {
   /*
       case rfbEncodingRRE:

@@ -399,6 +399,7 @@ typedef struct {
 /* PalmVNC 1.4 & 2.0 SetScale Factor message */
 #define rfbPalmVNCSetScaleFactor 0xF
 #define rfbMulticastFramebufferUpdateRequest 249
+#define rfbMulticastFramebufferUpdateNACK 247
 
 
 
@@ -1268,6 +1269,20 @@ typedef struct {
 
 #define sz_rfbMulticastFramebufferUpdateRequestMsg 2
 
+/*-----------------------------------------------------------------------------
+ * MulticastFramebufferUpdateNACK - indicate that the specified partial 
+ * multicast updates were missing. 
+ */
+
+typedef struct {
+    uint8_t type;			/* always rfbMulticastFramebufferUpdateNACK */
+    uint8_t pad;
+    uint16_t nPartialUpds;              /* number of missing partial updates */
+    uint32_t idPartialUpd;              /* id of first missing partial update */
+} rfbMulticastFramebufferUpdateNACKMsg;
+
+#define sz_rfbMulticastFramebufferUpdateNACKMsg 8
+
 
 
 /*-----------------------------------------------------------------------------
@@ -1429,6 +1444,7 @@ typedef union {
 	rfbSetSWMsg sw;
 	rfbTextChatMsg tc;
         rfbMulticastFramebufferUpdateRequestMsg mfur;
+        rfbMulticastFramebufferUpdateNACKMsg mfun;
 } rfbClientToServerMsg;
 
 /* 
