@@ -1,3 +1,5 @@
+- add autoconf detection of used functions.
+
 - implement server throttling
 
 - verify sender address+port in  ReadFromRFBServerMulticast()?
@@ -37,6 +39,7 @@
       rfbSendFramebufferUpdate(). Then we would need to turn of
       cl->lastrectenabled in the multicast case and re-enable it later
       on
+
 
 
 
