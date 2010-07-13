@@ -60,7 +60,8 @@
 #         sslrepeater://host:port.
 #
 # -showcert  Only fetch the certificate using the 'openssl s_client'
-#            command (openssl(1) must in installed).
+#            command (openssl(1) must in installed).  On ssvnc 1.0.27 and
+#            later the bundled command 'ultravnc_dsm_helper' is used.
 #
 #    See http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-ca for details on
 #    SSL certificates with VNC.
@@ -273,6 +274,8 @@ do
 	"-sshargs")	shift; ssh_args="$1"
                 ;;
 	"-anondh")	ciphers="ciphers=$anondh"
+			ULTRAVNC_DSM_HELPER_SHOWCERT_ADH=1
+			export ULTRAVNC_DSM_HELPER_SHOWCERT_ADH
 			anondh_set=1
                 ;;
 	"-ciphers")	shift; ciphers="ciphers=$1"
@@ -382,7 +385,9 @@ if [ "X$reverse" != "X" ]; then
 			echo "*Warning*: -listen and a single proxy/gateway does not make sense."
 			sleep 2
 		fi
-		SSVNC_LISTEN_ONCE=1; export SSVNC_LISTEN_ONCE
+
+		# we now try to PPROXY_LOOP_THYSELF, set this var to disable that.
+		#SSVNC_LISTEN_ONCE=1; export SSVNC_LISTEN_ONCE
 	fi
 fi
 if [ "X$ssh_cmd" = "X" ]; then
@@ -398,6 +403,23 @@ shift
 dL="-L"
 if uname -sr | egrep 'SunOS 5\.[5-8]' > /dev/null; then
 	dL="-h"
+fi
+
+have_uvnc_dsm_helper_showcert=""
+if [ "X$showcert" = "X1" -a "X$SSVNC_USE_S_CLIENT" = "X" -a "X$reverse" = "X" ]; then
+	if type ultravnc_dsm_helper >/dev/null 2>&1; then
+		if ultravnc_dsm_helper -help 2>&1 | grep -w showcert >/dev/null; then
+			have_uvnc_dsm_helper_showcert=1
+		fi
+	fi
+fi
+have_uvnc_dsm_helper_ipv6=""
+if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
+	if type ultravnc_dsm_helper >/dev/null 2>&1; then
+		if ultravnc_dsm_helper -help 2>&1 | grep -iw ipv6 >/dev/null; then
+			have_uvnc_dsm_helper_ipv6=1
+		fi
+	fi
 fi
 
 rchk() {
@@ -520,12 +542,6 @@ if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
 	fi
 fi
 
-# (possibly) tell the vncviewer to only listen on lo: 
-if [ "X$reverse" != "X" -a "X$direct_connect" = "X" ]; then
-	VNCVIEWER_LISTEN_LOCALHOST=1
-	export VNCVIEWER_LISTEN_LOCALHOST
-fi
-
 # rsh mode is an internal/secret thing only I use.
 rsh=""
 if echo "$orig" | grep '^rsh://' > /dev/null; then
@@ -551,10 +567,117 @@ else
 fi
 
 # extract host and disp number:
-host=`echo "$orig" | awk -F: '{print $1}'`
-disp=`echo "$orig" | awk -F: '{print $2}'`
+
+# try to see if it is ipv6 address:
+ipv6=0
+if echo "$orig" | grep '\[' > /dev/null; then
+	# ipv6 [fe80::219:dbff:fee5:3f92%eth1]:5900
+	host=`echo "$orig" | sed -e 's/\].*$//' -e 's/\[//'`
+	disp=`echo "$orig" | sed -e 's/^.*\]://'`
+	ipv6=1
+elif echo "$orig" | grep ':..*:' > /dev/null; then
+	# ipv6 fe80::219:dbff:fee5:3f92%eth1:5900
+	host=`echo "$orig" | sed -e 's/:[^:]*$//'`
+	disp=`echo "$orig" | sed -e 's/^.*://'`
+	ipv6=1
+else
+	# regular host:port
+	host=`echo "$orig" | awk -F: '{print $1}'`
+	disp=`echo "$orig" | awk -F: '{print $2}'`
+fi
+
+if [ "X$reverse" != "X" -a "X$STUNNEL_LISTEN" = "X" -a "X$host" != "X" ]; then
+	STUNNEL_LISTEN=$host
+	echo "set STUNNEL_LISTEN=$STUNNEL_LISTEN"
+fi
+
 if [ "X$host" = "X" ]; then
 	host=$localhost
+fi
+
+if [ "X$SSVNC_IPV6" = "X0" ]; then
+	# disable checking for it.
+	ipv6=0
+#elif [ "X$reverse" != "X" -a "X$ipv6" = "X1" ]; then
+#	ipv6=0
+elif [ "X$ipv6" = "X1" ]; then
+	:
+elif echo "$host" | grep '^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' > /dev/null; then
+	:
+else
+	# regular hostname, can't be sure...
+	gout=""
+	if type getent > /dev/null 2>/dev/null; then
+		gout=`getent hosts "$host" 2>/dev/null`
+	fi
+	if echo "$gout" | grep ':.*:' > /dev/null; then
+		if echo "$gout" | grep '^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' > /dev/null; then
+			:
+		else
+			echo "ipv6: "`echo "$gout" | grep ':.*:' | head -n 1`
+			ipv6=1
+		fi
+	fi
+	if [ "X$ipv6" = "X0" ]; then
+		hout=""
+		if type host > /dev/null 2>/dev/null; then
+			host "$host" >/dev/null 2>&1
+			host "$host" >/dev/null 2>&1
+			hout=`host "$host" 2>/dev/null`
+		fi
+		if echo "$hout" | grep -i 'has ipv6 address' > /dev/null; then
+			if echo "$hout" | grep -i 'has address' > /dev/null; then
+				:
+			else
+				echo "ipv6: "`echo "$hout" | grep -i 'has ipv6 address' | head -n 1`
+				ipv6=1
+			fi
+		fi
+	fi
+	if [ "X$ipv6" = "X0" ]; then
+		dout=""
+		if type dig > /dev/null 2>/dev/null; then
+		dout=`dig -t any "$host" 2>/dev/null`
+		fi
+		if echo "$dout" | grep -i "^$host" | grep '[ 	]AAAA[ 	]' > /dev/null; then
+			if echo "$dout" | grep -i "^$host" | grep '[ 	]A[ 	]' > /dev/null; then
+				:
+			else
+				echo "ipv6: "`echo "$dout" | grep -i '[ 	]AAAA[ 	]' | head -n 1`
+				ipv6=1
+			fi
+		fi
+	fi
+	if [ "X$ipv6" = "X0" ]; then
+		sout=`env LOOKUP="$host" \
+		      perl -e '	eval {use Socket};  exit 0 if $@;
+				eval {use Socket6}; exit 0 if $@;
+				@res = getaddrinfo($ENV{LOOKUP}, "daytime", AF_UNSPEC, SOCK_STREAM);
+				$ipv4 = 0;
+				$ipv6 = 0;
+				$ip6 = "";
+				while (scalar(@res) >= 5) {
+					($family, $socktype, $proto, $saddr, $canon, @res) = @res;
+					$ipv4 = 1 if $family == AF_INET;
+					$ipv6 = 1 if $family == AF_INET6;
+					if ($family == AF_INET6 && $ip6 eq "") {
+						my ($host, $port) = getnameinfo($saddr, NI_NUMERICHOST | NI_NUMERICSERV);
+						$ip6 = $host;
+					}
+				}
+				if (! $ipv4 && $ipv6) {
+					print "AF_INET6_ONLY: $ENV{LOOKUP}: $ip6\n";
+				}
+				exit 0;
+			' 2>/dev/null`
+		if echo "$sout" | grep AF_INET6_ONLY > /dev/null; then
+			echo "$sout"
+			ipv6=1
+		fi
+	fi
+fi
+if [ "X$ipv6" = "X1" ]; then
+	echo "ipv6: addr=$host disp=$disp"
 fi
 if [ "X$disp" = "X" ]; then
 	port=""	# probably -listen mode.
@@ -571,6 +694,29 @@ elif [ $disp -lt 200 ]; then
 else
 	# otherwise use the number directly, e.g. 443, 2345
 	port=$disp
+fi
+
+if [ "X$ipv6" = "X1" -a "X$direct_connect" = "X1" ]; then
+	if [ "X$proxy" = "X" -a "X$reverse" = "X" ]; then
+		if [ "X$SSVNC_ULTRA_DSM" != "X" -a "X$have_uvnc_dsm_helper_ipv6" = "X1" ]; then
+			:
+		elif [ "X$SSVNC_NO_IPV6_PROXY" != "X" ]; then
+			:
+		elif [ "X$SSVNC_NO_IPV6_PROXY_DIRECT" != "X" ]; then
+			:
+		else
+			proxy="ipv6://$host:$port"
+			echo "direct connect: set proxy=$proxy"
+		fi
+	fi
+fi
+
+# (possibly) tell the vncviewer to only listen on lo: 
+if [ "X$reverse" != "X" ]; then
+	if [ "X$direct_connect" = "X" -o "X$proxy" != "X" -o "X$STUNNEL_LISTEN" != "X" ]; then
+		VNCVIEWER_LISTEN_LOCALHOST=1
+		export VNCVIEWER_LISTEN_LOCALHOST
+	fi
 fi
 
 # try to find an open listening port via netstat(1):
@@ -787,6 +933,60 @@ pcode() {
 
 use IO::Socket::INET;
 
+my $have_inet6 = "";
+eval "use IO::Socket::INET6;";
+$have_inet6 = 1 if $@ eq "";
+
+#my $have_sock6 = "";
+#eval "use Socket; use Socket6;";
+#$have_sock6 = 1 if $@ eq "";
+
+if (exists $ENV{PPROXY_LOOP_THYSELF}) {
+	# used for reverse vnc, run a repeating outer loop.
+	print STDERR "PPROXY_LOOP: $ENV{PPROXY_LOOP_THYSELF}\n";
+	my $rm = $ENV{PPROXY_REMOVE};
+	my $lp = $ENV{PPROXY_LOOP_THYSELF};
+	delete $ENV{PPROXY_REMOVE};
+	delete $ENV{PPROXY_LOOP_THYSELF};
+	$ENV{PPROXY_LOOP_THYSELF_MASTER} = $$;
+	my $pid = $$;
+	my $dbg = 0;
+	my $c = 0;
+	use POSIX ":sys_wait_h";
+	while (1) {
+		$pid = fork();
+		last if ! defined $pid;
+		if ($pid eq "0") {
+			last;
+		}
+		$c++;
+		print STDERR "\nPPROXY_LOOP: pid=$$ child=$pid count=$c\n";
+		while (1) {
+			waitpid(-1, WNOHANG);
+			fsleep(0.25);
+			if (! kill 0, $pid) {
+				print STDERR "PPROXY_LOOP: child=$pid gone.\n";
+				last;
+			}
+			print STDERR "PPROXY_LOOP: child=$pid alive.\n" if $dbg;
+			if (! -f $lp) {
+				print STDERR "PPROXY_LOOP: flag file $lp gone, killing $pid\n";
+				kill TERM, $pid;
+				fsleep(0.1);
+				wait;
+				last;
+			}
+			print STDERR "PPROXY_LOOP: file exists $lp\n" if $dbg;
+		}
+		last if ! -f $lp;
+		fsleep(0.25);
+	}
+	if ($pid ne "0") {
+		unlink($0) if $rm;
+		exit 0;
+	}
+}
+
 if (exists $ENV{PPROXY_SLEEP} && $ENV{PPROXY_SLEEP} > 0) {
 	print STDERR "PPROXY_PID: $$\n";
 	sleep $ENV{PPROXY_SLEEP};
@@ -835,7 +1035,7 @@ if (exists $ENV{SSVNC_PREDIGESTED_HANDSHAKE})  {
 }
 
 my $have_gettimeofday = 0;
-eval "use Time::HiRes";
+eval "use Time::HiRes;";
 if ($@ eq "") {
 	$have_gettimeofday = 1;
 }
@@ -851,6 +1051,8 @@ my $listen_handle = "";
 my $sock = "";
 my $parent = $$;
 
+my $initial_data = "";
+
 if ($ENV{PPROXY_VENCRYPT_VIEWER_BRIDGE}) {
 	my ($from, $to) = split(/,/, $ENV{PPROXY_VENCRYPT_VIEWER_BRIDGE});
 	do_vencrypt_viewer_bridge($from, $to);
@@ -862,7 +1064,11 @@ my ($mode_1st, $mode_2nd, $mode_3rd) = ("", "", "");
 
 ($first, $mode_1st) = url_parse($first);
 
-my ($proxy_host, $proxy_port) = split(/:/, $first);
+my ($proxy_host, $proxy_port) = ($first, "");
+if ($proxy_host =~ /^(.*):(\d+)$/) {
+	$proxy_host = $1;
+	$proxy_port = $2;
+}
 my $connect = $ENV{PPROXY_DEST};
 
 if ($second ne "") {
@@ -875,14 +1081,20 @@ if ($third ne "") {
 
 
 print STDERR "\n";
-print STDERR "PPROXY v0.3: a tool for Web, SOCKS, and UltraVNC proxies and VeNCrypt bridging.\n";
+print STDERR "PPROXY v0.4: a tool for Web, SOCKS, and UltraVNC proxies and for\n";
+print STDERR "PPROXY v0.4: IPv6 and VNC VeNCrypt bridging.\n";
 print STDERR "proxy_host:       $proxy_host\n";
 print STDERR "proxy_port:       $proxy_port\n";
 print STDERR "proxy_connect:    $connect\n";
 print STDERR "pproxy_params:    $ENV{PPROXY_PROXY}\n";
 print STDERR "pproxy_listen:    $ENV{PPROXY_LISTEN}\n";
 print STDERR "pproxy_reverse:   $ENV{PPROXY_REVERSE}\n";
+print STDERR "io_socket_inet6:  $have_inet6\n";
 print STDERR "\n";
+if (! $have_inet6) {
+	print STDERR "PPROXY: To enable IPv6 connections, install the IO::Socket::INET6 perl module.\n\n";
+}
+
 if (1) {
 	print STDERR "pproxy 1st: $first\t- $mode_1st\n";
 	print STDERR "pproxy 2nd: $second\t- $mode_2nd\n";
@@ -897,15 +1109,29 @@ sub pdie {
 }
 
 if ($ENV{PPROXY_REVERSE} ne "") {
-	my ($rhost, $rport) = split(/:/, $ENV{PPROXY_REVERSE});
+	my ($rhost, $rport) = ($ENV{PPROXY_REVERSE}, "");
+	if ($rhost =~ /^(.*):(\d+)$/) {
+		$rhost = $1;
+		$rport = $2;
+	}
 	$rport = 5900 unless $rport;
+	my $emsg = "";
 	$listen_handle = IO::Socket::INET->new(
 		PeerAddr => $rhost,
 		PeerPort => $rport,
 		Proto => "tcp"
 	);
+	$emsg = $!;
+	if (! $listen_handle && $have_inet6) {
+		eval {$listen_handle = IO::Socket::INET6->new(
+			PeerAddr => $rhost,
+			PeerPort => $rport,
+			Proto => "tcp"
+		);};
+		$emsg .= " / $!";
+	}
 	if (! $listen_handle) {
-		pdie "pproxy: $! -- PPROXY_REVERSE\n";
+		pdie "pproxy: $emsg -- PPROXY_REVERSE\n";
 	}
 	print STDERR "PPROXY_REVERSE: connected to $rhost $rport\n";
 
@@ -914,27 +1140,75 @@ if ($ENV{PPROXY_REVERSE} ne "") {
 	my $maxtry = 12;
 	my $sleep = 5;
 	my $p2 = "";
+	my $emsg = "";
 	for (my $i=0; $i < $maxtry; $i++)  {
-		if ($ENV{PPROXY_LISTEN} =~ /^INADDR_ANY:(.*)/) {
-			my $p = $1;
-			$p2 = "*:$p";
+		my ($if, $p) = ("", $ENV{PPROXY_LISTEN});
+		if ($p =~ /^(.*):(\d+)$/) {
+			$if = $1;
+			$p = $2;
+		}
+		$p2 = "*:$p";
+		if ($if eq "") {
+			$if = "localhost";
+		}
+		print STDERR "pproxy interface: $if\n";
+
+		$emsg = "";
+		if (($if eq "INADDR_ANY6" || $if eq "::") && $have_inet6) {
+			eval {$listen_sock = IO::Socket::INET6->new(
+				Listen    => 2,
+				ReuseAddr => 1,
+				Domain    => AF_INET6,
+				LocalAddr => "::",
+				LocalPort => $p,
+				Proto     => "tcp"
+			);};
+			$p2 = ":::$p";
+		} elsif ($if =~ /^INADDR_ANY/) {
 			$listen_sock = IO::Socket::INET->new(
 				Listen    => 2,
+				ReuseAddr => 1,
 				LocalPort => $p,
 				Proto     => "tcp"
 			);
+		} elsif (($if eq "INADDR_LOOPBACK6" || $if eq "::1") && $have_inet6) {
+			$p2 = "::1:$p";
+			eval {$listen_sock = IO::Socket::INET6->new(
+				Listen    => 2,
+				ReuseAddr => 1,
+				Domain    => AF_INET6,
+				LocalAddr => "::1",
+				LocalPort => $p,
+				Proto     => "tcp"
+			);};
+			$p2 = "::1:$p";
 		} else {
-			$p2 = "localhost:$ENV{PPROXY_LISTEN}";
+			$p2 = "$if:$p";
 			$listen_sock = IO::Socket::INET->new(
 				Listen    => 2,
-				LocalAddr => "127.0.0.1",
-				LocalPort => $ENV{PPROXY_LISTEN},
+				ReuseAddr => 1,
+				LocalAddr => $if,
+				LocalPort => $p,
 				Proto     => "tcp"
 			);
+			$emsg = $!;
+			
+			if (! $listen_sock && $have_inet6) {
+				print STDERR "PPROXY_LISTEN: retry with INET6\n";
+				eval {$listen_sock = IO::Socket::INET6->new(
+					Listen    => 2,
+					ReuseAddr => 1,
+					Domain    => AF_INET6,
+					LocalAddr => $if,
+					LocalPort => $p,
+					Proto     => "tcp"
+				);};
+				$emsg .= " / $!";
+			}
 		}
 		if (! $listen_sock) {
 			if ($i < $maxtry - 1) {
-				warn "pproxy: $!\n";
+				warn "pproxy: $emsg $!\n";
 				warn "Could not listen on port $p2, retrying in $sleep seconds... (Ctrl-C to quit)\n";
 				sleep $sleep;
 			}
@@ -943,7 +1217,7 @@ if ($ENV{PPROXY_REVERSE} ne "") {
 		}
 	}
 	if (! $listen_sock) {
-		pdie "pproxy: $! -- PPROXY_LISTEN\n";
+		pdie "pproxy: $emsg -- PPROXY_LISTEN\n";
 	}
 	print STDERR "pproxy: listening on $p2\n";
 	my $ip;
@@ -953,6 +1227,24 @@ if ($ENV{PPROXY_REVERSE} ne "") {
 	if (! $listen_handle) {
 		pdie "pproxy: $err\n";
 	}
+
+	if ($ENV{PPROXY_LOOP_THYSELF_MASTER}) {
+		my $sml = $ENV{SSVNC_MULTIPLE_LISTEN}; 
+		if ($sml ne "" && $sml ne "0") {
+			setpgrp(0, 0);
+			if (fork()) {
+				close $viewer_sock;
+				wait;
+				exit 0;
+			}
+			if (fork()) {
+				close $viewer_sock;
+				exit 0;
+			}
+			setpgrp(0, 0);
+			$parent = $$;
+		}
+	}
 }
 
 $sock = IO::Socket::INET->new(
@@ -961,15 +1253,27 @@ $sock = IO::Socket::INET->new(
 	Proto => "tcp"
 );
 
+my $err = "";
+
+if (! $sock && $have_inet6) {
+	$err = $!;
+
+	eval {$sock = IO::Socket::INET6->new(
+		PeerAddr => $proxy_host,
+		PeerPort => $proxy_port,
+		Proto => "tcp"
+	);};
+	$err .= " / $!";
+}
+
 if (! $sock) {
-	my $err = $!;
 	unlink($0) if $ENV{PPROXY_REMOVE};
 	pdie "pproxy: $err\n";
 }
 
 unlink($0) if $ENV{PPROXY_REMOVE};
 
-if ($ENV{PPROXY_PROXY} =~ /^vencrypt:/ && $ENV{PPROXY_LISTEN} =~ /^INADDR_ANY:/) {
+if ($ENV{PPROXY_PROXY} =~ /^vencrypt:/ && $ENV{PPROXY_VENCRYPT_REVERSE}) {
 	print STDERR "\nPPROXY: vencrypt+reverse: swapping listen socket with connect socket.\n";
 	my $tmp_swap = $sock;
 	$sock = $listen_handle;
@@ -1091,10 +1395,24 @@ sub xfer_both {
 	} else {
 		select(undef, undef, undef, 0.05);
 		if ($listen_handle) {
-			print STDERR "pproxy child [$$]  socket -> listen_handle\n\n";
+			print STDERR "pproxy child [$$]  socket -> listen_handle\n";
+			if ($initial_data ne "") {
+				my $len = length $initial_data;
+				print STDERR "pproxy child [$$]  sending initial_data, length $len\n\n";
+				syswrite($listen_handle, $initial_data, $len);
+			} else {
+				print STDERR "\n";
+			}
 			xfer($sock, $listen_handle);
 		} else {
-			print STDERR "pproxy child [$$]  socket -> STDOUT\n\n";
+			print STDERR "pproxy child [$$]  socket -> STDOUT\n";
+			if ($initial_data ne "") {
+				my $len = length $initial_data;
+				print STDERR "pproxy child [$$]  sending initial_data, length $len\n\n";
+				syswrite(STDOUT, $initial_data, $len);
+			} else {
+				print STDERR "\n";
+			}
 			xfer($sock, STDOUT);
 		}
 		select(undef, undef, undef, 0.25);
@@ -1116,6 +1434,10 @@ xfer_both();
 
 exit;
 
+sub fsleep {
+	select(undef, undef, undef, shift);
+}
+
 sub url_parse {
 	my $hostport = shift;
 	my $mode = "http";
@@ -1128,11 +1450,14 @@ sub url_parse {
 	} elsif ($hostport =~ m,^https?://(\S*)$,i) {
 		$mode = "http";
 		$hostport = $1;
+	} elsif ($hostport =~ m,^ipv6://(\S*)$,i) {
+		$mode = "ipv6";
+		$hostport = $1;
 	} elsif ($hostport =~ m,^repeater://(\S*)\+(\S*)$,i) {
 		# ultravnc repeater proxy.
 		$hostport = $1;
 		$mode = "repeater:$2";
-		if ($hostport !~ /:\d+/) {
+		if ($hostport !~ /:\d+$/) {
 			$hostport .= ":5900";
 		}
 	} elsif ($hostport =~ m,^vencrypt://(\S*)$,i) {
@@ -1144,7 +1469,7 @@ sub url_parse {
 			$mode = $2;
 		}
 		$mode = "vencrypt:$m";
-		if ($hostport !~ /:\d+/) {
+		if ($hostport !~ /:\d+$/) {
 			$hostport .= ":5900";
 		}
 	}
@@ -1161,6 +1486,8 @@ sub setmode {
 		} else {
 			$ENV{PPROXY_SOCKS} = 1;
 		}
+	} elsif ($mode =~ /^ipv6/i) {
+		$ENV{PPROXY_SOCKS} = 0;
 	} elsif ($mode =~ /^repeater:(.*)/) {
 		$ENV{PPROXY_REPEATER} = $1;
 		$ENV{PPROXY_SOCKS} = "";
@@ -1180,7 +1507,11 @@ sub connection {
 
 	if ($ENV{PPROXY_SOCKS} eq "5") {
 		# SOCKS5
-		my ($h, $p) = split(/:/, $CONNECT);
+		my ($h, $p) = ($CONNECT, "");
+		if ($h =~ /^(.*):(\d+)$/) {
+			$h = $1;
+			$p = $2;
+		}
 		$con .= pack("C", 0x05);
 		$con .= pack("C", 0x01);
 		$con .= pack("C", 0x00);
@@ -1242,9 +1573,13 @@ sub connection {
 			exit(1);
 		}
 
-	} elsif ($ENV{PPROXY_SOCKS} ne "") {
+	} elsif ($ENV{PPROXY_SOCKS} eq "1") {
 		# SOCKS4 SOCKS4a
-		my ($h, $p) = split(/:/, $CONNECT);
+		my ($h, $p) = ($CONNECT, "");
+		if ($h =~ /^(.*):(\d+)$/) {
+			$h = $1;
+			$p = $2;
+		}
 		$con .= pack("C", 0x04);
 		$con .= pack("C", 0x01);
 		$con .= pack("n", $p);
@@ -1296,17 +1631,29 @@ sub connection {
 			close $sock;
 			exit(1);
 		}
+	} elsif ($ENV{PPROXY_SOCKS} eq "0") {
+		# hack for ipv6 "proxy", nothing to do, assume INET6 call worked.
+		;
 	} elsif ($ENV{PPROXY_REPEATER} ne "") {
 		my $rep = $ENV{PPROXY_REPEATER};
 		print STDERR "repeater: $rep\n";
 		$rep .= pack("x") x 250;
 		syswrite($sock, $rep, 250);
 
+		my $rfb = "";
+
 		my $ok = 1;
 		for (my $i = 0; $i < 12; $i++) {
 			my $c;
+			last if $ENV{PPROXY_GENERIC_REPEATER};
 			sysread($sock, $c, 1);
 			print STDERR $c;
+			$rfb .= $c;
+		}
+		if ($rfb ne "" && $rfb !~ /^RFB 000\.000/) {
+			$initial_data = $rfb;
+			$rfb =~ s/\n//g;
+			print STDERR "detected non-UltraVNC repeater; forwarding \"$rfb\"\nlength: ", length($initial_data), "\n";
 		}
 	} elsif ($ENV{PPROXY_VENCRYPT} ne "") {
 		my $vencrypt = $ENV{PPROXY_VENCRYPT};
@@ -1582,6 +1929,7 @@ sub do_vencrypt_viewer_bridge {
 	for (my $i=0; $i < $maxtry; $i++)  {
 		$listen_sock = IO::Socket::INET->new(
 			Listen    => 2,
+			ReuseAddr => 1,
 			LocalAddr => "127.0.0.1",
 			LocalPort => $listen,
 			Proto     => "tcp"
@@ -1605,6 +1953,23 @@ sub do_vencrypt_viewer_bridge {
 	close $listen_sock;
 	if (! $viewer_sock) {
 		die "pproxy: vencrypt_viewer_bridge[$$]: $err\n";
+	}
+	if ($ENV{PPROXY_LOOP_THYSELF_MASTER}) {
+		my $sml = $ENV{SSVNC_MULTIPLE_LISTEN}; 
+		if ($sml ne "" && $sml ne "0") {
+			setpgrp(0, 0);
+			if (fork()) {
+				close $viewer_sock;
+				wait;
+				exit 0;
+			}
+			if (fork()) {
+				close $viewer_sock;
+				exit 0;
+			}
+			setpgrp(0, 0);
+			$parent = $$;
+		}
 	}
 	print STDERR "vencrypt_viewer_bridge[$$]: viewer_sock $viewer_sock\n" if $db;
 
@@ -2055,14 +2420,24 @@ NHAFL_warning() {
 	echo "** Warning: you to manually remove a key from ~/.ssh/known_hosts.)"
 	echo "** Warning: "
 	echo "** Warning: This decreases security: a Man-In-The-Middle attack is possible."
+	echo "** Warning: For chained ssh connections the first ssh leg is secure but the"
+	echo "** Warning: 2nd ssh leg is vulnerable.  For an ssh connection going through"
+	echo "** Warning: a HTTP or SOCKS proxy the ssh connection is vulnerable."
+	echo "** Warning: "
 	echo "** Warning: You can set the SSVNC_SSH_LOCALHOST_AUTH=1 env. var. to disable" 
-	echo "** Warning: using the NoHostAuthenticationForLocalhost ssh option." 
+	echo "** Warning: using the NoHostAuthenticationForLocalhost=yes ssh option." 
 	echo "** Warning: "
 	echo "** Warning: A better solution is to configure (in the SSVNC GUI) the setting:"
 	echo "** Warning: 'Options -> Advanced -> Private SSH KnownHosts file' (or set" 
 	echo "** Warning: SSVNC_KNOWN_HOSTS_FILE directly) to a per-connection known hosts" 
-	echo "** Warning: file.  This yields a both secure and convenient solution." 
+	echo "** Warning: file.  That file holds the 'localhost' cert for this specific" 
+	echo "** Warning: connection.  This yields a both secure and convenient solution." 
 	echo "" 
+}
+
+space_expand() {
+	str=`echo "$1" | sed -e 's/%SPACE/ /g' -e 's/%TAB/\t/g'`
+	echo "$str"
 }
 
 # handle ssh case:
@@ -2243,6 +2618,7 @@ if [ "X$use_ssh" = "X1" ]; then
 
 		nd=`findfree 6600`
 		PPROXY_LISTEN=$nd; export PPROXY_LISTEN
+		# XXX no reverse forever PPROXY_LOOP_THYSELF ...
 		$ptmp &
 		sleep 1
 		if [ "X$ssh_NHAFL" != "X" -a "X$did_ssh_NHAFL" != "X1" ]; then
@@ -2304,9 +2680,14 @@ if [ "X$use_ssh" = "X1" ]; then
 		if [ "X$ssh_UKHF" != "X" ]; then 
 			ukhf="$ssh_UKHF$localhost_extra"
 		fi
-		echo "$ssh -f -x $ssh_port1 $targ -e none $ssh_NHAFL $ukhf -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
+		if echo "$ssh_host1" | grep '%' > /dev/null; then
+			uath=`space_expand "$ssh_host1"`
+		else
+			uath="$ssh_host1"
+		fi
+		echo "$ssh -f -x $ssh_port1 $targ -e none $ssh_NHAFL $ukhf -L $proxport:$ssh_host2:$ssh_port2 \"$uath\" \"sleep 30\""
 		echo ""
-		      $ssh -f -x $ssh_port1 $targ -e none $ssh_NHAFL $ukhf -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
+		      $ssh -f -x $ssh_port1 $targ -e none $ssh_NHAFL $ukhf -L $proxport:$ssh_host2:$ssh_port2 "$uath" "sleep 30"
 		ssh_args="$ssh_args $ssh_NHAFL"
 		sleep 1
 		stty sane
@@ -2367,16 +2748,21 @@ if [ "X$use_ssh" = "X1" ]; then
 		ssh_port="-p $ssh_port"
 	fi
 
+	if echo "$ssh_host" | grep '%' > /dev/null; then
+		uath=`space_expand "$ssh_host"`
+	else
+		uath="$ssh_host"
+	fi
 	if [ "X$SS_VNCVIEWER_SSH_ONLY" != "X" ]; then
-		echo "$ssh -x $ssh_port $targ $C $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x $ssh_port $targ $C $ssh_args \"$uath\" \"$info\""
 		echo ""
-		$ssh -x $ssh_port $targ $C $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x $ssh_port $targ $C $ssh_args "$uath" "$ssh_cmd"
 		exit $?
 
 	elif [ "X$SS_VNCVIEWER_NO_F" != "X" ]; then
-		echo "$ssh -x $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x $ssh_port $targ $C $ssh_redir $ssh_args \"$uath\" \"$info\""
 		echo ""
-		$ssh -x $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x $ssh_port $targ $C $ssh_redir $ssh_args "$uath" "$ssh_cmd"
 		rc=$?
 
 	elif [ "X$getport" != "X" ]; then
@@ -2392,12 +2778,12 @@ if [ "X$use_ssh" = "X1" ]; then
 				echo "will require no password..."
 				echo ""
 				targ="-t"
-				$ssh -x $ssh_port $targ $ssh_args $ssh_host "sudo id; tty"
+				$ssh -x $ssh_port $targ $ssh_args "$uath" "sudo id; tty"
 				echo ""
 			fi
-			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
+			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args \"$uath\" \"$info\""
 			echo ""
-			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd" > $tport 2> $tport2
+			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args "$uath" "$ssh_cmd" > $tport 2> $tport2
 			if [ "X$teeport" = "X1" ]; then
 				tail -f $tport  1>&2 &
 				tail_pid=$!
@@ -2407,9 +2793,9 @@ if [ "X$use_ssh" = "X1" ]; then
 			rc=$?
 		else
 			rsh_setup
-			echo "rsh $ul $ssh_host \"$ssh_cmd\""
+			echo "rsh $ul \"$ssh_host\" \"$ssh_cmd\""
 			echo ""
-			rsh $ul $ssh_host "$ssh_cmd" > $tport &
+			rsh $ul "$ssh_host" "$ssh_cmd" > $tport &
 			sleep 1
 			rc=0
 		fi
@@ -2453,31 +2839,46 @@ if [ "X$use_ssh" = "X1" ]; then
 		done
 
 		echo "found: PORT='$PORT'" 1>&2
+		lh6=""
+		if [ "X$SSVNC_PORT_IPV6" != "X" ]; then
+			lh6=1
+		elif egrep 'Info: listening on IPv6 only|Info: listening only on IPv6' $tport > /dev/null; then
+			lh6=1
+		fi
+		if [ "X$lh6" = "X1" ]; then
+			echo "set SOCKS5 localhost to ::1" 1>&2
+		fi
 		rm -f $tport $tport2
 		if [ "X$rsh" = "X1" ]; then
 			rsh_viewer "$@"
 			exit $?
 		fi
-		PPROXY_SOCKS=1
+		PPROXY_SOCKS=5
 		if [ "X$SSVNC_SOCKS5" != "X" ]; then
 			PPROXY_SOCKS=5
+		elif [ "X$SSVNC_SOCKS4" != "X" ]; then
+			PPROXY_SOCKS=1
 		fi
 		export PPROXY_SOCKS
-		host="$localhost"
+		if [ "X$lh6" = "X" ]; then
+			host="$localhost"
+		else
+			host="::1"
+		fi
 		port="$PORT"
 		proxy="$localhost:$use"
 
 	else
 		if [ "X$rsh" != "X1" ]; then
-			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
+			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args \"$uath\" \"$info\""
 			echo ""
-			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
+			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args "$uath" "$ssh_cmd"
 			rc=$?
 		else
 			rsh_setup
-			echo "rsh $ul $ssh_host \"$ssh_cmd\""
+			echo "rsh $ul \"$ssh_host\" \"$ssh_cmd\""
 			echo ""
-			rsh $ul $ssh_host "$ssh_cmd" &
+			rsh $ul "$ssh_host" "$ssh_cmd" &
 			sleep 1
 			PORT=$port
 			rsh_viewer "$@"
@@ -2487,7 +2888,7 @@ if [ "X$use_ssh" = "X1" ]; then
 
 	if [ "$rc" != "0" ]; then
 		echo ""
-		echo "ssh to $ssh_host failed."
+		echo "ssh to \"$uath\" failed."
 		exit 1
 	fi
 	stty sane
@@ -2633,6 +3034,20 @@ if [ "X$crl" != "X" ]; then
 	fi
 fi
 
+if [ "X$showcert" = "X1" ]; then
+	if [ "X$have_uvnc_dsm_helper_showcert" = "X1" ]; then
+		:
+	elif [ "X$SSVNC_NO_IPV6_PROXY" != "X" ]; then
+		:
+	elif [ "X$ipv6" = "X1" -a "X$proxy" = "X" ]; then
+		proxy="ipv6://$host:$port"
+	fi
+fi
+
+if [ "X$direct_connect" != "X" -a "X$STUNNEL_LISTEN" != "X" ]; then
+	proxy=reverse_direct
+fi
+
 ptmp=""
 if [ "X$proxy" != "X" ]; then
 	ptmp="/tmp/ss_vncviewer${RANDOM}.$$.pl"
@@ -2705,7 +3120,9 @@ if [ "X$showcert" = "X1" ]; then
 	if [ "X$ciphers" != "X" ]; then
 		cipher_args=`echo "$ciphers" | sed -e 's/ciphers=/-cipher /'`
 	fi
-	if type openssl > /dev/null 2>&1; then
+	if [ "X$have_uvnc_dsm_helper_showcert" = "X1" ]; then
+		:
+	elif type openssl > /dev/null 2>&1; then
 		:
 	else
 		echo ""
@@ -2720,16 +3137,25 @@ if [ "X$showcert" = "X1" ]; then
 	fi
 	#echo "openssl s_client $cipher_args -connect $host:$port" 
 	if [ "X$reverse" = "X" ]; then
-		host $host >/dev/null 2>&1
-		host $host >/dev/null 2>&1
+		if type host > /dev/null 2>/dev/null; then
+			host $host >/dev/null 2>&1
+			host $host >/dev/null 2>&1
+		fi
 		timeout=15
 		if [ "X$SSVNC_FETCH_TIMEOUT" != "X" ]; then
 			timeout=$SSVNC_FETCH_TIMEOUT
 		fi
-		if type pkill >/dev/null 2>&1; then
-			(sleep $timeout; if kill -0 $$; then pkill -TERM -f "openssl.*s_client.*$host.*$port"; fi) >/dev/null 2>&1 &
+		if [ "X$have_uvnc_dsm_helper_showcert" = "X1" ]; then
+			if type pkill >/dev/null 2>&1; then
+				(sleep $timeout; if kill -0 $$; then pkill -TERM -f "ultravnc_dsm_helper.*$host.*$port"; fi) >/dev/null 2>&1 &
+			fi
+			ultravnc_dsm_helper showcert $host:$port 2>&1
+		else
+			if type pkill >/dev/null 2>&1; then
+				(sleep $timeout; if kill -0 $$; then pkill -TERM -f "openssl.*s_client.*$host.*$port"; fi) >/dev/null 2>&1 &
+			fi
+			openssl s_client $cipher_args -prexit -connect $host:$port 2>&1 < /dev/null
 		fi
-		openssl s_client $cipher_args -prexit -connect $host:$port 2>&1 < /dev/null
 		rc=$?
 	else
 		tcert=""
@@ -2841,9 +3267,22 @@ if [ "X$direct_connect" != "X" ]; then
 			PPROXY_LISTEN=$use
 			export PPROXY_LISTEN
 		else
-			PPROXY_REVERSE="$localhost:$use"
-			export PPROXY_REVERSE
-			pps=3
+			if [ "X$proxy" = "Xreverse_direct" ]; then
+				PPROXY_LISTEN="$STUNNEL_LISTEN:`expr 5500 + $disp`"
+				PPROXY_DEST="$localhost:$use"
+				PPROXY_PROXY="ipv6://$localhost:$use"	# not always ipv6..
+				export PPROXY_LISTEN PPROXY_DEST PPROXY_PROXY
+				pps=1
+			else
+				PPROXY_REVERSE="$localhost:$use"
+				export PPROXY_LISTEN
+				pps=3
+			fi
+			if [ "X$SSVNC_LISTEN_ONCE" != "X1" ]; then
+				PPROXY_LOOP_THYSELF=`mytmp "/tmp/pproxy_loop_thyself.${RANDOM}.$$"`
+				export PPROXY_LOOP_THYSELF
+				pps=2
+			fi
 			if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
 				pps=`expr $pps + $SSVNC_EXTRA_SLEEP`
 			fi
@@ -2904,10 +3343,13 @@ if [ "X$direct_connect" != "X" ]; then
 		echo ""
 		trap "final" 0 2 15
 		if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
-			echo "NOTE: The ultravnc_dsm_helper only runs once.  So after the first LISTEN"
-			echo "      ends, you may have to Press Ctrl-C and restart for another connection."
-			echo ""
-			SSVNC_LISTEN_ONCE=1; export SSVNC_LISTEN_ONCE
+			if [ "X$SSVNC_LISTEN_ONCE" = "X1" ]; then
+				echo "NOTE: The ultravnc_dsm_helper only runs once.  So after the first LISTEN"
+				echo "      ends you must restart the Listening mode.  You may also need to"
+				echo "      Press Ctrl-C to stop the viewer and restart for another connection."
+				echo ""
+			fi
+			#SSVNC_LISTEN_ONCE=1; export SSVNC_LISTEN_ONCE
 			VNCVIEWER_LISTEN_LOCALHOST=1
 			export VNCVIEWER_LISTEN_LOCALHOST
 			dport=`expr 5500 + $disp`
@@ -2917,8 +3359,13 @@ if [ "X$direct_connect" != "X" ]; then
 			echo
 			echo "$ustr &"
 			echo
-			$cmd &
-			dsm_pid=$!
+			if [ "X$SSVNC_LISTEN_ONCE" = "X1" ]; then
+				$cmd &
+				dsm_pid=$!
+			else
+				while [ 1 ]; do $cmd; sleep 1; done &
+				dsm_pid=$!
+			fi
 			sleep 2
 			disp=$use
 			if [ $disp -ge 5500 ]; then
@@ -2935,6 +3382,9 @@ if [ "X$direct_connect" != "X" ]; then
 		echo "$VNCVIEWERCMD" "$@" -listen $disp2
 		echo ""
 		$VNCVIEWERCMD "$@" -listen $disp2
+		if [ "X$PPROXY_LOOP_THYSELF" != "X" ]; then
+			rm -f $PPROXY_LOOP_THYSELF
+		fi
 	fi
 	exit $?
 fi
@@ -2998,6 +3448,8 @@ else
 	hloc=""
 	if [ "X$use_ssh" = "X1" ]; then
 		hloc="$localhost:"
+	elif [ "X$STUNNEL_LISTEN" != "X" ]; then
+		hloc="$STUNNEL_LISTEN:"
 	fi
 	if echo "$proxy" | grep -i '^vencrypt:' > /dev/null; then
 		hloc="$localhost:"
@@ -3127,7 +3579,12 @@ else
 		if echo "$proxy" | grep -i '^vencrypt:' > /dev/null; then
 			pstunnel=`echo "$proxy" | awk -F: '{print $2}'`
 			plisten=`echo "$proxy" | awk -F: '{print $3}'`
-			PPROXY_LISTEN="INADDR_ANY:$plisten"; export PPROXY_LISTEN
+			IF=INADDR_ANY
+			if [ "X$STUNNEL_LISTEN" != "X" ]; then
+				IF=$STUNNEL_LISTEN
+			fi
+			PPROXY_VENCRYPT_REVERSE=1; export PPROXY_VENCRYPT_REVERSE
+			PPROXY_LISTEN="$IF:$plisten"; export PPROXY_LISTEN
 			PPROXY_PROXY="vencrypt://$localhost:$pstunnel"; export PPROXY_PROXY
 			PPROXY_DEST="$localhost:$pstunnel"; export PPROXY_DEST
 			STUNNEL_ONCE=1; export STUNNEL_ONCE
@@ -3140,6 +3597,11 @@ else
 				if [ $N2_trim -le 200 ]; then
 					N2_trim=`expr $N2_trim + 5500`
 				fi
+				if [ "X$SSVNC_LISTEN_ONCE" != "X1" ]; then
+					PPROXY_LOOP_THYSELF=`mytmp "/tmp/pproxy_loop_thyself1.${RANDOM}.$$"`
+					export PPROXY_LOOP_THYSELF
+					PPROXY_LOOP_THYSELF0=$PPROXY_LOOP_THYSELF
+				fi
 				env PPROXY_REMOVE=0 PPROXY_SLEEP=0 PPROXY_VENCRYPT_VIEWER_BRIDGE="-$port1,$port2" $ptmp &
 				sleep 1
 			fi
@@ -3148,6 +3610,10 @@ else
 			PPROXY_SLEEP=1; export PPROXY_SLEEP;
 		fi
 		PPROXY_KILLPID=+1; export PPROXY_KILLPID;
+		if [ "X$SSVNC_LISTEN_ONCE" != "X1" ]; then
+			PPROXY_LOOP_THYSELF=`mytmp "/tmp/pproxy_loop_thyself2.${RANDOM}.$$"`
+			export PPROXY_LOOP_THYSELF
+		fi
 		$ptmp &
 		# Important to have no extra pids generated between here and VNCVIEWERCMD
 	fi
@@ -3157,6 +3623,13 @@ else
 	echo "$VNCVIEWERCMD" "$@" -listen $N2
 	echo ""
 	$VNCVIEWERCMD "$@" -listen $N2
+
+	if [ "X$PPROXY_LOOP_THYSELF" != "X" ]; then
+		rm -f $PPROXY_LOOP_THYSELF
+	fi
+	if [ "X$PPROXY_LOOP_THYSELF0" != "X" ]; then
+		rm -f $PPROXY_LOOP_THYSELF0
+	fi
 fi
 
 sleep 1

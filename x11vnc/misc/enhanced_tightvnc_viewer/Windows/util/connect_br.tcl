@@ -123,6 +123,12 @@ proc bmesg {msg} {
 	label $w.l -width 70 -text "$msg"
 	pack $w.l
 	update
+	if {$env(BMESG) > 1} {
+		for {set i 0} {$i < $env(BMESG)} {incr i} {
+			after 1000
+			update
+		}
+	}
 }
 
 proc do_connect_http {sock hostport which} {
@@ -165,9 +171,15 @@ proc do_connect_http {sock hostport which} {
 proc do_connect_socks4 {sock hostport which} {
 	global debug cur_proxy
 
-	set s [split $hostport ":"]
-	set host [lindex $s 0]
-	set port [lindex $s 1]
+	set host ""
+	set port ""
+	if [regexp {^(.*):([0-9][0-9]*)$} $hostport mvar host port] {
+		;
+	} else {
+		puts stderr "could not parse host:port $hostport"
+		destroy .
+		exit 1
+	}
 
 	set i1 ""
 	set i2 ""
@@ -249,9 +261,15 @@ proc do_connect_socks4 {sock hostport which} {
 proc do_connect_socks5 {sock hostport which} {
 	global debug cur_proxy
 
-	set s [split $hostport ":"]
-	set host [lindex $s 0]
-	set port [lindex $s 1]
+	set host ""
+	set port ""
+	if [regexp {^(.*):([0-9][0-9]*)$} $hostport mvar host port] {
+		;
+	} else {
+		puts stderr "could not parse host:port $hostport"
+		destroy .
+		exit 1
+	}
 
 	set p1 [binary format ccc 5 1 0]
 	puts -nonewline $sock $p1
@@ -1058,7 +1076,7 @@ proc proxy_type {proxy} {
 }
 
 proc proxy_hostport {proxy} {
-	regsub -nocase {^[a-z][a-z]*://} $proxy "" hp
+	regsub -nocase {^[a-z][a-z0-9]*://} $proxy "" hp
 	regsub {\+.*$} $hp "" hp
 	if {! [regexp {:[0-9]} $hp] && [regexp {^repeater:} $proxy]} {
 		set hp "$hp:5900"
@@ -1068,9 +1086,23 @@ proc proxy_hostport {proxy} {
 
 proc setb {} {
 	wm withdraw .
+	catch {destroy .b}
 	button .b -text "CONNECT_BR" -command {destroy .}
 	pack .b
 	after 1000 check_callback 
+}
+
+proc connect_br_sleep {} {
+	global env
+	if [info exists env(CONNECT_BR_SLEEP)] {
+		if [regexp {^[0-9][0-9]*$} $env(CONNECT_BR_SLEEP)] {
+			setb
+			for {set i 0} {$i < $env(CONNECT_BR_SLEEP)} {incr i} {
+				bmesg "$i sleep"	
+				after 1000
+			}
+		}
+	}
 }
 
 global env
@@ -1140,9 +1172,15 @@ if {$do_bridge} {
 	set proxy1_type [proxy_type     $proxy1]
 	set proxy1_hp   [proxy_hostport $proxy1]
 
-	set s [split $proxy1_hp ":"]
-	set proxy1_host [lindex $s 0]
-	set proxy1_port [lindex $s 1]
+	set proxy1_host ""
+	set proxy1_port ""
+	if [regexp {^(.*):([0-9][0-9]*)$} $proxy1_hp mvar proxy1_host proxy1_port] {
+		;
+	} else {
+		puts stderr "could not parse hp1 host:port $proxy1_hp"
+		destroy .
+		exit 1
+	}
 
 	set proxy2_type ""
 	set proxy2_host ""
@@ -1151,9 +1189,16 @@ if {$do_bridge} {
 	if {$proxy2 != ""} {
 		set proxy2_type [proxy_type     $proxy2]
 		set proxy2_hp   [proxy_hostport $proxy2]
-		set s [split $proxy2_hp ":"]
-		set proxy2_host [lindex $s 0]
-		set proxy2_port [lindex $s 1]
+
+		set proxy2_host ""
+		set proxy2_port ""
+		if [regexp {^(.*):([0-9][0-9]*)$} $proxy2_hp mvar proxy2_host proxy2_port] {
+			;
+		} else {
+			puts stderr "could not parse hp2 host:port $proxy2_hp"
+			destroy .
+			exit 1
+		}
 	}
 
 	set proxy3_type ""
@@ -1163,9 +1208,16 @@ if {$do_bridge} {
 	if {$proxy3 != ""} {
 		set proxy3_type [proxy_type     $proxy3]
 		set proxy3_hp   [proxy_hostport $proxy3]
-		set s [split $proxy3_hp ":"]
-		set proxy3_host [lindex $s 0]
-		set proxy3_port [lindex $s 1]
+
+		set proxy3_host ""
+		set proxy3_port ""
+		if [regexp {^(.*):([0-9][0-9]*)$} $proxy3_hp mvar proxy3_host proxy3_port] {
+			;
+		} else {
+			puts stderr "could not parse hp3 host:port $proxy3_hp"
+			destroy .
+			exit 1
+		}
 	}
 
 	bmesg "1: '$proxy1_host' '$proxy1_port' '$proxy1_type'";
@@ -1173,19 +1225,41 @@ if {$do_bridge} {
 	bmesg "3: '$proxy3_host' '$proxy3_port' '$proxy3_type'";
 
 	if [info exists env(SSVNC_REVERSE)] {
-		set s [split $env(SSVNC_REVERSE) ":"]
-		set rhost [lindex $s 0]
-		set rport [lindex $s 1]
+		set rhost ""
+		set rport ""
+		if [regexp {^(.*):([0-9][0-9]*)$} $env(SSVNC_REVERSE) mvar rhost rport] {
+			;
+		} else {
+			puts stderr "could not parse SSVNC_REVERSE host:port $env(SSVNC_REVERSE)"
+			destroy .
+			exit 1
+		}
+		setb
 		set rc [catch {set lsock [socket $rhost $rport]}]
 		if {$rc != 0} {
 			puts stderr "error reversing"	
+			bmesg "1 error reversing"	
+			after 2000
+			set rc [catch {set lsock [socket $rhost $rport]}]
+		}
+		if {$rc != 0} {
+			puts stderr "error reversing"	
+			bmesg "2 error reversing"	
+			after 2000
+			set rc [catch {set lsock [socket $rhost $rport]}]
+		}
+		if {$rc != 0} {
+			puts stderr "error reversing"	
+			bmesg "3 error reversing"	
 			destroy .; exit 1
 		}
 		puts stderr "SSVNC_REVERSE to $rhost $rport OK";
-		setb
+		bmesg "SSVNC_REVERSE to $rhost $rport OK";
+		connect_br_sleep
 		handle_connection $lsock $rhost $rport
 	} else {
 		set lport $env(SSVNC_LISTEN)
+		connect_br_sleep
 		set rc [catch {set lsock [socket -myaddr 127.0.0.1 -server handle_connection $lport]}]
 		if {$rc != 0} {
 			puts stderr "error listening"	

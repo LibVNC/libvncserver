@@ -2608,6 +2608,8 @@ static void snap_vcsa_rawfb(void) {
 	fake_screen->frameBuffer = snap->data;
 	fake_screen->paddedWidthInBytes = snap->bytes_per_line;
 	fake_screen->serverFormat.bitsPerPixel = raw_fb_native_bpp;
+	fake_screen->width = snap->width;
+	fake_screen->height = snap->height;
 
 	for (i=0; i < rows * cols; i++) {
 		int ix, iy, x, y, w, h;
@@ -3012,11 +3014,12 @@ static void ping_clients(int tile_cnt) {
 	if (tile_cnt > 0) {
 		last_send = now;
 	} else if (tile_cnt < 0) {
+		/* negative tile_cnt is -ping case */
 		if (now >= last_send - tile_cnt) {
 			mark_rect_as_modified(0, 0, 1, 1, 1);
 			last_send = now;
 		}
-	} else if (now - last_send > 2) {
+	} else if (now - last_send > 5) {
 		/* Send small heartbeat to client */
 		mark_rect_as_modified(0, 0, 1, 1, 1);
 		last_send = now;

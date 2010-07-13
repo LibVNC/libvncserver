@@ -5,13 +5,13 @@
 .\" Copyright (C) 1998 Marcus.Brinkmann@ruhr-uni-bochum.de
 .\" Copyright (C) 2000,2001 Red Hat, Inc.
 .\" Copyright (C) 2001-2003 Constantin Kaplinsky <const@ce.cctpu.edu.ru>
-.\" Copyright (C) 2006-2009 Karl J. Runge <runge@karlrunge.com>
+.\" Copyright (C) 2006-2010 Karl J. Runge <runge@karlrunge.com>
 .\"
 .\" You may distribute under the terms of the GNU General Public
 .\" License as specified in the file LICENCE.TXT that comes with the
 .\" TightVNC distribution.
 .\"
-.TH ssvncviewer 1 "December 2009" "" "SSVNC"
+.TH ssvncviewer 1 "April 2010" "" "SSVNC"
 .SH NAME
 ssvncviewer \- an X viewer client for VNC
 .SH SYNOPSIS
@@ -452,6 +452,12 @@ X11 console (i.e. to chat with the person at the display).
 To save writing a shell script to set environment
 variables, specify as many as you need on the command line.  For example,
 -env SSVNC_MULTIPLE_LISTEN=MAX:5 -env EDITOR=vi
+.TP
+\fB\-noipv6\fR
+Disable all IPv6 sockets.  Same as VNCVIEWER_NO_IPV6=1.
+.TP
+\fB\-noipv4\fR
+Disable all IPv4 sockets.  Same as VNCVIEWER_NO_IPV4=1.
 .TP
 \fB\-printres\fR
 Print out the Ssvnc X resources (appdefaults) and

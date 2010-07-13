@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 2.6)
+
 project(LibVNCServer)
 include(CheckFunctionExists)
 include(CheckIncludeFile)
@@ -14,6 +16,8 @@ include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/
 find_package(ZLIB)
 find_package(JPEG)
 find_package(SDL)
+find_package(GnuTLS)
+find_package(Threads)
 
 if(SDL_FOUND)   # == pthread.h available
   option(TIGHTVNC_FILETRANSFER "Enable filetransfer" ON)
@@ -25,10 +29,12 @@ if(JPEG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBJPEG 1)
 endif(JPEG_FOUND)
 option(LIBVNCSERVER_ALLOW24BPP "Allow 24 bpp" ON)
+if(GNUTLS_FOUND)
+  set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
+endif(GNUTLS_FOUND)
 
 check_include_file("fcntl.h"       LIBVNCSERVER_HAVE_FCNTL_H)
 check_include_file("netinet/in.h"  LIBVNCSERVER_HAVE_NETINET_IN_H)
-check_include_file("pthread.h"     LIBVNCSERVER_HAVE_LIBPTHREAD)
 check_include_file("sys/socket.h"  LIBVNCSERVER_HAVE_SYS_SOCKET_H)
 check_include_file("sys/stat.h"    LIBVNCSERVER_HAVE_SYS_STAT_H)
 check_include_file("sys/time.h"    LIBVNCSERVER_HAVE_SYS_TIME_H)
@@ -44,6 +50,9 @@ check_include_file("sys/types.h"   HAVE_SYS_TYPES_H)
 
 check_function_exists(gettimeofday    LIBVNCSERVER_HAVE_GETTIMEOFDAY)
 
+if(CMAKE_USE_PTHREADS_INIT)
+  set(LIBVNCSERVER_HAVE_LIBPTHREAD 1)
+endif(CMAKE_USE_PTHREADS_INIT)
 if(LIBVNCSERVER_HAVE_SYS_SOCKET_H)
   # socklen_t
   list(APPEND CMAKE_EXTRA_INCLUDE_FILES "sys/socket.h")
@@ -107,6 +116,7 @@ set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
     ${LIBVNCCLIENT_DIR}/minilzo.c
+    ${LIBVNCCLIENT_DIR}/tls.c
 )
 
 if(ZLIB_FOUND)
@@ -221,13 +231,13 @@ endif(HAVE_FFMPEG)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/examples)
 foreach(test ${LIBVNCSERVER_TESTS})
   add_executable(examples/${test} ${LIBVNCSRVTEST_DIR}/${test}.c)
-  target_link_libraries(examples/${test} vncserver)
+  target_link_libraries(examples/${test} vncserver ${CMAKE_THREAD_LIBS_INIT})
 endforeach(test ${LIBVNCSERVER_TESTS})
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/client_examples)
 foreach(test ${LIBVNCCLIENT_TESTS})
   add_executable(client_examples/${test} ${LIBVNCCLITEST_DIR}/${test}.c)
-  target_link_libraries(client_examples/${test} vncclient ${SDL_LIBRARIES} ${FFMPEG_LIBRARIES})
+  target_link_libraries(client_examples/${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${GNUTLS_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
 endforeach(test ${LIBVNCCLIENT_TESTS})
 
 install_targets(/lib vncserver)

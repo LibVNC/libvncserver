@@ -16,8 +16,8 @@ See these sites and related ones for more information:
 
         http://www.tightvnc.com
         http://www.realvnc.com
-        http://www.stunnel.org
         http://stunnel.mirt.net
+        http://www.stunnel.org
         http://www.openssl.org
         http://www.chiark.greenend.org.uk/~sgtatham/putty/
 	http://sourceforge.net/projects/cotvnc/
@@ -255,7 +255,7 @@ Unix and Mac OS X:
 
     Unpack the archive:
 
-        % gzip -dc ssvnc-1.0.25.tar.gz | tar xvf -
+        % gzip -dc ssvnc-1.0.28.tar.gz | tar xvf -
 
     Run the GUI:
 
@@ -263,7 +263,7 @@ Unix and Mac OS X:
 
         % ./ssvnc/MacOSX/ssvnc             (for Mac OS X)
 
-    The smaller file "ssvnc_no_windows-1.0.25.tar.gz"
+    The smaller file "ssvnc_no_windows-1.0.28.tar.gz"
     could have been used as well.
 
     On MacOSX you could also click on the SSVNC app icon in the Finder.
@@ -309,8 +309,8 @@ Unix/MacOSX Install:
 
     For the conventional source tarball it will compile and install, e.g.:
 
-       gzip -dc ssvnc-1.0.25.src.tar.gz | tar xvf -
-       cd ssvnc-1.0.25
+       gzip -dc ssvnc-1.0.28.src.tar.gz | tar xvf -
+       cd ssvnc-1.0.28
        make config
        make all
        make PREFIX=/my/install/dir install
@@ -322,7 +322,7 @@ Windows:
 
     Unzip, using WinZip or a similar utility, the zip file:
 
-        ssvnc-1.0.25.zip
+        ssvnc-1.0.28.zip
 
     Run the GUI, e.g.:
 
@@ -334,7 +334,7 @@ Windows:
 
     select Open, and then OK to launch it.
 
-    The smaller file "ssvnc_windows_only-1.0.25.zip"
+    The smaller file "ssvnc_windows_only-1.0.28.zip"
     could have been used as well.
 
     You can make a Windows shortcut to this program if you want to.
@@ -664,7 +664,7 @@ Untrusted Local Users:
     By 'do not trust' we mean they might try to gain access to remote
     machines you connect to via SSVNC.  Note that an untrusted local
     user can often obtain root access in a short amount of time; if a
-    user has acheived that, then all bets are off for ANYTHING that you
+    user has achieved that, then all bets are off for ANYTHING that you
     do on the workstation.  It is best to get rid of Untrusted Local
     Users as soon as possible.
 
@@ -680,7 +680,7 @@ Untrusted Local Users:
     If the untrusted local user tries to connect to these ports, he may
     succeed in varying degrees to gain access to the remote machine.
     We now list some safeguards one can put in place to try to make this
-    more difficult to acheive.
+    more difficult to achieve.
 
     It probably pays to have the VNC server require a password, even
     though there has already been SSL or SSH authentication (via
@@ -747,8 +747,8 @@ See also:
 	http://www.karlrunge.com/x11vnc/faq.html
 	x11vnc -h | more
 
-	http://www.stunnel.org
 	http://stunnel.mirt.net
+	http://www.stunnel.org
 	http://www.openssl.org
 	http://www.tightvnc.com
         http://www.realvnc.com

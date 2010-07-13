@@ -33,3 +33,14 @@ Misc. scripts:
 		use Xsetup mechanism.
    Xdummy       An LD_PRELOAD kludge to run the Xorg "dummy" device driver
 		like Xvfb.
+
+   ultravnc_repeater.pl: Unix script to act as UltraVNC repeater proxy.
+
+   connect_switch:  Share HTTPS, VNC, SSH, etc. through a single port (e.g. 443)
+
+   panner.pl    Allows a small rectangle to pan around a desktop more or less.
+
+   desktop.cgi  CGI script for creating multi-user virtual desktops on a
+                server.  Also can do port-redirection to internal machines.
+
+   inet6to4     ipv6 to ipv4 relay (i.e. until libvncserver supports ipv6)

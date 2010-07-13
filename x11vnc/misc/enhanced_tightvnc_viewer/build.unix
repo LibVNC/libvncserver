@@ -387,9 +387,9 @@ if [ "X$SSVNC_BUILD_SKIP_STUNNEL" = "X" ]; then
 	cd $tmp/stunnel
 	if [ `uname` = "SunOS" ]; then
 		cp configure configure.orig
-		sed -e "s,/var/ssl,/var/ssl /usr/sfw," configure.orig > configure
+		sed -e "s,maindir in,maindir in /usr/sfw," configure.orig > configure
 	fi
-	env LDFLAGS="-L$start/$libs $LDFLAGS_OS" CPPFLAGS="$CPPFLAGS_OS" ./configure --disable-libwrap
+	env LDFLAGS="-L$start/$libs $LDFLAGS_OS" CPPFLAGS="$CPPFLAGS_OS" ./configure --disable-libwrap --enable-ipv6
 	make
 	ls -l src/stunnel
 	cd "$start"
@@ -453,7 +453,7 @@ if [ "X$SSVNC_BUILD_SKIP_VNCSTOREPW" = "X" ]; then
 	cd $tmp/vncstorepw
 	make clean
 
-	env LD_SSL="-L$start/$libs $LDFLAGS_OS" CPP_SSL="$CPPFLAGS_OS" make ultravnc_dsm_helper
+	env LD_SSL="-L$start/$libs $LDFLAGS_OS $LD_SSL" CPP_SSL="$CPPFLAGS_OS" make ultravnc_dsm_helper
 
 	cd "$start"
 	cp -p $tmp/vncstorepw/ultravnc_dsm_helper $dest

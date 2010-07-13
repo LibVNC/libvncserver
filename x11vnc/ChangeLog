@@ -1,3 +1,61 @@
+2010-05-08  Karl Runge <runge@karlrunge.com>
+	* x11vnc: set cd->unixname in apply_opts.  Print message in
+	  vnc_reflect_resize.  Some tweaks to prepare_x11vnc_dist.sh
+
+2010-05-01  Karl Runge <runge@karlrunge.com>
+	* x11vnc: X11VNC_DISABLE_SSL_CLIENT_MODE option to disable SSL
+	  client role in reverse connections.  Improvements to logging in
+	  ultravnc_repeater, ULTRAVNC_REPEATER_NO_RFB option.  Increase
+	  SSL timeout and print message if 'repeater' mode is detected for
+	  reverse SSL connection.  Fix RECORD scroll XCopyArea detection
+	  with recent gtk/gdk library; set X11VNC_SCROLL_MUST_EQUAL
+	  to disable.  Limit logging of RECORD error messages.
+
+2010-04-25  Karl Runge <runge@karlrunge.com>
+	* x11vnc: incorporate new ultravnc_dsm_helper.c, add pointer_mask
+	  remote control query.  Cut openssl default -ping delay.
+
+2010-04-18  Karl Runge <runge@karlrunge.com>
+	* x11vnc/misc: improvements to demo scripts
+	* x11vnc: Alias -coe for -connect_or_exit.  more accurate
+	  dotted_ip() and -listen6.  Improvements to ipv6 mode.
+	  http interface for X11VNC_HTTP_LISTEN_LOCALHOST.  Print
+	  warning about missing Xvfb, Xdummy, or Xvnc in -create.
+	  Fix __LINUX_VIDEODEV2_H / HAVE_V4L2.	Always print out info
+	  about Xinerama screens.
+	* x11vnc/misc/enhanced_tightvnc_viewer: check for host cmd.
+	  fix stunnel mode w/o proxy.  Update to stunnel 4.33, Fix
+	  build.unix with new stunnel on Solaris. ipv6 support for
+	  unix ssvncviewer
+
+2010-04-09  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: debugging and workarounds for java viewer
+	* x11vnc/misc: sync ssvnc, improve util scripts.
+	* x11vnc: exit(1) for -connect_or_exit failure, quiet query
+	  mode for grab_state, etc. ipv6 support. STUNNEL_LISTEN for
+	  particular interface. -input_eagerly in addition to -allinput.
+	  quiet Xinerama message.
+
+2010-03-20  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: Many improvements to Java SSL applet, onetimekey
+	  serverCert param, debugging printout, user dialogs, catch
+	  socket exceptions, autodetect x11vnc for GET=1.
+	* x11vnc: misc/scripts: desktop.cgi, inet6to4, panner.pl.
+	  X11VNC_HTTPS_DOWNLOAD_WAIT_TIME, -unixpw %xxx documented, and
+	  can run user cmd in UNIXPW_CMD. FD_XDMCP_IF for create script,
+	  autodetect dm on udp6 only.  Queries: pointer_x, pointer_y,
+	  pointer_same, pointer_root.  Switch on -xkd if keysyms per key >
+	  4 in all cases.  daemon mode improvements for connect_switch,
+	  inet6to4, ultravnc_repeater.pl.  Dynamic change of -clip do
+	  not create new fb if WxH is unchanged.
+
+2010-02-22  Karl Runge <runge@karlrunge.com>
+	* classes/ssl: Java SSL applet viewer now works with certificate
+	  chains.
+	* x11vnc: Printout option -sslScripts.  Suggest -auth guess
+	  in error message.  Set fake_screen width and height.  Test
+	  for +kb in Xvfb.
+
 2010-01-02  Karl Runge <runge@karlrunge.com>
 	* x11vnc: small tweaks to Xdummy, rx11vnc*.  Apply
 	  SMALL_FOOTPRINT to -appshare text.  Copyright year change.

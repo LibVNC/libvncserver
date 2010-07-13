@@ -47,7 +47,7 @@ AM_CONDITIONAL(HAVE_MP3LAME, test "$HAVE_MP3LAME" = "true")
 AC_CHECK_HEADER(thenonexistentheader.h, HAVE_THENONEXISTENTHEADER_H="true")
 
 # Checks for X libraries
-HAVE_X="false"
+HAVE_X11="false"
 AC_PATH_XTRA
 AH_TEMPLATE(HAVE_X11, [X11 build environment present])
 
@@ -122,14 +122,14 @@ fi
 # end x11vnc only.
 
 if test "x$with_x" = "xno"; then
-	HAVE_X="false"
+	HAVE_X11="false"
 elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
-	AC_CHECK_LIB(X11, XGetImage, [AC_DEFINE(HAVE_X11) HAVE_X="true"],
-		HAVE_X="false",
+	AC_CHECK_LIB(X11, XGetImage, [AC_DEFINE(HAVE_X11) HAVE_X11="true"],
+		HAVE_X11="false",
 		$X_LIBS $X_PRELIBS -lX11 $X_EXTRA_LIBS)
 
 	# x11vnc only:
-	if test $HAVE_X = "true" -a "$build_x11vnc" = "yes"; then
+	if test $HAVE_X11 = "true" -a "$build_x11vnc" = "yes"; then
 		X_PRELIBS="$X_PRELIBS -lXext"
 
 		AC_CHECK_LIB(Xext, XShmGetImage, 
@@ -248,12 +248,12 @@ elif test "$X_CFLAGS" != "-DX_DISPLAY_MISSING"; then
 fi
 
 AC_SUBST(X_LIBS)
-AM_CONDITIONAL(HAVE_X, test $HAVE_X != "false")
+AM_CONDITIONAL(HAVE_X11, test $HAVE_X11 != "false")
 
 # x11vnc only:
 if test "$build_x11vnc" = "yes"; then
 
-if test "x$HAVE_X" = "xfalse" -a "x$with_x" != "xno"; then
+if test "x$HAVE_X11" = "xfalse" -a "x$with_x" != "xno"; then
 	AC_MSG_ERROR([
 ==========================================================================
 *** A working X window system build environment is required to build ***
@@ -271,7 +271,7 @@ or for native Mac OS X), specify the --without-x configure option.
 ])
 fi
 
-if test "x$HAVE_X" = "xtrue" -a "x$HAVE_XTEST" != "xtrue"; then
+if test "x$HAVE_X11" = "xtrue" -a "x$HAVE_XTEST" != "xtrue"; then
 	AC_MSG_WARN([
 ==========================================================================
 *** A working build environment for the XTEST extension was not found ***
@@ -695,6 +695,15 @@ if test "x$with_gnutls" != "xno"; then
 	if test "x$with_client_tls" != "xno"; then
 		AC_DEFINE(WITH_CLIENT_TLS)
 	fi
+fi
+
+# IPv6
+AH_TEMPLATE(IPv6, [Enable IPv6 support])
+AC_ARG_WITH(ipv6,
+[  --without-ipv6          disable IPv6 support],,)
+if test "x$with_ipv6" != "xno"; then
+	AC_CHECK_FUNC(getaddrinfo, AC_DEFINE(IPv6,1),
+		AC_CHECK_LIB(socket, getaddrinfo, AC_DEFINE(IPv6,1)))
 fi
 
 # Checks for header files.
