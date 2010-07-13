@@ -72,14 +72,15 @@
  interval mentioned above, it is possible for clients to reorder
  incoming messages and detect loss of parts of a multicast framebuffer
  update or of the update as a whole. They can then resort to whatever
- strategy they think is best, i.e. ignore the loss and wait for the
- next update or request a full non-incremental multicast framebuffer 
- update.
+ strategy they think is best, i.e. do nothing, request resending of
+ missing messages by sending a 'MulticastFramebufferUpdateNACK'
+ client-to-server message (message type 247) or request a full
+ non-incremental multicast framebuffer update.
 
  Note that 'MulticastFramebufferUpdate's are the only messages sent
  via multicast. Handshaking messages, client-to-server messages and
  all other server-to-client messages are sent via the traditional
- unicast way!
+ unicast channel!
 
 
  2.2 Session Setup
@@ -134,12 +135,12 @@
  (true) or zero (false).
 
 
- +--------------------+--------------------+--------------------+
- |No. of bytes        |Type        [Value] |Description         |
- +--------------------+--------------------+--------------------+
- |1                   |U8            249   |message-type        |
- |1                   |U8                  |incremental         |
- +--------------------+--------------------+--------------------+
+ +--------------------+--------------------+-------------------------+
+ |No. of bytes        |Type        [Value] |Description              |
+ +--------------------+--------------------+-------------------------+
+ |1                   |U8            249   |message-type             |
+ |1                   |U8                  |incremental              |
+ +--------------------+--------------------+-------------------------+
 
 
  2.3.2 MulticastFramebufferUpdate
@@ -177,6 +178,7 @@
  The header is padded so that it is an exact multiple of 4 bytes (to
  help with alignment of 32-bit pixels).
 
+
  +--------------------+--------------------+-------------------------+
  |No. of bytes        |Type        [Value] |Description		     |
  +--------------------+--------------------+-------------------------+
@@ -190,6 +192,32 @@
 
  where  'number-of-rectangles' is the number of rectangles per
  'MulticastFramebufferUpdate' message, not per whole update.
+
+
+ 2.3.3 MulticastFramebufferUpdateNACK
+
+ If a client notices lost messages by examining sequence numbers of
+ received partial updates, it can choose to request retransmission of
+ consecutive missing partial updates by sending a 'Multicast-
+ FramebufferUpdateNACK' client-to-server message (message type 247). 
+ This message contains the sequence number of a missing partial update
+ which optionally indexes the start of a consecution of further
+ partial updates. The total number of consecutive partial updates is
+ counted including the first indexing partial update.
+
+ If the server receives a 'MulticastFramebufferUpdateNACK', it should
+ resend the requested partial updates.
+
+
+ +--------------------+--------------------+-------------------------+
+ |No. of bytes        |Type        [Value] |Description              |
+ +--------------------+--------------------+-------------------------+
+ |1                   |U8            247   |message-type             |
+ |1                   |U8                  |padding                  |
+ |2                   |U16                 |number-of-partial-upds   |
+ |4                   |U32                 |id-of-partial-update     |
+ +--------------------+--------------------+-------------------------+
+
 
 
 
