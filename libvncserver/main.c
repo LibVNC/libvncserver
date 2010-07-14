@@ -832,6 +832,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    INIT_MUTEX(screen->multicastUpdateMutex);
    screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
    screen->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE);
+   screen->multicastPartUpdRgnsSaved = FALSE;
    screen->multicastUseCopyRect = TRUE;  
 
    screen->maxFd=0;

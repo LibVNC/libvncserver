@@ -205,8 +205,9 @@
  partial updates. The total number of consecutive partial updates is
  counted including the first indexing partial update.
 
- If the server receives a 'MulticastFramebufferUpdateNACK', it should
- resend the requested partial updates.
+ If the server receives a 'MulticastFramebufferUpdateNACK', it can
+ choose to resend the requested partial updates or simply do
+ nothing, clients are not guarenteed to get repair data back.
 
 
  +--------------------+--------------------+-------------------------+

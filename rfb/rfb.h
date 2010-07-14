@@ -384,10 +384,11 @@ typedef struct _rfbScreenInfo
 #define MULTICAST_MAX_CONCURRENT_PIXELFORMATS 256 
     char multicastUpdPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
     char multicastUpdPendingForEncoding[32]; /* since non-pseudo encodings are all < 256 */
-    rfbBool multicastUseCopyRect;  /* all multicast clients support CopyRect */
+    rfbBool multicastUseCopyRect;            /* all multicast clients support CopyRect */
     sraRegionPtr multicastUpdateRegion;
 #define MULTICAST_PART_UPD_RGN_BUF_SIZE 10000
-    void* multicastPartUpdRgnBuf;
+    void* multicastPartUpdRgnBuf;      /* a ringbuffer holding partial update <-> region mappings */
+    rfbBool multicastPartUpdRgnsSaved; /* flag indicating that partial updates have been saved for a whole one */
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     MUTEX(multicastOutputMutex);
     MUTEX(multicastUpdateMutex);

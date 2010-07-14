@@ -3323,9 +3323,18 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	  /* reset sequence numbers */
 	  cl->screen->multicastWholeUpdId = wholeUpdIdSave;
 	  cl->screen->multicastPartialUpdId = partialUpdIdSave;
+	  /* indicate that these partial updates have been saved in the ringbuffer.
+	     the regions of each partial update are the same for every 
+	     pixel-format and encoding combination! */
+	  if(cl->screen->multicastVNCdoNACK)
+	    cl->screen->multicastPartUpdRgnsSaved = TRUE;
 	}
-	else /* all done */
+	else { /* all done */
 	  sraRgnMakeEmpty(cl->screen->multicastUpdateRegion);
+	  /* whole update done, indicate that partial updates can be saved again */
+	  if(cl->screen->multicastVNCdoNACK)
+	    cl->screen->multicastPartUpdRgnsSaved = FALSE;
+	}
       }
 
     UNLOCK(cl->screen->multicastUpdateMutex);
@@ -3346,7 +3355,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 rfbMulticastFramebufferUpdateMsg *
 rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUpd, uint16_t nRects)
 {
-  if(cl->screen->multicastVNCdoNACK) {
+  if(cl->screen->multicastVNCdoNACK && !cl->screen->multicastPartUpdRgnsSaved) {
     partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
     partialUpdRegion tmp;
     tmp.idPartial = idPartialUpd;
@@ -3382,7 +3391,7 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
 int 
 rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h)
 {
-  if(cl->screen->multicastVNCdoNACK) {
+  if(cl->screen->multicastVNCdoNACK && !cl->screen->multicastPartUpdRgnsSaved) {
     partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
     sraRegionPtr tmp = sraRgnCreateRect(x, y, x+w, y+h);
     partialUpdRegion* lastone = partUpdRgnBufAt(buf, partUpdRgnBufCount(buf)-1); 
