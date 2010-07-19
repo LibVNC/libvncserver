@@ -249,7 +249,7 @@ ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
 
   /* not enough data left in buffer */
   /* so flush buffer and read in another packet FIXME:really? */
-  memcpy(out, client->multicastbufoutptr, client->buffered);
+  memcpy(out, client->multicastbufoutptr, client->multicastbuffered);
   out += client->multicastbuffered;
   n -= client->multicastbuffered;
 
