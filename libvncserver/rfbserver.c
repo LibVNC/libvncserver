@@ -3148,7 +3148,6 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     uint32_t partialUpdIdSave = cl->screen->multicastPartialUpdId;
     uint16_t wholeUpdIdSave = cl->screen->multicastWholeUpdId;
 
-    /* FIXME call this here as well? */
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
 
@@ -3349,7 +3348,10 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     }
   
     sraRgnDestroy(updateRegion);
-
+    
+    if(cl->screen->displayFinishedHook)
+      cl->screen->displayFinishedHook(cl, result);
+    
     return result;
 }
 

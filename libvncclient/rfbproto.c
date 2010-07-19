@@ -1599,8 +1599,12 @@ HandleRFBServerMessage(rfbClient* client)
 		client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
 
 	      if(msg.mfu.idWholeUpd > client->multicastLastWholeUpd || 
-		 client->multicastLastWholeUpd - msg.mfu.idWholeUpd > 0x7FFF)
+		 client->multicastLastWholeUpd - msg.mfu.idWholeUpd > 0x7FFF) {
 		client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
+		/* old one done */
+		if (client->FinishedFrameBufferUpdate)
+		  client->FinishedFrameBufferUpdate(client);
+	      }
 
 #ifdef MULTICAST_DEBUG
 	      rfbClientLog("MulticastVNC DEBUG: --got message--\n");
@@ -1676,10 +1680,6 @@ HandleRFBServerMessage(rfbClient* client)
 		  client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 		}
 	    }
-
-	  /* FIXME this gets called after each partial update, not a whole one. Is this problematic? */
-	  if (client->FinishedFrameBufferUpdate)
-	    client->FinishedFrameBufferUpdate(client);
 	}
       else
 	{
