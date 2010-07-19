@@ -2357,7 +2357,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 #ifdef MULTICAST_DEBUG
 	rfbLog("MulticastVNC DEBUG: got NACK from client %p: %d and %d more missing\n",
-	       cl, msg.mfun.idPartialUpd, msg.mfun.nPartialUpds);
+	       cl, msg.mfun.idPartialUpd, msg.mfun.nPartialUpds-1);
 #endif
 
         rfbStatRecordMessageRcvd(cl, msg.type, 
@@ -2371,17 +2371,22 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	LOCK(cl->screen->multicastUpdateMutex);
 
 	/* check if this partial update is in the buffer */
-	if(msg.mfun.idPartialUpd >= firstInBuf && msg.mfun.idPartialUpd < firstInBuf + buf->len) {
-	  uint32_t pos = msg.mfun.idPartialUpd - firstInBuf;
+	if(msg.mfun.idPartialUpd >= firstInBuf && msg.mfun.idPartialUpd < firstInBuf + partUpdRgnBufCount(buf)-1) {
+	  uint32_t start = msg.mfun.idPartialUpd - firstInBuf;
 	  uint32_t i;
 
-	  /* mark the lost partial updates's regions as modified */
-	  for(i = pos; i < pos+msg.mfun.nPartialUpds && i < buf->len; ++i) 
-	    sraRgnOr(cl->screen->multicastUpdateRegion, partUpdRgnBufAt(buf, i)->region);
+	  /* mark the lost partial updates as requested */
+	  for(i = start; i < start+msg.mfun.nPartialUpds && i < buf->len; ++i) {
+#ifdef MULTICAST_DEBUG
+	    rfbLog("MulticastVNC DEBUG: marking buffer position %u, partial id %u as NACKed\n",
+		   i, partUpdRgnBufAt(buf, i)->idPartial);
+#endif
+	    partUpdRgnBufAt(buf, i)->pending = TRUE;
+	  }
 
-	  /* mark this pixelformat and encoding as requested */
-	  rfbSetBit(cl->screen->multicastUpdPendingForPixelformat, cl->multicastPixelformatId);
-	  rfbSetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredEncoding);
+	  /* mark this pixelformat and encoding as needing repair */
+	  rfbSetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
+	  rfbSetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredEncoding);
 	}
 #ifdef MULTICAST_DEBUG
 	else
@@ -3348,6 +3353,69 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     return result;
 }
 
+
+
+/*
+ * Sends a single multicast partial framebuffer update with specified whole and partial update id,
+ * pixel-format and encoding as preferred by client. 
+ * Note that the region has to fit!
+ * The region is not modified.
+ */
+rfbBool
+rfbSendMulticastPartialUpdate(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUpd, sraRegionPtr region, rfbBool save)
+{
+  sraRectangleIterator* i=NULL;
+  sraRect rect;
+  rfbBool partUpdRgnsSavesOld;
+
+  LOCK(cl->screen->multicastUpdateMutex);
+
+  /* flush buffer just for safety */
+  if(!rfbSendMulticastUpdateBuf(cl->screen)) {
+    UNLOCK(cl->screen->multicastUpdateMutex);
+    return FALSE;
+  }
+  
+  /* set flags so that this partial update is NOT put into the ringbuffer */
+  if(!save) {
+    partUpdRgnsSavesOld = cl->screen->multicastPartUpdRgnsSaved;
+    cl->screen->multicastPartUpdRgnsSaved = TRUE;
+  }
+    
+  rfbPutMulticastHeader(cl, 
+			idWholeUpd,
+			idPartialUpd,
+			sraRgnCountRects(region));
+
+  for(i = sraRgnGetIterator(region); sraRgnIteratorNext(i,&rect);){
+    int x = rect.x1;
+    int y = rect.y1;
+    int w = rect.x2 - x;
+    int h = rect.y2 - y;
+    rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
+  }
+  
+  if(!save)
+    cl->screen->multicastPartUpdRgnsSaved = partUpdRgnsSavesOld;
+
+  /* and send */
+  if(!rfbSendMulticastUpdateBuf(cl->screen)) {
+    UNLOCK(cl->screen->multicastUpdateMutex);
+    return FALSE;
+  }
+
+#ifdef MULTICAST_DEBUG
+  rfbLog("MulticastVNC DEBUG: sent single partial upd: wholeId %d, partialId %d\n\n",
+	 idWholeUpd, idPartialUpd);
+#endif  
+
+
+  UNLOCK(cl->screen->multicastUpdateMutex);
+  return TRUE;
+}
+
+
+
 /*
  * Puts the multicast message header into the multicast update buffer.
  */
@@ -3358,7 +3426,9 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
   if(cl->screen->multicastVNCdoNACK && !cl->screen->multicastPartUpdRgnsSaved) {
     partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
     partialUpdRegion tmp;
+    tmp.idWhole = idWholeUpd;
     tmp.idPartial = idPartialUpd;
+    tmp.pending = FALSE;
     tmp.region = sraRgnCreate();
     partUpdRgnBufInsert(buf, tmp);
   }

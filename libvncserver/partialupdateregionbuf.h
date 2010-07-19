@@ -31,8 +31,10 @@
    partial update ids to rfb regions 
 */
 typedef struct _partialUpdRegion {
+  uint16_t idWhole;
   uint32_t idPartial;
   sraRegionPtr region;
+  rfbBool pending;
 } partialUpdRegion;
 
 

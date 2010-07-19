@@ -364,7 +364,9 @@ typedef struct _rfbScreenInfo
     /* displayFinishedHook is called just after a frame buffer update */
     rfbDisplayFinishedHookPtr displayFinishedHook;
     
-    /* multicast stuff */
+    /*
+      multicast stuff 
+    */
     rfbBool multicastVNC;
     rfbBool multicastVNCdoNACK;
     char*   multicastAddr;
@@ -386,14 +388,17 @@ typedef struct _rfbScreenInfo
     char multicastUpdPendingForEncoding[32]; /* since non-pseudo encodings are all < 256 */
     rfbBool multicastUseCopyRect;            /* all multicast clients support CopyRect */
     sraRegionPtr multicastUpdateRegion;
-#define MULTICAST_PART_UPD_RGN_BUF_SIZE 10000
-    void* multicastPartUpdRgnBuf;      /* a ringbuffer holding partial update <-> region mappings */
-    rfbBool multicastPartUpdRgnsSaved; /* flag indicating that partial updates have been saved for a whole one */
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     MUTEX(multicastOutputMutex);
     MUTEX(multicastUpdateMutex);
 #endif
     int multicastDeferUpdateTime;
+    /* multicast NACK stuff */ 
+#define MULTICAST_PART_UPD_RGN_BUF_SIZE 10000
+    void* multicastPartUpdRgnBuf;      /* a ringbuffer holding partial update <-> region mappings */
+    rfbBool multicastPartUpdRgnsSaved; /* flag indicating that partial updates have been saved for a whole one */
+    char multicastRepairPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
+    char multicastRepairPendingForEncoding[32]; /* since non-pseudo encodings are all < 256 */
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -738,6 +743,7 @@ extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
 extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
 extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
 extern rfbBool rfbSendMulticastFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
+  extern rfbBool rfbSendMulticastPartialUpdate(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUpd, sraRegionPtr region, rfbBool save);
 extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern int rfbPutMulticastRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);

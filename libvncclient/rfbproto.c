@@ -1588,13 +1588,22 @@ HandleRFBServerMessage(rfbClient* client)
 		     last, but not _much_ lower, as this would be a wrap-around), it was counted as 
 		     lost before, so revert this  */
 		  if(msg.mfu.idPartialUpd < client->multicastLastPartialUpd &&
-		     client->multicastLastPartialUpd - msg.mfu.idPartialUpd < 0x0FFF0000)
+		     client->multicastLastPartialUpd - msg.mfu.idPartialUpd < 0x0FFF0000 &&
+		     client->multicastLost > 0)
 		    client->multicastLost--;
 		}
-	      client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
-	      client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
+	      
+	      /* save last received highest sequence numbers, care for wrap-around */
+	      if(msg.mfu.idPartialUpd > client->multicastLastPartialUpd || 
+		 client->multicastLastPartialUpd - msg.mfu.idPartialUpd > 0x0FFF0000)
+		client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
+
+	      if(msg.mfu.idWholeUpd > client->multicastLastWholeUpd || 
+		 client->multicastLastWholeUpd - msg.mfu.idWholeUpd > 0x7FFF)
+		client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
 
 #ifdef MULTICAST_DEBUG
+	      rfbClientLog("MulticastVNC DEBUG: --got message--\n");
 	      rfbClientLog("MulticastVNC DEBUG: id whole:    %d\n", msg.mfu.idWholeUpd);
 	      rfbClientLog("MulticastVNC DEBUG: id partial:  %d\n", msg.mfu.idPartialUpd);
 	      rfbClientLog("MulticastVNC DEBUG: received:    %d\n", client->multicastRcvd);

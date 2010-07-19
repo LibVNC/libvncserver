@@ -1147,6 +1147,13 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	(screen->multicastUpdPendingForEncoding[((cl->preferredEncoding & 0xFF)/8)] &
 	 (1<<(cl->preferredEncoding % 8)));
 
+      /* some partial updates were NACKed for this (pixelformat,encoding) combination */
+      rfbBool mcRepairPending = 
+	(screen->multicastRepairPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] &
+	 (1<<(cl->multicastPixelformatId % 8))) &&
+	(screen->multicastRepairPendingForEncoding[((cl->preferredEncoding & 0xFF)/8)] &
+	 (1<<(cl->preferredEncoding % 8)));
+
       /* update pending for non-image data to be sent via unicast */
       rfbBool auxUpdPending =
 	((cl->enableCursorShapeUpdates && cl->cursorWasChanged) ||       
@@ -1179,8 +1186,28 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	  rfbSendFramebufferUpdate(cl, cl->copyRegion); 
 	}
 
+	if(mcRepairPending) {
+	  partUpdRgnBuf* buf = (partUpdRgnBuf*)screen->multicastPartUpdRgnBuf;
+	  size_t i, count = partUpdRgnBufCount(buf);
+	  for(i = 0; i < count; ++i) {
+	    partialUpdRegion* pur = partUpdRgnBufAt(buf, i);
+	    if(pur->pending) {
+#ifdef MULTICAST_DEBUG
+	      rfbLog("MulticastVNC DEBUG: whole %d, partial %d was NACKed, resending now\n",
+		     pur->idWhole,pur->idPartial);
+#endif
+	      rfbSendMulticastPartialUpdate(cl, pur->idWhole, pur->idPartial, pur->region, FALSE);
+	    }
+	      
+	  }
+	  /* mark this pixelformat and encoding combination as done */
+	  rfbUnsetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
+	  rfbUnsetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredEncoding);
+	}
+	
 	if(mcUpdPending)
 	  rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
+
       } else if(cl->startMulticastDeferring.tv_usec == 0) {
 	gettimeofday(&cl->startMulticastDeferring,NULL);
 	if(cl->startMulticastDeferring.tv_usec == 0)
@@ -1214,6 +1241,25 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	    rfbSendFramebufferUpdate(cl, cl->copyRegion); 
 	  }
 
+	  if(mcRepairPending) {
+	    partUpdRgnBuf* buf = (partUpdRgnBuf*)screen->multicastPartUpdRgnBuf;
+	    size_t i, count = partUpdRgnBufCount(buf);
+	    for(i = 0; i < count; ++i) {
+	      partialUpdRegion* pur = partUpdRgnBufAt(buf, i);
+	      if(pur->pending) {
+#ifdef MULTICAST_DEBUG
+		rfbLog("MulticastVNC DEBUG: whole %d, partial %d was NACKed, resending now\n",
+		       pur->idWhole,pur->idPartial);
+#endif		
+		rfbSendMulticastPartialUpdate(cl, pur->idWhole, pur->idPartial, pur->region, FALSE);
+		pur->pending = FALSE;
+	      }
+	    }
+	    /* mark this pixelformat and encoding combination as done */
+	    rfbUnsetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
+	    rfbUnsetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredEncoding);
+	  }
+	    
 	  if(mcUpdPending)
 	    rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
 	}
