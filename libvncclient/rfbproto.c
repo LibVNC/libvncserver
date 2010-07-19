@@ -1902,7 +1902,10 @@ HandleRFBServerMessage(rfbClient* client)
 	client->multicastUpdInterval = rect.r.w;
   	client->multicastPixelformatId = rect.r.x;
 
-	rfbClientLog("Enabling MulticastVNC specific messages\n");
+	if(client->multicastVNCdoNACK)
+	  rfbClientLog("MulticastVNC: NACK'ing of lost messages enabled\n");
+
+	rfbClientLog("MulticastVNC: Enabling multicast specific messages\n");
 	DefaultSupportedMessagesMulticastVNC(client);
  	
 	continue;

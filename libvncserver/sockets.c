@@ -180,9 +180,10 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
     }
 
     if (rfbScreen->multicastVNC) {
-        rfbLog("Enabling MulticastVNC on %s:%d with a TTL of %d, update interval %dms\n", 
+        rfbLog("Enabling MulticastVNC on %s:%d with a TTL of %d, update interval %dms, retransmiting of NACKed messages is %s\n", 
 	       rfbScreen->multicastAddr, rfbScreen->multicastPort,
-	       rfbScreen->multicastTTL, rfbScreen->multicastDeferUpdateTime);
+	       rfbScreen->multicastTTL, rfbScreen->multicastDeferUpdateTime,
+	       rfbScreen->multicastVNCdoNACK ? "enabled" : "disabled");
 
 	if ((rfbScreen->multicastSock = rfbCreateMulticastSocket(rfbScreen->multicastAddr,
 								 rfbScreen->multicastPort,
