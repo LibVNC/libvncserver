@@ -3368,7 +3368,7 @@ rfbSendMulticastPartialUpdate(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idP
 {
   sraRectangleIterator* i=NULL;
   sraRect rect;
-  rfbBool partUpdRgnsSavesOld;
+  rfbBool partUpdRgnsSavesOld=FALSE;
 
   LOCK(cl->screen->multicastUpdateMutex);
 
