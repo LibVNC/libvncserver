@@ -3181,6 +3181,11 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 #endif
    
     LOCK(cl->screen->multicastUpdateMutex);
+
+    mfu = rfbPutMulticastHeader(cl, 
+				cl->screen->multicastWholeUpdId,
+				cl->screen->multicastPartialUpdId++,
+				0);
   
     for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
         int x = rect.x1;
@@ -3277,22 +3282,14 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     }
     sraRgnReleaseIterator(i); i=NULL;
 
-
-    /* if nothing was done above, at least send a heartbeat
-       so that clients don't assume the connection is dead */
-    if(sraRgnEmpty(updateRegion))
-      {
-#ifdef MULTICAST_DEBUG
-	rfbLog("MulticastVNC DEBUG:   nothing changed, putting heartbeat into buffer(now %d)\n", cl->screen->mcublen);
-#endif
-	rfbPutMulticastHeader(cl,  
-			      cl->screen->multicastWholeUpdId,
-			      cl->screen->multicastPartialUpdId++,
-			      0);
-      }
     
-
-    /* flush buffer at the end */
+    /* flush buffer at the end, at least sending the single header
+       we put in the buffer at the beginning as a heartbeat message
+       so that clients don't assume the connection is dead */
+#ifdef MULTICAST_DEBUG
+    if(sraRgnEmpty(updateRegion))
+      rfbLog("MulticastVNC DEBUG:   nothing changed, just sending heartbeat msginto buffer(now %d)\n", cl->screen->mcublen);
+#endif
     if(mfu)
       mfu->nRects = Swap16IfLE(nRects);
     if (!rfbSendMulticastUpdateBuf(cl->screen))
