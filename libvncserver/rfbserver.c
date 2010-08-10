@@ -3264,16 +3264,15 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 		    ++offs;
 		    --nSplitRects;
 		  }
+		/* when done with the splitting, prepare buffer for stuffing other rects in */
+		mfu = rfbPutMulticastHeader(cl, 
+					    cl->screen->multicastWholeUpdId,
+					    cl->screen->multicastPartialUpdId++,
+					    0);
 	      }
 	  }
 	else                                            /* rect fits */  
 	  {
-	    if(cl->screen->mcublen == 0)                /* new partial update */
-	      mfu = rfbPutMulticastHeader(cl, 
-					  cl->screen->multicastWholeUpdId,
-					  cl->screen->multicastPartialUpdId++,
-					  0);
-	    
 	    nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
 #ifdef MULTICAST_DEBUG
 	    rfbLog("MulticastVNC DEBUG:   put rect into buffer(now %d), now %d in there\n", cl->screen->mcublen, nRects);
