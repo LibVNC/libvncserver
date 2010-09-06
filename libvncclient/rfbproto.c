@@ -47,6 +47,9 @@
 #endif
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
+#ifdef _RPCNDR_H /* This Windows header typedefs 'boolean', jpeglib has to know */
+#define HAVE_BOOLEAN
+#endif
 #include <jpeglib.h>
 #endif
 #include <stdarg.h>
