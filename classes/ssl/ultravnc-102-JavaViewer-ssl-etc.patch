@@ -1648,6 +1648,26 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +	}
 +}
 +// end runge/x11vnc
+diff -Naur JavaViewer.orig/Makefile JavaViewer/Makefile
+--- JavaViewer.orig/Makefile	2006-05-29 09:06:32.000000000 -0400
++++ JavaViewer/Makefile	2010-05-18 20:53:32.000000000 -0400
+@@ -4,6 +4,7 @@
+ 
+ CP = cp
+ JC = javac
++JC_ARGS = -target 1.4 -source 1.4
+ JAR = jar
+ ARCHIVE = VncViewer.jar
+ PAGES = index.vnc shared.vnc noshared.vnc hextile.vnc zlib.vnc tight.vnc
+@@ -20,7 +21,7 @@
+ all: $(CLASSES) $(ARCHIVE)
+ 
+ $(CLASSES): $(SOURCES)
+-	$(JC) -O $(SOURCES)
++	$(JC) $(JC_ARGS) -O $(SOURCES)
+ 
+ $(ARCHIVE): $(CLASSES)
+ 	$(JAR) cf $(ARCHIVE) $(CLASSES)
 diff -Naur JavaViewer.orig/OptionsFrame.java JavaViewer/OptionsFrame.java
 --- JavaViewer.orig/OptionsFrame.java	2005-11-21 18:50:16.000000000 -0500
 +++ JavaViewer/OptionsFrame.java	2007-05-13 22:18:30.000000000 -0400
@@ -2693,8 +2713,8 @@ diff -Naur JavaViewer.orig/RfbProto.java JavaViewer/RfbProto.java
  
 diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 --- JavaViewer.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
-+++ JavaViewer/SSLSocketToMe.java	2010-03-21 12:53:24.000000000 -0400
-@@ -0,0 +1,2055 @@
++++ JavaViewer/SSLSocketToMe.java	2010-07-10 19:18:06.000000000 -0400
+@@ -0,0 +1,2067 @@
 +/*
 + * SSLSocketToMe.java: add SSL encryption to Java VNC Viewer.
 + *
@@ -3883,13 +3903,6 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +				String s2 = s.toLowerCase();
 +				String v2 = v.toLowerCase();
 +
-+				if (s2.indexOf("proxy") < 0 && v2.indexOf("proxy") < 0) {
-+					continue;
-+				}
-+				if (v2.indexOf("http") < 0) {
-+					continue;
-+				}
-+
 +				if (s2.indexOf("proxy.https.host") >= 0) {
 +					proxyHost = v2;
 +					continue;
@@ -3904,6 +3917,25 @@ diff -Naur JavaViewer.orig/SSLSocketToMe.java JavaViewer/SSLSocketToMe.java
 +				}
 +				if (s2.indexOf("proxy.http.port") >= 0) {
 +					proxyPort_nossl = gint(v2);
++					continue;
++				}
++			}
++
++			for (Enumeration e = props.propertyNames(); e.hasMoreElements(); ) {
++				String s = (String) e.nextElement();
++				String v = System.getProperty(s);
++				String s2 = s.toLowerCase();
++				String v2 = v.toLowerCase();
++
++				if (proxyHost != null && proxyPort > 0) {
++					break;
++				}
++
++				// look for something like: javaplugin.proxy.config.list = http=10.0.2.1:8082
++				if (s2.indexOf("proxy") < 0 && v2.indexOf("proxy") < 0) {
++					continue;
++				}
++				if (v2.indexOf("http") < 0) {
 +					continue;
 +				}
 +

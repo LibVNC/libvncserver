@@ -60,7 +60,8 @@
 #         sslrepeater://host:port.
 #
 # -showcert  Only fetch the certificate using the 'openssl s_client'
-#            command (openssl(1) must in installed).
+#            command (openssl(1) must in installed).  On ssvnc 1.0.27 and
+#            later the bundled command 'ultravnc_dsm_helper' is used.
 #
 #    See http://www.karlrunge.com/x11vnc/faq.html#faq-ssl-ca for details on
 #    SSL certificates with VNC.
@@ -273,6 +274,8 @@ do
 	"-sshargs")	shift; ssh_args="$1"
                 ;;
 	"-anondh")	ciphers="ciphers=$anondh"
+			ULTRAVNC_DSM_HELPER_SHOWCERT_ADH=1
+			export ULTRAVNC_DSM_HELPER_SHOWCERT_ADH
 			anondh_set=1
                 ;;
 	"-ciphers")	shift; ciphers="ciphers=$1"
@@ -400,6 +403,23 @@ shift
 dL="-L"
 if uname -sr | egrep 'SunOS 5\.[5-8]' > /dev/null; then
 	dL="-h"
+fi
+
+have_uvnc_dsm_helper_showcert=""
+if [ "X$showcert" = "X1" -a "X$SSVNC_USE_S_CLIENT" = "X" -a "X$reverse" = "X" ]; then
+	if type ultravnc_dsm_helper >/dev/null 2>&1; then
+		if ultravnc_dsm_helper -help 2>&1 | grep -w showcert >/dev/null; then
+			have_uvnc_dsm_helper_showcert=1
+		fi
+	fi
+fi
+have_uvnc_dsm_helper_ipv6=""
+if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
+	if type ultravnc_dsm_helper >/dev/null 2>&1; then
+		if ultravnc_dsm_helper -help 2>&1 | grep -iw ipv6 >/dev/null; then
+			have_uvnc_dsm_helper_ipv6=1
+		fi
+	fi
 fi
 
 rchk() {
@@ -535,7 +555,7 @@ elif echo "$orig" | grep '^rsh:' > /dev/null; then
 fi
 
 # play around with host:display port:
-if echo "$orig" | grep ':' > /dev/null; then
+if echo "$orig" | grep ':[0-9][0-9]*$' > /dev/null; then
 	:
 else
 	# add or assume :0 if no ':'
@@ -586,19 +606,39 @@ elif echo "$host" | grep '^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' 
 	:
 else
 	# regular hostname, can't be sure...
-	host "$host" >/dev/null 2>&1
-	host "$host" >/dev/null 2>&1
-	hout=`host "$host" 2>/dev/null`
-	if echo "$hout" | grep -i 'has ipv6 address' > /dev/null; then
-		if echo "$hout" | grep -i 'has address' > /dev/null; then
+	gout=""
+	if type getent > /dev/null 2>/dev/null; then
+		gout=`getent hosts "$host" 2>/dev/null`
+	fi
+	if echo "$gout" | grep ':.*:' > /dev/null; then
+		if echo "$gout" | grep '^[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*$' > /dev/null; then
 			:
 		else
-			echo "ipv6: "`echo "$hout" | grep -i 'has ipv6 address' | head -n 1`
+			echo "ipv6: "`echo "$gout" | grep ':.*:' | head -n 1`
 			ipv6=1
 		fi
 	fi
 	if [ "X$ipv6" = "X0" ]; then
+		hout=""
+		if type host > /dev/null 2>/dev/null; then
+			host "$host" >/dev/null 2>&1
+			host "$host" >/dev/null 2>&1
+			hout=`host "$host" 2>/dev/null`
+		fi
+		if echo "$hout" | grep -i 'has ipv6 address' > /dev/null; then
+			if echo "$hout" | grep -i 'has address' > /dev/null; then
+				:
+			else
+				echo "ipv6: "`echo "$hout" | grep -i 'has ipv6 address' | head -n 1`
+				ipv6=1
+			fi
+		fi
+	fi
+	if [ "X$ipv6" = "X0" ]; then
+		dout=""
+		if type dig > /dev/null 2>/dev/null; then
 		dout=`dig -t any "$host" 2>/dev/null`
+		fi
 		if echo "$dout" | grep -i "^$host" | grep '[ 	]AAAA[ 	]' > /dev/null; then
 			if echo "$dout" | grep -i "^$host" | grep '[ 	]A[ 	]' > /dev/null; then
 				:
@@ -658,8 +698,19 @@ fi
 
 if [ "X$ipv6" = "X1" -a "X$direct_connect" = "X1" ]; then
 	if [ "X$proxy" = "X" -a "X$reverse" = "X" ]; then
-		proxy="ipv6://$host:$port"
-		echo "direct connect: set proxy=$proxy"
+		if [ "X$SSVNC_ULTRA_DSM" != "X" -a "X$have_uvnc_dsm_helper_ipv6" = "X1" ]; then
+			:
+		elif [ "X$SSVNC_NO_IPV6_PROXY" != "X" ]; then
+			:
+		elif [ "X$SSVNC_NO_IPV6_PROXY_DIRECT" != "X" ]; then
+			:
+		elif [ "X$SSVNC_USE_OURS" = "X1" ]; then
+			# requires 1.0.27 and later ssvncviewer binary
+			:
+		else
+			proxy="ipv6://$host:$port"
+			echo "direct connect: set proxy=$proxy"
+		fi
 	fi
 fi
 
@@ -1003,6 +1054,8 @@ my $listen_handle = "";
 my $sock = "";
 my $parent = $$;
 
+my $initial_data = "";
+
 if ($ENV{PPROXY_VENCRYPT_VIEWER_BRIDGE}) {
 	my ($from, $to) = split(/,/, $ENV{PPROXY_VENCRYPT_VIEWER_BRIDGE});
 	do_vencrypt_viewer_bridge($from, $to);
@@ -1041,6 +1094,10 @@ print STDERR "pproxy_listen:    $ENV{PPROXY_LISTEN}\n";
 print STDERR "pproxy_reverse:   $ENV{PPROXY_REVERSE}\n";
 print STDERR "io_socket_inet6:  $have_inet6\n";
 print STDERR "\n";
+if (! $have_inet6) {
+	print STDERR "PPROXY: To enable IPv6 connections, install the IO::Socket::INET6 perl module.\n\n";
+}
+
 if (1) {
 	print STDERR "pproxy 1st: $first\t- $mode_1st\n";
 	print STDERR "pproxy 2nd: $second\t- $mode_2nd\n";
@@ -1204,8 +1261,33 @@ my $err = "";
 if (! $sock && $have_inet6) {
 	$err = $!;
 
+	print STDERR "pproxy: $!\n";
+
 	eval {$sock = IO::Socket::INET6->new(
 		PeerAddr => $proxy_host,
+		PeerPort => $proxy_port,
+		Proto => "tcp"
+	);};
+	$err .= " / $!";
+}
+
+if (! $sock && ($proxy_host =~ /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i || $proxy_host =~ /^::ffff:([\da-f]+:[\da-f]+)$/i)) {
+	print STDERR "pproxy: $!\n";
+	my $ipv4_addr = $1;
+	if ($ipv4_addr =~ /:/) {
+		my ($a, $b) = split(/:/, $ipv4_addr);
+		$a = hex($a);
+		$b = hex($b);
+		$ipv4_addr  = sprintf("%d.", ($a & 0xff00) >> 8);
+		$ipv4_addr .= sprintf("%d.", ($a & 0x00ff));
+		$ipv4_addr .= sprintf("%d.", ($b & 0xff00) >> 8);
+		$ipv4_addr .= sprintf("%d",  ($b & 0x00ff));
+	}
+
+	print STDERR "pproxy: re-trying with ipv4 addr: $ipv4_addr\n";
+
+	eval {$sock = IO::Socket::INET->new(
+		PeerAddr => $ipv4_addr,
 		PeerPort => $proxy_port,
 		Proto => "tcp"
 	);};
@@ -1341,10 +1423,24 @@ sub xfer_both {
 	} else {
 		select(undef, undef, undef, 0.05);
 		if ($listen_handle) {
-			print STDERR "pproxy child [$$]  socket -> listen_handle\n\n";
+			print STDERR "pproxy child [$$]  socket -> listen_handle\n";
+			if ($initial_data ne "") {
+				my $len = length $initial_data;
+				print STDERR "pproxy child [$$]  sending initial_data, length $len\n\n";
+				syswrite($listen_handle, $initial_data, $len);
+			} else {
+				print STDERR "\n";
+			}
 			xfer($sock, $listen_handle);
 		} else {
-			print STDERR "pproxy child [$$]  socket -> STDOUT\n\n";
+			print STDERR "pproxy child [$$]  socket -> STDOUT\n";
+			if ($initial_data ne "") {
+				my $len = length $initial_data;
+				print STDERR "pproxy child [$$]  sending initial_data, length $len\n\n";
+				syswrite(STDOUT, $initial_data, $len);
+			} else {
+				print STDERR "\n";
+			}
 			xfer($sock, STDOUT);
 		}
 		select(undef, undef, undef, 0.25);
@@ -1572,11 +1668,20 @@ sub connection {
 		$rep .= pack("x") x 250;
 		syswrite($sock, $rep, 250);
 
+		my $rfb = "";
+
 		my $ok = 1;
 		for (my $i = 0; $i < 12; $i++) {
 			my $c;
+			last if $ENV{PPROXY_GENERIC_REPEATER};
 			sysread($sock, $c, 1);
 			print STDERR $c;
+			$rfb .= $c;
+		}
+		if ($rfb ne "" && $rfb !~ /^RFB 000\.000/) {
+			$initial_data = $rfb;
+			$rfb =~ s/\n//g;
+			print STDERR "detected non-UltraVNC repeater; forwarding \"$rfb\"\nlength: ", length($initial_data), "\n";
 		}
 	} elsif ($ENV{PPROXY_VENCRYPT} ne "") {
 		my $vencrypt = $ENV{PPROXY_VENCRYPT};
@@ -2358,6 +2463,11 @@ NHAFL_warning() {
 	echo "" 
 }
 
+space_expand() {
+	str=`echo "$1" | sed -e 's/%SPACE/ /g' -e 's/%TAB/\t/g'`
+	echo "$str"
+}
+
 # handle ssh case:
 #
 if [ "X$use_ssh" = "X1" ]; then
@@ -2483,6 +2593,7 @@ if [ "X$use_ssh" = "X1" ]; then
 		sproxy1_user=""
 
 		if [ "X$sproxy1" != "X" ]; then
+			# XXX fix ipv6 ip adder here and below.
 			sproxy1_host=`echo "$sproxy1" | awk -F: '{print $1}'`
 			sproxy1_user=`echo "$sproxy1_host" | awk -F@ '{print $1}'`
 			sproxy1_host=`echo "$sproxy1_host" | awk -F@ '{print $2}'`
@@ -2598,9 +2709,14 @@ if [ "X$use_ssh" = "X1" ]; then
 		if [ "X$ssh_UKHF" != "X" ]; then 
 			ukhf="$ssh_UKHF$localhost_extra"
 		fi
-		echo "$ssh -f -x $ssh_port1 $targ -e none $ssh_NHAFL $ukhf -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 \"sleep 30\""
+		if echo "$ssh_host1" | grep '%' > /dev/null; then
+			uath=`space_expand "$ssh_host1"`
+		else
+			uath="$ssh_host1"
+		fi
+		echo "$ssh -f -x $ssh_port1 $targ -e none $ssh_NHAFL $ukhf -L $proxport:$ssh_host2:$ssh_port2 \"$uath\" \"sleep 30\""
 		echo ""
-		      $ssh -f -x $ssh_port1 $targ -e none $ssh_NHAFL $ukhf -L $proxport:$ssh_host2:$ssh_port2 $ssh_host1 "sleep 30"
+		      $ssh -f -x $ssh_port1 $targ -e none $ssh_NHAFL $ukhf -L $proxport:$ssh_host2:$ssh_port2 "$uath" "sleep 30"
 		ssh_args="$ssh_args $ssh_NHAFL"
 		sleep 1
 		stty sane
@@ -2661,16 +2777,21 @@ if [ "X$use_ssh" = "X1" ]; then
 		ssh_port="-p $ssh_port"
 	fi
 
+	if echo "$ssh_host" | grep '%' > /dev/null; then
+		uath=`space_expand "$ssh_host"`
+	else
+		uath="$ssh_host"
+	fi
 	if [ "X$SS_VNCVIEWER_SSH_ONLY" != "X" ]; then
-		echo "$ssh -x $ssh_port $targ $C $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x $ssh_port $targ $C $ssh_args \"$uath\" \"$info\""
 		echo ""
-		$ssh -x $ssh_port $targ $C $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x $ssh_port $targ $C $ssh_args "$uath" "$ssh_cmd"
 		exit $?
 
 	elif [ "X$SS_VNCVIEWER_NO_F" != "X" ]; then
-		echo "$ssh -x $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
+		echo "$ssh -x $ssh_port $targ $C $ssh_redir $ssh_args \"$uath\" \"$info\""
 		echo ""
-		$ssh -x $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
+		$ssh -x $ssh_port $targ $C $ssh_redir $ssh_args "$uath" "$ssh_cmd"
 		rc=$?
 
 	elif [ "X$getport" != "X" ]; then
@@ -2686,12 +2807,12 @@ if [ "X$use_ssh" = "X1" ]; then
 				echo "will require no password..."
 				echo ""
 				targ="-t"
-				$ssh -x $ssh_port $targ $ssh_args $ssh_host "sudo id; tty"
+				$ssh -x $ssh_port $targ $ssh_args "$uath" "sudo id; tty"
 				echo ""
 			fi
-			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
+			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args \"$uath\" \"$info\""
 			echo ""
-			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd" > $tport 2> $tport2
+			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args "$uath" "$ssh_cmd" > $tport 2> $tport2
 			if [ "X$teeport" = "X1" ]; then
 				tail -f $tport  1>&2 &
 				tail_pid=$!
@@ -2701,9 +2822,9 @@ if [ "X$use_ssh" = "X1" ]; then
 			rc=$?
 		else
 			rsh_setup
-			echo "rsh $ul $ssh_host \"$ssh_cmd\""
+			echo "rsh $ul \"$ssh_host\" \"$ssh_cmd\""
 			echo ""
-			rsh $ul $ssh_host "$ssh_cmd" > $tport &
+			rsh $ul "$ssh_host" "$ssh_cmd" > $tport &
 			sleep 1
 			rc=0
 		fi
@@ -2747,31 +2868,46 @@ if [ "X$use_ssh" = "X1" ]; then
 		done
 
 		echo "found: PORT='$PORT'" 1>&2
+		lh6=""
+		if [ "X$SSVNC_PORT_IPV6" != "X" ]; then
+			lh6=1
+		elif egrep 'Info: listening on IPv6 only|Info: listening only on IPv6' $tport > /dev/null; then
+			lh6=1
+		fi
+		if [ "X$lh6" = "X1" ]; then
+			echo "set SOCKS5 localhost to ::1" 1>&2
+		fi
 		rm -f $tport $tport2
 		if [ "X$rsh" = "X1" ]; then
 			rsh_viewer "$@"
 			exit $?
 		fi
-		PPROXY_SOCKS=1
+		PPROXY_SOCKS=5
 		if [ "X$SSVNC_SOCKS5" != "X" ]; then
 			PPROXY_SOCKS=5
+		elif [ "X$SSVNC_SOCKS4" != "X" ]; then
+			PPROXY_SOCKS=1
 		fi
 		export PPROXY_SOCKS
-		host="$localhost"
+		if [ "X$lh6" = "X" ]; then
+			host="$localhost"
+		else
+			host="::1"
+		fi
 		port="$PORT"
 		proxy="$localhost:$use"
 
 	else
 		if [ "X$rsh" != "X1" ]; then
-			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host \"$info\""
+			echo "$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args \"$uath\" \"$info\""
 			echo ""
-			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args $ssh_host "$ssh_cmd"
+			$ssh -x -f $ssh_port $targ $C $ssh_redir $ssh_args "$uath" "$ssh_cmd"
 			rc=$?
 		else
 			rsh_setup
-			echo "rsh $ul $ssh_host \"$ssh_cmd\""
+			echo "rsh $ul \"$ssh_host\" \"$ssh_cmd\""
 			echo ""
-			rsh $ul $ssh_host "$ssh_cmd" &
+			rsh $ul "$ssh_host" "$ssh_cmd" &
 			sleep 1
 			PORT=$port
 			rsh_viewer "$@"
@@ -2781,7 +2917,7 @@ if [ "X$use_ssh" = "X1" ]; then
 
 	if [ "$rc" != "0" ]; then
 		echo ""
-		echo "ssh to $ssh_host failed."
+		echo "ssh to \"$uath\" failed."
 		exit 1
 	fi
 	stty sane
@@ -2928,7 +3064,11 @@ if [ "X$crl" != "X" ]; then
 fi
 
 if [ "X$showcert" = "X1" ]; then
-	if [ "X$ipv6" = "X1" -a "X$proxy" = "X" ]; then
+	if [ "X$have_uvnc_dsm_helper_showcert" = "X1" ]; then
+		:
+	elif [ "X$SSVNC_NO_IPV6_PROXY" != "X" ]; then
+		:
+	elif [ "X$ipv6" = "X1" -a "X$proxy" = "X" ]; then
 		proxy="ipv6://$host:$port"
 	fi
 fi
@@ -3009,7 +3149,9 @@ if [ "X$showcert" = "X1" ]; then
 	if [ "X$ciphers" != "X" ]; then
 		cipher_args=`echo "$ciphers" | sed -e 's/ciphers=/-cipher /'`
 	fi
-	if type openssl > /dev/null 2>&1; then
+	if [ "X$have_uvnc_dsm_helper_showcert" = "X1" ]; then
+		:
+	elif type openssl > /dev/null 2>&1; then
 		:
 	else
 		echo ""
@@ -3024,16 +3166,25 @@ if [ "X$showcert" = "X1" ]; then
 	fi
 	#echo "openssl s_client $cipher_args -connect $host:$port" 
 	if [ "X$reverse" = "X" ]; then
-		host $host >/dev/null 2>&1
-		host $host >/dev/null 2>&1
+		if type host > /dev/null 2>/dev/null; then
+			host $host >/dev/null 2>&1
+			host $host >/dev/null 2>&1
+		fi
 		timeout=15
 		if [ "X$SSVNC_FETCH_TIMEOUT" != "X" ]; then
 			timeout=$SSVNC_FETCH_TIMEOUT
 		fi
-		if type pkill >/dev/null 2>&1; then
-			(sleep $timeout; if kill -0 $$; then pkill -TERM -f "openssl.*s_client.*$host.*$port"; fi) >/dev/null 2>&1 &
+		if [ "X$have_uvnc_dsm_helper_showcert" = "X1" ]; then
+			if type pkill >/dev/null 2>&1; then
+				(sleep $timeout; if kill -0 $$; then pkill -TERM -f "ultravnc_dsm_helper.*$host.*$port"; fi) >/dev/null 2>&1 &
+			fi
+			ultravnc_dsm_helper showcert $host:$port 2>&1
+		else
+			if type pkill >/dev/null 2>&1; then
+				(sleep $timeout; if kill -0 $$; then pkill -TERM -f "openssl.*s_client.*$host.*$port"; fi) >/dev/null 2>&1 &
+			fi
+			openssl s_client $cipher_args -prexit -connect $host:$port 2>&1 < /dev/null
 		fi
-		openssl s_client $cipher_args -prexit -connect $host:$port 2>&1 < /dev/null
 		rc=$?
 	else
 		tcert=""
