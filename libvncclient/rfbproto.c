@@ -47,6 +47,9 @@
 #endif
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
+#ifdef _RPCNDR_H /* This Windows header typedefs 'boolean', jpeglib has to know */
+#define HAVE_BOOLEAN
+#endif
 #include <jpeglib.h>
 #endif
 #include <stdarg.h>
@@ -363,8 +366,6 @@ IsUnixSocket(const char *name)
 rfbBool
 ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
 {
-  unsigned int host;
-
   if (client->serverPort==-1) {
     /* serverHost is a file recorded by vncrec. */
     const char* magic="vncLog0.0";
@@ -399,12 +400,20 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
   else
 #endif
   {
-    /* serverHost is a hostname */
-    if (!StringToIPAddr(hostname, &host)) {
-      rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
-      return FALSE;
+#ifdef LIBVNCSERVER_IPv6
+    client->sock = ConnectClientToTcpAddr6(hostname, port);
+    if (client->sock == -1)
+#endif
+    {
+      unsigned int host;
+
+      /* serverHost is a hostname */
+      if (!StringToIPAddr(hostname, &host)) {
+        rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
+        return FALSE;
+      }
+      client->sock = ConnectClientToTcpAddr(host, port);
     }
-    client->sock = ConnectClientToTcpAddr(host, port);
   }
 
   if (client->sock < 0) {
@@ -421,17 +430,23 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
 
 rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort)
 {
-  unsigned int host;
   rfbProtocolVersionMsg pv;
   int major,minor;
   char tmphost[250];
 
-  if (!StringToIPAddr(repeaterHost, &host)) {
-    rfbClientLog("Couldn't convert '%s' to host address\n", repeaterHost);
-    return FALSE;
-  }
+#ifdef LIBVNCSERVER_IPv6
+  client->sock = ConnectClientToTcpAddr6(repeaterHost, repeaterPort);
+  if (client->sock == -1)
+#endif
+  {
+    unsigned int host;
+    if (!StringToIPAddr(repeaterHost, &host)) {
+      rfbClientLog("Couldn't convert '%s' to host address\n", repeaterHost);
+      return FALSE;
+    }
 
-  client->sock = ConnectClientToTcpAddr(host, repeaterPort);
+    client->sock = ConnectClientToTcpAddr(host, repeaterPort);
+  }
 
   if (client->sock < 0) {
     rfbClientLog("Unable to connect to VNC repeater\n");

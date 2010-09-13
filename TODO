@@ -11,7 +11,6 @@ style fixes: use Linux' coding guidelines & ANSIfy tightvnc-filetransfer:
 LibVNCClient cleanup: prefix with "rfbClient", and make sure it does
 	not deliberately die() or exit() anywhere!
 java vncviewer doesn't do colour cursors?
-MinGW32 doesn't do fcntl on sockets; use setsockopt instead...
 make corre work again (libvncclient or libvncserver?)
 teach SDLvncviewer about CopyRect...
 implement "-record" in libvncclient

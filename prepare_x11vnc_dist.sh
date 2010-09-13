@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="0.9.11"
+VERSION="0.9.13"
 
 cd "$(dirname "$0")"
 
@@ -33,9 +33,10 @@ echo "" >> Makefile.am
 cat Makefile.am.LibVNCServer | \
 sed -e "s/^SUBDIRS.*$/#SUBDIRS=libvncserver libvncclient x11vnc classes/" \
     -e "s/^DIST_SUBDIRS.*$/#DIST_SUBDIRS=libvncserver libvncclient x11vnc classes/" \
-    -e "/all: make_config_executable/,\$d" \
     -e "/^.*bin_SCRIPTS.*$/d" \
-    -e "s/include_/noinst_/" \
+    -e "s/^include_HEADERS/if HAVE_SYSTEM_LIBVNCSERVER^else^include_HEADERS/" \
+    -e "s/rfbclient\.h/rfbclient.h^endif/" \
+    | tr '^' '\n' \
 >> Makefile.am
 
 mv README README.LibVNCServer

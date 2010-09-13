@@ -1327,7 +1327,7 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 	 * loop over all possible (keycode, group, level) triples
 	 * and record what we find for it:
 	 */
-	if (debug_keyboard > 1) {
+	if (debug_keyboard) {
 		rfbLog("initialize_xkb_modtweak: XKB keycode -> keysyms "
 		    "mapping info:\n");
 	}
@@ -1504,7 +1504,7 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 				xkbignore[kc][grp][lvl] = mods_save | ms2;
 			}
 
-			if (debug_keyboard > 1) {
+			if (debug_keyboard) {
 				char *str;
 				fprintf(stderr, "  %03d  G%d L%d  mod=%s ",
 				    kc, grp+1, lvl+1, bitprint(ms, 8));
@@ -1562,7 +1562,7 @@ xkbmodifiers[]    For the KeySym bound to this (keycode,group,level) store
 		}
 		free(str);
 	}
-	if (debug_keyboard > 1) {
+	if (debug_keyboard) {
 		fprintf(stderr, "grp_max=%d lvl_max=%d\n", grp_max, lvl_max);
 	}
 }
@@ -2913,9 +2913,9 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			t[1] = '\0';
 			if (sscanf(t, "%d", &butt) == 1) {
 				mask = 1<<(butt-1);
-				pointer(mask, x, y, client);
+				pointer_event(mask, x, y, client);
 				mask = 0;
-				pointer(mask, x, y, client);
+				pointer_event(mask, x, y, client);
 			}
 			b++;
 		}	

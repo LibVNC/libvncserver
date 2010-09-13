@@ -725,6 +725,11 @@ sub xfer_both {
 	}
 }
 
+sub fsleep {
+	my ($time) = @_;
+	select(undef, undef, undef, $time) if $time;
+}
+
 sub cleanup {
 	close $client_listen  if $client_listen;
 	close $client_listen6 if $client_listen6;
