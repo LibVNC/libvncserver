@@ -1362,7 +1362,7 @@ rfbBool vnc_reflect_cursor_pos(rfbClient *cl, int x, int y) {
 		return TRUE; /* some clients initializing, cannot send */ 
 	}
 
-	cursor_position(x, y);
+	cursor_position(x, y, NULL);
 	set_cursor(x, y, get_which_cursor());
 
 	return TRUE;
