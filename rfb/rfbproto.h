@@ -68,6 +68,11 @@
 #endif
 #endif
 
+/* some autotool versions do not properly prefix
+   WORDS_BIGENDIAN, so do that manually */
+#ifdef WORDS_BIGENDIAN
+#define LIBVNCSERVER_WORDS_BIGENDIAN
+#endif
 
 #if !defined(WIN32) || defined(__MINGW32__)
 #define max(a,b) (((a)>(b))?(a):(b))
