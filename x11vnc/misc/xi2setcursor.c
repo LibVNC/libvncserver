@@ -590,7 +590,8 @@ int main(int argc, char** argv)
 		    if(!devinfo)
 		      {
 			XDestroyWindow(display, cursorwindow);
-			pexit("device removed, exiting!\n");
+		        fprintf(stderr, "device %d removed\n", dev);
+			pexit("exiting!\n");
 		      }
 		    XIFreeDeviceInfo(devinfo);
 		  }
