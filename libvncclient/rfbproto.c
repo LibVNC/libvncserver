@@ -31,13 +31,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#else
-#define strncasecmp _strnicmp
-#endif
-#include <errno.h>
-#ifndef WIN32
 #include <pwd.h>
 #endif
+#include <errno.h>
 #include <rfb/rfbclient.h>
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
@@ -420,6 +416,9 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     rfbClientLog("Unable to connect to VNC server\n");
     return FALSE;
   }
+
+  if(client->QoS_DSCP && !SetDSCP(client->sock, client->QoS_DSCP))
+     return FALSE;
 
   return SetNonBlocking(client->sock);
 }

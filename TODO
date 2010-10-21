@@ -14,6 +14,7 @@ java vncviewer doesn't do colour cursors?
 make corre work again (libvncclient or libvncserver?)
 teach SDLvncviewer about CopyRect...
 implement "-record" in libvncclient
+implement QoS for Windows in libvncclient
 
 later:
 ------
