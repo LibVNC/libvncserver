@@ -74,6 +74,11 @@
 #define LIBVNCSERVER_WORDS_BIGENDIAN
 #endif
 
+/* MS compilers don't have strncasecmp */
+#ifdef _MSC_VER
+#define strncasecmp _strnicmp
+#endif
+
 #if !defined(WIN32) || defined(__MINGW32__)
 #define max(a,b) (((a)>(b))?(a):(b))
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
