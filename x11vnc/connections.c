@@ -3999,7 +3999,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
             xi2_device_creation_in_progress = 0;
 
             snprintf(tmp, 256, "%i", cd->uid);
-	    cd->cursor = setClientCursor(dpy, cd->ptr_id, 0.4*(cd->uid%3), 0.2*(cd->uid%5), 1*(cd->uid%2), tmp);
+	    cd->cursor = setClientCursor(dpy, cd->ptr_id, 0.4*(cd->ptr_id%3), 0.2*(cd->ptr_id%5), 1*(cd->ptr_id%2), tmp);
 	    if(!cd->cursor)
               rfbLog("Setting cursor for client %s failed.\n", client->host);
 
