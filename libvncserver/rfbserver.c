@@ -57,10 +57,6 @@
 #endif
 #endif
 
-#ifdef CORBA
-#include <vncserverctrl.h>
-#endif
-
 #ifdef DEBUGPROTO
 #undef DEBUGPROTO
 #define DEBUGPROTO(x) x
@@ -223,15 +219,11 @@ rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,
     rfbClientPtr cl;
 
     cl = rfbNewClient(rfbScreen,sock);
-#ifdef CORBA
-    if(cl!=NULL)
-      newConnection(cl, (KEYBOARD_DEVICE|POINTER_DEVICE),1,1,1);
-#endif
 }
 
 
 /*
- * rfbReverseConnection is called by the CORBA stuff to make an outward
+ * rfbReverseConnection is called to make an outward
  * connection to a "listening" RFB client.
  */
 
@@ -316,13 +308,10 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       }
       rfbReleaseClientIterator(iterator);
 
-#ifndef WIN32
-      if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
-	rfbLogPerror("fcntl failed");
+      if(!rfbSetNonBlocking(sock)) {
 	close(sock);
 	return NULL;
       }
-#endif
 
       if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		     (char *)&one, sizeof(one)) < 0) {
@@ -565,10 +554,6 @@ rfbClientConnectionGone(rfbClientPtr cl)
     LOCK(cl->sendMutex);
     UNLOCK(cl->sendMutex);
     TINI_MUTEX(cl->sendMutex);
-
-#ifdef CORBA
-    destroyConnection(cl);
-#endif
 
     rfbPrintStats(cl);
 
@@ -900,6 +885,7 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     /*rfbSetBit(msgs.client2server, rfbTextChat);        */
     /*rfbSetBit(msgs.client2server, rfbKeyFrameRequest); */
     rfbSetBit(msgs.client2server, rfbPalmVNCSetScaleFactor);
+    rfbSetBit(msgs.client2server, rfbXvp);
     rfbSetBit(msgs.client2server, rfbMulticastFramebufferUpdateRequest);
     rfbSetBit(msgs.client2server, rfbMulticastFramebufferUpdateNACK);
 
@@ -910,6 +896,7 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     rfbSetBit(msgs.server2client, rfbResizeFrameBuffer);
     /*rfbSetBit(msgs.server2client, rfbKeyFrameUpdate);  */
     rfbSetBit(msgs.server2client, rfbPalmVNCReSizeFrameBuffer);
+    rfbSetBit(msgs.server2client, rfbXvp);
     rfbSetBit(msgs.server2client, rfbMulticastFramebufferUpdate);
 
     memcpy(&cl->updateBuf[cl->ublen], (char *)&msgs, sz_rfbSupportedMessages);
@@ -1154,6 +1141,33 @@ rfbSendMulticastVNCSessionInfo(rfbClientPtr cl)
 
 
 
+/*
+ * Send an xvp server message
+ */
+
+rfbBool
+rfbSendXvp(rfbClientPtr cl, uint8_t version, uint8_t code)
+{
+    rfbXvpMsg xvp;
+
+    xvp.type = rfbXvp;
+    xvp.pad = 0;
+    xvp.version = version;
+    xvp.code = code;
+
+    LOCK(cl->sendMutex);
+    if (rfbWriteExact(cl, (char *)&xvp, sz_rfbXvpMsg) < 0) {
+      rfbLogPerror("rfbSendXvp: write");
+      rfbCloseClient(cl);
+    }
+    UNLOCK(cl->sendMutex);
+
+    rfbStatRecordMessageSent(cl, rfbXvp, sz_rfbXvpMsg, sz_rfbXvpMsg);
+
+    return TRUE;
+}
+
+
 rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *buffer)
 {
     rfbTextChatMsg tc;
@@ -1371,7 +1385,11 @@ rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer)
                 /*
                 rfbLog("rfbProcessFileTransfer() rfbDirContentRequest: rfbRDirContent: Sending \"%s\"\n", (char *)win32filename.cFileName);
                 */
-                if (rfbSendFileTransferMessage(cl, rfbDirPacket, rfbADirectory, 0, nOptLen, (char *)&win32filename)==FALSE) return FALSE;
+                if (rfbSendFileTransferMessage(cl, rfbDirPacket, rfbADirectory, 0, nOptLen, (char *)&win32filename)==FALSE)
+                {
+                    closedir(dirp);
+                    return FALSE;
+                }
             }
         }
     }
@@ -2108,7 +2126,15 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                           "%s\n", cl->host);
                   cl->enableServerIdentity = TRUE;
                 }
-                break;           
+		break;
+	    case rfbEncodingXvp:
+	        rfbLog("Enabling Xvp protocol extension for client "
+		        "%s\n", cl->host);
+		if (!rfbSendXvp(cl, 1, rfbXvp_Init)) {
+		  rfbCloseClient(cl);
+		  return;
+		}
+                break;
             case rfbEncodingMulticastVNC:
      	       /* do we have the right type of multicast socket? */
 	       if(cl->screen->multicastSockAddr.ss_family == AF_INET)
@@ -2622,6 +2648,28 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
       rfbScalingSetup(cl,cl->screen->width/msg.ssc.scale, cl->screen->height/msg.ssc.scale);
 
       rfbSendNewScaleSize(cl);
+      return;
+
+    case rfbXvp:
+
+      if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
+          sz_rfbXvpMsg - 1)) <= 0) {
+          if (n != 0)
+            rfbLogPerror("rfbProcessClientNormalMessage: read");
+          rfbCloseClient(cl);
+          return;
+      }
+      rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbXvpMsg, sz_rfbXvpMsg);
+
+      /* only version when is defined, so echo back a fail */
+      if(msg.xvp.version != 1) {
+	rfbSendXvp(cl, msg.xvp.version, rfbXvp_Fail);
+      }
+      else {
+	/* if the hook exists and fails, send a fail msg */
+	if(cl->screen->xvpHook && !cl->screen->xvpHook(cl, msg.xvp.version, msg.xvp.code))
+	  rfbSendXvp(cl, 1, rfbXvp_Fail);
+      }
       return;
 
     default:

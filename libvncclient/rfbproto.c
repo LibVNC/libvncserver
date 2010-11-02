@@ -33,15 +33,9 @@
 #include <sys/stat.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#else
-#define WINVER 0x0501
-#include <ws2tcpip.h>
-#define strncasecmp _strnicmp
-#endif
-#include <errno.h>
-#ifndef WIN32
 #include <pwd.h>
 #endif
+#include <errno.h>
 #include <rfb/rfbclient.h>
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
@@ -51,6 +45,9 @@
 #endif
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
+#ifdef _RPCNDR_H /* This Windows header typedefs 'boolean', jpeglib has to know */
+#define HAVE_BOOLEAN
+#endif
 #include <jpeglib.h>
 #endif
 #include <stdarg.h>
@@ -433,6 +430,9 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     rfbClientLog("Unable to connect to VNC server\n");
     return FALSE;
   }
+
+  if(client->QoS_DSCP && !SetDSCP(client->sock, client->QoS_DSCP))
+     return FALSE;
 
   return SetNonBlocking(client->sock);
 }
@@ -1244,6 +1244,10 @@ SetFormatAndEncodings(rfbClient* client)
   if (se->nEncodings < MAX_ENCODINGS)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingServerIdentity);
 
+  /* xvp */
+  if (se->nEncodings < MAX_ENCODINGS)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingXvp);
+
   /* Multicast framebuffer updates */
   if (se->nEncodings < MAX_ENCODINGS && client->canHandleMulticastVNC)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingMulticastVNC);
@@ -1454,6 +1458,37 @@ rfbBool PermitServerInput(rfbClient* client, int enabled)
     msg.status = (enabled ? 1 : 0);
     msg.pad = 0;
     return  (WriteToRFBServer(client, (char *)&msg, sz_rfbSetServerInputMsg) ? TRUE : FALSE);
+}
+
+
+/*
+ * send xvp client message
+ * A client supporting the xvp extension sends this to request that the server initiate
+ * a clean shutdown, clean reboot or abrupt reset of the system whose framebuffer the
+ * client is displaying.
+ *
+ * only version 1 is defined in the protocol specs
+ *
+ * possible values for code are:
+ *   rfbXvp_Shutdown
+ *   rfbXvp_Reboot
+ *   rfbXvp_Reset
+ */
+
+rfbBool SendXvpMsg(rfbClient* client, uint8_t version, uint8_t code)
+{
+    rfbXvpMsg xvp;
+
+    if (!SupportsClient2Server(client, rfbXvp)) return TRUE;
+    xvp.type = rfbXvp;
+    xvp.pad = 0;
+    xvp.version = version;
+    xvp.code = code;
+
+    if (!WriteToRFBServer(client, (char *)&xvp, sz_rfbXvpMsg))
+        return FALSE;
+
+    return TRUE;
 }
 
 
@@ -2278,6 +2313,24 @@ HandleRFBServerMessage(rfbClient* client)
           break;
       }
       break;
+  }
+
+  case rfbXvp:
+  {
+    if (!ReadFromRFBServer(client, ((char *)&msg) + 1,
+                           sz_rfbXvpMsg -1))
+      return FALSE;
+
+    SetClient2Server(client, rfbXvp);
+    /* technically, we only care what we can *send* to the server
+     * but, we set Server2Client Just in case it ever becomes useful
+     */
+    SetServer2Client(client, rfbXvp);
+
+    if(client->HandleXvpMsg)
+      client->HandleXvpMsg(client, msg.xvp.version, msg.xvp.code);
+
+    break;
   }
 
   case rfbResizeFrameBuffer:

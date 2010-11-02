@@ -34,6 +34,9 @@
 #define NEEDFAR_POINTERS
 #endif
 
+#ifdef _RPCNDR_H /* This Windows header typedefs 'boolean', jpeglib has to know */
+#define HAVE_BOOLEAN
+#endif
 #include <jpeglib.h>
 
 /* Note: The following constant should not be changed. */

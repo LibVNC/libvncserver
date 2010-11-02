@@ -55,6 +55,7 @@ char *messageNameServer2Client(uint32_t type, char *buf, int len) {
     case rfbFileTransfer:             snprintf(buf, len, "FileTransfer"); break;
     case rfbTextChat:                 snprintf(buf, len, "TextChat"); break;
     case rfbPalmVNCReSizeFrameBuffer: snprintf(buf, len, "PalmVNCReSize"); break;
+    case rfbXvp:                      snprintf(buf, len, "XvpServerMessage"); break;
     case rfbMulticastFramebufferUpdate:
                                       snprintf(buf, len, "MulticastFBUpd"); break;
     default:
@@ -80,6 +81,7 @@ char *messageNameClient2Server(uint32_t type, char *buf, int len) {
     case rfbTextChat:                 snprintf(buf, len, "TextChat"); break;
     case rfbKeyFrameRequest:          snprintf(buf, len, "KeyFrameRequest"); break;
     case rfbPalmVNCSetScaleFactor:    snprintf(buf, len, "PalmVNCSetScale"); break;
+    case rfbXvp:                      snprintf(buf, len, "XvpClientMessage"); break;
     case rfbMulticastFramebufferUpdateRequest:
                                       snprintf(buf, len, "MulticastFBUpdReq"); break;
     case rfbMulticastFramebufferUpdateNACK:

@@ -146,6 +146,7 @@ typedef void (*rfbDisplayHookPtr)(struct _rfbClientRec* cl);
 typedef void (*rfbDisplayFinishedHookPtr)(struct _rfbClientRec* cl, int result);
 /* support the capability to view the caps/num/scroll states of the X server */
 typedef int  (*rfbGetKeyboardLedStateHookPtr)(struct _rfbScreenInfo* screen);
+typedef rfbBool (*rfbXvpHookPtr)(struct _rfbClientRec* cl, uint8_t, uint8_t);
 /* If x==1 and y==1 then set the whole display
  * else find the window underneath x and y and set the framebuffer to the dimensions
  * of that window
@@ -363,6 +364,8 @@ typedef struct _rfbScreenInfo
 
     /* displayFinishedHook is called just after a frame buffer update */
     rfbDisplayFinishedHookPtr displayFinishedHook;
+    /* xvpHook is called to handle an xvp client message */
+    rfbXvpHookPtr xvpHook;
     
     /*
       multicast stuff 
@@ -718,6 +721,7 @@ extern int rfbListenOnTCPPort(int port, in_addr_t iface);
 extern int rfbListenOnUDPPort(int port, in_addr_t iface);
 extern int rfbCreateMulticastSocket(char* addr, int port, int ttl, in_addr_t iface, struct sockaddr_storage* sockAddrSave);
 extern int rfbStringToAddr(char* string,in_addr_t* addr);
+extern rfbBool rfbSetNonBlocking(int sock);
 
 /* rfbserver.c */
 
