@@ -24,7 +24,7 @@
 
 
 #define CW_SIZE 10 /* width and height of cursor window */
-#define SLEEPTIME 50 /* milliseconds to wait in between pointer queries */
+#define DFLT_SLEEPTIME 50 /* default milliseconds to wait in between pointer queries */
 
 
 char *progname;
@@ -60,6 +60,7 @@ void usage()
 	-dev <device id>	open device with this id instead of last\n\
                                 created pointer\n\
 	-label <label>		cursor label to apply. if none, use device id\n\
+	-sleep		        miliseconds to wait in between cursor updates\n\
 	-color <X11 color>	color of the cursor, given as an X11 color name\n\
                                 if none is given, color depends on device id\n\
 	-onescreen		apply only to given screen of display\n\
@@ -260,6 +261,7 @@ int main(int argc, char** argv)
   Window root;
   char *displayname = 0;
   char *label = 0;
+  int sleeptime = DFLT_SLEEPTIME;
   XColor color;
   char* colorspec = 0;
   XIDeviceInfo* devinfo;
@@ -311,6 +313,10 @@ int main(int argc, char** argv)
       argc--,argv++;
       if(argc<0)usage();
       label = *argv;
+    }else if(strcmp(*argv,"-sleep")==0){
+      argc--,argv++;
+      if(argc<0)usage();
+      sleeptime = atoi(*argv);
     }else if(strcmp(*argv,"-color")==0){
       argc--,argv++;
       if(argc<0)usage();
@@ -508,7 +514,7 @@ int main(int argc, char** argv)
 		      }
 		  }
 
-	  usleep(1000* SLEEPTIME);
+	  usleep(1000*sleeptime);
 	}
 
 
