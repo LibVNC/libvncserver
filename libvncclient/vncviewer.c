@@ -404,16 +404,6 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
     { 
       struct timeval now;
 
-      /* first, analyse multicast loss ratio and spit out some warnings */
-      double lossrate = 0;
-      if(client->multicastRcvd > 0)
-	lossrate = client->multicastLost/(double)(client->multicastRcvd+client->multicastLost);
-
-      if(lossrate > 0.5) 
-	rfbClientLog("MulticastVNC: ALERT: loss ratio > 0.5\n");
-      else if(lossrate > 0.2) 
-	rfbClientLog("MulticastVNC: Warning: loss ratio > 0.2\n");
-
       /* then, see if it's time for a request */
       gettimeofday(&now, NULL);
       if(((now.tv_sec - client->multicastRequestTimestamp.tv_sec)*1000

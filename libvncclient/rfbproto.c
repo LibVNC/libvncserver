@@ -1342,6 +1342,10 @@ SendMulticastFramebufferUpdateNACK(rfbClient* client, uint32_t idPartialUpd, uin
 
   if (!SupportsClient2Server(client, rfbMulticastFramebufferUpdateNACK)) return TRUE;
 
+#ifdef MULTICAST_DEBUG
+  rfbClientLog("MulticastVNC DEBUG: sending NACK: start partial upd %d, count %d\n", idPartialUpd, nPartialUpds);
+#endif
+
   mfun.type = rfbMulticastFramebufferUpdateNACK;
   mfun.idPartialUpd = rfbClientSwap32IfLE(idPartialUpd);
   mfun.nPartialUpds = rfbClientSwap16IfLE(nPartialUpds);

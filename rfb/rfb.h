@@ -379,9 +379,10 @@ typedef struct _rfbScreenInfo
     struct sockaddr_storage multicastSockAddr;
     /*
      * the constraints for MULTICAST_UPDATE_BUF_SIZE are the same as for UPDATE_BUF_SIZE 
-     * (see comment there), additionally, it _must_ fit into a UDP packet
+     * (see comment there).
+     * Additionally, it _must_ fit into a UDP packet, but even better into an MTU.
      */
-#define MULTICAST_UPDATE_BUF_SIZE 60000
+#define MULTICAST_UPDATE_BUF_SIZE 8192
     char multicastUpdateBuf[MULTICAST_UPDATE_BUF_SIZE];
     int  mcublen;
     uint16_t multicastWholeUpdId;
