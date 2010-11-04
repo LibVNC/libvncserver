@@ -3921,6 +3921,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 
         if(use_multipointer && xi2_device_creation_in_progress) {
             rfbLog("denying additional client: %s during MD creation.\n", client->host);
+	    CLIENT_UNLOCK;
             return(RFB_CLIENT_REFUSE);
         }
 
@@ -3989,6 +3990,7 @@ enum rfbNewClientAction new_client(rfbClientPtr client) {
 	      rfbLog("ERROR creating XInput2 MD for client %s, denying client.\n", client->host);
 	      free_client_data(client);
 	      xi2_device_creation_in_progress = 0;
+	      CLIENT_UNLOCK;
 	      return(RFB_CLIENT_REFUSE);
 	    }
 
