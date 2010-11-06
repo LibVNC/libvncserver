@@ -790,27 +790,16 @@ static void nofb_hook(rfbClientPtr cl) {
 
 
 /*
-  hook to draw cursors when in threaded mode.
-  still a bit hacky because there is no 
-  DisplayFinishedHook.
- */
+  hook to draw and restore cursors when in threaded mode.
+*/
 static void multicursor_hook(rfbClientPtr client)
 {
   ClientData* cd = (ClientData*)client->clientData;
+  rfbClientIteratorPtr iter;
+  rfbClientPtr cl;
 
-  if(! cd->cursor_hook_lock) {
-    rfbClientIteratorPtr iter;
-    rfbClientPtr cl;
-
-    /* make sure this doesn't get called again in the
-       rfbSendFramebufferUpdate() call below */
-    cd->cursor_hook_lock = TRUE;
-
-    /* maybe this is not needed */
-    LOCK(multi_cursor_mutex);
-
-
-    /* disable cursor shape/position updates for this client */
+  if(! cd->cursor_drawn) {
+     /* disable cursor shape/position updates for this client */
     if (client->enableCursorShapeUpdates) {
       cd->had_cursor_shape_updates = 1;
       client->enableCursorShapeUpdates = FALSE;
@@ -825,11 +814,8 @@ static void multicursor_hook(rfbClientPtr client)
     }
     client->cursorWasChanged = FALSE;
 
-    /* restore modified regions we saved in a previous call */ 
-    LOCK(client->updateMutex);
-    sraRgnOr(client->modifiedRegion, cd->cursor_region);
-    sraRgnMakeEmpty(cd->cursor_region);
-    UNLOCK(client->updateMutex);
+    /* we use this to make sure positions are not changed */
+    INPUT_LOCK;
 
     /* save fb */
     iter = rfbGetClientIterator(screen);
@@ -837,32 +823,24 @@ static void multicursor_hook(rfbClientPtr client)
       save_under_cursor_buffer(cl);
     rfbReleaseClientIterator(iter);
 
-    /* draw all cursors into fb */
+    /* draw all cursors into fb after saving all */
     iter = rfbGetClientIterator(screen);
     while( (cl = rfbClientIteratorNext(iter)) ) 
       draw_cursor(cl);
     rfbReleaseClientIterator(iter);
 
-    /* send to this one client */
-    rfbSendFramebufferUpdate(client, client->modifiedRegion);
-
+    cd->cursor_drawn = TRUE;
+  }
+  else {
     /* restore fb */
     iter = rfbGetClientIterator(screen);
     while( (cl = rfbClientIteratorNext(iter)) ) 
       restore_under_cursor_buffer(cl);
     rfbReleaseClientIterator(iter);
 
-    LOCK(client->updateMutex);
-    /* save where the hidden cursors are for later */
-    sraRgnOr(cd->cursor_region, client->modifiedRegion);
-    /* prevent the outer rfbSendFramebufferUpdate() call to send out
-       the regions where the hidden cursors are. Otherwise we'd have flicker */
-    sraRgnMakeEmpty(client->modifiedRegion);
-    UNLOCK(client->updateMutex);
+    INPUT_UNLOCK;
   
-    UNLOCK(multi_cursor_mutex);
-  
-    cd->cursor_hook_lock = FALSE;
+    cd->cursor_drawn = FALSE;
   }
 }
 
@@ -3611,8 +3589,10 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		  /* needed to allow multiple dragging actions at once */
 		  screen->deferPtrUpdateTime = 0; 
 		  /* this draws cursors into the framebuffer */
-		  if(use_threads) 
+		  if(use_threads) {
 		    screen->displayHook = multicursor_hook;
+		    screen->displayFinishedHook = multicursor_hook;
+		  }
 		}
 
 		if (cmap8to24) {

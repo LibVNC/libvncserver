@@ -32,7 +32,6 @@
 extern int xinput2_present;
 extern int use_multipointer;
 extern int xi2_device_creation_in_progress;
-MUTEX(multi_cursor_mutex);
 
 
 /*

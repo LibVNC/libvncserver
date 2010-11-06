@@ -665,7 +665,7 @@ typedef struct _ClientData {
         char* under_cursor_buffer;
         int under_cursor_buffer_len;
         sraRegionPtr cursor_region;
-        rfbBool cursor_hook_lock;
+        rfbBool cursor_drawn;
 } ClientData;
 
 extern void nox11_exit(int rc);

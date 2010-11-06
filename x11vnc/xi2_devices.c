@@ -39,7 +39,6 @@
 #endif
 
 
-
 /* does the X version we're running on support XI2? */
 int xinput2_present;
 int use_multipointer;

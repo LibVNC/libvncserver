@@ -1914,8 +1914,10 @@ void cursor_position(int x, int y, rfbClientPtr client) {
 	   ClientData *cd = (ClientData *) client->clientData;
 	   if (debug_pointer)
 	     rfbLog("cursor_position: set client pos x=%3d y=%d\n", x, y);
+	   INPUT_LOCK;
 	   cd->cursor_x = x;
 	   cd->cursor_y = y;
+	   INPUT_UNLOCK;
 	 }
        }
 }
@@ -2332,7 +2334,8 @@ void restore_under_cursor_buffer(rfbClientPtr cl)
 	     cd->under_cursor_buffer+j*x2*bpp,
 	     x2*bpp);
 
-    mark_rect_as_modified(x1, y1, x1+x2, y1+y2, 1);
+    /* seems the additional w/2 and h/2 rect extension is needed in threaded mode */
+    mark_rect_as_modified(x1-x2/2, y1-y2/2, x1+x2+x2/2, y1+y2+y2/2, 1);
   }
   UNLOCK(cl->screen->cursorMutex);
 }

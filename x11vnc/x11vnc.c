@@ -5280,7 +5280,6 @@ int main(int argc, char* argv[]) {
             /* disable these as most clients expect only a single cursor */
             cursor_shape_updates = 0;
             rfbLog("Drawing cursors into framebuffer while using multiple pointer support.\n");
-	    INIT_MUTEX(multi_cursor_mutex);
           }
 
 #if LIBVNCSERVER_HAVE_LIBXDAMAGE
