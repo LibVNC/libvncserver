@@ -134,11 +134,13 @@ void rfbTightCleanup(rfbScreenInfoPtr screen)
 {
   if(tightBeforeBufSize) {
     free(tightBeforeBuf);
+    tightBeforeBuf = NULL;
     tightBeforeBufSize=0;
     tightBeforeBuf = NULL;
   }
   if(tightAfterBufSize) {
     free(tightAfterBuf);
+    tightAfterBuf = NULL;
     tightAfterBufSize=0;
     tightAfterBuf = NULL;
   }
