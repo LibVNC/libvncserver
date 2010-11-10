@@ -5,8 +5,8 @@
  */
 
 /*
- *  Copyright 2000, 2001 Const Kaplinsky <const@ce.cctpu.edu.ru> All Rights Reserved.
- *  Copyright 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
+ *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
+ *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,12 +20,13 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this software; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  *  USA.
  */
 
 /*#include <stdio.h>*/
-#include "rfb.h"
+#include <rfb/rfb.h>
+#include "private.h"
 
 #ifdef WIN32
 #define XMD_H
@@ -44,10 +45,10 @@
 #define MAX_SPLIT_TILE_SIZE       16
 
 /* May be set to TRUE with "-lazytight" Xvnc option. */
-Bool rfbTightDisableGradient = FALSE;
+rfbBool rfbTightDisableGradient = FALSE;
 
 /* This variable is set on every rfbSendRectEncodingTight() call. */
-static Bool usePixelFormat24;
+static rfbBool usePixelFormat24;
 
 
 /* Compression level stuff. The following array contains various
@@ -64,13 +65,13 @@ typedef struct TIGHT_CONF_s {
 } TIGHT_CONF;
 
 static TIGHT_CONF tightConf[10] = {
-    {   512,   32,   6, 65536, 0, 0, 0, 0,   0,   0,   4, 20, 10000, 23000 },
-    {  2048,  128,   6, 65536, 1, 1, 1, 0,   0,   0,   8, 30,  8000, 18000 },
-    {  6144,  256,   8, 65536, 3, 3, 2, 0,   0,   0,  24, 40,  6500, 15000 },
-    { 10240, 1024,  12, 65536, 5, 5, 3, 0,   0,   0,  32, 50,  5000, 12000 },
-    { 16384, 2048,  12, 65536, 6, 6, 4, 0,   0,   0,  32, 55,  4000, 10000 },
-    { 32768, 2048,  12,  4096, 7, 7, 5, 4, 150, 380,  32, 60,  3000,  8000 },
-    { 65536, 2048,  16,  4096, 7, 7, 6, 4, 170, 420,  48, 65,  2000,  5000 },
+    {   512,   32,   6, 65536, 0, 0, 0, 0,   0,   0,   4,  5, 10000, 23000 },
+    {  2048,  128,   6, 65536, 1, 1, 1, 0,   0,   0,   8, 10,  8000, 18000 },
+    {  6144,  256,   8, 65536, 3, 3, 2, 0,   0,   0,  24, 15,  6500, 15000 },
+    { 10240, 1024,  12, 65536, 5, 5, 3, 0,   0,   0,  32, 25,  5000, 12000 },
+    { 16384, 2048,  12, 65536, 6, 6, 4, 0,   0,   0,  32, 37,  4000, 10000 },
+    { 32768, 2048,  12,  4096, 7, 7, 5, 4, 150, 380,  32, 50,  3000,  8000 },
+    { 65536, 2048,  16,  4096, 7, 7, 6, 4, 170, 420,  48, 60,  2000,  5000 },
     { 65536, 2048,  16,  4096, 8, 8, 7, 5, 180, 450,  64, 70,  1000,  2500 },
     { 65536, 2048,  32,  8192, 9, 9, 8, 6, 190, 475,  64, 75,   500,  1200 },
     { 65536, 2048,  32,  8192, 9, 9, 9, 6, 200, 500,  96, 80,   200,   500 }
@@ -84,7 +85,7 @@ static int qualityLevel;
 typedef struct COLOR_LIST_s {
     struct COLOR_LIST_s *next;
     int idx;
-    CARD32 rgb;
+    uint32_t rgb;
 } COLOR_LIST;
 
 typedef struct PALETTE_ENTRY_s {
@@ -98,8 +99,9 @@ typedef struct PALETTE_s {
     COLOR_LIST list[256];
 } PALETTE;
 
+/* TODO: move into rfbScreen struct */
 static int paletteNumColors, paletteMaxColors;
-static CARD32 monoBackground, monoForeground;
+static uint32_t monoBackground, monoForeground;
 static PALETTE palette;
 
 /* Pointers to dynamically-allocated buffers. */
@@ -112,68 +114,79 @@ static char *tightAfterBuf = NULL;
 
 static int *prevRowBuf = NULL;
 
+void rfbTightCleanup(rfbScreenInfoPtr screen)
+{
+  if(tightBeforeBufSize) {
+    free(tightBeforeBuf);
+    tightBeforeBufSize=0;
+  }
+  if(tightAfterBufSize) {
+    free(tightAfterBuf);
+    tightAfterBufSize=0;
+  }
+}
 
 /* Prototypes for static functions. */
 
 static void FindBestSolidArea (rfbClientPtr cl, int x, int y, int w, int h,
-                               CARD32 colorValue, int *w_ptr, int *h_ptr);
+                               uint32_t colorValue, int *w_ptr, int *h_ptr);
 static void ExtendSolidArea   (rfbClientPtr cl, int x, int y, int w, int h,
-                               CARD32 colorValue,
+                               uint32_t colorValue,
                                int *x_ptr, int *y_ptr, int *w_ptr, int *h_ptr);
-static Bool CheckSolidTile    (rfbClientPtr cl, int x, int y, int w, int h,
-                               CARD32 *colorPtr, Bool needSameColor);
-static Bool CheckSolidTile8   (rfbClientPtr cl, int x, int y, int w, int h,
-                               CARD32 *colorPtr, Bool needSameColor);
-static Bool CheckSolidTile16  (rfbClientPtr cl, int x, int y, int w, int h,
-                               CARD32 *colorPtr, Bool needSameColor);
-static Bool CheckSolidTile32  (rfbClientPtr cl, int x, int y, int w, int h,
-                               CARD32 *colorPtr, Bool needSameColor);
+static rfbBool CheckSolidTile    (rfbClientPtr cl, int x, int y, int w, int h,
+                               uint32_t *colorPtr, rfbBool needSameColor);
+static rfbBool CheckSolidTile8   (rfbClientPtr cl, int x, int y, int w, int h,
+                               uint32_t *colorPtr, rfbBool needSameColor);
+static rfbBool CheckSolidTile16  (rfbClientPtr cl, int x, int y, int w, int h,
+                               uint32_t *colorPtr, rfbBool needSameColor);
+static rfbBool CheckSolidTile32  (rfbClientPtr cl, int x, int y, int w, int h,
+                               uint32_t *colorPtr, rfbBool needSameColor);
 
-static Bool SendRectSimple    (rfbClientPtr cl, int x, int y, int w, int h);
-static Bool SendSubrect       (rfbClientPtr cl, int x, int y, int w, int h);
-static Bool SendTightHeader   (rfbClientPtr cl, int x, int y, int w, int h);
+static rfbBool SendRectSimple    (rfbClientPtr cl, int x, int y, int w, int h);
+static rfbBool SendSubrect       (rfbClientPtr cl, int x, int y, int w, int h);
+static rfbBool SendTightHeader   (rfbClientPtr cl, int x, int y, int w, int h);
 
-static Bool SendSolidRect     (rfbClientPtr cl);
-static Bool SendMonoRect      (rfbClientPtr cl, int w, int h);
-static Bool SendIndexedRect   (rfbClientPtr cl, int w, int h);
-static Bool SendFullColorRect (rfbClientPtr cl, int w, int h);
-static Bool SendGradientRect  (rfbClientPtr cl, int w, int h);
+static rfbBool SendSolidRect     (rfbClientPtr cl);
+static rfbBool SendMonoRect      (rfbClientPtr cl, int w, int h);
+static rfbBool SendIndexedRect   (rfbClientPtr cl, int w, int h);
+static rfbBool SendFullColorRect (rfbClientPtr cl, int w, int h);
+static rfbBool SendGradientRect  (rfbClientPtr cl, int w, int h);
 
-static Bool CompressData(rfbClientPtr cl, int streamId, int dataLen,
+static rfbBool CompressData(rfbClientPtr cl, int streamId, int dataLen,
                          int zlibLevel, int zlibStrategy);
-static Bool SendCompressedData(rfbClientPtr cl, int compressedLen);
+static rfbBool SendCompressedData(rfbClientPtr cl, int compressedLen);
 
 static void FillPalette8(int count);
 static void FillPalette16(int count);
 static void FillPalette32(int count);
 
 static void PaletteReset(void);
-static int PaletteInsert(CARD32 rgb, int numPixels, int bpp);
+static int PaletteInsert(uint32_t rgb, int numPixels, int bpp);
 
 static void Pack24(rfbClientPtr cl, char *buf, rfbPixelFormat *fmt, int count);
 
-static void EncodeIndexedRect16(CARD8 *buf, int count);
-static void EncodeIndexedRect32(CARD8 *buf, int count);
+static void EncodeIndexedRect16(uint8_t *buf, int count);
+static void EncodeIndexedRect32(uint8_t *buf, int count);
 
-static void EncodeMonoRect8(CARD8 *buf, int w, int h);
-static void EncodeMonoRect16(CARD8 *buf, int w, int h);
-static void EncodeMonoRect32(CARD8 *buf, int w, int h);
+static void EncodeMonoRect8(uint8_t *buf, int w, int h);
+static void EncodeMonoRect16(uint8_t *buf, int w, int h);
+static void EncodeMonoRect32(uint8_t *buf, int w, int h);
 
 static void FilterGradient24(rfbClientPtr cl, char *buf, rfbPixelFormat *fmt, int w, int h);
-static void FilterGradient16(rfbClientPtr cl, CARD16 *buf, rfbPixelFormat *fmt, int w, int h);
-static void FilterGradient32(rfbClientPtr cl, CARD32 *buf, rfbPixelFormat *fmt, int w, int h);
+static void FilterGradient16(rfbClientPtr cl, uint16_t *buf, rfbPixelFormat *fmt, int w, int h);
+static void FilterGradient32(rfbClientPtr cl, uint32_t *buf, rfbPixelFormat *fmt, int w, int h);
 
 static int DetectSmoothImage(rfbClientPtr cl, rfbPixelFormat *fmt, int w, int h);
 static unsigned long DetectSmoothImage24(rfbClientPtr cl, rfbPixelFormat *fmt, int w, int h);
 static unsigned long DetectSmoothImage16(rfbClientPtr cl, rfbPixelFormat *fmt, int w, int h);
 static unsigned long DetectSmoothImage32(rfbClientPtr cl, rfbPixelFormat *fmt, int w, int h);
 
-static Bool SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h,
+static rfbBool SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h,
                          int quality);
-static void PrepareRowForJpeg(rfbClientPtr cl, CARD8 *dst, int x, int y, int count);
-static void PrepareRowForJpeg24(rfbClientPtr cl, CARD8 *dst, int x, int y, int count);
-static void PrepareRowForJpeg16(rfbClientPtr cl, CARD8 *dst, int x, int y, int count);
-static void PrepareRowForJpeg32(rfbClientPtr cl, CARD8 *dst, int x, int y, int count);
+static void PrepareRowForJpeg(rfbClientPtr cl, uint8_t *dst, int x, int y, int count);
+static void PrepareRowForJpeg24(rfbClientPtr cl, uint8_t *dst, int x, int y, int count);
+static void PrepareRowForJpeg16(rfbClientPtr cl, uint8_t *dst, int x, int y, int count);
+static void PrepareRowForJpeg32(rfbClientPtr cl, uint8_t *dst, int x, int y, int count);
 
 static void JpegInitDestination(j_compress_ptr cinfo);
 static boolean JpegEmptyOutputBuffer(j_compress_ptr cinfo);
@@ -186,9 +199,11 @@ static void JpegSetDstManager(j_compress_ptr cinfo);
  */
 
 int
-rfbNumCodedRectsTight(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbNumCodedRectsTight(rfbClientPtr cl,
+                      int x,
+                      int y,
+                      int w,
+                      int h)
 {
     int maxRectSize, maxRectWidth;
     int subrectMaxWidth, subrectMaxHeight;
@@ -211,16 +226,20 @@ rfbNumCodedRectsTight(cl, x, y, w, h)
     }
 }
 
-Bool
-rfbSendRectEncodingTight(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbBool
+rfbSendRectEncodingTight(rfbClientPtr cl,
+                         int x,
+                         int y,
+                         int w,
+                         int h)
 {
     int nMaxRows;
-    CARD32 colorValue;
+    uint32_t colorValue;
     int dx, dy, dw, dh;
     int x_best, y_best, w_best, h_best;
     char *fbptr;
+
+    rfbSendUpdateBuf(cl);
 
     compressLevel = cl->tightCompressLevel;
     qualityLevel = cl->tightQualityLevel;
@@ -313,13 +332,13 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
                 if (!SendTightHeader(cl, x_best, y_best, w_best, h_best))
                     return FALSE;
 
-                fbptr = (cl->screen->frameBuffer +
-                         (cl->screen->paddedWidthInBytes * y_best) +
-                         (x_best * (cl->screen->bitsPerPixel / 8)));
+                fbptr = (cl->scaledScreen->frameBuffer +
+                         (cl->scaledScreen->paddedWidthInBytes * y_best) +
+                         (x_best * (cl->scaledScreen->bitsPerPixel / 8)));
 
-                (*cl->translateFn)(cl->translateLookupTable, &cl->screen->rfbServerFormat,
+                (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
                                    &cl->format, fbptr, tightBeforeBuf,
-                                   cl->screen->paddedWidthInBytes, 1, 1);
+                                   cl->scaledScreen->paddedWidthInBytes, 1, 1);
 
                 if (!SendSolidRect(cl))
                     return FALSE;
@@ -350,11 +369,14 @@ rfbSendRectEncodingTight(cl, x, y, w, h)
 }
 
 static void
-FindBestSolidArea(cl, x, y, w, h, colorValue, w_ptr, h_ptr)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    CARD32 colorValue;
-    int *w_ptr, *h_ptr;
+FindBestSolidArea(rfbClientPtr cl,
+                  int x,
+                  int y,
+                  int w,
+                  int h,
+                  uint32_t colorValue,
+                  int *w_ptr,
+                  int *h_ptr)
 {
     int dx, dy, dw, dh;
     int w_prev;
@@ -392,11 +414,16 @@ FindBestSolidArea(cl, x, y, w, h, colorValue, w_ptr, h_ptr)
 }
 
 static void
-ExtendSolidArea(cl, x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    CARD32 colorValue;
-    int *x_ptr, *y_ptr, *w_ptr, *h_ptr;
+ExtendSolidArea(rfbClientPtr cl,
+                int x,
+                int y,
+                int w,
+                int h,
+                uint32_t colorValue,
+                int *x_ptr,
+                int *y_ptr,
+                int *w_ptr,
+                int *h_ptr)
 {
     int cx, cy;
 
@@ -429,14 +456,16 @@ ExtendSolidArea(cl, x, y, w, h, colorValue, x_ptr, y_ptr, w_ptr, h_ptr)
     *w_ptr += cx - (*x_ptr + *w_ptr);
 }
 
-static Bool
-CheckSolidTile(cl, x, y, w, h, colorPtr, needSameColor)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    CARD32 *colorPtr;
-    Bool needSameColor;
+/*
+ * Check if a rectangle is all of the same color. If needSameColor is
+ * set to non-zero, then also check that its color equals to the
+ * *colorPtr value. The result is 1 if the test is successfull, and in
+ * that case new color will be stored in *colorPtr.
+ */
+
+static rfbBool CheckSolidTile(rfbClientPtr cl, int x, int y, int w, int h, uint32_t* colorPtr, rfbBool needSameColor)
 {
-    switch(cl->screen->rfbServerFormat.bitsPerPixel) {
+    switch(cl->screen->serverFormat.bitsPerPixel) {
     case 32:
         return CheckSolidTile32(cl, x, y, w, h, colorPtr, needSameColor);
     case 16:
@@ -448,22 +477,19 @@ CheckSolidTile(cl, x, y, w, h, colorPtr, needSameColor)
 
 #define DEFINE_CHECK_SOLID_FUNCTION(bpp)                                      \
                                                                               \
-static Bool                                                                   \
-CheckSolidTile##bpp(cl, x, y, w, h, colorPtr, needSameColor)                  \
-    rfbClientPtr cl;  \
-    int x, y, w, h;                                                           \
-    CARD32 *colorPtr;                                                         \
-    Bool needSameColor;                                                       \
+static rfbBool                                                                \
+CheckSolidTile##bpp(rfbClientPtr cl, int x, int y, int w, int h,              \
+		uint32_t* colorPtr, rfbBool needSameColor)                    \
 {                                                                             \
-    CARD##bpp *fbptr;                                                         \
-    CARD##bpp colorValue;                                                     \
+    uint##bpp##_t *fbptr;                                                     \
+    uint##bpp##_t colorValue;                                                 \
     int dx, dy;                                                               \
                                                                               \
-    fbptr = (CARD##bpp *)                                                     \
-        &cl->screen->frameBuffer[y * cl->screen->paddedWidthInBytes + x * (bpp/8)]; \
+    fbptr = (uint##bpp##_t *)                                                 \
+        &cl->scaledScreen->frameBuffer[y * cl->scaledScreen->paddedWidthInBytes + x * (bpp/8)]; \
                                                                               \
     colorValue = *fbptr;                                                      \
-    if (needSameColor && (CARD32)colorValue != *colorPtr)                     \
+    if (needSameColor && (uint32_t)colorValue != *colorPtr)                   \
         return FALSE;                                                         \
                                                                               \
     for (dy = 0; dy < h; dy++) {                                              \
@@ -471,10 +497,10 @@ CheckSolidTile##bpp(cl, x, y, w, h, colorPtr, needSameColor)                  \
             if (colorValue != fbptr[dx])                                      \
                 return FALSE;                                                 \
         }                                                                     \
-        fbptr = (CARD##bpp *)((CARD8 *)fbptr + cl->screen->paddedWidthInBytes); \
+        fbptr = (uint##bpp##_t *)((uint8_t *)fbptr + cl->scaledScreen->paddedWidthInBytes); \
     }                                                                         \
                                                                               \
-    *colorPtr = (CARD32)colorValue;                                           \
+    *colorPtr = (uint32_t)colorValue;                                         \
     return TRUE;                                                              \
 }
 
@@ -482,10 +508,8 @@ DEFINE_CHECK_SOLID_FUNCTION(8)
 DEFINE_CHECK_SOLID_FUNCTION(16)
 DEFINE_CHECK_SOLID_FUNCTION(32)
 
-static Bool
-SendRectSimple(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+static rfbBool
+SendRectSimple(rfbClientPtr cl, int x, int y, int w, int h)
 {
     int maxBeforeSize, maxAfterSize;
     int maxRectSize, maxRectWidth;
@@ -537,13 +561,15 @@ SendRectSimple(cl, x, y, w, h)
     return TRUE;
 }
 
-static Bool
-SendSubrect(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+static rfbBool
+SendSubrect(rfbClientPtr cl,
+            int x,
+            int y,
+            int w,
+            int h)
 {
     char *fbptr;
-    Bool success = FALSE;
+    rfbBool success = FALSE;
 
     /* Send pending data if there is more than 128 bytes. */
     if (cl->ublen > 128) {
@@ -554,12 +580,12 @@ SendSubrect(cl, x, y, w, h)
     if (!SendTightHeader(cl, x, y, w, h))
         return FALSE;
 
-    fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)
-             + (x * (cl->screen->bitsPerPixel / 8)));
+    fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
+             + (x * (cl->scaledScreen->bitsPerPixel / 8)));
 
-    (*cl->translateFn)(cl->translateLookupTable, &cl->screen->rfbServerFormat,
+    (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
                        &cl->format, fbptr, tightBeforeBuf,
-                       cl->screen->paddedWidthInBytes, w, h);
+                       cl->scaledScreen->paddedWidthInBytes, w, h);
 
     paletteMaxColors = w * h / tightConf[compressLevel].idxMaxColorsDivisor;
     if ( paletteMaxColors < 2 &&
@@ -613,10 +639,12 @@ SendSubrect(cl, x, y, w, h)
     return success;
 }
 
-static Bool
-SendTightHeader(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+static rfbBool
+SendTightHeader(rfbClientPtr cl,
+                int x,
+                int y,
+                int w,
+                int h)
 {
     rfbFramebufferUpdateRectHeader rect;
 
@@ -635,8 +663,8 @@ SendTightHeader(cl, x, y, w, h)
            sz_rfbFramebufferUpdateRectHeader);
     cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-    cl->rfbRectanglesSent[rfbEncodingTight]++;
-    cl->rfbBytesSent[rfbEncodingTight] += sz_rfbFramebufferUpdateRectHeader;
+    rfbStatRecordEncodingSent(cl, rfbEncodingTight, sz_rfbFramebufferUpdateRectHeader,
+                              sz_rfbFramebufferUpdateRectHeader + w * (cl->format.bitsPerPixel / 8) * h);
 
     return TRUE;
 }
@@ -645,9 +673,8 @@ SendTightHeader(cl, x, y, w, h)
  * Subencoding implementations.
  */
 
-static Bool
-SendSolidRect(cl)
-    rfbClientPtr cl;
+static rfbBool
+SendSolidRect(rfbClientPtr cl)
 {
     int len;
 
@@ -666,15 +693,15 @@ SendSolidRect(cl)
     memcpy (&cl->updateBuf[cl->ublen], tightBeforeBuf, len);
     cl->ublen += len;
 
-    cl->rfbBytesSent[rfbEncodingTight] += len + 1;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, len+1);
 
     return TRUE;
 }
 
-static Bool
-SendMonoRect(cl, w, h)
-    rfbClientPtr cl;
-    int w, h;
+static rfbBool
+SendMonoRect(rfbClientPtr cl,
+             int w,
+             int h)
 {
     int streamId = 1;
     int paletteLen, dataLen;
@@ -697,10 +724,10 @@ SendMonoRect(cl, w, h)
     switch (cl->format.bitsPerPixel) {
 
     case 32:
-        EncodeMonoRect32((CARD8 *)tightBeforeBuf, w, h);
+        EncodeMonoRect32((uint8_t *)tightBeforeBuf, w, h);
 
-        ((CARD32 *)tightAfterBuf)[0] = monoBackground;
-        ((CARD32 *)tightAfterBuf)[1] = monoForeground;
+        ((uint32_t *)tightAfterBuf)[0] = monoBackground;
+        ((uint32_t *)tightAfterBuf)[1] = monoForeground;
         if (usePixelFormat24) {
             Pack24(cl, tightAfterBuf, &cl->format, 2);
             paletteLen = 6;
@@ -709,26 +736,26 @@ SendMonoRect(cl, w, h)
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteLen);
         cl->ublen += paletteLen;
-        cl->rfbBytesSent[rfbEncodingTight] += 3 + paletteLen;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 3 + paletteLen);
         break;
 
     case 16:
-        EncodeMonoRect16((CARD8 *)tightBeforeBuf, w, h);
+        EncodeMonoRect16((uint8_t *)tightBeforeBuf, w, h);
 
-        ((CARD16 *)tightAfterBuf)[0] = (CARD16)monoBackground;
-        ((CARD16 *)tightAfterBuf)[1] = (CARD16)monoForeground;
+        ((uint16_t *)tightAfterBuf)[0] = (uint16_t)monoBackground;
+        ((uint16_t *)tightAfterBuf)[1] = (uint16_t)monoForeground;
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, 4);
         cl->ublen += 4;
-        cl->rfbBytesSent[rfbEncodingTight] += 7;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 7);
         break;
 
     default:
-        EncodeMonoRect8((CARD8 *)tightBeforeBuf, w, h);
+        EncodeMonoRect8((uint8_t *)tightBeforeBuf, w, h);
 
         cl->updateBuf[cl->ublen++] = (char)monoBackground;
         cl->updateBuf[cl->ublen++] = (char)monoForeground;
-        cl->rfbBytesSent[rfbEncodingTight] += 5;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 5);
     }
 
     return CompressData(cl, streamId, dataLen,
@@ -736,10 +763,10 @@ SendMonoRect(cl, w, h)
                         Z_DEFAULT_STRATEGY);
 }
 
-static Bool
-SendIndexedRect(cl, w, h)
-    rfbClientPtr cl;
-    int w, h;
+static rfbBool
+SendIndexedRect(rfbClientPtr cl,
+                int w,
+                int h)
 {
     int streamId = 2;
     int i, entryLen;
@@ -760,10 +787,10 @@ SendIndexedRect(cl, w, h)
     switch (cl->format.bitsPerPixel) {
 
     case 32:
-        EncodeIndexedRect32((CARD8 *)tightBeforeBuf, w * h);
+        EncodeIndexedRect32((uint8_t *)tightBeforeBuf, w * h);
 
         for (i = 0; i < paletteNumColors; i++) {
-            ((CARD32 *)tightAfterBuf)[i] =
+            ((uint32_t *)tightAfterBuf)[i] =
                 palette.entry[i].listNode->rgb;
         }
         if (usePixelFormat24) {
@@ -774,20 +801,20 @@ SendIndexedRect(cl, w, h)
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteNumColors * entryLen);
         cl->ublen += paletteNumColors * entryLen;
-        cl->rfbBytesSent[rfbEncodingTight] += 3 + paletteNumColors * entryLen;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 3 + paletteNumColors * entryLen);
         break;
 
     case 16:
-        EncodeIndexedRect16((CARD8 *)tightBeforeBuf, w * h);
+        EncodeIndexedRect16((uint8_t *)tightBeforeBuf, w * h);
 
         for (i = 0; i < paletteNumColors; i++) {
-            ((CARD16 *)tightAfterBuf)[i] =
-                (CARD16)palette.entry[i].listNode->rgb;
+            ((uint16_t *)tightAfterBuf)[i] =
+                (uint16_t)palette.entry[i].listNode->rgb;
         }
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteNumColors * 2);
         cl->ublen += paletteNumColors * 2;
-        cl->rfbBytesSent[rfbEncodingTight] += 3 + paletteNumColors * 2;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 3 + paletteNumColors * 2);
         break;
 
     default:
@@ -799,10 +826,10 @@ SendIndexedRect(cl, w, h)
                         Z_DEFAULT_STRATEGY);
 }
 
-static Bool
-SendFullColorRect(cl, w, h)
-    rfbClientPtr cl;
-    int w, h;
+static rfbBool
+SendFullColorRect(rfbClientPtr cl,
+                  int w,
+                  int h)
 {
     int streamId = 0;
     int len;
@@ -813,7 +840,7 @@ SendFullColorRect(cl, w, h)
     }
 
     cl->updateBuf[cl->ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
-    cl->rfbBytesSent[rfbEncodingTight]++;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 1);
 
     if (usePixelFormat24) {
         Pack24(cl, tightBeforeBuf, &cl->format, w * h);
@@ -826,10 +853,10 @@ SendFullColorRect(cl, w, h)
                         Z_DEFAULT_STRATEGY);
 }
 
-static Bool
-SendGradientRect(cl, w, h)
-    rfbClientPtr cl;
-    int w, h;
+static rfbBool
+SendGradientRect(rfbClientPtr cl,
+                 int w,
+                 int h)
 {
     int streamId = 3;
     int len;
@@ -847,16 +874,16 @@ SendGradientRect(cl, w, h)
 
     cl->updateBuf[cl->ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     cl->updateBuf[cl->ublen++] = rfbTightFilterGradient;
-    cl->rfbBytesSent[rfbEncodingTight] += 2;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 2);
 
     if (usePixelFormat24) {
         FilterGradient24(cl, tightBeforeBuf, &cl->format, w, h);
         len = 3;
     } else if (cl->format.bitsPerPixel == 32) {
-        FilterGradient32(cl, (CARD32 *)tightBeforeBuf, &cl->format, w, h);
+        FilterGradient32(cl, (uint32_t *)tightBeforeBuf, &cl->format, w, h);
         len = 4;
     } else {
-        FilterGradient16(cl, (CARD16 *)tightBeforeBuf, &cl->format, w, h);
+        FilterGradient16(cl, (uint16_t *)tightBeforeBuf, &cl->format, w, h);
         len = 2;
     }
 
@@ -865,10 +892,12 @@ SendGradientRect(cl, w, h)
                         Z_FILTERED);
 }
 
-static Bool
-CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
-    rfbClientPtr cl;
-    int streamId, dataLen, zlibLevel, zlibStrategy;
+static rfbBool
+CompressData(rfbClientPtr cl,
+             int streamId,
+             int dataLen,
+             int zlibLevel,
+             int zlibStrategy)
 {
     z_streamp pz;
     int err;
@@ -876,7 +905,7 @@ CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
     if (dataLen < TIGHT_MIN_TO_COMPRESS) {
         memcpy(&cl->updateBuf[cl->ublen], tightBeforeBuf, dataLen);
         cl->ublen += dataLen;
-        cl->rfbBytesSent[rfbEncodingTight] += dataLen;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, dataLen);
         return TRUE;
     }
 
@@ -920,22 +949,21 @@ CompressData(cl, streamId, dataLen, zlibLevel, zlibStrategy)
     return SendCompressedData(cl, tightAfterBufSize - pz->avail_out);
 }
 
-static Bool SendCompressedData(cl, compressedLen)
-    rfbClientPtr cl;
-    int compressedLen;
+static rfbBool SendCompressedData(rfbClientPtr cl,
+                                  int compressedLen)
 {
     int i, portionLen;
 
     cl->updateBuf[cl->ublen++] = compressedLen & 0x7F;
-    cl->rfbBytesSent[rfbEncodingTight]++;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 1);
     if (compressedLen > 0x7F) {
         cl->updateBuf[cl->ublen-1] |= 0x80;
         cl->updateBuf[cl->ublen++] = compressedLen >> 7 & 0x7F;
-        cl->rfbBytesSent[rfbEncodingTight]++;
+        rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 1);
         if (compressedLen > 0x3FFF) {
             cl->updateBuf[cl->ublen-1] |= 0x80;
             cl->updateBuf[cl->ublen++] = compressedLen >> 14 & 0xFF;
-            cl->rfbBytesSent[rfbEncodingTight]++;
+            rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 1);
         }
     }
 
@@ -951,8 +979,8 @@ static Bool SendCompressedData(cl, compressedLen)
         memcpy(&cl->updateBuf[cl->ublen], &tightAfterBuf[i], portionLen);
         cl->ublen += portionLen;
     }
-    portionLen = UPDATE_BUF_SIZE;
-    cl->rfbBytesSent[rfbEncodingTight] += compressedLen;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, compressedLen);
+
     return TRUE;
 }
 
@@ -961,11 +989,10 @@ static Bool SendCompressedData(cl, compressedLen)
  */
 
 static void
-FillPalette8(count)
-    int count;
+FillPalette8(int count)
 {
-    CARD8 *data = (CARD8 *)tightBeforeBuf;
-    CARD8 c0, c1;
+    uint8_t *data = (uint8_t *)tightBeforeBuf;
+    uint8_t c0, c1;
     int i, n0, n1;
 
     paletteNumColors = 0;
@@ -993,11 +1020,11 @@ FillPalette8(count)
     }
     if (i == count) {
         if (n0 > n1) {
-            monoBackground = (CARD32)c0;
-            monoForeground = (CARD32)c1;
+            monoBackground = (uint32_t)c0;
+            monoForeground = (uint32_t)c1;
         } else {
-            monoBackground = (CARD32)c1;
-            monoForeground = (CARD32)c0;
+            monoBackground = (uint32_t)c1;
+            monoForeground = (uint32_t)c0;
         }
         paletteNumColors = 2;   /* Two colors */
     }
@@ -1006,11 +1033,9 @@ FillPalette8(count)
 #define DEFINE_FILL_PALETTE_FUNCTION(bpp)                               \
                                                                         \
 static void                                                             \
-FillPalette##bpp(count)                                                 \
-    int count;                                                          \
-{                                                                       \
-    CARD##bpp *data = (CARD##bpp *)tightBeforeBuf;                      \
-    CARD##bpp c0, c1, ci;                                               \
+FillPalette##bpp(int count) {                                           \
+    uint##bpp##_t *data = (uint##bpp##_t *)tightBeforeBuf;              \
+    uint##bpp##_t c0, c1, ci;                                           \
     int i, n0, n1, ni;                                                  \
                                                                         \
     c0 = data[0];                                                       \
@@ -1039,32 +1064,32 @@ FillPalette##bpp(count)                                                 \
     }                                                                   \
     if (i >= count) {                                                   \
         if (n0 > n1) {                                                  \
-            monoBackground = (CARD32)c0;                                \
-            monoForeground = (CARD32)c1;                                \
+            monoBackground = (uint32_t)c0;                              \
+            monoForeground = (uint32_t)c1;                              \
         } else {                                                        \
-            monoBackground = (CARD32)c1;                                \
-            monoForeground = (CARD32)c0;                                \
+            monoBackground = (uint32_t)c1;                              \
+            monoForeground = (uint32_t)c0;                              \
         }                                                               \
         paletteNumColors = 2;   /* Two colors */                        \
         return;                                                         \
     }                                                                   \
                                                                         \
     PaletteReset();                                                     \
-    PaletteInsert (c0, (CARD32)n0, bpp);                                \
-    PaletteInsert (c1, (CARD32)n1, bpp);                                \
+    PaletteInsert (c0, (uint32_t)n0, bpp);                              \
+    PaletteInsert (c1, (uint32_t)n1, bpp);                              \
                                                                         \
     ni = 1;                                                             \
     for (i++; i < count; i++) {                                         \
         if (data[i] == ci) {                                            \
             ni++;                                                       \
         } else {                                                        \
-            if (!PaletteInsert (ci, (CARD32)ni, bpp))                   \
+            if (!PaletteInsert (ci, (uint32_t)ni, bpp))                 \
                 return;                                                 \
             ci = data[i];                                               \
             ni = 1;                                                     \
         }                                                               \
     }                                                                   \
-    PaletteInsert (ci, (CARD32)ni, bpp);                                \
+    PaletteInsert (ci, (uint32_t)ni, bpp);                              \
 }
 
 DEFINE_FILL_PALETTE_FUNCTION(16)
@@ -1086,10 +1111,9 @@ PaletteReset(void)
 }
 
 static int
-PaletteInsert(rgb, numPixels, bpp)
-    CARD32 rgb;
-    int numPixels;
-    int bpp;
+PaletteInsert(uint32_t rgb,
+              int numPixels,
+              int bpp)
 {
     COLOR_LIST *pnode;
     COLOR_LIST *prev_pnode = NULL;
@@ -1158,19 +1182,18 @@ PaletteInsert(rgb, numPixels, bpp)
  * Color components assumed to be byte-aligned.
  */
 
-static void Pack24(cl, buf, fmt, count)
-    rfbClientPtr cl;
-    char *buf;
-    rfbPixelFormat *fmt;
-    int count;
+static void Pack24(rfbClientPtr cl,
+                   char *buf,
+                   rfbPixelFormat *fmt,
+                   int count)
 {
-    CARD32 *buf32;
-    CARD32 pix;
+    uint32_t *buf32;
+    uint32_t pix;
     int r_shift, g_shift, b_shift;
 
-    buf32 = (CARD32 *)buf;
+    buf32 = (uint32_t *)buf;
 
-    if (!cl->screen->rfbServerFormat.bigEndian == !fmt->bigEndian) {
+    if (!cl->screen->serverFormat.bigEndian == !fmt->bigEndian) {
         r_shift = fmt->redShift;
         g_shift = fmt->greenShift;
         b_shift = fmt->blueShift;
@@ -1196,16 +1219,13 @@ static void Pack24(cl, buf, fmt, count)
 #define DEFINE_IDX_ENCODE_FUNCTION(bpp)                                 \
                                                                         \
 static void                                                             \
-EncodeIndexedRect##bpp(buf, count)                                      \
-    CARD8 *buf;                                                         \
-    int count;                                                          \
-{                                                                       \
+EncodeIndexedRect##bpp(uint8_t *buf, int count) {                       \
     COLOR_LIST *pnode;                                                  \
-    CARD##bpp *src;                                                     \
-    CARD##bpp rgb;                                                      \
+    uint##bpp##_t *src;                                                 \
+    uint##bpp##_t rgb;                                                  \
     int rep = 0;                                                        \
                                                                         \
-    src = (CARD##bpp *) buf;                                            \
+    src = (uint##bpp##_t *) buf;                                        \
                                                                         \
     while (count--) {                                                   \
         rgb = *src++;                                                   \
@@ -1214,10 +1234,10 @@ EncodeIndexedRect##bpp(buf, count)                                      \
         }                                                               \
         pnode = palette.hash[HASH_FUNC##bpp(rgb)];                      \
         while (pnode != NULL) {                                         \
-            if ((CARD##bpp)pnode->rgb == rgb) {                         \
-                *buf++ = (CARD8)pnode->idx;                             \
+            if ((uint##bpp##_t)pnode->rgb == rgb) {                     \
+                *buf++ = (uint8_t)pnode->idx;                           \
                 while (rep) {                                           \
-                    *buf++ = (CARD8)pnode->idx;                         \
+                    *buf++ = (uint8_t)pnode->idx;                       \
                     rep--;                                              \
                 }                                                       \
                 break;                                                  \
@@ -1233,18 +1253,15 @@ DEFINE_IDX_ENCODE_FUNCTION(32)
 #define DEFINE_MONO_ENCODE_FUNCTION(bpp)                                \
                                                                         \
 static void                                                             \
-EncodeMonoRect##bpp(buf, w, h)                                          \
-    CARD8 *buf;                                                         \
-    int w, h;                                                           \
-{                                                                       \
-    CARD##bpp *ptr;                                                     \
-    CARD##bpp bg;                                                       \
+EncodeMonoRect##bpp(uint8_t *buf, int w, int h) {                       \
+    uint##bpp##_t *ptr;                                                 \
+    uint##bpp##_t bg;                                                   \
     unsigned int value, mask;                                           \
     int aligned_width;                                                  \
     int x, y, bg_bits;                                                  \
                                                                         \
-    ptr = (CARD##bpp *) buf;                                            \
-    bg = (CARD##bpp) monoBackground;                                    \
+    ptr = (uint##bpp##_t *) buf;                                        \
+    bg = (uint##bpp##_t) monoBackground;                                \
     aligned_width = w - w % 8;                                          \
                                                                         \
     for (y = 0; y < h; y++) {                                           \
@@ -1265,7 +1282,7 @@ EncodeMonoRect##bpp(buf, w, h)                                          \
                     value |= mask;                                      \
                 }                                                       \
             }                                                           \
-            *buf++ = (CARD8)value;                                      \
+            *buf++ = (uint8_t)value;                                    \
         }                                                               \
                                                                         \
         mask = 0x80;                                                    \
@@ -1279,7 +1296,7 @@ EncodeMonoRect##bpp(buf, w, h)                                          \
             }                                                           \
             mask >>= 1;                                                 \
         }                                                               \
-        *buf++ = (CARD8)value;                                          \
+        *buf++ = (uint8_t)value;                                        \
     }                                                                   \
 }
 
@@ -1295,24 +1312,20 @@ DEFINE_MONO_ENCODE_FUNCTION(32)
  */
 
 static void
-FilterGradient24(cl, buf, fmt, w, h)
-    rfbClientPtr cl;
-    char *buf;
-    rfbPixelFormat *fmt;
-    int w, h;
+FilterGradient24(rfbClientPtr cl, char *buf, rfbPixelFormat *fmt, int w, int h)
 {
-    CARD32 *buf32;
-    CARD32 pix32;
+    uint32_t *buf32;
+    uint32_t pix32;
     int *prevRowPtr;
     int shiftBits[3];
     int pixHere[3], pixUpper[3], pixLeft[3], pixUpperLeft[3];
     int prediction;
     int x, y, c;
 
-    buf32 = (CARD32 *)buf;
+    buf32 = (uint32_t *)buf;
     memset (prevRowBuf, 0, w * 3 * sizeof(int));
 
-    if (!cl->screen->rfbServerFormat.bigEndian == !fmt->bigEndian) {
+    if (!cl->screen->serverFormat.bigEndian == !fmt->bigEndian) {
         shiftBits[0] = fmt->redShift;
         shiftBits[1] = fmt->greenShift;
         shiftBits[2] = fmt->blueShift;
@@ -1357,14 +1370,10 @@ FilterGradient24(cl, buf, fmt, w, h)
 #define DEFINE_GRADIENT_FILTER_FUNCTION(bpp)                             \
                                                                          \
 static void                                                              \
-FilterGradient##bpp(cl, buf, fmt, w, h)                                      \
-    rfbClientPtr cl; \
-    CARD##bpp *buf;                                                      \
-    rfbPixelFormat *fmt;                                                 \
-    int w, h;                                                            \
-{                                                                        \
-    CARD##bpp pix, diff;                                                 \
-    Bool endianMismatch;                                                 \
+FilterGradient##bpp(rfbClientPtr cl, uint##bpp##_t *buf,                 \
+		rfbPixelFormat *fmt, int w, int h) {                     \
+    uint##bpp##_t pix, diff;                                             \
+    rfbBool endianMismatch;                                              \
     int *prevRowPtr;                                                     \
     int maxColor[3], shiftBits[3];                                       \
     int pixHere[3], pixUpper[3], pixLeft[3], pixUpperLeft[3];            \
@@ -1373,7 +1382,7 @@ FilterGradient##bpp(cl, buf, fmt, w, h)                                      \
                                                                          \
     memset (prevRowBuf, 0, w * 3 * sizeof(int));                         \
                                                                          \
-    endianMismatch = (!cl->screen->rfbServerFormat.bigEndian != !fmt->bigEndian);    \
+    endianMismatch = (!cl->screen->serverFormat.bigEndian != !fmt->bigEndian);    \
                                                                          \
     maxColor[0] = fmt->redMax;                                           \
     maxColor[1] = fmt->greenMax;                                         \
@@ -1434,14 +1443,11 @@ DEFINE_GRADIENT_FILTER_FUNCTION(32)
 #define DETECT_MIN_HEIGHT      8
 
 static int
-DetectSmoothImage (cl, fmt, w, h)
-    rfbClientPtr cl;
-    rfbPixelFormat *fmt;
-    int w, h;
+DetectSmoothImage (rfbClientPtr cl, rfbPixelFormat *fmt, int w, int h)
 {
     long avgError;
 
-    if ( cl->screen->rfbServerFormat.bitsPerPixel == 8 || fmt->bitsPerPixel == 8 ||
+    if ( cl->screen->serverFormat.bitsPerPixel == 8 || fmt->bitsPerPixel == 8 ||
          w < DETECT_MIN_WIDTH || h < DETECT_MIN_HEIGHT ) {
         return 0;
     }
@@ -1477,10 +1483,10 @@ DetectSmoothImage (cl, fmt, w, h)
 }
 
 static unsigned long
-DetectSmoothImage24 (cl, fmt, w, h)
-    rfbClientPtr cl;
-    rfbPixelFormat *fmt;
-    int w, h;
+DetectSmoothImage24 (rfbClientPtr cl,
+                     rfbPixelFormat *fmt,
+                     int w,
+                     int h)
 {
     int off;
     int x, y, d, dx, c;
@@ -1539,13 +1545,9 @@ DetectSmoothImage24 (cl, fmt, w, h)
 #define DEFINE_DETECT_FUNCTION(bpp)                                          \
                                                                              \
 static unsigned long                                                         \
-DetectSmoothImage##bpp (cl, fmt, w, h)                                           \
-    rfbClientPtr cl; \
-    rfbPixelFormat *fmt;                                                     \
-    int w, h;                                                                \
-{                                                                            \
-    Bool endianMismatch;                                                     \
-    CARD##bpp pix;                                                           \
+DetectSmoothImage##bpp (rfbClientPtr cl, rfbPixelFormat *fmt, int w, int h) {\
+    rfbBool endianMismatch;                                                  \
+    uint##bpp##_t pix;                                                       \
     int maxColor[3], shiftBits[3];                                           \
     int x, y, d, dx, c;                                                      \
     int diffStat[256];                                                       \
@@ -1553,7 +1555,7 @@ DetectSmoothImage##bpp (cl, fmt, w, h)                                          
     int sample, sum, left[3];                                                \
     unsigned long avgError;                                                  \
                                                                              \
-    endianMismatch = (!cl->screen->rfbServerFormat.bigEndian != !fmt->bigEndian);        \
+    endianMismatch = (!cl->screen->serverFormat.bigEndian != !fmt->bigEndian); \
                                                                              \
     maxColor[0] = fmt->redMax;                                               \
     maxColor[1] = fmt->greenMax;                                             \
@@ -1567,7 +1569,7 @@ DetectSmoothImage##bpp (cl, fmt, w, h)                                          
     y = 0, x = 0;                                                            \
     while (y < h && x < w) {                                                 \
         for (d = 0; d < h - y && d < w - x - DETECT_SUBROW_WIDTH; d++) {     \
-            pix = ((CARD##bpp *)tightBeforeBuf)[(y+d)*w+x+d];                \
+            pix = ((uint##bpp##_t *)tightBeforeBuf)[(y+d)*w+x+d];            \
             if (endianMismatch) {                                            \
                 pix = Swap##bpp(pix);                                        \
             }                                                                \
@@ -1575,7 +1577,7 @@ DetectSmoothImage##bpp (cl, fmt, w, h)                                          
                 left[c] = (int)(pix >> shiftBits[c] & maxColor[c]);          \
             }                                                                \
             for (dx = 1; dx <= DETECT_SUBROW_WIDTH; dx++) {                  \
-                pix = ((CARD##bpp *)tightBeforeBuf)[(y+d)*w+x+d+dx];         \
+                pix = ((uint##bpp##_t *)tightBeforeBuf)[(y+d)*w+x+d+dx];     \
                 if (endianMismatch) {                                        \
                     pix = Swap##bpp(pix);                                    \
                 }                                                            \
@@ -1626,25 +1628,22 @@ DEFINE_DETECT_FUNCTION(32)
  */
 
 static struct jpeg_destination_mgr jpegDstManager;
-static Bool jpegError;
+static rfbBool jpegError;
 static int jpegDstDataLen;
 
-static Bool
-SendJpegRect(cl, x, y, w, h, quality)
-    rfbClientPtr cl;
-    int x, y, w, h;
-    int quality;
+static rfbBool
+SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
 {
     struct jpeg_compress_struct cinfo;
     struct jpeg_error_mgr jerr;
-    CARD8 *srcBuf;
+    uint8_t *srcBuf;
     JSAMPROW rowPointer[1];
     int dy;
 
-    if (cl->screen->rfbServerFormat.bitsPerPixel == 8)
+    if (cl->screen->serverFormat.bitsPerPixel == 8)
         return SendFullColorRect(cl, w, h);
 
-    srcBuf = (CARD8 *)malloc(w * 3);
+    srcBuf = (uint8_t *)malloc(w * 3);
     if (srcBuf == NULL) {
         return SendFullColorRect(cl, w, h);
     }
@@ -1687,21 +1686,22 @@ SendJpegRect(cl, x, y, w, h, quality)
     }
 
     cl->updateBuf[cl->ublen++] = (char)(rfbTightJpeg << 4);
-    cl->rfbBytesSent[rfbEncodingTight]++;
+    rfbStatRecordEncodingSentAdd(cl, rfbEncodingTight, 1);
 
     return SendCompressedData(cl, jpegDstDataLen);
 }
 
 static void
-PrepareRowForJpeg(cl, dst, x, y, count)
-    rfbClientPtr cl;
-    CARD8 *dst;
-    int x, y, count;
+PrepareRowForJpeg(rfbClientPtr cl,
+                  uint8_t *dst,
+                  int x,
+                  int y,
+                  int count)
 {
-    if (cl->screen->rfbServerFormat.bitsPerPixel == 32) {
-        if ( cl->screen->rfbServerFormat.redMax == 0xFF &&
-             cl->screen->rfbServerFormat.greenMax == 0xFF &&
-             cl->screen->rfbServerFormat.blueMax == 0xFF ) {
+    if (cl->screen->serverFormat.bitsPerPixel == 32) {
+        if ( cl->screen->serverFormat.redMax == 0xFF &&
+             cl->screen->serverFormat.greenMax == 0xFF &&
+             cl->screen->serverFormat.blueMax == 0xFF ) {
             PrepareRowForJpeg24(cl, dst, x, y, count);
         } else {
             PrepareRowForJpeg32(cl, dst, x, y, count);
@@ -1713,57 +1713,54 @@ PrepareRowForJpeg(cl, dst, x, y, count)
 }
 
 static void
-PrepareRowForJpeg24(cl, dst, x, y, count)
-    rfbClientPtr cl;
-    CARD8 *dst;
-    int x, y, count;
+PrepareRowForJpeg24(rfbClientPtr cl,
+                    uint8_t *dst,
+                    int x,
+                    int y,
+                    int count)
 {
-    CARD32 *fbptr;
-    CARD32 pix;
+    uint32_t *fbptr;
+    uint32_t pix;
 
-    fbptr = (CARD32 *)
-        &cl->screen->frameBuffer[y * cl->screen->paddedWidthInBytes + x * 4];
+    fbptr = (uint32_t *)
+        &cl->scaledScreen->frameBuffer[y * cl->scaledScreen->paddedWidthInBytes + x * 4];
 
     while (count--) {
         pix = *fbptr++;
-        *dst++ = (CARD8)(pix >> cl->screen->rfbServerFormat.redShift);
-        *dst++ = (CARD8)(pix >> cl->screen->rfbServerFormat.greenShift);
-        *dst++ = (CARD8)(pix >> cl->screen->rfbServerFormat.blueShift);
+        *dst++ = (uint8_t)(pix >> cl->screen->serverFormat.redShift);
+        *dst++ = (uint8_t)(pix >> cl->screen->serverFormat.greenShift);
+        *dst++ = (uint8_t)(pix >> cl->screen->serverFormat.blueShift);
     }
 }
 
 #define DEFINE_JPEG_GET_ROW_FUNCTION(bpp)                                   \
                                                                             \
 static void                                                                 \
-PrepareRowForJpeg##bpp(cl, dst, x, y, count)                                    \
-    rfbClientPtr cl; \
-    CARD8 *dst;                                                             \
-    int x, y, count;                                                        \
-{                                                                           \
-    CARD##bpp *fbptr;                                                       \
-    CARD##bpp pix;                                                          \
+PrepareRowForJpeg##bpp(rfbClientPtr cl, uint8_t *dst, int x, int y, int count) { \
+    uint##bpp##_t *fbptr;                                                   \
+    uint##bpp##_t pix;                                                      \
     int inRed, inGreen, inBlue;                                             \
                                                                             \
-    fbptr = (CARD##bpp *)                                                   \
-        &cl->screen->frameBuffer[y * cl->screen->paddedWidthInBytes +             \
+    fbptr = (uint##bpp##_t *)                                               \
+        &cl->scaledScreen->frameBuffer[y * cl->scaledScreen->paddedWidthInBytes +       \
                              x * (bpp / 8)];                                \
                                                                             \
     while (count--) {                                                       \
         pix = *fbptr++;                                                     \
                                                                             \
         inRed = (int)                                                       \
-            (pix >> cl->screen->rfbServerFormat.redShift   & cl->screen->rfbServerFormat.redMax);   \
+            (pix >> cl->screen->serverFormat.redShift   & cl->screen->serverFormat.redMax); \
         inGreen = (int)                                                     \
-            (pix >> cl->screen->rfbServerFormat.greenShift & cl->screen->rfbServerFormat.greenMax); \
+            (pix >> cl->screen->serverFormat.greenShift & cl->screen->serverFormat.greenMax); \
         inBlue  = (int)                                                     \
-            (pix >> cl->screen->rfbServerFormat.blueShift  & cl->screen->rfbServerFormat.blueMax);  \
+            (pix >> cl->screen->serverFormat.blueShift  & cl->screen->serverFormat.blueMax); \
                                                                             \
-	*dst++ = (CARD8)((inRed   * 255 + cl->screen->rfbServerFormat.redMax / 2) /     \
-                         cl->screen->rfbServerFormat.redMax);                           \
-	*dst++ = (CARD8)((inGreen * 255 + cl->screen->rfbServerFormat.greenMax / 2) /   \
-                         cl->screen->rfbServerFormat.greenMax);                         \
-	*dst++ = (CARD8)((inBlue  * 255 + cl->screen->rfbServerFormat.blueMax / 2) /    \
-                         cl->screen->rfbServerFormat.blueMax);                          \
+	*dst++ = (uint8_t)((inRed   * 255 + cl->screen->serverFormat.redMax / 2) / \
+                         cl->screen->serverFormat.redMax);                  \
+	*dst++ = (uint8_t)((inGreen * 255 + cl->screen->serverFormat.greenMax / 2) / \
+                         cl->screen->serverFormat.greenMax);                \
+	*dst++ = (uint8_t)((inBlue  * 255 + cl->screen->serverFormat.blueMax / 2) / \
+                         cl->screen->serverFormat.blueMax);                 \
     }                                                                       \
 }
 

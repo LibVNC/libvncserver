@@ -4,14 +4,19 @@
  *
  *  LibVNCServer (C) 2001 Johannes E. Schindelin <Johannes.Schindelin@gmx.de>
  *  Original OSXvnc (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
- *  Original Xvnc (C) 1999 AT&T Laboratories Cambridge.
+ *  Original Xvnc (C) 1999 AT&T Laboratories Cambridge.  
  *  All Rights Reserved.
  *
  *  see GPL (latest version) for full details
  */
 
-#include <stdio.h>
-#include <stdlib.h>
+#ifdef __STRICT_ANSI__
+#define _BSD_SOURCE
+#endif
+#include <rfb/rfb.h>
+#include <rfb/rfbregion.h>
+#include "private.h"
+
 #include <stdarg.h>
 #include <errno.h>
 
@@ -20,36 +25,194 @@
 #define true -1
 #endif
 
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
-#ifdef __osf__
-typedef int socklen_t;
 #endif
+
 #ifndef WIN32
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #endif
+
 #include <signal.h>
 #include <time.h>
 
-#include "rfb.h"
-#include "sraRegion.h"
+static int extMutex_initialized = 0;
+static int logMutex_initialized = 0;
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+static MUTEX(logMutex);
+static MUTEX(extMutex);
+#endif
 
-/* minimum interval between attempts to send something */
-#define PING_MS 10000
+static int rfbEnableLogging=1;
 
-MUTEX(logMutex);
+#ifdef LIBVNCSERVER_WORDS_BIGENDIAN
+char rfbEndianTest = (1==0);
+#else
+char rfbEndianTest = (1==1);
+#endif
 
-int rfbEnableLogging=1;
+/*
+ * Protocol extensions
+ */
 
-/* we cannot compare to _LITTLE_ENDIAN, because some systems
-   (as Solaris) assume little endian if _LITTLE_ENDIAN is
-   defined, even if _BYTE_ORDER is not _LITTLE_ENDIAN */
-char rfbEndianTest = (_BYTE_ORDER == 1234);
+static rfbProtocolExtension* rfbExtensionHead = NULL;
 
-/* from rfbserver.c */
-void rfbIncrClientRef(rfbClientPtr cl);
-void rfbDecrClientRef(rfbClientPtr cl);
+/*
+ * This method registers a list of new extensions.  
+ * It avoids same extension getting registered multiple times. 
+ * The order is not preserved if multiple extensions are
+ * registered at one-go.
+ */
+void
+rfbRegisterProtocolExtension(rfbProtocolExtension* extension)
+{
+	rfbProtocolExtension *head = rfbExtensionHead, *next = NULL;
+
+	if(extension == NULL)
+		return;
+
+	next = extension->next;
+
+	if (! extMutex_initialized) {
+		INIT_MUTEX(extMutex);
+		extMutex_initialized = 1;
+	}
+
+	LOCK(extMutex);
+
+	while(head != NULL) {
+		if(head == extension) {
+			UNLOCK(extMutex);
+			rfbRegisterProtocolExtension(next);
+			return;
+		}
+
+		head = head->next;
+	}
+
+	extension->next = rfbExtensionHead;
+	rfbExtensionHead = extension;
+
+	UNLOCK(extMutex);
+	rfbRegisterProtocolExtension(next);
+}
+
+/*
+ * This method unregisters a list of extensions.  
+ * These extensions won't be available for any new
+ * client connection. 
+ */
+void
+rfbUnregisterProtocolExtension(rfbProtocolExtension* extension)
+{
+
+	rfbProtocolExtension *cur = NULL, *pre = NULL;
+
+	if(extension == NULL)
+		return;
+
+	if (! extMutex_initialized) {
+		INIT_MUTEX(extMutex);
+		extMutex_initialized = 1;
+	}
+
+	LOCK(extMutex);
+
+	if(rfbExtensionHead == extension) {
+		rfbExtensionHead = rfbExtensionHead->next;
+		UNLOCK(extMutex);
+		rfbUnregisterProtocolExtension(extension->next);
+		return;
+	}
+
+	cur = pre = rfbExtensionHead;
+
+	while(cur) {
+		if(cur == extension) {
+			pre->next = cur->next;
+			break;
+		}
+		pre = cur;
+		cur = cur->next;
+	}
+
+	UNLOCK(extMutex);
+
+	rfbUnregisterProtocolExtension(extension->next);
+}
+
+rfbProtocolExtension* rfbGetExtensionIterator()
+{
+	LOCK(extMutex);
+	return rfbExtensionHead;
+}
+
+void rfbReleaseExtensionIterator()
+{
+	UNLOCK(extMutex);
+}
+
+rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
+	void* data)
+{
+	rfbExtensionData* extData;
+
+	/* make sure extension is not yet enabled. */
+	for(extData = cl->extensions; extData; extData = extData->next)
+		if(extData->extension == extension)
+			return FALSE;
+
+	extData = calloc(sizeof(rfbExtensionData),1);
+	extData->extension = extension;
+	extData->data = data;
+	extData->next = cl->extensions;
+	cl->extensions = extData;
+
+	return TRUE;
+}
+
+rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension)
+{
+	rfbExtensionData* extData;
+	rfbExtensionData* prevData = NULL;
+
+	for(extData = cl->extensions; extData; extData = extData->next) {
+		if(extData->extension == extension) {
+			if(extData->data)
+				free(extData->data);
+			if(prevData == NULL)
+				cl->extensions = extData->next;
+			else
+				prevData->next = extData->next;
+			return TRUE;
+		}
+		prevData = extData;
+	}
+
+	return FALSE;
+}
+
+void* rfbGetExtensionClientData(rfbClientPtr cl, rfbProtocolExtension* extension)
+{
+    rfbExtensionData* data = cl->extensions;
+
+    while(data && data->extension != extension)
+	data = data->next;
+
+    if(data == NULL) {
+	rfbLog("Extension is not enabled !\n");
+	/* rfbCloseClient(cl); */
+	return NULL;
+    }
+
+    return data->data;
+}
+
+/*
+ * Logging
+ */
 
 void rfbLogEnable(int enabled) {
   rfbEnableLogging=enabled;
@@ -59,8 +222,8 @@ void rfbLogEnable(int enabled) {
  * rfbLog prints a time-stamped message to the log file (stderr).
  */
 
-void
-rfbLog(const char *format, ...)
+static void
+rfbDefaultLog(const char *format, ...)
 {
     va_list args;
     char buf[256];
@@ -69,12 +232,17 @@ rfbLog(const char *format, ...)
     if(!rfbEnableLogging)
       return;
 
+    if (! logMutex_initialized) {
+      INIT_MUTEX(logMutex);
+      logMutex_initialized = 1;
+    }
+
     LOCK(logMutex);
     va_start(args, format);
 
     time(&log_clock);
-    strftime(buf, 255, "%d/%m/%Y %T ", localtime(&log_clock));
-    fprintf(stderr,"%s", buf);
+    strftime(buf, 255, "%d/%m/%Y %X ", localtime(&log_clock));
+    fprintf(stderr,buf);
 
     vfprintf(stderr, format, args);
     fflush(stderr);
@@ -83,17 +251,18 @@ rfbLog(const char *format, ...)
     UNLOCK(logMutex);
 }
 
+rfbLogProc rfbLog=rfbDefaultLog;
+rfbLogProc rfbErr=rfbDefaultLog;
+
 void rfbLogPerror(const char *str)
 {
-    rfbLog("%s: %s\n", str, strerror(errno));
+    rfbErr("%s: %s\n", str, strerror(errno));
 }
 
 void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy)
-{
+{  
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
-
-   rfbUndrawCursor(rfbScreen);
 
    iterator=rfbGetClientIterator(rfbScreen);
    while((cl=rfbClientIteratorNext(iterator))) {
@@ -117,7 +286,7 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
 	     sraRgnDestroy(modifiedRegionBackup);
 	  }
        }
-
+	  
        sraRgnOr(cl->copyRegion,copyRegion);
        cl->copyDX = dx;
        cl->copyDY = dy;
@@ -131,22 +300,44 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
        sraRgnOr(cl->modifiedRegion,modifiedRegionBackup);
        sraRgnDestroy(modifiedRegionBackup);
 
-#if 0
-//TODO: is this needed? Or does it mess up deferring?
-       /* while(!sraRgnEmpty(cl->copyRegion)) */ {
-#ifdef HAVE_PTHREADS
-	 if(!cl->screen->backgroundLoop)
-#endif
-	   {
-	     sraRegionPtr updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
-	     sraRgnOr(updateRegion,cl->copyRegion);
-	     UNLOCK(cl->updateMutex);
-	     rfbSendFramebufferUpdate(cl,updateRegion);
-	     sraRgnDestroy(updateRegion);
-	     continue;
-	   }
+       if(!cl->enableCursorShapeUpdates) {
+          /*
+           * n.b. (dx, dy) is the vector pointing in the direction the
+           * copyrect displacement will take place.  copyRegion is the
+           * destination rectangle (say), not the source rectangle.
+           */
+          sraRegionPtr cursorRegion;
+          int x = cl->cursorX - cl->screen->cursor->xhot;
+          int y = cl->cursorY - cl->screen->cursor->yhot;
+          int w = cl->screen->cursor->width;
+          int h = cl->screen->cursor->height;
+
+          cursorRegion = sraRgnCreateRect(x, y, x + w, y + h);
+          sraRgnAnd(cursorRegion, cl->copyRegion);
+          if(!sraRgnEmpty(cursorRegion)) {
+             /*
+              * current cursor rect overlaps with the copy region *dest*,
+              * mark it as modified since we won't copy-rect stuff to it.
+              */
+             sraRgnOr(cl->modifiedRegion, cursorRegion);
+          }
+          sraRgnDestroy(cursorRegion);
+
+          cursorRegion = sraRgnCreateRect(x, y, x + w, y + h);
+          /* displace it to check for overlap with copy region source: */
+          sraRgnOffset(cursorRegion, dx, dy);
+          sraRgnAnd(cursorRegion, cl->copyRegion);
+          if(!sraRgnEmpty(cursorRegion)) {
+             /*
+              * current cursor rect overlaps with the copy region *source*,
+              * mark the *displaced* cursorRegion as modified since we
+              * won't copyrect stuff to it.
+              */
+             sraRgnOr(cl->modifiedRegion, cursorRegion);
+          }
+          sraRgnDestroy(cursorRegion);
        }
-#endif
+
      } else {
        sraRgnOr(cl->modifiedRegion,copyRegion);
      }
@@ -157,22 +348,20 @@ void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,in
    rfbReleaseClientIterator(iterator);
 }
 
-void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy)
+void rfbDoCopyRegion(rfbScreenInfoPtr screen,sraRegionPtr copyRegion,int dx,int dy)
 {
    sraRectangleIterator* i;
    sraRect rect;
-   int j,widthInBytes,bpp=rfbScreen->rfbServerFormat.bitsPerPixel/8,
-    rowstride=rfbScreen->paddedWidthInBytes;
+   int j,widthInBytes,bpp=screen->serverFormat.bitsPerPixel/8,
+    rowstride=screen->paddedWidthInBytes;
    char *in,*out;
-
-   rfbUndrawCursor(rfbScreen);
 
    /* copy it, really */
    i = sraRgnGetReverseIterator(copyRegion,dx<0,dy<0);
    while(sraRgnIteratorNext(i,&rect)) {
      widthInBytes = (rect.x2-rect.x1)*bpp;
-     out = rfbScreen->frameBuffer+rect.x1*bpp+rect.y1*rowstride;
-     in = rfbScreen->frameBuffer+(rect.x1-dx)*bpp+(rect.y1-dy)*rowstride;
+     out = screen->frameBuffer+rect.x1*bpp+rect.y1*rowstride;
+     in = screen->frameBuffer+(rect.x1-dx)*bpp+(rect.y1-dy)*rowstride;
      if(dy<0)
        for(j=rect.y1;j<rect.y2;j++,out+=rowstride,in+=rowstride)
 	 memmove(out,in,widthInBytes);
@@ -183,28 +372,31 @@ void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,i
 	 memmove(out,in,widthInBytes);
      }
    }
-
-   rfbScheduleCopyRegion(rfbScreen,copyRegion,dx,dy);
+   sraRgnReleaseIterator(i);
+  
+   rfbScheduleCopyRegion(screen,copyRegion,dx,dy);
 }
 
-void rfbDoCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy)
+void rfbDoCopyRect(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2,int dx,int dy)
 {
   sraRegionPtr region = sraRgnCreateRect(x1,y1,x2,y2);
-  rfbDoCopyRegion(rfbScreen,region,dx,dy);
+  rfbDoCopyRegion(screen,region,dx,dy);
+  sraRgnDestroy(region);
 }
 
-void rfbScheduleCopyRect(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2,int dx,int dy)
+void rfbScheduleCopyRect(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2,int dx,int dy)
 {
   sraRegionPtr region = sraRgnCreateRect(x1,y1,x2,y2);
-  rfbScheduleCopyRegion(rfbScreen,region,dx,dy);
+  rfbScheduleCopyRegion(screen,region,dx,dy);
+  sraRgnDestroy(region);
 }
 
-void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
+void rfbMarkRegionAsModified(rfbScreenInfoPtr screen,sraRegionPtr modRegion)
 {
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
 
-   iterator=rfbGetClientIterator(rfbScreen);
+   iterator=rfbGetClientIterator(screen);
    while((cl=rfbClientIteratorNext(iterator))) {
      LOCK(cl->updateMutex);
      sraRgnOr(cl->modifiedRegion,modRegion);
@@ -215,32 +407,38 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion)
    rfbReleaseClientIterator(iterator);
 }
 
-void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2)
+void rfbScaledScreenUpdate(rfbScreenInfoPtr screen, int x1, int y1, int x2, int y2);
+void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
 {
    sraRegionPtr region;
    int i;
 
    if(x1>x2) { i=x1; x1=x2; x2=i; }
    if(x1<0) x1=0;
-   if(x2>=rfbScreen->width) x2=rfbScreen->width-1;
+   if(x2>screen->width) x2=screen->width;
    if(x1==x2) return;
-
+   
    if(y1>y2) { i=y1; y1=y2; y2=i; }
    if(y1<0) y1=0;
-   if(y2>=rfbScreen->height) y2=rfbScreen->height-1;
+   if(y2>screen->height) y2=screen->height;
    if(y1==y2) return;
 
+   /* update scaled copies for this rectangle */
+   rfbScaledScreenUpdate(screen,x1,y1,x2,y2);
+
    region = sraRgnCreateRect(x1,y1,x2,y2);
-   rfbMarkRegionAsModified(rfbScreen,region);
+   rfbMarkRegionAsModified(screen,region);
    sraRgnDestroy(region);
 }
 
-#ifdef HAVE_PTHREADS
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#include <unistd.h>
+
 static void *
 clientOutput(void *data)
 {
     rfbClientPtr cl = (rfbClientPtr)data;
-    Bool haveUpdate;
+    rfbBool haveUpdate;
     sraRegion* updateRegion;
 
     while (1) {
@@ -257,19 +455,16 @@ clientOutput(void *data)
 		haveUpdate = sraRgnAnd(updateRegion,cl->requestedRegion);
 		sraRgnDestroy(updateRegion);
 	    }
-	    UNLOCK(cl->updateMutex);
 
             if (!haveUpdate) {
-                TIMEDWAIT(cl->updateCond, cl->updateMutex, PING_MS);
-		UNLOCK(cl->updateMutex); /* we really needn't lock now. */
-		if (!haveUpdate)
-		    rfbSendPing(cl);
+                WAIT(cl->updateCond, cl->updateMutex);
             }
+	    UNLOCK(cl->updateMutex);
         }
-
+        
         /* OK, now, to save bandwidth, wait a little while for more
            updates to come along. */
-        usleep(cl->screen->rfbDeferUpdateTime * 1000);
+        usleep(cl->screen->deferUpdateTime * 1000);
 
         /* Now, get the region we're going to update, and remove
            it from cl->modifiedRegion _before_ we send the update.
@@ -287,6 +482,7 @@ clientOutput(void *data)
 	sraRgnDestroy(updateRegion);
     }
 
+    /* Not reached. */
     return NULL;
 }
 
@@ -298,7 +494,40 @@ clientInput(void *data)
     pthread_create(&output_thread, NULL, clientOutput, (void *)cl);
 
     while (1) {
-        rfbProcessClientMessage(cl);
+	fd_set rfds, wfds, efds;
+	struct timeval tv;
+	int n;
+
+	FD_ZERO(&rfds);
+	FD_SET(cl->sock, &rfds);
+	FD_ZERO(&efds);
+	FD_SET(cl->sock, &efds);
+
+	/* Are we transferring a file in the background? */
+	FD_ZERO(&wfds);
+	if ((cl->fileTransfer.fd!=-1) && (cl->fileTransfer.sending==1))
+	    FD_SET(cl->sock, &wfds);
+
+	tv.tv_sec = 60; /* 1 minute */
+	tv.tv_usec = 0;
+	n = select(cl->sock + 1, &rfds, &wfds, &efds, &tv);
+	if (n < 0) {
+	    rfbLogPerror("ReadExact: select");
+	    break;
+	}
+	if (n == 0) /* timeout */
+	{
+            rfbSendFileTransferChunk(cl);
+	    continue;
+        }
+        
+        /* We have some space on the transmit queue, send some data */
+        if (FD_ISSET(cl->sock, &wfds))
+            rfbSendFileTransferChunk(cl);
+
+        if (FD_ISSET(cl->sock, &rfds) || FD_ISSET(cl->sock, &efds))
+            rfbProcessClientMessage(cl);
+
         if (cl->sock == -1) {
             /* Client has disconnected. */
             break;
@@ -319,36 +548,28 @@ clientInput(void *data)
 static void*
 listenerRun(void *data)
 {
-    rfbScreenInfoPtr rfbScreen=(rfbScreenInfoPtr)data;
+    rfbScreenInfoPtr screen=(rfbScreenInfoPtr)data;
     int client_fd;
     struct sockaddr_in peer;
     rfbClientPtr cl;
-    size_t len;
-
-    if (rfbScreen->inetdSock != -1) {
-       cl = rfbNewClient(rfbScreen, rfbScreen->inetdSock);
-       if (cl && !cl->onHold)
-           rfbStartOnHoldClient(cl);
-       else if (rfbScreen->inetdDisconnectHook && !cl)
-           rfbScreen->inetdDisconnectHook();
-       return 0;
-    }
+    socklen_t len;
 
     len = sizeof(peer);
 
     /* TODO: this thread wont die by restarting the server */
-    while ((client_fd = accept(rfbScreen->rfbListenSock,
+    /* TODO: HTTP is not handled */
+    while ((client_fd = accept(screen->listenSock, 
                                (struct sockaddr*)&peer, &len)) >= 0) {
-        cl = rfbNewClient(rfbScreen,client_fd);
+        cl = rfbNewClient(screen,client_fd);
         len = sizeof(peer);
 
 	if (cl && !cl->onHold )
 		rfbStartOnHoldClient(cl);
     }
-    return NULL;
+    return(NULL);
 }
 
-void
+void 
 rfbStartOnHoldClient(rfbClientPtr cl)
 {
     pthread_create(&cl->client_thread, NULL, clientInput, (void *)cl);
@@ -356,7 +577,7 @@ rfbStartOnHoldClient(rfbClientPtr cl)
 
 #else
 
-void
+void 
 rfbStartOnHoldClient(rfbClientPtr cl)
 {
 	cl->onHold = FALSE;
@@ -364,7 +585,7 @@ rfbStartOnHoldClient(rfbClientPtr cl)
 
 #endif
 
-void
+void 
 rfbRefuseOnHoldClient(rfbClientPtr cl)
 {
     rfbCloseClient(cl);
@@ -372,76 +593,88 @@ rfbRefuseOnHoldClient(rfbClientPtr cl)
 }
 
 static void
-defaultKbdAddEvent(Bool down, KeySym keySym, rfbClientPtr cl)
+rfbDefaultKbdAddEvent(rfbBool down, rfbKeySym keySym, rfbClientPtr cl)
 {
 }
 
 void
-defaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
+rfbDefaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
 {
-   if(x!=cl->screen->cursorX || y!=cl->screen->cursorY) {
-      cl->cursorWasMoved = TRUE;
-      if(cl->screen->cursorIsDrawn)
-	rfbUndrawCursor(cl->screen);
-      LOCK(cl->screen->cursorMutex);
-      if(!cl->screen->cursorIsDrawn) {
-	  cl->screen->cursorX = x;
-	  cl->screen->cursorY = y;
+  rfbClientIteratorPtr iterator;
+  rfbClientPtr other_client;
+  rfbScreenInfoPtr s = cl->screen;
+
+  if (x != s->cursorX || y != s->cursorY) {
+    LOCK(s->cursorMutex);
+    s->cursorX = x;
+    s->cursorY = y;
+    UNLOCK(s->cursorMutex);
+
+    /* The cursor was moved by this client, so don't send CursorPos. */
+    if (cl->enableCursorPosUpdates)
+      cl->cursorWasMoved = FALSE;
+
+    /* But inform all remaining clients about this cursor movement. */
+    iterator = rfbGetClientIterator(s);
+    while ((other_client = rfbClientIteratorNext(iterator)) != NULL) {
+      if (other_client != cl && other_client->enableCursorPosUpdates) {
+	other_client->cursorWasMoved = TRUE;
       }
-      UNLOCK(cl->screen->cursorMutex);
-   }
+    }
+    rfbReleaseClientIterator(iterator);
+  }
 }
 
-void defaultSetXCutText(char* text, int len, rfbClientPtr cl)
+static void rfbDefaultSetXCutText(char* text, int len, rfbClientPtr cl)
 {
 }
 
 /* TODO: add a nice VNC or RFB cursor */
 
-#if defined(WIN32) || defined(sparc) || defined(_AIX) || defined(__osf__)
-static rfbCursor myCursor =
+#if defined(WIN32) || defined(sparc) || !defined(NO_STRICT_ANSI)
+static rfbCursor myCursor = 
 {
-   "\000\102\044\030\044\102\000",
-   "\347\347\176\074\176\347\347",
+   FALSE, FALSE, FALSE, FALSE,
+   (unsigned char*)"\000\102\044\030\044\102\000",
+   (unsigned char*)"\347\347\176\074\176\347\347",
    8, 7, 3, 3,
    0, 0, 0,
    0xffff, 0xffff, 0xffff,
-   0
+   NULL
 };
 #else
-static rfbCursor myCursor =
+static rfbCursor myCursor = 
 {
+   cleanup: FALSE,
+   cleanupSource: FALSE,
+   cleanupMask: FALSE,
+   cleanupRichSource: FALSE,
    source: "\000\102\044\030\044\102\000",
    mask:   "\347\347\176\074\176\347\347",
    width: 8, height: 7, xhot: 3, yhot: 3,
-   /*
-     width: 8, height: 7, xhot: 0, yhot: 0,
-     source: "\000\074\176\146\176\074\000",
-     mask:   "\176\377\377\377\377\377\176",
-   */
    foreRed: 0, foreGreen: 0, foreBlue: 0,
    backRed: 0xffff, backGreen: 0xffff, backBlue: 0xffff,
-   richSource: 0
+   richSource: NULL
 };
 #endif
 
-rfbCursorPtr defaultGetCursorPtr(rfbClientPtr cl)
+static rfbCursorPtr rfbDefaultGetCursorPtr(rfbClientPtr cl)
 {
    return(cl->screen->cursor);
 }
 
 /* response is cl->authChallenge vncEncrypted with passwd */
-Bool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
+static rfbBool rfbDefaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
 {
   int i;
-  char *passwd=vncDecryptPasswdFromFile(cl->screen->rfbAuthPasswdData);
+  char *passwd=rfbDecryptPasswdFromFile(cl->screen->authPasswdData);
 
   if(!passwd) {
-    rfbLog("Couldn't read password file: %s\n",cl->screen->rfbAuthPasswdData);
+    rfbErr("Couldn't read password file: %s\n",cl->screen->authPasswdData);
     return(FALSE);
   }
 
-  vncEncryptBytes(cl->authChallenge, passwd);
+  rfbEncryptBytes(cl->authChallenge, passwd);
 
   /* Lose the password from memory */
   for (i = strlen(passwd); i >= 0; i--) {
@@ -451,7 +684,7 @@ Bool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
   free(passwd);
 
   if (memcmp(cl->authChallenge, response, len) != 0) {
-    rfbLog("rfbAuthProcessClientMessage: authentication failed from %s\n",
+    rfbErr("authProcessClientMessage: authentication failed from %s\n",
 	   cl->host);
     return(FALSE);
   }
@@ -459,104 +692,57 @@ Bool defaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
   return(TRUE);
 }
 
-/* for this method, rfbAuthPasswdData is really a pointer to an array
+/* for this method, authPasswdData is really a pointer to an array
    of char*'s, where the last pointer is 0. */
-Bool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
+rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
 {
   char **passwds;
+  int i=0;
 
-  for(passwds=(char**)cl->screen->rfbAuthPasswdData;*passwds;passwds++) {
-    vncEncryptBytes(cl->authChallenge, *passwds);
+  for(passwds=(char**)cl->screen->authPasswdData;*passwds;passwds++,i++) {
+    uint8_t auth_tmp[CHALLENGESIZE];
+    memcpy((char *)auth_tmp, (char *)cl->authChallenge, CHALLENGESIZE);
+    rfbEncryptBytes(auth_tmp, *passwds);
 
-    if (memcmp(cl->authChallenge, response, len) == 0)
+    if (memcmp(auth_tmp, response, len) == 0) {
+      if(i>=cl->screen->authPasswdFirstViewOnly)
+	cl->viewOnly=TRUE;
       return(TRUE);
+    }
   }
 
-  rfbLog("rfbAuthProcessClientMessage: authentication failed from %s\n",
+  rfbErr("authProcessClientMessage: authentication failed from %s\n",
 	 cl->host);
   return(FALSE);
 }
 
-void doNothingWithClient(rfbClientPtr cl)
+void rfbDoNothingWithClient(rfbClientPtr cl)
 {
 }
 
-enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl)
+static enum rfbNewClientAction rfbDefaultNewClientHook(rfbClientPtr cl)
 {
 	return RFB_CLIENT_ACCEPT;
 }
 
-rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
- int width,int height,int bitsPerSample,int samplesPerPixel,
- int bytesPerPixel)
+/*
+ * Update server's pixel format in screenInfo structure. This
+ * function is called from rfbGetScreen() and rfbNewFramebuffer().
+ */
+
+static void rfbInitServerFormat(rfbScreenInfoPtr screen, int bitsPerSample)
 {
-   rfbScreenInfoPtr rfbScreen=malloc(sizeof(rfbScreenInfo));
-   rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
+   rfbPixelFormat* format=&screen->serverFormat;
 
-   INIT_MUTEX(logMutex);
-
-   if(width&3)
-     fprintf(stderr,"WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
-
-   rfbScreen->autoPort=FALSE;
-   rfbScreen->rfbClientHead=0;
-   rfbScreen->rfbPort=5900;
-   rfbScreen->socketInitDone=FALSE;
-
-   rfbScreen->inetdInitDone = FALSE;
-   rfbScreen->inetdSock=-1;
-
-   rfbScreen->udpSock=-1;
-   rfbScreen->udpSockConnected=FALSE;
-   rfbScreen->udpPort=0;
-   rfbScreen->udpClient=0;
-
-   rfbScreen->maxFd=0;
-   rfbScreen->rfbListenSock=-1;
-
-   rfbScreen->httpInitDone=FALSE;
-   rfbScreen->httpPort=0;
-   rfbScreen->httpDir=NULL;
-   rfbScreen->httpListenSock=-1;
-   rfbScreen->httpSock=-1;
-   rfbScreen->httpFP=NULL;
-
-   rfbScreen->desktopName = "LibVNCServer";
-   rfbScreen->rfbAlwaysShared = FALSE;
-   rfbScreen->rfbNeverShared = FALSE;
-   rfbScreen->rfbDontDisconnect = FALSE;
-   rfbScreen->rfbAuthPasswdData = 0;
-
-   rfbScreen->width = width;
-   rfbScreen->height = height;
-   rfbScreen->bitsPerPixel = rfbScreen->depth = 8*bytesPerPixel;
-
-   rfbScreen->passwordCheck = defaultPasswordCheck;
-
-   rfbProcessArguments(rfbScreen,argc,argv);
-
-#ifdef WIN32
-   {
-	   DWORD dummy=255;
-	   GetComputerName(rfbScreen->rfbThisHost,&dummy);
-   }
-#else
-   gethostname(rfbScreen->rfbThisHost, 255);
-#endif
-
-   rfbScreen->paddedWidthInBytes = width*bytesPerPixel;
-
-   /* format */
-
-   format->bitsPerPixel = rfbScreen->bitsPerPixel;
-   format->depth = rfbScreen->depth;
+   format->bitsPerPixel = screen->bitsPerPixel;
+   format->depth = screen->depth;
    format->bigEndian = rfbEndianTest?FALSE:TRUE;
    format->trueColour = TRUE;
-   rfbScreen->colourMap.count = 0;
-   rfbScreen->colourMap.is16 = 0;
-   rfbScreen->colourMap.data.bytes = NULL;
+   screen->colourMap.count = 0;
+   screen->colourMap.is16 = 0;
+   screen->colourMap.data.bytes = NULL;
 
-   if(bytesPerPixel == 1) {
+   if (format->bitsPerPixel == 8) {
      format->redMax = 7;
      format->greenMax = 7;
      format->blueMax = 3;
@@ -572,7 +758,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
        format->greenShift = bitsPerSample;
        format->blueShift = bitsPerSample * 2;
      } else {
-       if(bytesPerPixel==3) {
+       if(format->bitsPerPixel==8*3) {
 	 format->redShift = bitsPerSample*2;
 	 format->greenShift = bitsPerSample*1;
 	 format->blueShift = 0;
@@ -583,42 +769,204 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
        }
      }
    }
+}
+
+rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
+ int width,int height,int bitsPerSample,int samplesPerPixel,
+ int bytesPerPixel)
+{
+   rfbScreenInfoPtr screen=calloc(sizeof(rfbScreenInfo),1);
+
+   if (! logMutex_initialized) {
+     INIT_MUTEX(logMutex);
+     logMutex_initialized = 1;
+   }
+
+
+   if(width&3)
+     rfbErr("WARNING: Width (%d) is not a multiple of 4. VncViewer has problems with that.\n",width);
+
+   screen->autoPort=FALSE;
+   screen->clientHead=NULL;
+   screen->pointerClient=NULL;
+   screen->port=5900;
+   screen->socketState=RFB_SOCKET_INIT;
+
+   screen->inetdInitDone = FALSE;
+   screen->inetdSock=-1;
+
+   screen->udpSock=-1;
+   screen->udpSockConnected=FALSE;
+   screen->udpPort=0;
+   screen->udpClient=NULL;
+
+   screen->maxFd=0;
+   screen->listenSock=-1;
+
+   screen->httpInitDone=FALSE;
+   screen->httpEnableProxyConnect=FALSE;
+   screen->httpPort=0;
+   screen->httpDir=NULL;
+   screen->httpListenSock=-1;
+   screen->httpSock=-1;
+
+   screen->desktopName = "LibVNCServer";
+   screen->alwaysShared = FALSE;
+   screen->neverShared = FALSE;
+   screen->dontDisconnect = FALSE;
+   screen->authPasswdData = NULL;
+   screen->authPasswdFirstViewOnly = 1;
+   
+   screen->width = width;
+   screen->height = height;
+   screen->bitsPerPixel = screen->depth = 8*bytesPerPixel;
+
+   screen->passwordCheck = rfbDefaultPasswordCheck;
+
+   screen->ignoreSIGPIPE = TRUE;
+
+   /* disable progressive updating per default */
+   screen->progressiveSliceHeight = 0;
+
+   screen->listenInterface = htonl(INADDR_ANY);
+
+   screen->deferUpdateTime=5;
+   screen->maxRectsPerUpdate=50;
+
+   screen->handleEventsEagerly = FALSE;
+
+   screen->protocolMajorVersion = rfbProtocolMajorVersion;
+   screen->protocolMinorVersion = rfbProtocolMinorVersion;
+
+   screen->permitFileTransfer = FALSE;
+
+   if(!rfbProcessArguments(screen,argc,argv)) {
+     free(screen);
+     return NULL;
+   }
+
+#ifdef WIN32
+   {
+	   DWORD dummy=255;
+	   GetComputerName(screen->thisHost,&dummy);
+   }
+#else
+   gethostname(screen->thisHost, 255);
+#endif
+
+   screen->paddedWidthInBytes = width*bytesPerPixel;
+
+   /* format */
+
+   rfbInitServerFormat(screen, bitsPerSample);
 
    /* cursor */
 
-   rfbScreen->cursorIsDrawn = FALSE;
-   rfbScreen->dontSendFramebufferUpdate = FALSE;
-   rfbScreen->cursorX=rfbScreen->cursorY=rfbScreen->underCursorBufferLen=0;
-   rfbScreen->underCursorBuffer=NULL;
-   rfbScreen->dontConvertRichCursorToXCursor = FALSE;
-   rfbScreen->cursor = &myCursor;
-   INIT_MUTEX(rfbScreen->cursorMutex);
+   screen->cursorX=screen->cursorY=screen->underCursorBufferLen=0;
+   screen->underCursorBuffer=NULL;
+   screen->dontConvertRichCursorToXCursor = FALSE;
+   screen->cursor = &myCursor;
+   INIT_MUTEX(screen->cursorMutex);
 
-   IF_PTHREADS(rfbScreen->backgroundLoop = FALSE);
-
-   rfbScreen->rfbDeferUpdateTime=5;
+   IF_PTHREADS(screen->backgroundLoop = FALSE);
 
    /* proc's and hook's */
 
-   rfbScreen->kbdAddEvent = defaultKbdAddEvent;
-   rfbScreen->kbdReleaseAllKeys = doNothingWithClient;
-   rfbScreen->ptrAddEvent = defaultPtrAddEvent;
-   rfbScreen->setXCutText = defaultSetXCutText;
-   rfbScreen->getCursorPtr = defaultGetCursorPtr;
-   rfbScreen->setTranslateFunction = rfbSetTranslateFunction;
-   rfbScreen->newClientHook = defaultNewClientHook;
-   rfbScreen->displayHook = 0;
-   rfbScreen->inetdDisconnectHook = 0;
+   screen->kbdAddEvent = rfbDefaultKbdAddEvent;
+   screen->kbdReleaseAllKeys = rfbDoNothingWithClient;
+   screen->ptrAddEvent = rfbDefaultPtrAddEvent;
+   screen->setXCutText = rfbDefaultSetXCutText;
+   screen->getCursorPtr = rfbDefaultGetCursorPtr;
+   screen->setTranslateFunction = rfbSetTranslateFunction;
+   screen->newClientHook = rfbDefaultNewClientHook;
+   screen->displayHook = NULL;
+   screen->getKeyboardLedStateHook = NULL;
 
    /* initialize client list and iterator mutex */
-   rfbClientListInit(rfbScreen);
+   rfbClientListInit(screen);
 
-   return(rfbScreen);
+   return(screen);
 }
 
-void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
+/*
+ * Switch to another framebuffer (maybe of different size and color
+ * format). Clients supporting NewFBSize pseudo-encoding will change
+ * their local framebuffer dimensions if necessary.
+ * NOTE: Rich cursor data should be converted to new pixel format by
+ * the caller.
+ */
+
+void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
+                       int width, int height,
+                       int bitsPerSample, int samplesPerPixel,
+                       int bytesPerPixel)
 {
-  rfbClientIteratorPtr i=rfbGetClientIterator(rfbScreen);
+  rfbPixelFormat old_format;
+  rfbBool format_changed = FALSE;
+  rfbClientIteratorPtr iterator;
+  rfbClientPtr cl;
+
+  /* Update information in the screenInfo structure */
+
+  old_format = screen->serverFormat;
+
+  if (width & 3)
+    rfbErr("WARNING: New width (%d) is not a multiple of 4.\n", width);
+
+  screen->width = width;
+  screen->height = height;
+  screen->bitsPerPixel = screen->depth = 8*bytesPerPixel;
+  screen->paddedWidthInBytes = width*bytesPerPixel;
+
+  rfbInitServerFormat(screen, bitsPerSample);
+
+  if (memcmp(&screen->serverFormat, &old_format,
+             sizeof(rfbPixelFormat)) != 0) {
+    format_changed = TRUE;
+  }
+
+  screen->frameBuffer = framebuffer;
+
+  /* Adjust pointer position if necessary */
+
+  if (screen->cursorX >= width)
+    screen->cursorX = width - 1;
+  if (screen->cursorY >= height)
+    screen->cursorY = height - 1;
+
+  /* For each client: */
+  iterator = rfbGetClientIterator(screen);
+  while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
+
+    /* Re-install color translation tables if necessary */
+
+    if (format_changed)
+      screen->setTranslateFunction(cl);
+
+    /* Mark the screen contents as changed, and schedule sending
+       NewFBSize message if supported by this client. */
+
+    LOCK(cl->updateMutex);
+    sraRgnDestroy(cl->modifiedRegion);
+    cl->modifiedRegion = sraRgnCreateRect(0, 0, width, height);
+    sraRgnMakeEmpty(cl->copyRegion);
+    cl->copyDX = 0;
+    cl->copyDY = 0;
+
+    if (cl->useNewFBSize)
+      cl->newFBSizePending = TRUE;
+
+    TSIGNAL(cl->updateCond);
+    UNLOCK(cl->updateMutex);
+  }
+  rfbReleaseClientIterator(iterator);
+}
+
+/* hang up on all clients and free all reserved memory */
+
+void rfbScreenCleanup(rfbScreenInfoPtr screen)
+{
+  rfbClientIteratorPtr i=rfbGetClientIterator(screen);
   rfbClientPtr cl,cl1=rfbClientIteratorNext(i);
   while(cl1) {
     cl=rfbClientIteratorNext(i);
@@ -626,26 +974,67 @@ void rfbScreenCleanup(rfbScreenInfoPtr rfbScreen)
     cl1=cl;
   }
   rfbReleaseClientIterator(i);
-
-  /* TODO: hang up on all clients and free all reserved memory */
-#define FREE_IF(x) if(rfbScreen->x) free(rfbScreen->x)
+    
+#define FREE_IF(x) if(screen->x) free(screen->x)
   FREE_IF(colourMap.data.bytes);
   FREE_IF(underCursorBuffer);
-  TINI_MUTEX(rfbScreen->cursorMutex);
-  free(rfbScreen);
+  TINI_MUTEX(screen->cursorMutex);
+  if(screen->cursor && screen->cursor->cleanup)
+    rfbFreeCursor(screen->cursor);
+
+  rfbRRECleanup(screen);
+  rfbCoRRECleanup(screen);
+  rfbUltraCleanup(screen);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+  rfbZlibCleanup(screen);
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+  rfbTightCleanup(screen);
+#endif
+
+  /* free all 'scaled' versions of this screen */
+  while (screen->scaledScreenNext!=NULL)
+  {
+      rfbScreenInfoPtr ptr;
+      ptr = screen->scaledScreenNext;
+      screen->scaledScreenNext = ptr->scaledScreenNext;
+      free(ptr->frameBuffer);
+      free(ptr);
+  }
+
+#endif
+  free(screen);
 }
 
-void rfbInitServer(rfbScreenInfoPtr rfbScreen)
+void rfbInitServer(rfbScreenInfoPtr screen)
 {
 #ifdef WIN32
   WSADATA trash;
-  int i=WSAStartup(MAKEWORD(2,2),&trash);
+  WSAStartup(MAKEWORD(2,2),&trash);
 #endif
-  rfbInitSockets(rfbScreen);
-  httpInitSockets(rfbScreen);
+  rfbInitSockets(screen);
+  rfbHttpInitSockets(screen);
+#ifndef __MINGW32__
+  if(screen->ignoreSIGPIPE)
+    signal(SIGPIPE,SIG_IGN);
+#endif
 }
 
-#ifdef WIN32
+void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
+  if(disconnectClients) {
+    rfbClientPtr cl;
+    rfbClientIteratorPtr iter = rfbGetClientIterator(screen);
+    while( (cl = rfbClientIteratorNext(iter)) )
+      if (cl->sock > -1)
+	/* we don't care about maxfd here, because the server goes away */
+	rfbCloseClient(cl);
+    rfbReleaseClientIterator(iter);
+  }
+
+  rfbShutdownSockets(screen);
+  rfbHttpShutdownSockets(screen);
+}
+
+#ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
 #include <fcntl.h>
 #include <conio.h>
 #include <sys/timeb.h>
@@ -659,27 +1048,32 @@ void gettimeofday(struct timeval* tv,char* dummy)
 }
 #endif
 
-void
-rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
+rfbBool
+rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 {
   rfbClientIteratorPtr i;
   rfbClientPtr cl,clPrev;
   struct timeval tv;
+  rfbBool result=FALSE;
+  extern rfbClientIteratorPtr
+    rfbGetClientIteratorWithClosed(rfbScreenInfoPtr rfbScreen);
 
   if(usec<0)
-    usec=rfbScreen->rfbDeferUpdateTime*1000;
+    usec=screen->deferUpdateTime*1000;
 
-  rfbCheckFds(rfbScreen,usec);
-  httpCheckFds(rfbScreen);
+  rfbCheckFds(screen,usec);
+  rfbHttpCheckFds(screen);
 #ifdef CORBA
-  corbaCheckFds(rfbScreen);
+  corbaCheckFds(screen);
 #endif
 
-  i = rfbGetClientIterator(rfbScreen);
-  cl=rfbClientIteratorNext(i);
+  i = rfbGetClientIteratorWithClosed(screen);
+  cl=rfbClientIteratorHead(i);
   while(cl) {
-    if(cl->sock>=0 && (!cl->onHold) && FB_UPDATE_PENDING(cl)) {
-      if(cl->screen->rfbDeferUpdateTime == 0) {
+    if (cl->sock >= 0 && !cl->onHold && FB_UPDATE_PENDING(cl) &&
+        !sraRgnEmpty(cl->requestedRegion)) {
+      result=TRUE;
+      if(screen->deferUpdateTime == 0) {
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
       } else if(cl->startDeferring.tv_usec == 0) {
 	gettimeofday(&cl->startDeferring,NULL);
@@ -690,39 +1084,68 @@ rfbProcessEvents(rfbScreenInfoPtr rfbScreen,long usec)
 	if(tv.tv_sec < cl->startDeferring.tv_sec /* at midnight */
 	   || ((tv.tv_sec-cl->startDeferring.tv_sec)*1000
 	       +(tv.tv_usec-cl->startDeferring.tv_usec)/1000)
-	     > cl->screen->rfbDeferUpdateTime) {
+	     > screen->deferUpdateTime) {
 	  cl->startDeferring.tv_usec = 0;
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
 	}
       }
     }
+
+    if (!cl->viewOnly && cl->lastPtrX >= 0) {
+      if(cl->startPtrDeferring.tv_usec == 0) {
+        gettimeofday(&cl->startPtrDeferring,NULL);
+        if(cl->startPtrDeferring.tv_usec == 0)
+          cl->startPtrDeferring.tv_usec++;
+      } else {
+        struct timeval tv;
+        gettimeofday(&tv,NULL);
+        if(tv.tv_sec < cl->startPtrDeferring.tv_sec /* at midnight */
+           || ((tv.tv_sec-cl->startPtrDeferring.tv_sec)*1000
+           +(tv.tv_usec-cl->startPtrDeferring.tv_usec)/1000)
+           > cl->screen->deferPtrUpdateTime) {
+          cl->startPtrDeferring.tv_usec = 0;
+          cl->screen->ptrAddEvent(cl->lastPtrButtons, 
+                                  cl->lastPtrX, 
+                                  cl->lastPtrY, cl);
+	  cl->lastPtrX = -1;
+        }
+      }
+    }
     clPrev=cl;
     cl=rfbClientIteratorNext(i);
-    if(clPrev->sock==-1)
+    if(clPrev->sock==-1) {
       rfbClientConnectionGone(clPrev);
+      result=TRUE;
+    }
   }
   rfbReleaseClientIterator(i);
+
+  return result;
 }
 
-void rfbRunEventLoop(rfbScreenInfoPtr rfbScreen, long usec, Bool runInBackground)
+rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo) {
+  return screenInfo->socketState!=RFB_SOCKET_SHUTDOWN || screenInfo->clientHead!=NULL;
+}
+
+void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground)
 {
   if(runInBackground) {
-#ifdef HAVE_PTHREADS
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
        pthread_t listener_thread;
 
-       rfbScreen->backgroundLoop = TRUE;
+       screen->backgroundLoop = TRUE;
 
-       pthread_create(&listener_thread, NULL, listenerRun, rfbScreen);
+       pthread_create(&listener_thread, NULL, listenerRun, screen);
     return;
 #else
-    fprintf(stderr,"Can't run in background, because I don't have PThreads!\n");
-    exit(-1);
+    rfbErr("Can't run in background, because I don't have PThreads!\n");
+    return;
 #endif
   }
 
   if(usec<0)
-    usec=rfbScreen->rfbDeferUpdateTime*1000;
+    usec=screen->deferUpdateTime*1000;
 
-  while(1)
-    rfbProcessEvents(rfbScreen,usec);
+  while(rfbIsActive(screen))
+    rfbProcessEvents(screen,usec);
 }

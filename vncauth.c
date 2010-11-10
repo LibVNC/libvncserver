@@ -13,7 +13,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  *  USA.
  */
 
@@ -21,21 +21,38 @@
  * vncauth.c - Functions for VNC password management and authentication.
  */
 
+#ifdef __STRICT_ANSI__
+#define _BSD_SOURCE
+#define _POSIX_SOURCE
+#endif
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <rfb/rfbproto.h>
+#include "d3des.h"
+
 #include <string.h>
-#include <sys/types.h>
+#include <math.h>
+
+#ifdef LIBVNCSERVER_HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#endif
+
 #include <time.h>
+
 #ifdef WIN32
 #define srandom srand
 #define random rand
 #else
 #include <sys/time.h>
 #endif
-#include "rfb.h"
-#include "d3des.h"
 
+
+/* libvncclient does not need this */
+#ifndef rfbEncryptBytes
 
 /*
  * We use a fixed key to store passwords, since we assume that our local
@@ -43,7 +60,7 @@
  * as plaintext.
  */
 
-unsigned char fixedkey[8] = {23,82,107,6,35,78,88,7};
+static unsigned char fixedkey[8] = {23,82,107,6,35,78,88,7};
 
 
 /*
@@ -52,7 +69,7 @@ unsigned char fixedkey[8] = {23,82,107,6,35,78,88,7};
  */
 
 int
-vncEncryptAndStorePasswd(char *passwd, char *fname)
+rfbEncryptAndStorePasswd(char *passwd, char *fname)
 {
     FILE *fp;
     unsigned int i;
@@ -62,7 +79,7 @@ vncEncryptAndStorePasswd(char *passwd, char *fname)
 
 	/* windows security sux */
 #ifndef WIN32
-    chmod(fname, S_IRUSR|S_IWUSR);
+    fchmod(fileno(fp), S_IRUSR|S_IWUSR);
 #endif
 
     /* pad password with nulls */
@@ -78,8 +95,8 @@ vncEncryptAndStorePasswd(char *passwd, char *fname)
     /* Do encryption in-place - this way we overwrite our copy of the plaintext
        password */
 
-    deskey(fixedkey, EN0);
-    des(encryptedPasswd, encryptedPasswd);
+    rfbDesKey(fixedkey, EN0);
+    rfbDes(encryptedPasswd, encryptedPasswd);
 
     for (i = 0; i < 8; i++) {
 	putc(encryptedPasswd[i], fp);
@@ -97,7 +114,7 @@ vncEncryptAndStorePasswd(char *passwd, char *fname)
  */
 
 char *
-vncDecryptPasswdFromFile(char *fname)
+rfbDecryptPasswdFromFile(char *fname)
 {
     FILE *fp;
     int i, ch;
@@ -116,8 +133,8 @@ vncDecryptPasswdFromFile(char *fname)
 
     fclose(fp);
 
-    deskey(fixedkey, DE1);
-    des(passwd, passwd);
+    rfbDesKey(fixedkey, DE1);
+    rfbDes(passwd, passwd);
 
     passwd[8] = 0;
 
@@ -131,24 +148,29 @@ vncDecryptPasswdFromFile(char *fname)
  */
 
 void
-vncRandomBytes(unsigned char *bytes)
+rfbRandomBytes(unsigned char *bytes)
 {
     int i;
-    unsigned int seed = (unsigned int) time(0);
+    static rfbBool s_srandom_called = FALSE;
 
-    srandom(seed);
+    if (!s_srandom_called) {
+	srandom((unsigned int)time(NULL) ^ (unsigned int)getpid());
+	s_srandom_called = TRUE;
+    }
+
     for (i = 0; i < CHALLENGESIZE; i++) {
 	bytes[i] = (unsigned char)(random() & 255);    
     }
 }
 
+#endif
 
 /*
  * Encrypt CHALLENGESIZE bytes in memory using a password.
  */
 
 void
-vncEncryptBytes(unsigned char *bytes, char *passwd)
+rfbEncryptBytes(unsigned char *bytes, char *passwd)
 {
     unsigned char key[8];
     unsigned int i;
@@ -163,9 +185,9 @@ vncEncryptBytes(unsigned char *bytes, char *passwd)
 	}
     }
 
-    deskey(key, EN0);
+    rfbDesKey(key, EN0);
 
     for (i = 0; i < CHALLENGESIZE; i += 8) {
-	des(bytes+i, bytes+i);
+	rfbDes(bytes+i, bytes+i);
     }
 }

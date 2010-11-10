@@ -30,7 +30,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this software; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  *  USA.
  */
 
@@ -39,8 +39,8 @@
 #error "It is included as part of translate.c"
 #endif
 
-#define IN_T CONCAT2E(CARD,IN)
-#define OUT_T CONCAT2E(CARD,OUT)
+#define IN_T CONCAT3E(uint,IN,_t)
+#define OUT_T CONCAT3E(uint,OUT,_t)
 #define rfbTranslateWithSingleTableINtoOUT \
                                 CONCAT4E(rfbTranslateWithSingleTable,IN,to,OUT)
 #define rfbTranslateWithRGBTablesINtoOUT \

@@ -18,19 +18,22 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this software; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  *  USA.
  */
 
-#include "rfb.h"
+#include <rfb/rfb.h>
+#include <rfb/rfbregion.h>
+#include "private.h"
+
+void rfbScaledScreenUpdate(rfbScreenInfoPtr screen, int x1, int y1, int x2, int y2);
 
 /*
  * Send cursor shape either in X-style format or in client pixel format.
  */
 
-Bool
-rfbSendCursorShape(cl)
-    rfbClientPtr cl;
+rfbBool
+rfbSendCursorShape(rfbClientPtr cl)
 {
     rfbCursorPtr pCursor;
     rfbFramebufferUpdateRectHeader rect;
@@ -38,19 +41,21 @@ rfbSendCursorShape(cl)
     int saved_ublen;
     int bitmapRowBytes, maskBytes, dataBytes;
     int i, j;
-    CARD8 *bitmapData;
-    CARD8 bitmapByte;
+    uint8_t *bitmapData;
+    uint8_t bitmapByte;
+
+    /* TODO: scale the cursor data to the correct size */
 
     pCursor = cl->screen->getCursorPtr(cl);
     /*if(!pCursor) return TRUE;*/
 
     if (cl->useRichCursorEncoding) {
       if(pCursor && !pCursor->richSource)
-	MakeRichCursorFromXCursor(cl->screen,pCursor);
+	rfbMakeRichCursorFromXCursor(cl->screen,pCursor);
       rect.encoding = Swap32IfLE(rfbEncodingRichCursor);
     } else {
        if(pCursor && !pCursor->source)
-	 MakeXCursorFromRichCursor(cl->screen,pCursor);
+	 rfbMakeXCursorFromRichCursor(cl->screen,pCursor);
        rect.encoding = Swap32IfLE(rfbEncodingXCursor);
     }
 
@@ -72,9 +77,6 @@ rfbSendCursorShape(cl)
 	memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
 	       sz_rfbFramebufferUpdateRectHeader);
 	cl->ublen += sz_rfbFramebufferUpdateRectHeader;
-
-	cl->rfbCursorBytesSent += sz_rfbFramebufferUpdateRectHeader;
-	cl->rfbCursorUpdatesSent++;
 
 	if (!rfbSendUpdateBuf(cl))
 	    return FALSE;
@@ -129,7 +131,7 @@ rfbSendCursorShape(cl)
 	memcpy(&cl->updateBuf[cl->ublen], (char *)&colors, sz_rfbXCursorColors);
 	cl->ublen += sz_rfbXCursorColors;
 
-	bitmapData = (CARD8 *)pCursor->source;
+	bitmapData = (uint8_t *)pCursor->source;
 
 	for (i = 0; i < pCursor->height; i++) {
 	    for (j = 0; j < bitmapRowBytes; j++) {
@@ -139,11 +141,11 @@ rfbSendCursorShape(cl)
 	}
     } else {
 	/* RichCursor encoding. */
-       int bpp1=cl->screen->rfbServerFormat.bitsPerPixel/8,
+       int bpp1=cl->screen->serverFormat.bitsPerPixel/8,
 	 bpp2=cl->format.bitsPerPixel/8;
        (*cl->translateFn)(cl->translateLookupTable,
-		       &(cl->screen->rfbServerFormat),
-                       &cl->format, pCursor->richSource,
+		       &(cl->screen->serverFormat),
+                       &cl->format, (char*)pCursor->richSource,
 		       &cl->updateBuf[cl->ublen],
                        pCursor->width*bpp1, pCursor->width, pCursor->height);
 
@@ -152,7 +154,7 @@ rfbSendCursorShape(cl)
 
     /* Prepare transparency mask. */
 
-    bitmapData = (CARD8 *)pCursor->mask;
+    bitmapData = (uint8_t *)pCursor->mask;
 
     for (i = 0; i < pCursor->height; i++) {
 	for (j = 0; j < bitmapRowBytes; j++) {
@@ -162,9 +164,8 @@ rfbSendCursorShape(cl)
     }
 
     /* Send everything we have prepared in the cl->updateBuf[]. */
-
-    cl->rfbCursorBytesSent += (cl->ublen - saved_ublen);
-    cl->rfbCursorUpdatesSent++;
+    rfbStatRecordEncodingSent(cl, (cl->useRichCursorEncoding ? rfbEncodingRichCursor : rfbEncodingXCursor), 
+        sz_rfbFramebufferUpdateRectHeader + (cl->ublen - saved_ublen), sz_rfbFramebufferUpdateRectHeader + (cl->ublen - saved_ublen));
 
     if (!rfbSendUpdateBuf(cl))
 	return FALSE;
@@ -173,132 +174,35 @@ rfbSendCursorShape(cl)
 }
 
 /*
- * Send soft cursor state and possibly image
+ * Send cursor position (PointerPos pseudo-encoding).
  */
 
-Bool
-rfbSendSoftCursor(rfbClientPtr cl, Bool cursorWasChanged)
+rfbBool
+rfbSendCursorPos(rfbClientPtr cl)
 {
-    rfbCursorPtr pCursor;
-    rfbSoftCursorSetImage setImage;
-    rfbSoftCursorMove moveMsg;
-    rfbFramebufferUpdateRectHeader rect;
-    int saved_ublen, i, scOindex, scNindex, nlen, imgLen;
+  rfbFramebufferUpdateRectHeader rect;
 
-    pCursor = cl->screen->getCursorPtr(cl);
-    if (cursorWasChanged && cl->softSource) {
-	free(cl->softSource);
-	cl->softSource = 0;
-    }
-    if (!cl->softSource)
-	MakeSoftCursor(cl, pCursor);
+  if (cl->ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
+    if (!rfbSendUpdateBuf(cl))
+      return FALSE;
+  }
 
-    imgLen = cl->softSourceLen;
+  rect.encoding = Swap32IfLE(rfbEncodingPointerPos);
+  rect.r.x = Swap16IfLE(cl->screen->cursorX);
+  rect.r.y = Swap16IfLE(cl->screen->cursorY);
+  rect.r.w = 0;
+  rect.r.h = 0;
 
-    /* If there is no cursor, send update with empty cursor data. */
+  memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+	 sz_rfbFramebufferUpdateRectHeader);
+  cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-    if ( pCursor && pCursor->width <= 1 &&
-	 pCursor->height <= 1 &&
-	 pCursor->mask[0] == 0 ) {
-	pCursor = NULL;
-    }
+  rfbStatRecordEncodingSent(cl, rfbEncodingPointerPos, sz_rfbFramebufferUpdateRectHeader, sz_rfbFramebufferUpdateRectHeader);
 
-    setImage.imageLength = Swap16IfLE(imgLen);
+  if (!rfbSendUpdateBuf(cl))
+    return FALSE;
 
-    scOindex = -1;
-    scNindex = -1;
-    for (i = 0; i < rfbSoftCursorMaxImages; i++) {
-	rfbSoftCursorSetImage *scsi = cl->softCursorImages[i];
-	if (!scsi) {
-	    scNindex = i;
-	    break;
-	}
-	
-	setImage.imageIndex = scsi->imageIndex;
-	if (!memcmp((char*)scsi, (char*)&setImage, sizeof(setImage))) {
-	    if (imgLen && !memcmp(((char*)scsi)+sizeof(rfbSoftCursorSetImage),
-				  cl->softSource,
-				  imgLen)) {
-		scOindex = i;
-		break;
-	    }
-	}
-    }
-
-    nlen = 0;
-    if (scOindex < 0) {
-	if (scNindex < 0) {
-	    scNindex = cl->nextUnusedSoftCursorImage;
-	    cl->nextUnusedSoftCursorImage = (cl->nextUnusedSoftCursorImage+1) 
-		% rfbSoftCursorMaxImages;
-	    free(cl->softCursorImages[scNindex]);
-	}
-
-	scOindex = scNindex;
-	setImage.imageIndex = scNindex + rfbSoftCursorSetIconOffset;
-	nlen = sizeof(setImage) + imgLen;
-	cl->softCursorImages[scNindex] = calloc(1, nlen);
-	memcpy((char*)cl->softCursorImages[scNindex], (char*)&setImage, 
-	       sizeof(setImage));
-	if (imgLen)
-	    memcpy(((char*)cl->softCursorImages[scNindex])+sizeof(setImage), 
-		   (char*)cl->softSource, imgLen);
-    }
-
-    /* Send buffer contents if needed. */
-
-    if ( cl->ublen + sizeof(rfbSoftCursorMove) + 
-	 ((scNindex >= 0 && cursorWasChanged) ? 
-	 (sizeof(rfbSoftCursorSetImage) + imgLen) : 0) > UPDATE_BUF_SIZE) {
-			    
-	if (!rfbSendUpdateBuf(cl))
-	    return FALSE;
-    }
-
-    saved_ublen = cl->ublen;
-
-    if (scNindex >= 0 && cursorWasChanged) {
-	rect.encoding = Swap32IfLE(rfbEncodingSoftCursor);
-	if (pCursor) {
-	    rect.r.x = Swap16IfLE(pCursor->xhot);
-	    rect.r.y = Swap16IfLE(pCursor->yhot);
-	    rect.r.w = Swap16IfLE(pCursor->width);
-	    rect.r.h = Swap16IfLE(pCursor->height);
-	}
-	else {
-	    rect.r.x = 0;
-	    rect.r.y = 0;
-	    rect.r.w = 0;
-	    rect.r.h = 0;
-	}
-
-	memcpy(&cl->updateBuf[cl->ublen], 
-	       (char *)&rect,sz_rfbFramebufferUpdateRectHeader);
-	cl->ublen += sz_rfbFramebufferUpdateRectHeader;
-	memcpy(&cl->updateBuf[cl->ublen], (char*)cl->softCursorImages[scNindex], nlen);
-	cl->ublen += nlen;
-	cl->rfbCursorUpdatesSent++;
-    }
-
-    rect.encoding = Swap32IfLE(rfbEncodingSoftCursor);
-    rect.r.x = 0;
-    rect.r.y = 0;
-    rect.r.w = Swap16IfLE(cl->screen->cursorX);
-    rect.r.h = Swap16IfLE(cl->screen->cursorY);
-    moveMsg.imageIndex = scOindex;
-    moveMsg.buttonMask = 0; /* todo */
-    memcpy(&cl->updateBuf[cl->ublen], 
-	   (char *)&rect,sz_rfbFramebufferUpdateRectHeader);
-    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
-    memcpy(&cl->updateBuf[cl->ublen], (char*)&moveMsg, sizeof(moveMsg));
-    cl->ublen += sizeof(moveMsg);
-
-    /* Send everything we have prepared in the cl->updateBuf[]. */
-
-    cl->rfbCursorBytesSent += (cl->ublen - saved_ublen);
-    cl->rfbCursorUpdatesSent++;
-
-    return rfbSendUpdateBuf(cl);
+  return TRUE;
 }
 
 /* conversion routine for predefined cursors in LSB order */
@@ -354,12 +258,14 @@ rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskSt
    char* cp;
    unsigned char bit;
 
+   cursor->cleanup=TRUE;
    cursor->width=width;
    cursor->height=height;
    /*cursor->backRed=cursor->backGreen=cursor->backBlue=0xffff;*/
    cursor->foreRed=cursor->foreGreen=cursor->foreBlue=0xffff;
    
    cursor->source = (unsigned char*)calloc(w,height);
+   cursor->cleanupSource = TRUE;
    for(j=0,cp=cursorString;j<height;j++)
       for(i=0,bit=0x80;i<width;i++,bit=(bit&1)?0x80:bit>>1,cp++)
 	if(*cp!=' ') cursor->source[j*w+i/8]|=bit;
@@ -370,7 +276,8 @@ rfbCursorPtr rfbMakeXCursor(int width,int height,char* cursorString,char* maskSt
 	for(i=0,bit=0x80;i<width;i++,bit=(bit&1)?0x80:bit>>1,cp++)
 	  if(*cp!=' ') cursor->mask[j*w+i/8]|=bit;
    } else
-     cursor->mask = (unsigned char*)rfbMakeMaskForXCursor(width,height,cursor->source);
+     cursor->mask = (unsigned char*)rfbMakeMaskForXCursor(width,height,(char*)cursor->source);
+   cursor->cleanupMask = TRUE;
 
    return(cursor);
 }
@@ -398,52 +305,151 @@ char* rfbMakeMaskForXCursor(int width,int height,char* source)
    return(mask);
 }
 
+/* this function dithers the alpha using Floyd-Steinberg */
+
+char* rfbMakeMaskFromAlphaSource(int width,int height,unsigned char* alphaSource)
+{
+	int* error=(int*)calloc(sizeof(int),width);
+	int i,j,currentError=0,maskStride=(width+7)/8;
+	unsigned char* result=(unsigned char*)calloc(maskStride,height);
+	
+	for(j=0;j<height;j++)
+		for(i=0;i<width;i++) {
+			int right,middle,left;
+			currentError+=alphaSource[i+width*j]+error[i];
+		
+			if(currentError<0x80) {
+				/* set to transparent */
+				/* alpha was treated as 0 */
+			} else {
+				/* set to solid */
+				result[i/8+j*maskStride]|=(0x100>>(i&7));
+				/* alpha was treated as 0xff */
+				currentError-=0xff;
+			}
+			/* propagate to next row */
+			right=currentError/16;
+			middle=currentError*5/16;
+			left=currentError*3/16;
+			currentError-=right+middle+left;
+			error[i]=right;
+			if(i>0) {
+				error[i-1]=middle;
+				if(i>1)
+					error[i-2]=left;
+			}
+		}
+	free(error);
+	return (char *) result;
+}
+
 void rfbFreeCursor(rfbCursorPtr cursor)
 {
    if(cursor) {
-      if(cursor->richSource)
-	 free(cursor->richSource);
-      free(cursor->source);
-      free(cursor->mask);
-      free(cursor);
+       if(cursor->cleanupRichSource && cursor->richSource)
+	   free(cursor->richSource);
+       if(cursor->cleanupRichSource && cursor->alphaSource)
+	   free(cursor->alphaSource);
+       if(cursor->cleanupSource && cursor->source)
+	   free(cursor->source);
+       if(cursor->cleanupMask && cursor->mask)
+	   free(cursor->mask);
+       if(cursor->cleanup)
+	   free(cursor);
+       else {
+	   cursor->cleanup=cursor->cleanupSource=cursor->cleanupMask
+	       =cursor->cleanupRichSource=FALSE;
+	   cursor->source=cursor->mask=cursor->richSource=NULL;
+	   cursor->alphaSource=NULL;
+       }
    }
    
 }
 
 /* background and foregroud colour have to be set beforehand */
-void MakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
+void rfbMakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
 {
-   rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
+   rfbPixelFormat* format=&rfbScreen->serverFormat;
    int i,j,w=(cursor->width+7)/8,bpp=format->bitsPerPixel/8,
      width=cursor->width*bpp;
-   CARD32 background;
+   uint32_t background;
    char *back=(char*)&background;
    unsigned char bit;
-   
+   int interp = 0, db = 0;
+
+   if(cursor->source && cursor->cleanupSource)
+       free(cursor->source);
    cursor->source=(unsigned char*)calloc(w,cursor->height);
+   cursor->cleanupSource=TRUE;
    
-   if(format->bigEndian)
+   if(format->bigEndian) {
       back+=4-bpp;
+   }
 
-   background=cursor->backRed<<format->redShift|
-     cursor->backGreen<<format->greenShift|cursor->backBlue<<format->blueShift;
+	/* all zeros means we should interpolate to black+white ourselves */
+	if (!cursor->backRed && !cursor->backGreen && !cursor->backBlue &&
+	    !cursor->foreRed && !cursor->foreGreen && !cursor->foreBlue) {
+		if (format->trueColour && (bpp == 1 || bpp == 2 || bpp == 4)) {
+			interp = 1;
+			cursor->foreRed = cursor->foreGreen = cursor->foreBlue = 0xffff;
+		}
+	}
 
-   for(j=0;j<cursor->height;j++)
-     for(i=0,bit=0x80;i<cursor->width;i++,bit=(bit&1)?0x80:bit>>1)
-       if(memcmp(cursor->richSource+j*width+i*bpp,back,bpp))
-	 cursor->source[j*w+i/8]|=bit;
+   background = ((format->redMax   * cursor->backRed)   / 0xffff) << format->redShift   |
+                ((format->greenMax * cursor->backGreen) / 0xffff) << format->greenShift |
+                ((format->blueMax  * cursor->backBlue)  / 0xffff) << format->blueShift;
+
+#define SETRGB(u) \
+   r = (255 * (((format->redMax   << format->redShift)   & (*u)) >> format->redShift))   / format->redMax; \
+   g = (255 * (((format->greenMax << format->greenShift) & (*u)) >> format->greenShift)) / format->greenMax; \
+   b = (255 * (((format->blueMax  << format->blueShift)  & (*u)) >> format->blueShift))  / format->blueMax;
+
+   if (db) fprintf(stderr, "interp: %d\n", interp);
+
+   for(j=0;j<cursor->height;j++) {
+	for(i=0,bit=0x80;i<cursor->width;i++,bit=(bit&1)?0x80:bit>>1) {
+		if (interp) {
+			int r = 0, g = 0, b = 0, grey;
+			char *p = cursor->richSource+j*width+i*bpp;
+			if (bpp == 1) {
+				unsigned char*  uc = (unsigned char*)  p;
+				SETRGB(uc);
+			} else if (bpp == 2) {
+				unsigned short* us = (unsigned short*) p;
+				SETRGB(us);
+			} else if (bpp == 4) {
+				unsigned int*   ui = (unsigned int*)   p;
+				SETRGB(ui);
+			}
+			grey = (r + g + b) / 3;
+			if (grey >= 128) {
+				cursor->source[j*w+i/8]|=bit;
+				if (db) fprintf(stderr, "1");
+			} else {
+				if (db) fprintf(stderr, "0");
+			}
+			
+		} else if(memcmp(cursor->richSource+j*width+i*bpp, back, bpp)) {
+			cursor->source[j*w+i/8]|=bit;
+		}
+	}
+	if (db) fprintf(stderr, "\n");
+   }
 }
 
-void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
+void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
 {
-   rfbPixelFormat* format=&rfbScreen->rfbServerFormat;
+   rfbPixelFormat* format=&rfbScreen->serverFormat;
    int i,j,w=(cursor->width+7)/8,bpp=format->bitsPerPixel/8;
-   CARD32 background,foreground;
+   uint32_t background,foreground;
    char *back=(char*)&background,*fore=(char*)&foreground;
    unsigned char *cp;
    unsigned char bit;
 
+   if(cursor->richSource && cursor->cleanupRichSource)
+       free(cursor->richSource);
    cp=cursor->richSource=(unsigned char*)calloc(cursor->width*bpp,cursor->height);
+   cursor->cleanupRichSource=TRUE;
    
    if(format->bigEndian) {
       back+=4-bpp;
@@ -456,105 +462,27 @@ void MakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor)
      cursor->foreGreen<<format->greenShift|cursor->foreBlue<<format->blueShift;
    
    for(j=0;j<cursor->height;j++)
-     for(i=0,bit=0x80;i<cursor->height;i++,bit=(bit&1)?0x80:bit>>1,cp+=bpp)
+     for(i=0,bit=0x80;i<cursor->width;i++,bit=(bit&1)?0x80:bit>>1,cp+=bpp)
        if(cursor->source[j*w+i/8]&bit) memcpy(cp,fore,bpp);
        else memcpy(cp,back,bpp);
 }
 
-void MakeSoftCursor(rfbClientPtr cl, rfbCursorPtr cursor)
-{
-    int w = (cursor->width+7)/8;
-    int bpp = cl->format.bitsPerPixel/8;
-    int sbpp= cl->screen->rfbServerFormat.bitsPerPixel/8;
-    unsigned char *cp, *sp, *translatedCursor;
-    int state; /* 0 = transparent, 1 otherwise */
-    CARD8 *counter;
-    unsigned char bit;
-    int i,j;
-    
-    if ((!cursor) || (cl->softSource)) {
-	cl->softSourceLen = 0;
-	return;
-    }
-    
-    if (!cursor->richSource)
-	MakeRichCursorFromXCursor(cl->screen, cursor);
-
-    sp = malloc(cursor->width*bpp*cursor->height);
-
-    (*cl->translateFn)(cl->translateLookupTable,
-		       &(cl->screen->rfbServerFormat),
-                       &cl->format, cursor->richSource,
-		       sp, cursor->width*sbpp, 
-		       cursor->width, cursor->height);
-
-    translatedCursor = sp;
-    cp=cl->softSource=(unsigned char*)calloc(cursor->width*(bpp+2),cursor->height);
-    
-    state = 0;
-    counter = cp++;
-    *counter = 0;
-    
-    for(j=0;j<cursor->height;j++)
-	for(i=0,bit=0x80;i<cursor->width;i++,bit=(bit&1)?0x80:bit>>1)
-	    if(cursor->mask[j*w+i/8]&bit) {
-		if (state) {
-		    memcpy(cp,sp,bpp);
-		    cp += bpp;
-		    sp += bpp;
-		    (*counter)++;
-		    if (*counter == 255) {
-			state = 0;
-			counter = cp++;
-			*counter = 0;
-		    }
-		}
-		else {
-		    state = 1;
-		    counter = cp++;
-		    *counter = 1;
-		    memcpy(cp,sp,bpp);
-		    cp += bpp;
-		    sp += bpp;
-		}
-	    }
-	    else {
-		if (!state) {
-		    (*counter)++;
-		    if (*counter == 255) {
-			state = 1;
-			counter = cp++;
-			*counter = 0;
-		    }
-		}
-		else {
-		    state = 0;
-		    counter = cp++;
-		    *counter = 1;
-		}
-		sp += bpp;
-	    }
-
-    free(translatedCursor);
-    cl->softSourceLen = cp - cl->softSource;
-}
-
-
 /* functions to draw/hide cursor directly in the frame buffer */
 
-void rfbUndrawCursor(rfbScreenInfoPtr s)
+void rfbHideCursor(rfbClientPtr cl)
 {
+   rfbScreenInfoPtr s=cl->screen;
    rfbCursorPtr c=s->cursor;
-   int j,x1,x2,y1,y2,bpp=s->rfbServerFormat.bitsPerPixel/8,
+   int j,x1,x2,y1,y2,bpp=s->serverFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
    LOCK(s->cursorMutex);
-   if(!s->cursorIsDrawn) {
+   if(!c) {
      UNLOCK(s->cursorMutex);
      return;
    }
    
    /* restore what is under the cursor */
-   x1=s->cursorX-c->xhot;
+   x1=cl->cursorX-c->xhot;
    x2=x1+c->width;
    if(x1<0) x1=0;
    if(x2>=s->width) x2=s->width-1;
@@ -562,7 +490,7 @@ void rfbUndrawCursor(rfbScreenInfoPtr s)
      UNLOCK(s->cursorMutex);
      return;
    }
-   y1=s->cursorY-c->yhot;
+   y1=cl->cursorY-c->yhot;
    y2=y1+c->height;
    if(y1<0) y1=0;
    if(y2>=s->height) y2=s->height-1;
@@ -576,25 +504,25 @@ void rfbUndrawCursor(rfbScreenInfoPtr s)
      memcpy(s->frameBuffer+(y1+j)*rowstride+x1*bpp,
 	    s->underCursorBuffer+j*x2*bpp,
 	    x2*bpp);
+
+   /* Copy to all scaled versions */
+   rfbScaledScreenUpdate(s, x1, y1, x1+x2, y1+y2);
    
-   rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
-   s->cursorIsDrawn = FALSE;
    UNLOCK(s->cursorMutex);
 }
 
-void rfbDrawCursor(rfbScreenInfoPtr s)
+void rfbShowCursor(rfbClientPtr cl)
 {
+   rfbScreenInfoPtr s=cl->screen;
    rfbCursorPtr c=s->cursor;
-   int i,j,x1,x2,y1,y2,i1,j1,bpp=s->rfbServerFormat.bitsPerPixel/8,
+   int i,j,x1,x2,y1,y2,i1,j1,bpp=s->serverFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes,
      bufSize,w;
+   rfbBool wasChanged=FALSE;
+
    if(!c) return;
    LOCK(s->cursorMutex);
-   if(s->cursorIsDrawn) {
-     /* is already drawn */
-     UNLOCK(s->cursorMutex);
-     return;
-   }
+
    bufSize=c->width*c->height*bpp;
    w=(c->width+7)/8;
    if(s->underCursorBufferLen<bufSize) {
@@ -603,9 +531,10 @@ void rfbDrawCursor(rfbScreenInfoPtr s)
       s->underCursorBuffer=malloc(bufSize);
       s->underCursorBufferLen=bufSize;
    }
+
    /* save what is under the cursor */
    i1=j1=0; /* offset in cursor */
-   x1=s->cursorX-c->xhot;
+   x1=cl->cursorX-c->xhot;
    x2=x1+c->width;
    if(x1<0) { i1=-x1; x1=0; }
    if(x2>=s->width) x2=s->width-1;
@@ -613,7 +542,8 @@ void rfbDrawCursor(rfbScreenInfoPtr s)
      UNLOCK(s->cursorMutex);
      return; /* nothing to do */
    }
-   y1=s->cursorY-c->yhot;
+
+   y1=cl->cursorY-c->yhot;
    y2=y1+c->height;
    if(y1<0) { j1=-y1; y1=0; }
    if(y2>=s->height) y2=s->height-1;
@@ -623,30 +553,158 @@ void rfbDrawCursor(rfbScreenInfoPtr s)
    }
 
    /* save data */
-   for(j=0;j<y2;j++)
-     memcpy(s->underCursorBuffer+j*x2*bpp,
-	    s->frameBuffer+(y1+j)*rowstride+x1*bpp,
-	    x2*bpp);
+   for(j=0;j<y2;j++) {
+     char* dest=s->underCursorBuffer+j*x2*bpp;
+     const char* src=s->frameBuffer+(y1+j)*rowstride+x1*bpp;
+     unsigned int count=x2*bpp;
+     if(wasChanged || memcmp(dest,src,count)) {
+       wasChanged=TRUE;
+       memcpy(dest,src,count);
+     }
+   }
    
    if(!c->richSource)
-     MakeRichCursorFromXCursor(s,c);
-   
-   /* now the cursor has to be drawn */
-   for(j=0;j<y2;j++)
-     for(i=0;i<x2;i++)
-       if((c->mask[(j+j1)*w+(i+i1)/8]<<((i+i1)&7))&0x80)
-	 memcpy(s->frameBuffer+(j+y1)*rowstride+(i+x1)*bpp,
-		c->richSource+(j+j1)*c->width*bpp+(i+i1)*bpp,bpp);
+     rfbMakeRichCursorFromXCursor(s,c);
+  
+   if (c->alphaSource) {
+	int rmax, rshift;
+	int gmax, gshift;
+	int bmax, bshift;
+	int amax = 255;	/* alphaSource is always 8bits of info per pixel */
+	unsigned int rmask, gmask, bmask;
 
+	rmax   = s->serverFormat.redMax;
+	gmax   = s->serverFormat.greenMax;
+	bmax   = s->serverFormat.blueMax;
+	rshift = s->serverFormat.redShift;
+	gshift = s->serverFormat.greenShift;
+	bshift = s->serverFormat.blueShift;
 
-   rfbMarkRectAsModified(s,x1,y1,x1+x2,y1+y2);
-   s->cursorIsDrawn = TRUE;
+	rmask = (rmax << rshift);
+	gmask = (gmax << gshift);
+	bmask = (bmax << bshift);
+
+	for(j=0;j<y2;j++) {
+		for(i=0;i<x2;i++) {
+			/*
+			 * we loop over the whole cursor ignoring c->mask[],
+			 * using the extracted alpha value instead.
+			 */
+			char *dest;
+			unsigned char *src, *aptr;
+			unsigned int val, dval, sval;
+			int rdst, gdst, bdst;		/* fb RGB */
+			int asrc, rsrc, gsrc, bsrc;	/* rich source ARGB */
+
+			dest = s->frameBuffer + (j+y1)*rowstride + (i+x1)*bpp;
+			src  = c->richSource  + (j+j1)*c->width*bpp + (i+i1)*bpp;
+			aptr = c->alphaSource + (j+j1)*c->width + (i+i1);
+
+			asrc = *aptr;
+			if (!asrc) {
+				continue;
+			}
+
+			if (bpp == 1) {
+				dval = *((unsigned char*) dest);
+				sval = *((unsigned char*) src);
+			} else if (bpp == 2) {
+				dval = *((unsigned short*) dest);
+				sval = *((unsigned short*) src);
+			} else if (bpp == 3) {
+				unsigned char *dst = (unsigned char *) dest;
+				dval = 0;
+				dval |= ((*(dst+0)) << 0);
+				dval |= ((*(dst+1)) << 8);
+				dval |= ((*(dst+2)) << 16);
+				sval = 0;
+				sval |= ((*(src+0)) << 0);
+				sval |= ((*(src+1)) << 8);
+				sval |= ((*(src+2)) << 16);
+			} else if (bpp == 4) {
+				dval = *((unsigned int*) dest);
+				sval = *((unsigned int*) src);
+			} else {
+				continue;
+			}
+
+			/* extract dest and src RGB */
+			rdst = (dval & rmask) >> rshift;	/* fb */
+			gdst = (dval & gmask) >> gshift;
+			bdst = (dval & bmask) >> bshift;
+
+			rsrc = (sval & rmask) >> rshift;	/* richcursor */
+			gsrc = (sval & gmask) >> gshift;
+			bsrc = (sval & bmask) >> bshift;
+
+			/* blend in fb data. */
+			if (! c->alphaPreMultiplied) {
+				rsrc = (asrc * rsrc)/amax;
+				gsrc = (asrc * gsrc)/amax;
+				bsrc = (asrc * bsrc)/amax;
+			}
+			rdst = rsrc + ((amax - asrc) * rdst)/amax;
+			gdst = gsrc + ((amax - asrc) * gdst)/amax;
+			bdst = bsrc + ((amax - asrc) * bdst)/amax;
+
+			val = 0;
+			val |= (rdst << rshift);
+			val |= (gdst << gshift);
+			val |= (bdst << bshift);
+
+			/* insert the cooked pixel into the fb */
+			memcpy(dest, &val, bpp);
+		}
+	}
+   } else {
+      /* now the cursor has to be drawn */
+      for(j=0;j<y2;j++)
+        for(i=0;i<x2;i++)
+          if((c->mask[(j+j1)*w+(i+i1)/8]<<((i+i1)&7))&0x80)
+   	 memcpy(s->frameBuffer+(j+y1)*rowstride+(i+x1)*bpp,
+   		c->richSource+(j+j1)*c->width*bpp+(i+i1)*bpp,bpp);
+   }
+
+   /* Copy to all scaled versions */
+   rfbScaledScreenUpdate(s, x1, y1, x1+x2, y1+y2);
+
    UNLOCK(s->cursorMutex);
 }
 
-/* for debugging */
+/* 
+ * If enableCursorShapeUpdates is FALSE, and the cursor is hidden, make sure
+ * that if the frameBuffer was transmitted with a cursor drawn, then that
+ * region gets redrawn.
+ */
 
-void rfbPrintXCursor(rfbCursorPtr cursor)
+void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion)
+{
+    rfbScreenInfoPtr s = cl->screen;
+    rfbCursorPtr c = s->cursor;
+    
+    if(c) {
+	int x,y,x2,y2;
+
+	x = cl->cursorX-c->xhot;
+	y = cl->cursorY-c->yhot;
+	x2 = x+c->width;
+	y2 = y+c->height;
+
+	if(sraClipRect2(&x,&y,&x2,&y2,0,0,s->width,s->height)) {
+	    sraRegionPtr rect;
+	    rect = sraRgnCreateRect(x,y,x2,y2);
+	    if(updateRegion)
+	    	sraRgnOr(updateRegion,rect);
+	    else
+		    sraRgnOr(cl->modifiedRegion,rect);
+	    sraRgnDestroy(rect);
+	}
+    }
+}
+
+#ifdef DEBUG
+
+static void rfbPrintXCursor(rfbCursorPtr cursor)
 {
    int i,i1,j,w=(cursor->width+7)/8;
    unsigned char bit;
@@ -660,19 +718,36 @@ void rfbPrintXCursor(rfbCursorPtr cursor)
    }
 }
 
-extern void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c,Bool freeOld)
-{
-  LOCK(rfbScreen->cursorMutex);
-  while(rfbScreen->cursorIsDrawn) {
-    UNLOCK(rfbScreen->cursorMutex);
-    rfbUndrawCursor(rfbScreen);
-    LOCK(rfbScreen->cursorMutex);
-  }
+#endif
 
-  if(freeOld && rfbScreen->cursor)
-    rfbFreeCursor(rfbScreen->cursor);
+void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
+{
+  rfbClientIteratorPtr iterator;
+  rfbClientPtr cl;
+
+  LOCK(rfbScreen->cursorMutex);
+
+  if(rfbScreen->cursor) {
+    iterator=rfbGetClientIterator(rfbScreen);
+    while((cl=rfbClientIteratorNext(iterator)))
+	if(!cl->enableCursorShapeUpdates)
+	  rfbRedrawAfterHideCursor(cl,NULL);
+    rfbReleaseClientIterator(iterator);
+
+    if(rfbScreen->cursor->cleanup)
+	 rfbFreeCursor(rfbScreen->cursor);
+  }
 
   rfbScreen->cursor = c;
 
+  iterator=rfbGetClientIterator(rfbScreen);
+  while((cl=rfbClientIteratorNext(iterator))) {
+    cl->cursorWasChanged = TRUE;
+    if(!cl->enableCursorShapeUpdates)
+      rfbRedrawAfterHideCursor(cl,NULL);
+  }
+  rfbReleaseClientIterator(iterator);
+
   UNLOCK(rfbScreen->cursorMutex);
 }
+

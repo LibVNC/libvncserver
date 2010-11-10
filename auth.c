@@ -6,6 +6,7 @@
  */
 
 /*
+ *  Copyright (C) 2005 Rohit Kumar, Johannes E. Schindelin
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
  *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.  
  *  All Rights Reserved.
@@ -22,48 +23,310 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this software; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  *  USA.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include "rfb.h"
+#include <rfb/rfb.h>
 
-static int rfbMaxPasswordWait = 120000;   /* password timeout (ms)  */
+/* RFB 3.8 clients are well informed */
+void rfbClientSendString(rfbClientPtr cl, char *reason);
+
 
 /*
- * rfbAuthNewClient is called when we reach the point of authenticating
- * a new client.  If authentication isn't being used then we simply send
- * rfbNoAuth.  Otherwise we send rfbVncAuth plus the challenge.
+ * Handle security types
  */
 
+static rfbSecurityHandler* securityHandlers = NULL;
+
+/*
+ * This method registers a list of new security types.  
+ * It avoids same security type getting registered multiple times. 
+ * The order is not preserved if multiple security types are
+ * registered at one-go.
+ */
 void
-rfbAuthNewClient(cl)
-    rfbClientPtr cl;
+rfbRegisterSecurityHandler(rfbSecurityHandler* handler)
 {
-    char buf[4 + CHALLENGESIZE];
-    int len;
+	rfbSecurityHandler *head = securityHandlers, *next = NULL;
 
-    cl->state = RFB_AUTHENTICATION;
+	if(handler == NULL)
+		return;
 
-    if (cl->screen->rfbAuthPasswdData && !cl->reverseConnection) {
-        *(CARD32 *)buf = Swap32IfLE(rfbVncAuth);
-        vncRandomBytes(cl->authChallenge);
-        memcpy(&buf[4], (char *)cl->authChallenge, CHALLENGESIZE);
-        len = 4 + CHALLENGESIZE;
-    } else {
-        *(CARD32 *)buf = Swap32IfLE(rfbNoAuth);
-        len = 4;
-        cl->state = RFB_INITIALISATION;
-    }
+	next = handler->next;
 
-    if (WriteExact(cl, buf, len) < 0) {
+	while(head != NULL) {
+		if(head == handler) {
+			rfbRegisterSecurityHandler(next);
+			return;
+		}
+
+		head = head->next;
+	}
+
+	handler->next = securityHandlers;
+	securityHandlers = handler;
+
+	rfbRegisterSecurityHandler(next);
+}
+
+/*
+ * This method unregisters a list of security types. 
+ * These security types won't be available for any new
+ * client connection. 
+ */
+void
+rfbUnregisterSecurityHandler(rfbSecurityHandler* handler)
+{
+	rfbSecurityHandler *cur = NULL, *pre = NULL;
+
+	if(handler == NULL)
+		return;
+
+	if(securityHandlers == handler) {
+		securityHandlers = securityHandlers->next;
+		rfbUnregisterSecurityHandler(handler->next);
+		return;
+	}
+
+	cur = pre = securityHandlers;
+
+	while(cur) {
+		if(cur == handler) {
+			pre->next = cur->next;
+			break;
+		}
+		pre = cur;
+		cur = cur->next;
+	}
+	rfbUnregisterSecurityHandler(handler->next);
+}
+
+/*
+ * Send the authentication challenge.
+ */
+
+static void
+rfbVncAuthSendChallenge(rfbClientPtr cl)
+{
+	
+    /* 4 byte header is alreay sent. Which is rfbSecTypeVncAuth 
+       (same as rfbVncAuth). Just send the challenge. */
+    rfbRandomBytes(cl->authChallenge);
+    if (rfbWriteExact(cl, (char *)cl->authChallenge, CHALLENGESIZE) < 0) {
         rfbLogPerror("rfbAuthNewClient: write");
         rfbCloseClient(cl);
         return;
     }
+    
+    /* Dispatch client input to rfbVncAuthProcessResponse. */
+    cl->state = RFB_AUTHENTICATION;
 }
+
+/*
+ * Send the NO AUTHENTICATION. SCARR
+ */
+
+static void
+rfbVncAuthNone(rfbClientPtr cl)
+{
+    uint32_t authResult;
+
+    if (cl->protocolMajorVersion==3 && cl->protocolMinorVersion > 7) {
+        rfbLog("rfbProcessClientSecurityType: returning securityResult for client rfb version >= 3.8\n");
+        authResult = Swap32IfLE(rfbVncAuthOK);
+        if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) {
+            rfbLogPerror("rfbAuthProcessClientMessage: write");
+            rfbCloseClient(cl);
+            return;
+        }
+    }
+    cl->state = RFB_INITIALISATION;
+    return;
+}
+
+
+/*
+ * Advertise the supported security types (protocol 3.7). Here before sending 
+ * the list of security types to the client one more security type is added 
+ * to the list if primaryType is not set to rfbSecTypeInvalid. This security
+ * type is the standard vnc security type which does the vnc authentication
+ * or it will be security type for no authentication.
+ * Different security types will be added by applications using this library.
+ */
+
+static rfbSecurityHandler VncSecurityHandlerVncAuth = {
+    rfbSecTypeVncAuth,
+    rfbVncAuthSendChallenge,
+    NULL
+};
+
+static rfbSecurityHandler VncSecurityHandlerNone = {
+    rfbSecTypeNone,
+    rfbVncAuthNone,
+    NULL
+};
+                        
+
+static void
+rfbSendSecurityTypeList(rfbClientPtr cl, int primaryType)
+{
+    /* The size of the message is the count of security types +1,
+     * since the first byte is the number of types. */
+    int size = 1;
+    rfbSecurityHandler* handler;
+#define MAX_SECURITY_TYPES 255
+    uint8_t buffer[MAX_SECURITY_TYPES+1];
+
+
+    /* Fill in the list of security types in the client structure. (NOTE: Not really in the client structure) */
+    switch (primaryType) {
+    case rfbSecTypeNone:
+        rfbRegisterSecurityHandler(&VncSecurityHandlerNone);
+        break;
+    case rfbSecTypeVncAuth:
+        rfbRegisterSecurityHandler(&VncSecurityHandlerVncAuth);
+        break;
+    }
+
+    for (handler = securityHandlers;
+	    handler && size<MAX_SECURITY_TYPES; handler = handler->next) {
+	buffer[size] = handler->type;
+	size++;
+    }
+    buffer[0] = (unsigned char)size-1;
+
+    /* Send the list. */
+    if (rfbWriteExact(cl, (char *)buffer, size) < 0) {
+	rfbLogPerror("rfbSendSecurityTypeList: write");
+	rfbCloseClient(cl);
+	return;
+    }
+
+    /*
+      * if count is 0, we need to send the reason and close the connection.
+      */
+    if(size <= 1) {
+	/* This means total count is Zero and so reason msg should be sent */
+	/* The execution should never reach here */
+	char* reason = "No authentication mode is registered!";
+
+	rfbClientSendString(cl, reason);
+	return;
+    }
+
+    /* Dispatch client input to rfbProcessClientSecurityType. */
+    cl->state = RFB_SECURITY_TYPE;
+}
+
+
+
+
+/*
+ * Tell the client what security type will be used (protocol 3.3).
+ */
+static void
+rfbSendSecurityType(rfbClientPtr cl, int32_t securityType)
+{
+    uint32_t value32;
+
+    /* Send the value. */
+    value32 = Swap32IfLE(securityType);
+    if (rfbWriteExact(cl, (char *)&value32, 4) < 0) {
+	rfbLogPerror("rfbSendSecurityType: write");
+	rfbCloseClient(cl);
+	return;
+    }
+
+    /* Decide what to do next. */
+    switch (securityType) {
+    case rfbSecTypeNone:
+	/* Dispatch client input to rfbProcessClientInitMessage. */
+	cl->state = RFB_INITIALISATION;
+	break;
+    case rfbSecTypeVncAuth:
+	/* Begin the standard VNC authentication procedure. */
+	rfbVncAuthSendChallenge(cl);
+	break;
+    default:
+	/* Impossible case (hopefully). */
+	rfbLogPerror("rfbSendSecurityType: assertion failed");
+	rfbCloseClient(cl);
+    }
+}
+
+
+
+/*
+ * rfbAuthNewClient is called right after negotiating the protocol
+ * version. Depending on the protocol version, we send either a code
+ * for authentication scheme to be used (protocol 3.3), or a list of
+ * possible "security types" (protocol 3.7).
+ */
+
+void
+rfbAuthNewClient(rfbClientPtr cl)
+{
+    int32_t securityType = rfbSecTypeInvalid;
+
+    if (!cl->screen->authPasswdData || cl->reverseConnection) {
+	/* chk if this condition is valid or not. */
+	securityType = rfbSecTypeNone;
+    } else if (cl->screen->authPasswdData) {
+ 	    securityType = rfbSecTypeVncAuth;
+    }
+
+    if (cl->protocolMajorVersion==3 && cl->protocolMinorVersion < 7)
+    {
+	/* Make sure we use only RFB 3.3 compatible security types. */
+	if (securityType == rfbSecTypeInvalid) {
+	    rfbLog("VNC authentication disabled - RFB 3.3 client rejected\n");
+	    rfbClientConnFailed(cl, "Your viewer cannot handle required "
+				"authentication methods");
+	    return;
+	}
+	rfbSendSecurityType(cl, securityType);
+    } else {
+	/* Here it's ok when securityType is set to rfbSecTypeInvalid. */
+	rfbSendSecurityTypeList(cl, securityType);
+    }
+}
+
+/*
+ * Read the security type chosen by the client (protocol 3.7).
+ */
+
+void
+rfbProcessClientSecurityType(rfbClientPtr cl)
+{
+    int n;
+    uint8_t chosenType;
+    rfbSecurityHandler* handler;
+    
+    /* Read the security type. */
+    n = rfbReadExact(cl, (char *)&chosenType, 1);
+    if (n <= 0) {
+	if (n == 0)
+	    rfbLog("rfbProcessClientSecurityType: client gone\n");
+	else
+	    rfbLogPerror("rfbProcessClientSecurityType: read");
+	rfbCloseClient(cl);
+	return;
+    }
+
+    /* Make sure it was present in the list sent by the server. */
+    for (handler = securityHandlers; handler; handler = handler->next) {
+	if (chosenType == handler->type) {
+	      rfbLog("rfbProcessClientSecurityType: executing handler for type %d\n", chosenType);
+	      handler->handler(cl);
+	      return;
+	}
+    }
+
+    rfbLog("rfbProcessClientSecurityType: wrong security type (%d) requested\n", chosenType);
+    rfbCloseClient(cl);
+}
+
 
 
 /*
@@ -72,34 +335,37 @@ rfbAuthNewClient(cl)
  */
 
 void
-rfbAuthProcessClientMessage(cl)
-    rfbClientPtr cl;
+rfbAuthProcessClientMessage(rfbClientPtr cl)
 {
     int n;
-    CARD8 response[CHALLENGESIZE];
-    CARD32 authResult;
+    uint8_t response[CHALLENGESIZE];
+    uint32_t authResult;
 
-    if ((n = ReadExactTimeout(cl, (char *)response, CHALLENGESIZE, 
-	                      rfbMaxPasswordWait)) <= 0) {
+    if ((n = rfbReadExact(cl, (char *)response, CHALLENGESIZE)) <= 0) {
         if (n != 0)
             rfbLogPerror("rfbAuthProcessClientMessage: read");
         rfbCloseClient(cl);
         return;
     }
 
-    if(!cl->screen->passwordCheck(cl,response,CHALLENGESIZE)) {
-        rfbLog("rfbAuthProcessClientMessage: password check failed\n");
+    if(!cl->screen->passwordCheck(cl,(const char*)response,CHALLENGESIZE)) {
+        rfbErr("rfbAuthProcessClientMessage: password check failed\n");
         authResult = Swap32IfLE(rfbVncAuthFailed);
-        if (WriteExact(cl, (char *)&authResult, 4) < 0) {
+        if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) {
             rfbLogPerror("rfbAuthProcessClientMessage: write");
         }
-        rfbCloseClient(cl);
+	/* support RFB 3.8 clients, they expect a reason *why* it was disconnected */
+        if (cl->protocolMinorVersion > 7) {
+            rfbClientSendString(cl, "password check failed!");
+	}
+	else
+            rfbCloseClient(cl);
         return;
     }
 
     authResult = Swap32IfLE(rfbVncAuthOK);
 
-    if (WriteExact(cl, (char *)&authResult, 4) < 0) {
+    if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) {
         rfbLogPerror("rfbAuthProcessClientMessage: write");
         rfbCloseClient(cl);
         return;

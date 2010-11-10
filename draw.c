@@ -1,6 +1,6 @@
-#include "rfb.h"
+#include <rfb/rfb.h>
 
-void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,Pixel col)
+void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col)
 {
   int rowstride = s->paddedWidthInBytes, bpp = s->bitsPerPixel>>3;
   int i,j;
@@ -17,7 +17,7 @@ void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,Pixel col)
 #define SETPIXEL(x,y) \
   memcpy(s->frameBuffer+(y)*rowstride+(x)*bpp,colour,bpp)
 
-void rfbDrawPixel(rfbScreenInfoPtr s,int x,int y,Pixel col)
+void rfbDrawPixel(rfbScreenInfoPtr s,int x,int y,rfbPixel col)
 {
   int rowstride = s->paddedWidthInBytes, bpp = s->bitsPerPixel>>3;
   char* colour=(char*)&col;
@@ -28,7 +28,7 @@ void rfbDrawPixel(rfbScreenInfoPtr s,int x,int y,Pixel col)
   rfbMarkRectAsModified(s,x,y,x+1,y+1);
 }
 
-void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,Pixel col)
+void rfbDrawLine(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col)
 {
   int rowstride = s->paddedWidthInBytes, bpp = s->bitsPerPixel>>3;
   int i;

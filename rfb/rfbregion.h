@@ -1,4 +1,3 @@
-
 #ifndef SRAREGION_H
 #define SRAREGION_H
 
@@ -26,36 +25,41 @@ extern sraRegion *sraRgnCreateRgn(const sraRegion *src);
 
 extern void sraRgnDestroy(sraRegion *rgn);
 extern void sraRgnMakeEmpty(sraRegion *rgn);
-extern Bool sraRgnAnd(sraRegion *dst, const sraRegion *src);
+extern rfbBool sraRgnAnd(sraRegion *dst, const sraRegion *src);
 extern void sraRgnOr(sraRegion *dst, const sraRegion *src);
-extern Bool sraRgnSubtract(sraRegion *dst, const sraRegion *src);
+extern rfbBool sraRgnSubtract(sraRegion *dst, const sraRegion *src);
 
 extern void sraRgnOffset(sraRegion *dst, int dx, int dy);
 
-extern Bool sraRgnPopRect(sraRegion *region, sraRect *rect,
+extern rfbBool sraRgnPopRect(sraRegion *region, sraRect *rect,
 			  unsigned long flags);
 
 extern unsigned long sraRgnCountRects(const sraRegion *rgn);
-extern Bool sraRgnEmpty(const sraRegion *rgn);
+extern rfbBool sraRgnEmpty(const sraRegion *rgn);
+
+extern sraRegion *sraRgnBBox(const sraRegion *src);
 
 /* -=- rectangle iterator */
 
 typedef struct sraRectangleIterator {
-  Bool reverseX,reverseY;
+  rfbBool reverseX,reverseY;
   int ptrSize,ptrPos;
   struct sraSpan** sPtrs;
 } sraRectangleIterator;
 
 extern sraRectangleIterator *sraRgnGetIterator(sraRegion *s);
-extern sraRectangleIterator *sraRgnGetReverseIterator(sraRegion *s,Bool reverseX,Bool reverseY);
-extern Bool sraRgnIteratorNext(sraRectangleIterator *i,sraRect *r);
+extern sraRectangleIterator *sraRgnGetReverseIterator(sraRegion *s,rfbBool reverseX,rfbBool reverseY);
+extern rfbBool sraRgnIteratorNext(sraRectangleIterator *i,sraRect *r);
 extern void sraRgnReleaseIterator(sraRectangleIterator *i);
 
 void sraRgnPrint(const sraRegion *s);
 
 /* -=- Rectangle clipper (for speed) */
 
-extern Bool sraClipRect(int *x, int *y, int *w, int *h,
+extern rfbBool sraClipRect(int *x, int *y, int *w, int *h,
 			int cx, int cy, int cw, int ch);
+
+extern rfbBool sraClipRect2(int *x, int *y, int *x2, int *y2,
+			int cx, int cy, int cx2, int cy2);
 
 #endif

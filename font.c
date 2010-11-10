@@ -1,13 +1,13 @@
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
-		 int x,int y,unsigned char c,Pixel col)
+		 int x,int y,unsigned char c,rfbPixel col)
 {
   int i,j,width,height;
   unsigned char* data=font->data+font->metaData[c*5];
   unsigned char d=*data;
   int rowstride=rfbScreen->paddedWidthInBytes;
-  int bpp=rfbScreen->rfbServerFormat.bitsPerPixel/8;
+  int bpp=rfbScreen->serverFormat.bitsPerPixel/8;
   char *colour=(char*)&col;
 
   if(!rfbEndianTest)
@@ -34,7 +34,7 @@ int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 }
 
 void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
-		   int x,int y,const char* string,Pixel colour)
+		   int x,int y,const char* string,rfbPixel colour)
 {
   while(*string) {
     x+=rfbDrawChar(rfbScreen,font,x,y,*string,colour);
@@ -43,16 +43,17 @@ void rfbDrawString(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 }
 
 /* TODO: these two functions need to be more efficient */
+/* if col==bcol, assume transparent background */
 int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 			int x,int y,unsigned char c,
 			int x1,int y1,int x2,int y2,
-			Pixel col,Pixel bcol)
+			rfbPixel col,rfbPixel bcol)
 {
   int i,j,width,height;
   unsigned char* data=font->data+font->metaData[c*5];
   unsigned char d;
   int rowstride=rfbScreen->paddedWidthInBytes;
-  int bpp=rfbScreen->rfbServerFormat.bitsPerPixel/8,extra_bytes=0;
+  int bpp=rfbScreen->serverFormat.bitsPerPixel/8,extra_bytes=0;
   char* colour=(char*)&col;
   char* bcolour=(char*)&bcol;
 
@@ -102,7 +103,7 @@ int rfbDrawCharWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 void rfbDrawStringWithClip(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 			   int x,int y,const char* string,
 			   int x1,int y1,int x2,int y2,
-			   Pixel colour,Pixel backColour)
+			   rfbPixel colour,rfbPixel backColour)
 {
   while(*string) {
     x+=rfbDrawCharWithClip(rfbScreen,font,x,y,*string,x1,y1,x2,y2,
@@ -130,8 +131,8 @@ void rfbFontBBox(rfbFontDataPtr font,unsigned char c,int* x1,int* y1,int* x2,int
 {
   *x1+=font->metaData[c*5+3];
   *y1+=-font->metaData[c*5+4]-font->metaData[c*5+2]+1;
-  *x2=*x1+font->metaData[c*5+1];
-  *y2=*y1+font->metaData[c*5+2];
+  *x2=*x1+font->metaData[c*5+1]+1;
+  *y2=*y1+font->metaData[c*5+2]+1;
 }
 
 #ifndef INT_MAX
@@ -144,7 +145,7 @@ void rfbWholeFontBBox(rfbFontDataPtr font,
    int i;
    int* m=font->metaData;
    
-   (*x1)=(*y1)=INT_MAX; (*x2)=(*y2)=-INT_MAX+1;
+   (*x1)=(*y1)=INT_MAX; (*x2)=(*y2)=1-(INT_MAX);
    for(i=0;i<256;i++) {
       if(m[i*5+1]-m[i*5+3]>(*x2))
 	(*x2)=m[i*5+1]-m[i*5+3];
@@ -155,6 +156,8 @@ void rfbWholeFontBBox(rfbFontDataPtr font,
       if(-m[i*5+4]>(*y2))
 	(*y2)=-m[i*5+4];
    }
+   (*x2)++;
+   (*y2)++;
 }
 
 rfbFontDataPtr rfbLoadConsoleFont(char *filename)
@@ -163,14 +166,14 @@ rfbFontDataPtr rfbLoadConsoleFont(char *filename)
   rfbFontDataPtr p;
   int i;
 
-  if(!f) return(0);
+  if(!f) return NULL;
 
   p=(rfbFontDataPtr)malloc(sizeof(rfbFontData));
   p->data=(unsigned char*)malloc(4096);
   if(1!=fread(p->data,4096,1,f)) {
     free(p->data);
     free(p);
-    return(0);
+    return NULL;
   }
   fclose(f);
   p->metaData=(int*)malloc(256*5*sizeof(int));

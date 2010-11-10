@@ -71,9 +71,8 @@ static unsigned char pc2[48] = {
 	40, 51, 30, 36, 46, 54, 29, 39, 50, 44, 32, 47,
 	43, 48, 38, 55, 33, 52, 45, 41, 49, 35, 28, 31 };
 
-void deskey(key, edf)	/* Thanks to James Gillogly & Phil Karn! */
-unsigned char *key;
-int edf;
+void rfbDesKey(unsigned char *key,
+               int edf)
 {
 	register int i, j, l, m, n;
 	unsigned char pc1m[56], pcr[56];
@@ -108,8 +107,7 @@ int edf;
 	return;
 	}
 
-static void cookey(raw1)
-register unsigned long *raw1;
+static void cookey(register unsigned long *raw1)
 {
 	register unsigned long *cook, *raw0;
 	unsigned long dough[32];
@@ -127,12 +125,11 @@ register unsigned long *raw1;
 		*cook	|= (*raw1 & 0x0003f000L) >> 4;
 		*cook++ |= (*raw1 & 0x0000003fL);
 		}
-	usekey(dough);
+	rfbUseKey(dough);
 	return;
 	}
 
-void cpkey(into)
-register unsigned long *into;
+void rfbCPKey(register unsigned long *into)
 {
 	register unsigned long *from, *endp;
 
@@ -141,8 +138,7 @@ register unsigned long *into;
 	return;
 	}
 
-void usekey(from)
-register unsigned long *from;
+void rfbUseKey(register unsigned long *from)
 {
 	register unsigned long *to, *endp;
 
@@ -151,8 +147,8 @@ register unsigned long *from;
 	return;
 	}
 
-void des(inblock, outblock)
-unsigned char *inblock, *outblock;
+void rfbDes(unsigned char *inblock,
+            unsigned char *outblock)
 {
 	unsigned long work[2];
 
@@ -162,9 +158,8 @@ unsigned char *inblock, *outblock;
 	return;
 	}
 
-static void scrunch(outof, into)
-register unsigned char *outof;
-register unsigned long *into;
+static void scrunch(register unsigned char *outof,
+                    register unsigned long *into)
 {
 	*into	 = (*outof++ & 0xffL) << 24;
 	*into	|= (*outof++ & 0xffL) << 16;
@@ -177,9 +172,8 @@ register unsigned long *into;
 	return;
 	}
 
-static void unscrun(outof, into)
-register unsigned long *outof;
-register unsigned char *into;
+static void unscrun(register unsigned long *outof,
+                    register unsigned char *into)
 {
 	*into++ = (unsigned char)((*outof >> 24) & 0xffL);
 	*into++ = (unsigned char)((*outof >> 16) & 0xffL);
@@ -336,8 +330,8 @@ static unsigned long SP8[64] = {
 	0x10041040L, 0x00041000L, 0x00041000L, 0x00001040L,
 	0x00001040L, 0x00040040L, 0x10000000L, 0x10041000L };
 
-static void desfunc(block, keys)
-register unsigned long *block, *keys;
+static void desfunc(register unsigned long *block,
+                    register unsigned long *keys)
 {
 	register unsigned long fval, work, right, leftt;
 	register int round;

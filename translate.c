@@ -19,19 +19,17 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this software; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  *  USA.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include "rfb.h"
-#include "sraRegion.h"
+#include <rfb/rfb.h>
+#include <rfb/rfbregion.h>
 
 static void PrintPixelFormat(rfbPixelFormat *pf);
-static Bool rfbSetClientColourMapBGR233(rfbClientPtr cl);
+static rfbBool rfbSetClientColourMapBGR233(rfbClientPtr cl);
 
-Bool rfbEconomicTranslate = FALSE;
+rfbBool rfbEconomicTranslate = FALSE;
 
 /*
  * Some standard pixel formats.
@@ -60,6 +58,8 @@ static const rfbPixelFormat BGR233Format = {
 
 #define CONCAT2(a,b) a##b
 #define CONCAT2E(a,b) CONCAT2(a,b)
+#define CONCAT3(a,b,c) a##b##c
+#define CONCAT3E(a,b,c) CONCAT3(a,b,c)
 #define CONCAT4(a,b,c,d) a##b##c##d
 #define CONCAT4E(a,b,c,d) CONCAT4(a,b,c,d)
 
@@ -108,7 +108,7 @@ static const rfbPixelFormat BGR233Format = {
 #undef IN
 #undef OUT
 
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
 #define COUNT_OFFSETS 4
 #define BPP2OFFSET(bpp) ((bpp)/8-1)
 #include "tableinit24.c"
@@ -134,47 +134,47 @@ typedef void (*rfbInitCMTableFnType)(char **table, rfbPixelFormat *in,
 typedef void (*rfbInitTableFnType)(char **table, rfbPixelFormat *in,
                                    rfbPixelFormat *out);
 
-rfbInitCMTableFnType rfbInitColourMapSingleTableFns[COUNT_OFFSETS] = {
+static rfbInitCMTableFnType rfbInitColourMapSingleTableFns[COUNT_OFFSETS] = {
     rfbInitColourMapSingleTable8,
     rfbInitColourMapSingleTable16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
     rfbInitColourMapSingleTable24,
 #endif
     rfbInitColourMapSingleTable32
 };
 
-rfbInitTableFnType rfbInitTrueColourSingleTableFns[COUNT_OFFSETS] = {
+static rfbInitTableFnType rfbInitTrueColourSingleTableFns[COUNT_OFFSETS] = {
     rfbInitTrueColourSingleTable8,
     rfbInitTrueColourSingleTable16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
     rfbInitTrueColourSingleTable24,
 #endif
     rfbInitTrueColourSingleTable32
 };
 
-rfbInitTableFnType rfbInitTrueColourRGBTablesFns[COUNT_OFFSETS] = {
+static rfbInitTableFnType rfbInitTrueColourRGBTablesFns[COUNT_OFFSETS] = {
     rfbInitTrueColourRGBTables8,
     rfbInitTrueColourRGBTables16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
     rfbInitTrueColourRGBTables24,
 #endif
     rfbInitTrueColourRGBTables32
 };
 
-rfbTranslateFnType rfbTranslateWithSingleTableFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
+static rfbTranslateFnType rfbTranslateWithSingleTableFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
     { rfbTranslateWithSingleTable8to8,
       rfbTranslateWithSingleTable8to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithSingleTable8to24,
 #endif
       rfbTranslateWithSingleTable8to32 },
     { rfbTranslateWithSingleTable16to8,
       rfbTranslateWithSingleTable16to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithSingleTable16to24,
 #endif
       rfbTranslateWithSingleTable16to32 },
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
     { rfbTranslateWithSingleTable24to8,
       rfbTranslateWithSingleTable24to16,
       rfbTranslateWithSingleTable24to24,
@@ -182,26 +182,26 @@ rfbTranslateFnType rfbTranslateWithSingleTableFns[COUNT_OFFSETS][COUNT_OFFSETS] 
 #endif
     { rfbTranslateWithSingleTable32to8,
       rfbTranslateWithSingleTable32to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithSingleTable32to24,
 #endif
       rfbTranslateWithSingleTable32to32 }
 };
 
-rfbTranslateFnType rfbTranslateWithRGBTablesFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
+static rfbTranslateFnType rfbTranslateWithRGBTablesFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
     { rfbTranslateWithRGBTables8to8,
       rfbTranslateWithRGBTables8to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithRGBTables8to24,
 #endif
       rfbTranslateWithRGBTables8to32 },
     { rfbTranslateWithRGBTables16to8,
       rfbTranslateWithRGBTables16to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithRGBTables16to24,
 #endif
       rfbTranslateWithRGBTables16to32 },
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
     { rfbTranslateWithRGBTables24to8,
       rfbTranslateWithRGBTables24to16,
       rfbTranslateWithRGBTables24to24,
@@ -209,7 +209,7 @@ rfbTranslateFnType rfbTranslateWithRGBTablesFns[COUNT_OFFSETS][COUNT_OFFSETS] = 
 #endif
     { rfbTranslateWithRGBTables32to8,
       rfbTranslateWithRGBTables32to16,
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
       rfbTranslateWithRGBTables32to24,
 #endif
       rfbTranslateWithRGBTables32to32 }
@@ -241,9 +241,8 @@ rfbTranslateNone(char *table, rfbPixelFormat *in, rfbPixelFormat *out,
  * rfbSetTranslateFunction sets the translation function.
  */
 
-Bool
-rfbSetTranslateFunction(cl)
-    rfbClientPtr cl;
+rfbBool
+rfbSetTranslateFunction(rfbClientPtr cl)
 {
     rfbLog("Pixel format for client %s:\n",cl->host);
     PrintPixelFormat(&cl->format);
@@ -252,35 +251,35 @@ rfbSetTranslateFunction(cl)
      * Check that bits per pixel values are valid
      */
 
-    if ((cl->screen->rfbServerFormat.bitsPerPixel != 8) &&
-        (cl->screen->rfbServerFormat.bitsPerPixel != 16) &&
-#ifdef ALLOW24BPP
-	(cl->screen->rfbServerFormat.bitsPerPixel != 24) &&
+    if ((cl->screen->serverFormat.bitsPerPixel != 8) &&
+        (cl->screen->serverFormat.bitsPerPixel != 16) &&
+#ifdef LIBVNCSERVER_ALLOW24BPP
+	(cl->screen->serverFormat.bitsPerPixel != 24) &&
 #endif
-        (cl->screen->rfbServerFormat.bitsPerPixel != 32))
+        (cl->screen->serverFormat.bitsPerPixel != 32))
     {
-        rfbLog("%s: server bits per pixel not 8, 16 or 32 (is %d)\n",
+        rfbErr("%s: server bits per pixel not 8, 16 or 32 (is %d)\n",
 	       "rfbSetTranslateFunction", 
-	       cl->screen->rfbServerFormat.bitsPerPixel);
+	       cl->screen->serverFormat.bitsPerPixel);
         rfbCloseClient(cl);
         return FALSE;
     }
 
     if ((cl->format.bitsPerPixel != 8) &&
         (cl->format.bitsPerPixel != 16) &&
-#ifdef ALLOW24BPP
+#ifdef LIBVNCSERVER_ALLOW24BPP
 	(cl->format.bitsPerPixel != 24) &&
 #endif
         (cl->format.bitsPerPixel != 32))
     {
-        rfbLog("%s: client bits per pixel not 8, 16 or 32\n",
+        rfbErr("%s: client bits per pixel not 8, 16 or 32\n",
                 "rfbSetTranslateFunction");
         rfbCloseClient(cl);
         return FALSE;
     }
 
     if (!cl->format.trueColour && (cl->format.bitsPerPixel != 8)) {
-        rfbLog("rfbSetTranslateFunction: client has colour map "
+        rfbErr("rfbSetTranslateFunction: client has colour map "
                 "but %d-bit - can only cope with 8-bit colour maps\n",
                 cl->format.bitsPerPixel);
         rfbCloseClient(cl);
@@ -307,7 +306,7 @@ rfbSetTranslateFunction(cl)
 
     /* truecolour -> truecolour */
 
-    if (PF_EQ(cl->format,cl->screen->rfbServerFormat)) {
+    if (PF_EQ(cl->format,cl->screen->serverFormat)) {
 
         /* client & server the same */
 
@@ -316,36 +315,36 @@ rfbSetTranslateFunction(cl)
         return TRUE;
     }
 
-    if ((cl->screen->rfbServerFormat.bitsPerPixel < 16) ||
-        ((!cl->screen->rfbServerFormat.trueColour || !rfbEconomicTranslate) &&
-	   (cl->screen->rfbServerFormat.bitsPerPixel == 16))) {
+    if ((cl->screen->serverFormat.bitsPerPixel < 16) ||
+        ((!cl->screen->serverFormat.trueColour || !rfbEconomicTranslate) &&
+	   (cl->screen->serverFormat.bitsPerPixel == 16))) {
 
         /* we can use a single lookup table for <= 16 bpp */
 
         cl->translateFn = rfbTranslateWithSingleTableFns
-                              [BPP2OFFSET(cl->screen->rfbServerFormat.bitsPerPixel)]
+                              [BPP2OFFSET(cl->screen->serverFormat.bitsPerPixel)]
                                   [BPP2OFFSET(cl->format.bitsPerPixel)];
 
-	if(cl->screen->rfbServerFormat.trueColour)
+	if(cl->screen->serverFormat.trueColour)
 	  (*rfbInitTrueColourSingleTableFns
 	   [BPP2OFFSET(cl->format.bitsPerPixel)]) (&cl->translateLookupTable,
-						   &(cl->screen->rfbServerFormat), &cl->format);
+						   &(cl->screen->serverFormat), &cl->format);
 	else
 	  (*rfbInitColourMapSingleTableFns
 	   [BPP2OFFSET(cl->format.bitsPerPixel)]) (&cl->translateLookupTable,
-						   &(cl->screen->rfbServerFormat), &cl->format,&cl->screen->colourMap);
+						   &(cl->screen->serverFormat), &cl->format,&cl->screen->colourMap);
 
     } else {
 
         /* otherwise we use three separate tables for red, green and blue */
 
         cl->translateFn = rfbTranslateWithRGBTablesFns
-                              [BPP2OFFSET(cl->screen->rfbServerFormat.bitsPerPixel)]
+                              [BPP2OFFSET(cl->screen->serverFormat.bitsPerPixel)]
                                   [BPP2OFFSET(cl->format.bitsPerPixel)];
 
         (*rfbInitTrueColourRGBTablesFns
             [BPP2OFFSET(cl->format.bitsPerPixel)]) (&cl->translateLookupTable,
-                                             &(cl->screen->rfbServerFormat), &cl->format);
+                                             &(cl->screen->serverFormat), &cl->format);
     }
 
     return TRUE;
@@ -358,18 +357,17 @@ rfbSetTranslateFunction(cl)
  * just like an 8-bit BGR233 true colour client.
  */
 
-static Bool
-rfbSetClientColourMapBGR233(cl)
-    rfbClientPtr cl;
+static rfbBool
+rfbSetClientColourMapBGR233(rfbClientPtr cl)
 {
     char buf[sz_rfbSetColourMapEntriesMsg + 256 * 3 * 2];
     rfbSetColourMapEntriesMsg *scme = (rfbSetColourMapEntriesMsg *)buf;
-    CARD16 *rgb = (CARD16 *)(&buf[sz_rfbSetColourMapEntriesMsg]);
+    uint16_t *rgb = (uint16_t *)(&buf[sz_rfbSetColourMapEntriesMsg]);
     int i, len;
     int r, g, b;
 
     if (cl->format.bitsPerPixel != 8 ) {
-        rfbLog("%s: client not 8 bits per pixel\n",
+        rfbErr("%s: client not 8 bits per pixel\n",
                 "rfbSetClientColourMapBGR233");
         rfbCloseClient(cl);
         return FALSE;
@@ -396,7 +394,7 @@ rfbSetClientColourMapBGR233(cl)
 
     len += 256 * 3 * 2;
 
-    if (WriteExact(cl, buf, len) < 0) {
+    if (rfbWriteExact(cl, buf, len) < 0) {
         rfbLogPerror("rfbSetClientColourMapBGR233: write");
         rfbCloseClient(cl);
         return FALSE;
@@ -413,13 +411,10 @@ rfbSetClientColourMapBGR233(cl)
  * and mark the whole screen as having been modified.
  */
 
-Bool
-rfbSetClientColourMap(cl, firstColour, nColours)
-    rfbClientPtr cl;
-    int firstColour;
-    int nColours;
+rfbBool
+rfbSetClientColourMap(rfbClientPtr cl, int firstColour, int nColours)
 {
-    if (cl->screen->rfbServerFormat.trueColour || !cl->readyForSetColourMapEntries) {
+    if (cl->screen->serverFormat.trueColour || !cl->readyForSetColourMapEntries) {
 	return TRUE;
     }
 
@@ -430,7 +425,7 @@ rfbSetClientColourMap(cl, firstColour, nColours)
     if (cl->format.trueColour) {
 	(*rfbInitColourMapSingleTableFns
 	    [BPP2OFFSET(cl->format.bitsPerPixel)]) (&cl->translateLookupTable,
-					     &cl->screen->rfbServerFormat, &cl->format,&cl->screen->colourMap);
+					     &cl->screen->serverFormat, &cl->format,&cl->screen->colourMap);
 
 	sraRgnDestroy(cl->modifiedRegion);
 	cl->modifiedRegion =
@@ -448,10 +443,7 @@ rfbSetClientColourMap(cl, firstColour, nColours)
  */
 
 void
-rfbSetClientColourMaps(rfbScreen, firstColour, nColours)
-    rfbScreenInfoPtr rfbScreen;
-    int firstColour;
-    int nColours;
+rfbSetClientColourMaps(rfbScreenInfoPtr rfbScreen, int firstColour, int nColours)
 {
     rfbClientIteratorPtr i;
     rfbClientPtr cl;
@@ -463,8 +455,7 @@ rfbSetClientColourMaps(rfbScreen, firstColour, nColours)
 }
 
 static void
-PrintPixelFormat(pf)
-    rfbPixelFormat *pf;
+PrintPixelFormat(rfbPixelFormat *pf)
 {
     if (pf->bitsPerPixel == 1) {
         rfbLog("  1 bpp, %s sig bit in each byte is leftmost on the screen.\n",

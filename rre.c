@@ -22,12 +22,11 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this software; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  *  USA.
  */
 
-#include <stdio.h>
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 /*
  * rreBeforeBuf contains pixel data in the client's format.
@@ -41,31 +40,46 @@ static char *rreBeforeBuf = NULL;
 
 static int rreAfterBufSize = 0;
 static char *rreAfterBuf = NULL;
-static int rreAfterBufLen;
+static int rreAfterBufLen=0;
 
-static int subrectEncode8(CARD8 *data, int w, int h);
-static int subrectEncode16(CARD16 *data, int w, int h);
-static int subrectEncode32(CARD32 *data, int w, int h);
-static CARD32 getBgColour(char *data, int size, int bpp);
+static int subrectEncode8(uint8_t *data, int w, int h);
+static int subrectEncode16(uint16_t *data, int w, int h);
+static int subrectEncode32(uint32_t *data, int w, int h);
+static uint32_t getBgColour(char *data, int size, int bpp);
+
+
+void rfbRRECleanup(rfbScreenInfoPtr screen)
+{
+  if (rreBeforeBufSize) {
+    free(rreBeforeBuf);
+    rreBeforeBufSize=0;
+  }
+  if (rreAfterBufSize) {
+    free(rreAfterBuf);
+    rreAfterBufSize=0;
+  }
+}
 
 
 /*
  * rfbSendRectEncodingRRE - send a given rectangle using RRE encoding.
  */
 
-Bool
-rfbSendRectEncodingRRE(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbBool
+rfbSendRectEncodingRRE(rfbClientPtr cl,
+                       int x,
+                       int y,
+                       int w,
+                       int h)
 {
     rfbFramebufferUpdateRectHeader rect;
     rfbRREHeader hdr;
     int nSubrects;
     int i;
-    char *fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)
-                   + (x * (cl->screen->bitsPerPixel / 8)));
+    char *fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
+                   + (x * (cl->scaledScreen->bitsPerPixel / 8)));
 
-    int maxRawSize = (cl->screen->width * cl->screen->height
+    int maxRawSize = (cl->scaledScreen->width * cl->scaledScreen->height
                       * (cl->format.bitsPerPixel / 8));
 
     if (rreBeforeBufSize < maxRawSize) {
@@ -85,23 +99,23 @@ rfbSendRectEncodingRRE(cl, x, y, w, h)
     }
 
     (*cl->translateFn)(cl->translateLookupTable,
-		       &(cl->screen->rfbServerFormat),
+		       &(cl->screen->serverFormat),
                        &cl->format, fbptr, rreBeforeBuf,
-                       cl->screen->paddedWidthInBytes, w, h);
+                       cl->scaledScreen->paddedWidthInBytes, w, h);
 
     switch (cl->format.bitsPerPixel) {
     case 8:
-        nSubrects = subrectEncode8((CARD8 *)rreBeforeBuf, w, h);
+        nSubrects = subrectEncode8((uint8_t *)rreBeforeBuf, w, h);
         break;
     case 16:
-        nSubrects = subrectEncode16((CARD16 *)rreBeforeBuf, w, h);
+        nSubrects = subrectEncode16((uint16_t *)rreBeforeBuf, w, h);
         break;
     case 32:
-        nSubrects = subrectEncode32((CARD32 *)rreBeforeBuf, w, h);
+        nSubrects = subrectEncode32((uint32_t *)rreBeforeBuf, w, h);
         break;
     default:
         rfbLog("getBgColour: bpp %d?\n",cl->format.bitsPerPixel);
-        exit(1);
+        return FALSE;
     }
         
     if (nSubrects < 0) {
@@ -111,9 +125,9 @@ rfbSendRectEncodingRRE(cl, x, y, w, h)
         return rfbSendRectEncodingRaw(cl, x, y, w, h);
     }
 
-    cl->rfbRectanglesSent[rfbEncodingRRE]++;
-    cl->rfbBytesSent[rfbEncodingRRE] += (sz_rfbFramebufferUpdateRectHeader
-                                         + sz_rfbRREHeader + rreAfterBufLen);
+    rfbStatRecordEncodingSent(cl, rfbEncodingRRE,
+                              sz_rfbFramebufferUpdateRectHeader + sz_rfbRREHeader + rreAfterBufLen,
+                              sz_rfbFramebufferUpdateRectHeader + w * h * (cl->format.bitsPerPixel / 8));
 
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbRREHeader
         > UPDATE_BUF_SIZE)
@@ -176,26 +190,22 @@ rfbSendRectEncodingRRE(cl, x, y, w, h)
 
 #define DEFINE_SUBRECT_ENCODE(bpp)                                            \
 static int                                                                    \
-subrectEncode##bpp(data,w,h)                                                  \
-    CARD##bpp *data;                                                          \
-    int w;                                                                    \
-    int h;                                                                    \
-{                                                                             \
-    CARD##bpp cl;                                                             \
+subrectEncode##bpp(uint##bpp##_t *data, int w, int h) {                       \
+    uint##bpp##_t cl;                                                         \
     rfbRectangle subrect;                                                     \
     int x,y;                                                                  \
     int i,j;                                                                  \
     int hx=0,hy,vx=0,vy;                                                      \
     int hyflag;                                                               \
-    CARD##bpp *seg;                                                           \
-    CARD##bpp *line;                                                          \
+    uint##bpp##_t *seg;                                                       \
+    uint##bpp##_t *line;                                                      \
     int hw,hh,vw,vh;                                                          \
     int thex,they,thew,theh;                                                  \
     int numsubs = 0;                                                          \
     int newLen;                                                               \
-    CARD##bpp bg = (CARD##bpp)getBgColour((char*)data,w*h,bpp);               \
+    uint##bpp##_t bg = (uint##bpp##_t)getBgColour((char*)data,w*h,bpp);       \
                                                                               \
-    *((CARD##bpp*)rreAfterBuf) = bg;                                          \
+    *((uint##bpp##_t*)rreAfterBuf) = bg;                                      \
                                                                               \
     rreAfterBufLen = (bpp/8);                                                 \
                                                                               \
@@ -247,7 +257,7 @@ subrectEncode##bpp(data,w,h)                                                  \
             return -1;                                                        \
                                                                               \
           numsubs += 1;                                                       \
-          *((CARD##bpp*)(rreAfterBuf + rreAfterBufLen)) = cl;                 \
+          *((uint##bpp##_t*)(rreAfterBuf + rreAfterBufLen)) = cl;             \
           rreAfterBufLen += (bpp/8);                                          \
           memcpy(&rreAfterBuf[rreAfterBufLen],&subrect,sz_rfbRectangle);      \
           rreAfterBufLen += sz_rfbRectangle;                                  \
@@ -275,11 +285,8 @@ DEFINE_SUBRECT_ENCODE(32)
 /*
  * getBgColour() gets the most prevalent colour in a byte array.
  */
-static CARD32
-getBgColour(data,size,bpp)
-    char *data;
-    int size;
-    int bpp;
+static uint32_t
+getBgColour(char *data, int size, int bpp)
 {
     
 #define NUMCLRS 256
@@ -288,16 +295,16 @@ getBgColour(data,size,bpp)
   int i,j,k;
 
   int maxcount = 0;
-  CARD8 maxclr = 0;
+  uint8_t maxclr = 0;
 
   if (bpp != 8) {
     if (bpp == 16) {
-      return ((CARD16 *)data)[0];
+      return ((uint16_t *)data)[0];
     } else if (bpp == 32) {
-      return ((CARD32 *)data)[0];
+      return ((uint32_t *)data)[0];
     } else {
       rfbLog("getBgColour: bpp %d?\n",bpp);
-      exit(1);
+      return 0;
     }
   }
 
@@ -306,15 +313,15 @@ getBgColour(data,size,bpp)
   }
 
   for (j=0; j<size; j++) {
-    k = (int)(((CARD8 *)data)[j]);
+    k = (int)(((uint8_t *)data)[j]);
     if (k >= NUMCLRS) {
-      rfbLog("getBgColour: unusual colour = %d\n", k);
-      exit(1);
+      rfbErr("getBgColour: unusual colour = %d\n", k);
+      return 0;
     }
     counts[k] += 1;
     if (counts[k] > maxcount) {
       maxcount = counts[k];
-      maxclr = ((CARD8 *)data)[j];
+      maxclr = ((uint8_t *)data)[j];
     }
   }
   

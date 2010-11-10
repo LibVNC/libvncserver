@@ -20,7 +20,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this software; if not, write to the Free Software
- *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  *  USA.
  *
  * For the latest source code, please check:
@@ -30,8 +30,7 @@
  * or send email to feedback@developvnc.org.
  */
 
-#include <stdio.h>
-#include "rfb.h"
+#include <rfb/rfb.h>
 
 /*
  * zlibBeforeBuf contains pixel data in the client's format.
@@ -48,28 +47,43 @@ static int zlibAfterBufSize = 0;
 static char *zlibAfterBuf = NULL;
 static int zlibAfterBufLen;
 
+void rfbZlibCleanup(rfbScreenInfoPtr screen)
+{
+  if (zlibBeforeBufSize) {
+    free(zlibBeforeBuf);
+    zlibBeforeBufSize=0;
+  }
+  if (zlibAfterBufSize) {
+    zlibAfterBufSize=0;
+    free(zlibAfterBuf);
+  }
+}
+
+
 /*
  * rfbSendOneRectEncodingZlib - send a given rectangle using one Zlib
  *                              rectangle encoding.
  */
 
-Bool
-rfbSendOneRectEncodingZlib(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+static rfbBool
+rfbSendOneRectEncodingZlib(rfbClientPtr cl,
+                           int x,
+                           int y,
+                           int w,
+                           int h)
 {
     rfbFramebufferUpdateRectHeader rect;
     rfbZlibHeader hdr;
     int deflateResult;
     int previousOut;
     int i;
-    char *fbptr = (cl->screen->frameBuffer + (cl->screen->paddedWidthInBytes * y)
-    	   + (x * (cl->screen->bitsPerPixel / 8)));
+    char *fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
+    	   + (x * (cl->scaledScreen->bitsPerPixel / 8)));
 
     int maxRawSize;
     int maxCompSize;
 
-    maxRawSize = (cl->screen->width * cl->screen->height
+    maxRawSize = (cl->scaledScreen->width * cl->scaledScreen->height
                   * (cl->format.bitsPerPixel / 8));
 
     if (zlibBeforeBufSize < maxRawSize) {
@@ -83,7 +97,7 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
     /* zlib compression is not useful for very small data sets.
      * So, we just send these raw without any compression.
      */
-    if (( w * h * (cl->screen->bitsPerPixel / 8)) <
+    if (( w * h * (cl->scaledScreen->bitsPerPixel / 8)) <
           VNC_ENCODE_ZLIB_MIN_COMP_SIZE ) {
 
         int result;
@@ -120,12 +134,13 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
 	    zlibAfterBuf = (char *)realloc(zlibAfterBuf, zlibAfterBufSize);
     }
 
+
     /* 
      * Convert pixel data to client format.
      */
-    (*cl->translateFn)(cl->translateLookupTable, &cl->screen->rfbServerFormat,
+    (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
 		       &cl->format, fbptr, zlibBeforeBuf,
-		       cl->screen->paddedWidthInBytes, w, h);
+		       cl->scaledScreen->paddedWidthInBytes, w, h);
 
     cl->compStream.next_in = ( Bytef * )zlibBeforeBuf;
     cl->compStream.avail_in = w * h * (cl->format.bitsPerPixel / 8);
@@ -163,7 +178,7 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
     zlibAfterBufLen = cl->compStream.total_out - previousOut;
 
     if ( deflateResult != Z_OK ) {
-        rfbLog("zlib deflation error: %s\n", cl->compStream.msg);
+        rfbErr("zlib deflation error: %s\n", cl->compStream.msg);
         return FALSE;
     }
 
@@ -175,9 +190,8 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
      */
 
     /* Update statics */
-    cl->rfbRectanglesSent[rfbEncodingZlib]++;
-    cl->rfbBytesSent[rfbEncodingZlib] += (sz_rfbFramebufferUpdateRectHeader
-					 + sz_rfbZlibHeader + zlibAfterBufLen);
+    rfbStatRecordEncodingSent(cl, rfbEncodingZlib, sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader + zlibAfterBufLen,
+        + w * (cl->format.bitsPerPixel / 8) * h);
 
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader
 	> UPDATE_BUF_SIZE)
@@ -230,10 +244,12 @@ rfbSendOneRectEncodingZlib(cl, x, y, w, h)
  *                           Zlib encoding rectangles.
  */
 
-Bool
-rfbSendRectEncodingZlib(cl, x, y, w, h)
-    rfbClientPtr cl;
-    int x, y, w, h;
+rfbBool
+rfbSendRectEncodingZlib(rfbClientPtr cl,
+                        int x,
+                        int y,
+                        int w,
+                        int h)
 {
     int  maxLines;
     int  linesRemaining;
@@ -300,5 +316,4 @@ rfbSendRectEncodingZlib(cl, x, y, w, h)
     return TRUE;
 
 }
-
 

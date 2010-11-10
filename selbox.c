@@ -1,6 +1,6 @@
 #include <ctype.h>
-#include "rfb.h"
-#include "keysym.h"
+#include <rfb/rfb.h>
+#include <rfb/keysym.h>
 
 typedef struct {
   rfbScreenInfoPtr screen;
@@ -12,21 +12,21 @@ typedef struct {
   int x1,y1,x2,y2,textH,pageH;
   int xhot,yhot;
   int buttonWidth,okBX,cancelBX,okX,cancelX,okY;
-  Bool okInverted,cancelInverted;
+  rfbBool okInverted,cancelInverted;
   int lastButtons;
-  Pixel colour,backColour;
+  rfbPixel colour,backColour;
   SelectionChangedHookPtr selChangedHook;
   enum { SELECTING, OK, CANCEL } state;
 } rfbSelectData;
 
-static const char okStr[] = "OK";
-static const char cancelStr[] = "Cancel";
+static const char* okStr="OK";
+static const char* cancelStr="Cancel";
 
-static void selPaintButtons(rfbSelectData* m,Bool invertOk,Bool invertCancel)
+static void selPaintButtons(rfbSelectData* m,rfbBool invertOk,rfbBool invertCancel)
 {
   rfbScreenInfoPtr s = m->screen;
-  Pixel bcolour = m->backColour;
-  Pixel colour = m->colour;
+  rfbPixel bcolour = m->backColour;
+  rfbPixel colour = m->colour;
 
   rfbFillRect(s,m->x1,m->okY-m->textH,m->x2,m->okY,bcolour);
 
@@ -52,7 +52,7 @@ static void selPaintButtons(rfbSelectData* m,Bool invertOk,Bool invertCancel)
 }
 
 /* line is relative to displayStart */
-static void selPaintLine(rfbSelectData* m,int line,Bool invert)
+static void selPaintLine(rfbSelectData* m,int line,rfbBool invert)
 {
   int y1 = m->y1+line*m->textH, y2 = y1+m->textH;
   if(y2>m->y2)
@@ -122,7 +122,7 @@ static void selSelect(rfbSelectData* m,int _index)
   /* todo: scrollbars */
 }
 
-static void selKbdAddEvent(Bool down,KeySym keySym,rfbClientPtr cl)
+static void selKbdAddEvent(rfbBool down,rfbKeySym keySym,rfbClientPtr cl)
 {
   if(down) {
     if(keySym>' ' && keySym<0xff) {
@@ -197,22 +197,22 @@ static void selPtrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl)
 
 static rfbCursorPtr selGetCursorPtr(rfbClientPtr cl)
 {
-  return(0);
+  return NULL;
 }
 
 int rfbSelectBox(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 		 char** list,
 		 int x1,int y1,int x2,int y2,
-		 Pixel colour,Pixel backColour,
+		 rfbPixel colour,rfbPixel backColour,
 		 int border,SelectionChangedHookPtr selChangedHook)
 {
    int bpp = rfbScreen->bitsPerPixel/8;
    char* frameBufferBackup;
    void* screenDataBackup = rfbScreen->screenData;
-   KbdAddEventProcPtr kbdAddEventBackup = rfbScreen->kbdAddEvent;
-   PtrAddEventProcPtr ptrAddEventBackup = rfbScreen->ptrAddEvent;
-   GetCursorProcPtr getCursorPtrBackup = rfbScreen->getCursorPtr;
-   DisplayHookPtr displayHookBackup = rfbScreen->displayHook;
+   rfbKbdAddEventProcPtr kbdAddEventBackup = rfbScreen->kbdAddEvent;
+   rfbPtrAddEventProcPtr ptrAddEventBackup = rfbScreen->ptrAddEvent;
+   rfbGetCursorProcPtr getCursorPtrBackup = rfbScreen->getCursorPtr;
+   rfbDisplayHookPtr displayHookBackup = rfbScreen->displayHook;
    rfbSelectData selData;
    int i,j,k;
    int fx1,fy1,fx2,fy2; /* for font bbox */
@@ -244,7 +244,6 @@ int rfbSelectBox(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
    selData.cancelX = selData.cancelBX+(k-j)/2;
    selData.okY = y2-border;
 
-   rfbUndrawCursor(rfbScreen);
    frameBufferBackup = (char*)malloc(bpp*(x2-x1)*(y2-y1));
 
    selData.state = SELECTING;
@@ -264,7 +263,7 @@ int rfbSelectBox(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
    rfbScreen->kbdAddEvent = selKbdAddEvent;
    rfbScreen->ptrAddEvent = selPtrAddEvent;
    rfbScreen->getCursorPtr = selGetCursorPtr;
-   rfbScreen->displayHook = 0;
+   rfbScreen->displayHook = NULL;
    
    /* backup screen */
    for(j=0;j<y2-y1;j++)
