@@ -668,7 +668,7 @@ extern rfbClientPtr rfbNewUDPClient(rfbScreenInfoPtr rfbScreen);
 extern rfbClientPtr rfbReverseConnection(rfbScreenInfoPtr rfbScreen,char *host, int port);
 extern void rfbClientConnectionGone(rfbClientPtr cl);
 extern void rfbProcessClientMessage(rfbClientPtr cl);
-extern void rfbClientConnFailed(rfbClientPtr cl, char *reason);
+extern void rfbClientConnFailed(rfbClientPtr cl, const char *reason);
 extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
 extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
 extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
@@ -684,7 +684,7 @@ extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
 extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
 extern rfbBool rfbSendFileTransferChunk(rfbClientPtr cl);
 extern rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer);
-extern rfbBool rfbSendFileTransferMessage(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, char *buffer);
+extern rfbBool rfbSendFileTransferMessage(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, const char *buffer);
 extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
 extern rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length);
 
