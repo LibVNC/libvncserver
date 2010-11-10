@@ -967,6 +967,12 @@ extern void rfbSetProtocolVersion(rfbScreenInfoPtr rfbScreen, int major_, int mi
 extern rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *buffer);
 
 
+/*
+ * Additions for Qt event loop integration
+ * Original idea taken from vino.
+ */
+void rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen);
+rfbBool rfbUpdateClient(rfbClientPtr cl);
 
 
 #if (defined __cplusplus)
