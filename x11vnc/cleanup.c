@@ -547,6 +547,8 @@ static void interrupted (int sig) {
 			unlink(rm_flagfile);
 			rm_flagfile = NULL;
 		}
+		/* don't forget to remove these on hard exit */
+		clean_xi2_devices();
 		exit(4);
 	}
 	exit_flag++;

@@ -73,8 +73,8 @@ int createMD(Display* dpy, char* name)
   old_handler = XSetErrorHandler(trap_xerror);
 	
   XIChangeHierarchy(dpy, (XIAnyHierarchyChangeInfo*)&c, 1);
-  
   XSync(dpy, False);
+
   if(trapped_xerror) {
     XSetErrorHandler(old_handler);
     trapped_xerror = 0;
@@ -138,6 +138,7 @@ int removeMD(Display* dpy, int dev_id)
     r.return_mode = XIFloating;
 
     res = XIChangeHierarchy(dpy, (XIAnyHierarchyChangeInfo*)&r, 1) == Success ? 1 : 0;
+    XSync(dpy, False);
   }
 
   X_UNLOCK;
