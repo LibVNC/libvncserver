@@ -617,12 +617,15 @@ int main(int argc, char** argv)
 	      break;
 	  }
 
-	/* check if a second unclutter is running cos they thrash */
-	/* if(event.type==LeaveNotify &&
+	/* check if a second xi2setcursor is running cos they thrash */
+	if(event.type==LeaveNotify &&
 	   event.xcrossing.window==cursorwindow &&
 	   event.xcrossing.detail==NotifyInferior)
-	   pexit("someone created a sub-window to my sub-window! giving up");
-	*/
+	  {
+	    fprintf(stderr, "xi2setcursor caring for dev %d: someone created a sub-window to my sub-window! taking a nap...\n", dev);
+	    usleep(1000*1000);
+	  }
+	
       }
       XDestroyWindow(display, cursorwindow);
     }
