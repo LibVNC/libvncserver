@@ -148,15 +148,27 @@ static void clean_icon_mode(void) {
 static void clean_xi2_devices(void) 
 {
   if(use_multipointer) {
+    /* make sure we're not interrupted while removing created XI2 MDs */
+    signal(SIGHUP,  SIG_IGN);
+    signal(SIGINT,  SIG_IGN);
+    signal(SIGQUIT, SIG_IGN);
+    signal(SIGABRT, SIG_IGN);
+    signal(SIGTERM, SIG_IGN);
+    signal(SIGBUS,  SIG_IGN);
+    signal(SIGSEGV, SIG_IGN);
+    signal(SIGFPE,  SIG_IGN);
     rfbClientIteratorPtr iter = rfbGetClientIterator(screen);
     rfbClientPtr cl;
 
     while((cl = rfbClientIteratorNext(iter))) {
       ClientData *cd = (ClientData *) cl->clientData;
       if(removeMD(dpy, cd->ptr_id))
-	rfbLog("removed XInput2 MD for client %s.\n", cl->host);
+	rfbLog("cleanup: removed XInput2 MD for client %s.\n", cl->host);
     }
     rfbReleaseClientIterator(iter);
+
+    /* and restore signal handlers */
+    initialize_signals();
   }
 }
 
@@ -547,8 +559,6 @@ static void interrupted (int sig) {
 			unlink(rm_flagfile);
 			rm_flagfile = NULL;
 		}
-		/* don't forget to remove these on hard exit */
-		clean_xi2_devices();
 		exit(4);
 	}
 	exit_flag++;
