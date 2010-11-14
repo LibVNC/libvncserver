@@ -883,7 +883,6 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     /*rfbSetBit(msgs.client2server, rfbSetServerInput);  */
     /*rfbSetBit(msgs.client2server, rfbSetSW);           */
     /*rfbSetBit(msgs.client2server, rfbTextChat);        */
-    /*rfbSetBit(msgs.client2server, rfbKeyFrameRequest); */
     rfbSetBit(msgs.client2server, rfbPalmVNCSetScaleFactor);
     rfbSetBit(msgs.client2server, rfbXvp);
     rfbSetBit(msgs.client2server, rfbMulticastFramebufferUpdateRequest);
@@ -894,7 +893,6 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     rfbSetBit(msgs.server2client, rfbBell);
     rfbSetBit(msgs.server2client, rfbServerCutText);
     rfbSetBit(msgs.server2client, rfbResizeFrameBuffer);
-    /*rfbSetBit(msgs.server2client, rfbKeyFrameUpdate);  */
     rfbSetBit(msgs.server2client, rfbPalmVNCReSizeFrameBuffer);
     rfbSetBit(msgs.server2client, rfbXvp);
     rfbSetBit(msgs.server2client, rfbMulticastFramebufferUpdate);
