@@ -1007,7 +1007,7 @@ extern rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *bu
  * Additions for Qt event loop integration
  * Original idea taken from vino.
  */
-void rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen);
+rfbBool rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen);
 rfbBool rfbUpdateClient(rfbClientPtr cl);
 
 
