@@ -264,7 +264,8 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 
 	if (rfbScreen->listenSock != -1 && FD_ISSET(rfbScreen->listenSock, &fds)) {
 
-	    rfbProcessNewConnection(rfbScreen);
+	    if (!rfbProcessNewConnection(rfbScreen))
+                return -1;
 
 	    FD_CLR(rfbScreen->listenSock, &fds);
 	    if (--nfds == 0)
@@ -326,7 +327,7 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     return result;
 }
 
-void
+rfbBool
 rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
 {
     const int one = 1;
@@ -337,14 +338,14 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
     if ((sock = accept(rfbScreen->listenSock,
                     (struct sockaddr *)&addr, &addrlen)) < 0) {
         rfbLogPerror("rfbCheckFds: accept");
-        return -1;
+        return FALSE;
     }
 
 #ifndef WIN32
     if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
         rfbLogPerror("rfbCheckFds: fcntl");
         closesocket(sock);
-        return -1;
+        return FALSE;
     }
 #endif
 
@@ -352,7 +353,7 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
                 (char *)&one, sizeof(one)) < 0) {
         rfbLogPerror("rfbCheckFds: setsockopt");
         closesocket(sock);
-        return -1;
+        return FALSE;
     }
 
 #ifdef USE_LIBWRAP
@@ -361,13 +362,15 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
         rfbLog("Rejected connection from client %s\n",
                 inet_ntoa(addr.sin_addr));
         closesocket(sock);
-        return -1;
+        return FALSE;
     }
 #endif
 
     rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
 
     rfbNewClient(rfbScreen,sock);
+
+    return TRUE;
 }
 
 
