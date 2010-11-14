@@ -4428,3 +4428,39 @@ void check_new_clients(void) {
 	}
 }
 
+
+/*
+ * checks if anything was received from clients in
+ * a certain time span. if not, kick idle clients
+ */
+void check_kick_idle_clients(int timeout) {
+  static time_t last_check = 0;
+  time_t now = time(NULL);
+
+  if(now - last_check > timeout) {
+    rfbClientIteratorPtr iter;
+    rfbClientPtr cl;
+
+    if (! screen)
+      return;
+
+    iter = rfbGetClientIterator(screen);
+    while( (cl = rfbClientIteratorNext(iter)) ) {
+      ClientData *cd = (ClientData *) cl->clientData;
+      size_t rcvdbytes = rfbStatGetRcvdBytes(cl);
+
+      if(!cd || !rcvdbytes)
+	continue;
+
+      if(rcvdbytes == cd->last_bytes_rcvd) {
+	rfbLog("Client %s idle for too long, disconnecting.\n", cl->host);
+	rfbCloseClient(cl);
+      }
+      else
+	cd->last_bytes_rcvd = rcvdbytes;
+    }
+    rfbReleaseClientIterator(iter);
+
+    last_check = now;
+  }
+}
