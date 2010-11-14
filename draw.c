@@ -1,4 +1,4 @@
-#include <rfb/rfb.h>
+#include "rfb/rfb.h"
 
 void rfbFillRect(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2,rfbPixel col)
 {

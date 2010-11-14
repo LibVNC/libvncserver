@@ -25,7 +25,7 @@
  */
 
 /*#include <stdio.h>*/
-#include <rfb/rfb.h>
+#include "rfb/rfb.h"
 #include "private.h"
 
 #ifdef WIN32

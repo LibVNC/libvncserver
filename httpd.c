@@ -22,7 +22,7 @@
  *  USA.
  */
 
-#include <rfb/rfb.h>
+#include "rfb/rfb.h"
 
 #include <ctype.h>
 #ifdef LIBVNCSERVER_HAVE_UNISTD_H

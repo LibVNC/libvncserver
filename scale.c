@@ -29,8 +29,8 @@
 #define _BSD_SOURCE
 #endif
 #include <string.h>
-#include <rfb/rfb.h>
-#include <rfb/rfbregion.h>
+#include "rfb/rfb.h"
+#include "rfb/rfbregion.h"
 #include "private.h"
 
 #ifdef LIBVNCSERVER_HAVE_FCNTL_H

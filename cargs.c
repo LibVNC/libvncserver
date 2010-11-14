@@ -12,7 +12,7 @@
  *  see GPL (latest version) for full details
  */
 
-#include <rfb/rfb.h>
+#include "rfb/rfb.h"
 
 extern int rfbStringToAddr(char *str, in_addr_t *iface);
 

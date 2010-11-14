@@ -31,8 +31,8 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <rfb/rfbproto.h>
-#include <rfb/keysym.h>
+#include "rfbproto.h"
+#include "keysym.h"
 
 #define rfbClientSwap16IfLE(s) \
     (*(char *)&client->endianTest ? ((((s) & 0xff) << 8) | (((s) >> 8) & 0xff)) : (s))

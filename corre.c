@@ -27,7 +27,7 @@
  *  USA.
  */
 
-#include <rfb/rfb.h>
+#include "rfb/rfb.h"
 
 /*
  * rreBeforeBuf contains pixel data in the client's format.

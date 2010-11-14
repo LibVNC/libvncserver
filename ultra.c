@@ -7,7 +7,7 @@
  * This is 'UltraZip' and is currently not implemented.
  */
 
-#include <rfb/rfb.h>
+#include "rfb/rfb.h"
 #include "minilzo.h"
 
 /*

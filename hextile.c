@@ -25,7 +25,7 @@
  *  USA.
  */
 
-#include <rfb/rfb.h>
+#include "rfb/rfb.h"
 
 static rfbBool sendHextiles8(rfbClientPtr cl, int x, int y, int w, int h);
 static rfbBool sendHextiles16(rfbClientPtr cl, int x, int y, int w, int h);

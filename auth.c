@@ -27,7 +27,7 @@
  *  USA.
  */
 
-#include <rfb/rfb.h>
+#include "rfb/rfb.h"
 
 /* RFB 3.8 clients are well informed */
 void rfbClientSendString(rfbClientPtr cl, const char *reason);

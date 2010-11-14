@@ -5,8 +5,8 @@
  * Only deals with rectangular regions, though.
  */
 
-#include <rfb/rfb.h>
-#include <rfb/rfbregion.h>
+#include "rfb/rfb.h"
+#include "rfb/rfbregion.h"
 
 /* -=- Internal Span structure */
 

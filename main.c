@@ -13,8 +13,8 @@
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #endif
-#include <rfb/rfb.h>
-#include <rfb/rfbregion.h>
+#include "rfb/rfb.h"
+#include "rfb/rfbregion.h"
 #include "private.h"
 
 #include <stdarg.h>

@@ -30,7 +30,7 @@
  * or send email to feedback@developvnc.org.
  */
 
-#include <rfb/rfb.h>
+#include "rfb/rfb.h"
 
 /*
  * zlibBeforeBuf contains pixel data in the client's format.

@@ -23,8 +23,8 @@
  *  USA.
  */
 
-#include <rfb/rfb.h>
-#include <rfb/rfbregion.h>
+#include "rfb/rfb.h"
+#include "rfb/rfbregion.h"
 
 static void PrintPixelFormat(rfbPixelFormat *pf);
 static rfbBool rfbSetClientColourMapBGR233(rfbClientPtr cl);

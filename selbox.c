@@ -1,6 +1,6 @@
 #include <ctype.h>
-#include <rfb/rfb.h>
-#include <rfb/keysym.h>
+#include "rfb/rfb.h"
+#include "rfb/keysym.h"
 
 typedef struct {
   rfbScreenInfoPtr screen;

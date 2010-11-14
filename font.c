@@ -1,4 +1,4 @@
-#include <rfb/rfb.h>
+#include "rfb/rfb.h"
 
 int rfbDrawChar(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
 		 int x,int y,unsigned char c,rfbPixel col)
