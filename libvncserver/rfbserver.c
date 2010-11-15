@@ -3202,20 +3202,18 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     sraRgnOr(updateRegion, cl->screen->multicastUpdateRegion);
 
     /* draw cursor into framebuffer */
-    if (!cl->enableCursorShapeUpdates) 
-      {
-	if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) 
-	  {
-	    rfbRedrawAfterHideCursor(cl,updateRegion);
-	    LOCK(cl->screen->cursorMutex);
-	    cl->cursorX = cl->screen->cursorX;
-	    cl->cursorY = cl->screen->cursorY;
-	    UNLOCK(cl->screen->cursorMutex);
-	    rfbRedrawAfterHideCursor(cl,updateRegion);
-	  }
-	rfbShowCursor(cl);
+    if (!cl->enableCursorShapeUpdates) {
+      if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) {
+	rfbRedrawAfterHideCursor(cl,updateRegion);
+	LOCK(cl->screen->cursorMutex);
+	cl->cursorX = cl->screen->cursorX;
+	cl->cursorY = cl->screen->cursorY;
+	UNLOCK(cl->screen->cursorMutex);
+	rfbRedrawAfterHideCursor(cl,updateRegion);
       }
-
+      rfbShowCursor(cl);
+    }
+    
 
     /* FIXME make this per-screen ?*/
     rfbStatRecordMessageSent(cl, rfbMulticastFramebufferUpdate, 0, 0);
@@ -3233,7 +3231,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 				cl->screen->multicastPartialUpdId++,
 				0);
   
-    for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+    for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);) {
         int x = rect.x1;
         int y = rect.y1;
         int w = rect.x2 - x;
@@ -3246,130 +3244,124 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 #endif
 
 	if(cl->screen->mcublen + sz_rfbFramebufferUpdateRectHeader + maxSizeRect 
-	   > MULTICAST_UPDATE_BUF_SIZE)                 /* would overflow */
-	  {
-	    if(mfu)
-	      mfu->nRects = Swap16IfLE(nRects);
+	   > MULTICAST_UPDATE_BUF_SIZE) {                /* would overflow */
+	  if(mfu)
+	    mfu->nRects = Swap16IfLE(nRects);
 
 #ifdef MULTICAST_DEBUG
-	    if(cl->screen->mcublen)
-	      rfbLog("MulticastVNC DEBUG:   buffer(now %d) would overflow, flushing\n", cl->screen->mcublen);
+	  if(cl->screen->mcublen)
+	    rfbLog("MulticastVNC DEBUG:   buffer(now %d) would overflow, flushing\n", cl->screen->mcublen);
 #endif
 
-	    if(!rfbSendMulticastUpdateBuf(cl->screen))  /* flush buffer */
-	      {
-		result = FALSE;
-		break;
-	      }
-	    nRects = 0;
+	  if(!rfbSendMulticastUpdateBuf(cl->screen)) { /* flush buffer */
+	    result = FALSE;
+	    break;
+	  }
+	  nRects = 0;
 	 
-	    if(sz_rfbMulticastFramebufferUpdateMsg + sz_rfbFramebufferUpdateRectHeader + maxSizeRect 
-	       <= MULTICAST_UPDATE_BUF_SIZE)            /* headers + rect fit into now empty buffer */
-	      {  
-		mfu = rfbPutMulticastHeader(cl, 
-					    cl->screen->multicastWholeUpdId,
-					    cl->screen->multicastPartialUpdId++,
-					    0);
-   		nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
-	      }
-	    else                                        /* rect too large for buffer, must be split up */
-	      {
-		const int bytesPerPixel = cl->format.bitsPerPixel/8;
-		const int bytesPerLine = w * bytesPerPixel;
-		const int payload = (MULTICAST_UPDATE_BUF_SIZE - sz_rfbMulticastFramebufferUpdateMsg) - sz_rfbFramebufferUpdateRectHeader;
-		const int linesPerUpd =  payload / bytesPerLine;
-		int wholeLineSplitRects = 0;
-		int lineOffset=0;
-		
-		if(linesPerUpd > 0) {
-		  wholeLineSplitRects  = h/linesPerUpd;
-		  if(wholeLineSplitRects*linesPerUpd < h)   /* there is a remainder */
-		    ++wholeLineSplitRects;
-		}
-		else { /* linesPerUpd == 0, a whole line does not fit into buffer, 
-			  i.e. lines have to be split up into sublines */
-		  wholeLineSplitRects = h;
-		}	
-
-		while(wholeLineSplitRects) 
-		  {
-		    if(linesPerUpd > 0) { /* send one or more whole lines in an update */
-		      mfu = rfbPutMulticastHeader(cl, 
-						  cl->screen->multicastWholeUpdId,
-						  cl->screen->multicastPartialUpdId++,
-						  0);
-		   
-		      if(lineOffset*linesPerUpd + linesPerUpd <= h)
-			nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+lineOffset*linesPerUpd, w, linesPerUpd);
-		      else
-			nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+lineOffset*linesPerUpd, w, h - lineOffset*linesPerUpd);
-
-		      mfu->nRects = Swap16IfLE(nRects);
-#ifdef MULTICAST_DEBUG
-		      rfbLog("MulticastVNC DEBUG:   original rect too large, was split into line(s)!\n");
-#endif
-		      if(!rfbSendMulticastUpdateBuf(cl->screen))
-			{
-			  result = FALSE;
-			  break;
-			}
-		      nRects = 0;
-		    
-		    }
-		    else { /* we have to split a whole line into several updates */
-		      const int pixelsPerUpd = payload / bytesPerPixel;
-		      int subLineOffset=0;
-		      int subLineSplitRects  = w/pixelsPerUpd;
-		      if(subLineSplitRects*pixelsPerUpd < w)   /* there is a remainder */
-			++subLineSplitRects;
-		      
-		      while(subLineSplitRects)
-			{
-			  mfu = rfbPutMulticastHeader(cl, 
-						      cl->screen->multicastWholeUpdId,
-						      cl->screen->multicastPartialUpdId++,
-						      0);
-			  
-			  if(subLineOffset*pixelsPerUpd + pixelsPerUpd <= w)
-			    nRects += rfbPutMulticastRectEncodingPreferred(cl, x+subLineOffset*pixelsPerUpd, y+lineOffset, pixelsPerUpd, 1);
-			  else
-			    nRects += rfbPutMulticastRectEncodingPreferred(cl, x+subLineOffset*pixelsPerUpd, y+lineOffset, w - subLineOffset*pixelsPerUpd, 1);
-			  
-			  mfu->nRects = Swap16IfLE(nRects);
-#ifdef MULTICAST_DEBUG
-			  rfbLog("MulticastVNC DEBUG:   original rect too large, was split into subline(s)!\n");
-#endif
-			  if(!rfbSendMulticastUpdateBuf(cl->screen))
-			    {
-			      result = FALSE;
-			      break;
-			    }
-			  nRects = 0;
-			  
-			  ++subLineOffset; 
-			  --subLineSplitRects;
-			}
-
-		    }
-		    
-		    ++lineOffset; 
-		    --wholeLineSplitRects;
-		  }
-
-		/* when done with the splitting, prepare buffer for stuffing other rects in */
-		mfu = rfbPutMulticastHeader(cl, 
-					    cl->screen->multicastWholeUpdId,
-					    cl->screen->multicastPartialUpdId++,
-					    0);
-	      }
-	  }
-	else                                            /* rect fits */  
-	  {
+	  if(sz_rfbMulticastFramebufferUpdateMsg + sz_rfbFramebufferUpdateRectHeader + maxSizeRect 
+	     <= MULTICAST_UPDATE_BUF_SIZE) {            /* headers + rect fit into now empty buffer */
+	    
+	    mfu = rfbPutMulticastHeader(cl, 
+					cl->screen->multicastWholeUpdId,
+					cl->screen->multicastPartialUpdId++,
+					0);
 	    nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
-#ifdef MULTICAST_DEBUG
-	    rfbLog("MulticastVNC DEBUG:   did put rect into buffer(now %d), now %d in there\n", cl->screen->mcublen, nRects);
-#endif
 	  }
+
+	  else {                                        /* rect too large for buffer, must be split up */
+	    const int bytesPerPixel = cl->format.bitsPerPixel/8;
+	    const int bytesPerLine = w * bytesPerPixel;
+	    const int payload = (MULTICAST_UPDATE_BUF_SIZE - sz_rfbMulticastFramebufferUpdateMsg) - sz_rfbFramebufferUpdateRectHeader;
+	    const int linesPerUpd =  payload / bytesPerLine;
+	    int wholeLineSplitRects = 0;
+	    int lineOffset=0;
+	    
+	    if(linesPerUpd > 0) {
+	      wholeLineSplitRects  = h/linesPerUpd;
+	      if(wholeLineSplitRects*linesPerUpd < h)   /* there is a remainder */
+		++wholeLineSplitRects;
+	    }
+	    else { /* linesPerUpd == 0, a whole line does not fit into buffer, 
+		      i.e. lines have to be split up into sublines */
+	      wholeLineSplitRects = h;
+	    }	
+
+	    while(wholeLineSplitRects) {
+	      if(linesPerUpd > 0) { /* send one or more whole lines in an update */
+		mfu = rfbPutMulticastHeader(cl, 
+					    cl->screen->multicastWholeUpdId,
+					    cl->screen->multicastPartialUpdId++,
+					    0);
+		
+		if(lineOffset*linesPerUpd + linesPerUpd <= h)
+		  nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+lineOffset*linesPerUpd, w, linesPerUpd);
+		else
+		  nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+lineOffset*linesPerUpd, w, h - lineOffset*linesPerUpd);
+		
+		mfu->nRects = Swap16IfLE(nRects);
+#ifdef MULTICAST_DEBUG
+		rfbLog("MulticastVNC DEBUG:   original rect too large, was split into line(s)!\n");
+#endif
+		if(!rfbSendMulticastUpdateBuf(cl->screen)) {
+		  result = FALSE;
+		  break;
+		}
+		nRects = 0;
+		    
+	      }
+
+	      else { /* we have to split a whole line into several updates */
+		const int pixelsPerUpd = payload / bytesPerPixel;
+		int subLineOffset=0;
+		int subLineSplitRects  = w/pixelsPerUpd;
+		if(subLineSplitRects*pixelsPerUpd < w)   /* there is a remainder */
+		  ++subLineSplitRects;
+		
+		while(subLineSplitRects) {
+		  mfu = rfbPutMulticastHeader(cl, 
+					      cl->screen->multicastWholeUpdId,
+					      cl->screen->multicastPartialUpdId++,
+					      0);
+		  
+		  if(subLineOffset*pixelsPerUpd + pixelsPerUpd <= w)
+		    nRects += rfbPutMulticastRectEncodingPreferred(cl, x+subLineOffset*pixelsPerUpd, y+lineOffset, pixelsPerUpd, 1);
+		  else
+		    nRects += rfbPutMulticastRectEncodingPreferred(cl, x+subLineOffset*pixelsPerUpd, y+lineOffset, w - subLineOffset*pixelsPerUpd, 1);
+		  
+		  mfu->nRects = Swap16IfLE(nRects);
+#ifdef MULTICAST_DEBUG
+		  rfbLog("MulticastVNC DEBUG:   original rect too large, was split into subline(s)!\n");
+#endif
+		  if(!rfbSendMulticastUpdateBuf(cl->screen)) {
+		    result = FALSE;
+		    break;
+		  }
+		  nRects = 0;
+			  
+		  ++subLineOffset; 
+		  --subLineSplitRects;
+		}
+		
+	      }
+		    
+	      ++lineOffset; 
+	      --wholeLineSplitRects;
+	    }
+
+	    /* when done with the splitting, prepare buffer for stuffing other rects in */
+	    mfu = rfbPutMulticastHeader(cl, 
+					cl->screen->multicastWholeUpdId,
+					cl->screen->multicastPartialUpdId++,
+					0);
+	  }
+	}
+	else {                                            /* rect fits */  
+	  nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
+#ifdef MULTICAST_DEBUG
+	  rfbLog("MulticastVNC DEBUG:   did put rect into buffer(now %d), now %d in there\n", cl->screen->mcublen, nRects);
+#endif
+	}
     }
     sraRgnReleaseIterator(i); i=NULL;
 
@@ -3391,43 +3383,40 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     cl->screen->multicastWholeUpdId++;
 
    
-    if(result == TRUE) /* no error while sending */
-      {
-	/* mark this pixelformat and encoding combination as done */
-	rfbUnsetBit(cl->screen->multicastUpdPendingForPixelformat, cl->multicastPixelformatId);
-	rfbUnsetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredEncoding);
-    
-	/* empty multicastUpdateRegion if no updates are pending */
-	for(j=0; j < sizeof(cl->screen->multicastUpdPendingForPixelformat); ++j)
-	  if(cl->screen->multicastUpdPendingForPixelformat[j] != 0)
-	    {
-	      otherUpdatesPending = TRUE;
-	      break;
-	    }
-	if(j == sizeof(cl->screen->multicastUpdPendingForPixelformat)-1) /* no pf pending */
-	  for(j=0; j < sizeof(cl->screen->multicastUpdPendingForEncoding); ++j)
-	    if(cl->screen->multicastUpdPendingForEncoding[j] != 0)
-	      {
-		otherUpdatesPending = TRUE;
-		break;
-	      } 
-	if(otherUpdatesPending) {
-	  /* reset sequence numbers */
-	  cl->screen->multicastWholeUpdId = wholeUpdIdSave;
-	  cl->screen->multicastPartialUpdId = partialUpdIdSave;
-	  /* indicate that these partial updates have been saved in the ringbuffer.
-	     the regions of each partial update are the same for every 
-	     pixel-format and encoding combination! */
-	  if(cl->screen->multicastVNCdoNACK)
-	    cl->screen->multicastPartUpdRgnsSaved = TRUE;
+    if(result == TRUE) {/* no error while sending */
+      /* mark this pixelformat and encoding combination as done */
+      rfbUnsetBit(cl->screen->multicastUpdPendingForPixelformat, cl->multicastPixelformatId);
+      rfbUnsetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredEncoding);
+      
+      /* empty multicastUpdateRegion if no updates are pending */
+      for(j=0; j < sizeof(cl->screen->multicastUpdPendingForPixelformat); ++j)
+	if(cl->screen->multicastUpdPendingForPixelformat[j] != 0) {
+	  otherUpdatesPending = TRUE;
+	  break;
 	}
-	else { /* all done */
-	  sraRgnMakeEmpty(cl->screen->multicastUpdateRegion);
-	  /* whole update done, indicate that partial updates can be saved again */
-	  if(cl->screen->multicastVNCdoNACK)
-	    cl->screen->multicastPartUpdRgnsSaved = FALSE;
-	}
+      if(j == sizeof(cl->screen->multicastUpdPendingForPixelformat)-1) /* no pf pending */
+	for(j=0; j < sizeof(cl->screen->multicastUpdPendingForEncoding); ++j)
+	  if(cl->screen->multicastUpdPendingForEncoding[j] != 0) {
+	    otherUpdatesPending = TRUE;
+	    break;
+	  } 
+      if(otherUpdatesPending) {
+	/* reset sequence numbers */
+	cl->screen->multicastWholeUpdId = wholeUpdIdSave;
+	cl->screen->multicastPartialUpdId = partialUpdIdSave;
+	/* indicate that these partial updates have been saved in the ringbuffer.
+	   the regions of each partial update are the same for every 
+	   pixel-format and encoding combination! */
+	if(cl->screen->multicastVNCdoNACK)
+	  cl->screen->multicastPartUpdRgnsSaved = TRUE;
       }
+      else { /* all done */
+	sraRgnMakeEmpty(cl->screen->multicastUpdateRegion);
+	/* whole update done, indicate that partial updates can be saved again */
+	if(cl->screen->multicastVNCdoNACK)
+	  cl->screen->multicastPartUpdRgnsSaved = FALSE;
+      }
+    }
 
     UNLOCK(cl->screen->multicastUpdateMutex);
 
