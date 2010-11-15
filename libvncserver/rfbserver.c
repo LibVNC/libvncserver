@@ -3253,7 +3253,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 
 #ifdef MULTICAST_DEBUG
 	    if(cl->screen->mcublen)
-	      rfbLog("MulticastVNC DEBUG:   buffer(now %d) would overflow)\n", cl->screen->mcublen);
+	      rfbLog("MulticastVNC DEBUG:   buffer(now %d) would overflow, flushing\n", cl->screen->mcublen);
 #endif
 
 	    if(!rfbSendMulticastUpdateBuf(cl->screen))  /* flush buffer */
@@ -3274,42 +3274,88 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	      }
 	    else                                        /* rect too large for buffer, must be split up */
 	      {
-		int offs=0;
-		int bytesPerLine = w * (cl->format.bitsPerPixel/8);
-		int linesPerUpd = ((MULTICAST_UPDATE_BUF_SIZE 
-				    - sz_rfbMulticastFramebufferUpdateMsg)
-				   - sz_rfbFramebufferUpdateRectHeader) / bytesPerLine;
-		int nSplitRects = h/linesPerUpd;
+		const int bytesPerPixel = cl->format.bitsPerPixel/8;
+		const int bytesPerLine = w * bytesPerPixel;
+		const int payload = (MULTICAST_UPDATE_BUF_SIZE - sz_rfbMulticastFramebufferUpdateMsg) - sz_rfbFramebufferUpdateRectHeader;
+		const int linesPerUpd =  payload / bytesPerLine;
+		int wholeLineSplitRects = 0;
+		int lineOffset=0;
+		
+		if(linesPerUpd > 0) {
+		  wholeLineSplitRects  = h/linesPerUpd;
+		  if(wholeLineSplitRects*linesPerUpd < h)   /* there is a remainder */
+		    ++wholeLineSplitRects;
+		}
+		else { /* linesPerUpd == 0, a whole line does not fit into buffer, 
+			  i.e. lines have to be split up into sublines */
+		  wholeLineSplitRects = h;
+		}	
 
-		if(nSplitRects*linesPerUpd < h)         /* there is a remainder */
-		  ++nSplitRects;
-	
-		while(nSplitRects)
+		while(wholeLineSplitRects) 
 		  {
-		    mfu = rfbPutMulticastHeader(cl, 
-						cl->screen->multicastWholeUpdId,
-						cl->screen->multicastPartialUpdId++,
-						0);
+		    if(linesPerUpd > 0) { /* send one or more whole lines in an update */
+		      mfu = rfbPutMulticastHeader(cl, 
+						  cl->screen->multicastWholeUpdId,
+						  cl->screen->multicastPartialUpdId++,
+						  0);
 		   
-		    if(offs*linesPerUpd + linesPerUpd <= h)
-			nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+offs*linesPerUpd, w, linesPerUpd);
-		    else
-			nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+offs*linesPerUpd, w, h - offs*linesPerUpd);
+		      if(lineOffset*linesPerUpd + linesPerUpd <= h)
+			nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+lineOffset*linesPerUpd, w, linesPerUpd);
+		      else
+			nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+lineOffset*linesPerUpd, w, h - lineOffset*linesPerUpd);
 
-		    mfu->nRects = Swap16IfLE(nRects);
-
+		      mfu->nRects = Swap16IfLE(nRects);
 #ifdef MULTICAST_DEBUG
-		    rfbLog("MulticastVNC DEBUG:   rect too large, splitted!\n");
+		      rfbLog("MulticastVNC DEBUG:   original rect too large, was split into line(s)!\n");
 #endif
-		    if(!rfbSendMulticastUpdateBuf(cl->screen))
-		      {
-			result = FALSE;
-			break;
-		      }
-		    nRects = 0;
-		    ++offs;
-		    --nSplitRects;
+		      if(!rfbSendMulticastUpdateBuf(cl->screen))
+			{
+			  result = FALSE;
+			  break;
+			}
+		      nRects = 0;
+		    
+		    }
+		    else { /* we have to split a whole line into several updates */
+		      const int pixelsPerUpd = payload / bytesPerPixel;
+		      int subLineOffset=0;
+		      int subLineSplitRects  = w/pixelsPerUpd;
+		      if(subLineSplitRects*pixelsPerUpd < w)   /* there is a remainder */
+			++subLineSplitRects;
+		      
+		      while(subLineSplitRects)
+			{
+			  mfu = rfbPutMulticastHeader(cl, 
+						      cl->screen->multicastWholeUpdId,
+						      cl->screen->multicastPartialUpdId++,
+						      0);
+			  
+			  if(subLineOffset*pixelsPerUpd + pixelsPerUpd <= w)
+			    nRects += rfbPutMulticastRectEncodingPreferred(cl, x+subLineOffset*pixelsPerUpd, y+lineOffset, pixelsPerUpd, 1);
+			  else
+			    nRects += rfbPutMulticastRectEncodingPreferred(cl, x+subLineOffset*pixelsPerUpd, y+lineOffset, w - subLineOffset*pixelsPerUpd, 1);
+			  
+			  mfu->nRects = Swap16IfLE(nRects);
+#ifdef MULTICAST_DEBUG
+			  rfbLog("MulticastVNC DEBUG:   original rect too large, was split into subline(s)!\n");
+#endif
+			  if(!rfbSendMulticastUpdateBuf(cl->screen))
+			    {
+			      result = FALSE;
+			      break;
+			    }
+			  nRects = 0;
+			  
+			  ++subLineOffset; 
+			  --subLineSplitRects;
+			}
+
+		    }
+		    
+		    ++lineOffset; 
+		    --wholeLineSplitRects;
 		  }
+
 		/* when done with the splitting, prepare buffer for stuffing other rects in */
 		mfu = rfbPutMulticastHeader(cl, 
 					    cl->screen->multicastWholeUpdId,
@@ -3321,7 +3367,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	  {
 	    nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
 #ifdef MULTICAST_DEBUG
-	    rfbLog("MulticastVNC DEBUG:   put rect into buffer(now %d), now %d in there\n", cl->screen->mcublen, nRects);
+	    rfbLog("MulticastVNC DEBUG:   did put rect into buffer(now %d), now %d in there\n", cl->screen->mcublen, nRects);
 #endif
 	  }
     }
@@ -3489,7 +3535,8 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
   cl->screen->mcublen = sz_rfbMulticastFramebufferUpdateMsg;
 
 #ifdef MULTICAST_DEBUG
-  rfbLog("MulticastVNC DEBUG:   put header into buffer(now %d)\n", cl->screen->mcublen);
+  rfbLog("MulticastVNC DEBUG:   put header (whole %d, partial %d, nRects %d)  into buffer(now %d)\n", 
+	 idWholeUpd, idPartialUpd, nRects, cl->screen->mcublen);
 #endif
 
   return mfu;
@@ -3512,6 +3559,11 @@ rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h
     sraRgnOr(lastone->region, tmp);
     sraRgnDestroy(tmp);
   }
+
+#ifdef MULTICAST_DEBUG
+  rfbLog("MulticastVNC DEBUG:   about to put rect (%d, %d, %d, %d)  into buffer(now %d)\n", 
+	 x, y, w, h, cl->screen->mcublen);
+#endif
 
   switch (cl->preferredEncoding) {
   /*
@@ -3827,7 +3879,7 @@ rfbSendUpdateBuf(rfbClientPtr cl)
 
 
 /*
- * Send the contents of cl->updateBuf via Multicast.
+ * Send the contents of cl->multicastUpdateBuf via Multicast.
  * Returns 1 if successful, -1 if not (errno should be set).
  */
 
@@ -3835,7 +3887,7 @@ rfbBool
 rfbSendMulticastUpdateBuf(rfbScreenInfoPtr rfbScreen)
 {
 #ifdef MULTICAST_DEBUG
-  if(rfbScreen->mcublen)
+  if(rfbScreen->mcublen) 
     {
       rfbLog("MulticastVNC DEBUG:     about to send message %d bytes big\n", rfbScreen->mcublen);
       rfbMulticastFramebufferUpdateMsg *mfu =
