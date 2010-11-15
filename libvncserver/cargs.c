@@ -34,7 +34,7 @@ rfbUsage(void)
                                                              "(default 40)\n");
     fprintf(stderr, "-deferptrupdate time   time in ms to defer pointer updates"
                                                            " (default none)\n");
-    fprintf(stderr, "-defermcupdate time    time in ms to defer multicast updates"
+    fprintf(stderr, "-defermcastupdate time time in ms to defer multicast updates"
                                                            " (default 30)\n");
     fprintf(stderr, "-desktop name          VNC desktop name (default \"LibVNCServer\")\n");
     fprintf(stderr, "-alwaysshared          always treat new clients as shared\n");
@@ -129,7 +129,7 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		return FALSE;
 	    }
             rfbScreen->deferPtrUpdateTime = atoi(argv[++i]);
-	} else if (strcmp(argv[i], "-defermcupdate") == 0) {  /* -defermcupdate milliseconds */
+	} else if (strcmp(argv[i], "-defermcastupdate") == 0) {  /* -defermcastupdate milliseconds */
             if (i + 1 >= *argc) {
 		rfbUsage();
 		return FALSE;
