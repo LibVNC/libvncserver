@@ -3371,7 +3371,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
        so that clients don't assume the connection is dead */
 #ifdef MULTICAST_DEBUG
     if(sraRgnEmpty(updateRegion))
-      rfbLog("MulticastVNC DEBUG:   nothing changed, just sending heartbeat msginto buffer(now %d)\n", cl->screen->mcublen);
+      rfbLog("MulticastVNC DEBUG:   nothing changed, just sending empty heartbeat msg\n");
 #endif
     if(mfu)
       mfu->nRects = Swap16IfLE(nRects);
