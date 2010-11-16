@@ -83,7 +83,6 @@ static int exit_flag = 0;
 static int exit_sig = 0;
 
 static void clean_icon_mode(void);
-static void clean_xi2_devices(void);
 static int Xerror(Display *d, XErrorEvent *error);
 static int XIOerr(Display *d);
 static void crash_shell_help(void);
@@ -145,32 +144,6 @@ static void clean_icon_mode(void) {
 	}
 }
 
-static void clean_xi2_devices(void) 
-{
-  if(use_multipointer) {
-    /* make sure we're not interrupted while removing created XI2 MDs */
-    signal(SIGHUP,  SIG_IGN);
-    signal(SIGINT,  SIG_IGN);
-    signal(SIGQUIT, SIG_IGN);
-    signal(SIGABRT, SIG_IGN);
-    signal(SIGTERM, SIG_IGN);
-    signal(SIGBUS,  SIG_IGN);
-    signal(SIGSEGV, SIG_IGN);
-    signal(SIGFPE,  SIG_IGN);
-    rfbClientIteratorPtr iter = rfbGetClientIterator(screen);
-    rfbClientPtr cl;
-
-    while((cl = rfbClientIteratorNext(iter))) {
-      ClientData *cd = (ClientData *) cl->clientData;
-      if(removeMD(dpy, cd->ptr_id))
-	rfbLog("cleanup: removed XInput2 MD for client %s.\n", cl->host);
-    }
-    rfbReleaseClientIterator(iter);
-
-    /* and restore signal handlers */
-    initialize_signals();
-  }
-}
 
 /*
  * Normal exiting
@@ -229,7 +202,16 @@ void clean_up_exit(int ret) {
 	delete_added_keycodes(0);
 
 	/* remove all created XInput2 devices */
-	clean_xi2_devices();
+	if(use_multipointer) {
+	  rfbClientIteratorPtr iter = rfbGetClientIterator(screen);
+	  rfbClientPtr cl;
+	  while((cl = rfbClientIteratorNext(iter))) {
+	    ClientData *cd = (ClientData *) cl->clientData;
+	    if(removeMD(dpy, cd->ptr_id))
+	      rfbLog("cleanup: removed XInput2 MD for client %s.\n", cl->host);
+	  }
+	  rfbReleaseClientIterator(iter);
+	}
 
 	if (clear_mods == 1) {
 		clear_modifiers(0);
@@ -550,17 +532,15 @@ static void interrupted (int sig) {
 	if (exit_flag) {
 		fprintf(stderr, "extra[%d] signal: %d\n", exit_flag, sig);
 		exit_flag++;
-		if (use_threads) {
-			usleep2(250 * 1000);
-		} else if (exit_flag <= 2) {
-			return;
-		}
+		if (use_threads)
+		  usleep2(250 * 1000);
+		if (exit_flag <= 2)
+		  return;
+
 		if (rm_flagfile) {
 			unlink(rm_flagfile);
 			rm_flagfile = NULL;
 		}
-		/* remove these on hard exit as well */
-		clean_xi2_devices();
 		exit(4);
 	}
 	exit_flag++;
@@ -572,7 +552,7 @@ static void interrupted (int sig) {
 	} else {
 		fprintf(stderr, "caught signal: %d\n", sig);
 	}
-	if (sig == SIGINT) {
+	if (sig == SIGINT || sig == SIGTERM) {
 		shut_down = 1;
 		return;
 	}
@@ -600,9 +580,6 @@ static void interrupted (int sig) {
 
 	/* X keyboard cleanups */
 	delete_added_keycodes(0);
-
-	/* remove all created XInput2 devices */
-	clean_xi2_devices();
 
 	if (clear_mods == 1) {
 		clear_modifiers(0);
