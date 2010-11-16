@@ -1,3 +1,11 @@
+- rework rfbProcessEvents: code duplication
+
+- threaded case
+
+- some empty updates are sent in split rect case
+
+- more heartbeat messages if nothing changed?
+
 - add autoconf detection of used functions.
 
 - implement server throttling
