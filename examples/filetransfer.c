@@ -1,3 +1,7 @@
+/**
+ * @example filetransfer.c
+ */
+
 #include <rfb/rfb.h>
 
 int main(int argc,char** argv)

@@ -1,5 +1,5 @@
-/*
- * 
+/**
+ * @example example.c
  * This is an example of how to use libvncserver.
  * 
  * libvncserver example
