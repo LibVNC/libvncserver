@@ -3521,7 +3521,7 @@ rfbSendMulticastRepairUpdate(rfbClientPtr cl)
  * Puts the multicast message header into the multicast update buffer.
  */
 
-rfbMulticastFramebufferUpdateMsg *
+static rfbMulticastFramebufferUpdateMsg *
 rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUpd, uint16_t nRects)
 {
   if(cl->screen->multicastVNCdoNACK && !cl->screen->multicastPartUpdRgnsSaved) {
@@ -3560,7 +3560,7 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
  * encoded in client's preferred encoding. 
  */
 
-int 
+static int
 rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h)
 {
   if(cl->screen->multicastVNCdoNACK && !cl->screen->multicastPartUpdRgnsSaved) {
