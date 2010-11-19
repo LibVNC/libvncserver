@@ -746,7 +746,7 @@ extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
 extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
 extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
 extern rfbBool rfbSendMulticastFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
-  extern rfbBool rfbSendMulticastPartialUpdate(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUpd, sraRegionPtr region, rfbBool save);
+extern rfbBool rfbSendMulticastRepairUpdate(rfbClientPtr cl);
 extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern int rfbPutMulticastRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);

@@ -441,6 +441,58 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
    sraRgnDestroy(region);
 }
 
+
+
+
+static void doMcast(rfbClientPtr cl)
+{
+  /* Sends cursor shape, cursor position, newFBsize and copyRect updates
+     if these updates are pending to be sent via unicast.
+   */
+  rfbBool haveAuxUpd = FALSE;
+
+  LOCK(cl->updateMutex);
+
+  if(((cl->enableCursorShapeUpdates && cl->cursorWasChanged) ||
+      (cl->useNewFBSize && cl->newFBSizePending) ||
+      (cl->enableCursorPosUpdates && cl->cursorWasMoved) ||
+      !sraRgnEmpty(cl->copyRegion))) {
+
+    haveAuxUpd = TRUE;
+
+    /* Do CopyRect only if  _every_ multicast client supports it.
+       We do this by preparing modifiedRegion and requestedRegion
+       so rfbSendFramebufferUpdate only sends CopyRect.
+    */
+    LOCK(cl->screen->multicastUpdateMutex);
+    if(cl->screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion)) {
+      sraRgnMakeEmpty(cl->modifiedRegion);
+      sraRegionPtr tmp = sraRgnCreateRect(0, 0, cl->screen->width, cl->screen->height);
+      sraRgnOr(cl->requestedRegion, tmp);
+      sraRgnDestroy(tmp);
+      /* subtract copyRegion from the region to be sent via multicast */
+      sraRgnSubtract(cl->screen->multicastUpdateRegion, cl->copyRegion);
+    }
+    UNLOCK(cl->screen->multicastUpdateMutex);
+  }
+
+  UNLOCK(cl->updateMutex);
+
+  if(haveAuxUpd) {
+    /* if requestedRegion is empty, this only sends auxiliary data */
+    LOCK(cl->sendMutex);
+    rfbSendFramebufferUpdate(cl, cl->copyRegion);
+    UNLOCK(cl->sendMutex);
+  }
+
+  /*
+    and the real multicast stuff
+  */
+  rfbSendMulticastRepairUpdate(cl);
+  rfbSendMulticastFramebufferUpdate(cl, cl->screen->multicastUpdateRegion);
+}
+
+
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 #include <unistd.h>
 
@@ -838,7 +890,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
    screen->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE);
    screen->multicastPartUpdRgnsSaved = FALSE;
-   screen->multicastUseCopyRect = TRUE;  
+   screen->multicastUseCopyRect = TRUE;
 
    screen->maxFd=0;
    screen->listenSock=-1;
@@ -960,11 +1012,15 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
   screen->bitsPerPixel = screen->depth = 8*bytesPerPixel;
   screen->paddedWidthInBytes = width*bytesPerPixel;
 
+  LOCK(screen->multicastUpdateMutex);
+
   sraRgnDestroy(screen->multicastUpdateRegion);  
   screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
 
   partUpdRgnBufDestroy(screen->multicastPartUpdRgnBuf);
   screen->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE);
+
+  UNLOCK(screen->multicastUpdateMutex);
 
   rfbInitServerFormat(screen, bitsPerSample);
 
@@ -1143,74 +1199,9 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 
     if (screen->multicastVNC && screen->multicastSock >= 0 && 
 	cl->useMulticastVNC && cl->sock >= 0 && !cl->onHold) {
-      /* image data update pending for this (pixelformat,encoding) combination */
-      rfbBool mcUpdPending = 
-	(screen->multicastUpdPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] &
-	 (1<<(cl->multicastPixelformatId % 8))) &&
-	(screen->multicastUpdPendingForEncoding[((cl->preferredEncoding & 0xFF)/8)] &
-	 (1<<(cl->preferredEncoding % 8)));
-
-      /* some partial updates were NACKed for this (pixelformat,encoding) combination */
-      rfbBool mcRepairPending = 
-	(screen->multicastRepairPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] &
-	 (1<<(cl->multicastPixelformatId % 8))) &&
-	(screen->multicastRepairPendingForEncoding[((cl->preferredEncoding & 0xFF)/8)] &
-	 (1<<(cl->preferredEncoding % 8)));
-
-      /* update pending for non-image data to be sent via unicast */
-      rfbBool auxUpdPending =
-	((cl->enableCursorShapeUpdates && cl->cursorWasChanged) ||       
-	 (cl->useNewFBSize && cl->newFBSizePending) ||                     
-	 (cl->enableCursorPosUpdates && cl->cursorWasMoved) ||
-	 !sraRgnEmpty(cl->copyRegion)); 
-
       result=TRUE;
-
       if(screen->multicastDeferUpdateTime == 0) {
-
-	if(auxUpdPending) {
-	  /* Do CopyRect only if  _every_ multicast client supports it.
-	     We do this by preparing modifiedRegion and requestedRegion 
-	     so rfbSendFramebufferUpdate only sends CopyRect. 
-	  */
-	  if(screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion)) {
-	    LOCK(cl->updateMutex);
-	    sraRgnMakeEmpty(cl->modifiedRegion);
-	    sraRegionPtr tmp = sraRgnCreateRect(0, 0, screen->width, screen->height);
-	    sraRgnOr(cl->requestedRegion, tmp);
-	    UNLOCK(cl->updateMutex);
-	    sraRgnDestroy(tmp);
-	    /* subtract copyRegion from the region to be sent via multicast */
-	    LOCK(screen->multicastUpdateMutex);
-	    sraRgnSubtract(screen->multicastUpdateRegion, cl->copyRegion);
-	    UNLOCK(screen->multicastUpdateMutex);
-	  }
-	  /* if requestedRegion is empty, this only sends auxiliary data */
-	  rfbSendFramebufferUpdate(cl, cl->copyRegion); 
-	}
-
-	if(mcRepairPending) {
-	  partUpdRgnBuf* buf = (partUpdRgnBuf*)screen->multicastPartUpdRgnBuf;
-	  size_t i, count = partUpdRgnBufCount(buf);
-	  for(i = 0; i < count; ++i) {
-	    partialUpdRegion* pur = partUpdRgnBufAt(buf, i);
-	    if(pur->pending) {
-#ifdef MULTICAST_DEBUG
-	      rfbLog("MulticastVNC DEBUG: whole %d, partial %d was NACKed, resending now\n",
-		     pur->idWhole,pur->idPartial);
-#endif
-	      rfbSendMulticastPartialUpdate(cl, pur->idWhole, pur->idPartial, pur->region, FALSE);
-	    }
-	      
-	  }
-	  /* mark this pixelformat and encoding combination as done */
-	  rfbUnsetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
-	  rfbUnsetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredEncoding);
-	}
-	
-	if(mcUpdPending)
-	  rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
-
+	doMcast(cl);
       } else if(cl->startMulticastDeferring.tv_usec == 0) {
 	gettimeofday(&cl->startMulticastDeferring,NULL);
 	if(cl->startMulticastDeferring.tv_usec == 0)
@@ -1222,49 +1213,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	       +(tv.tv_usec-cl->startMulticastDeferring.tv_usec)/1000)
 	   > screen->multicastDeferUpdateTime) {
 	  cl->startMulticastDeferring.tv_usec = 0;
-
-	  if(auxUpdPending) {
-	    /* Do CopyRect only if  _every_ multicast client supports it.
-	       We do this by preparing modifiedRegion and requestedRegion 
-	       so rfbSendFramebufferUpdate only sends CopyRect. 
-	    */
-	    if(screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion)) {
-	      LOCK(cl->updateMutex);
-	      sraRgnMakeEmpty(cl->modifiedRegion);
-	      sraRegionPtr tmp = sraRgnCreateRect(0, 0, screen->width, screen->height);
-	      sraRgnOr(cl->requestedRegion, tmp);
-	      UNLOCK(cl->updateMutex);
-	      sraRgnDestroy(tmp);
-	      /* subtract copyRegion from the region to be sent via multicast */
-	      LOCK(screen->multicastUpdateMutex);
-	      sraRgnSubtract(screen->multicastUpdateRegion, cl->copyRegion);
-	      UNLOCK(screen->multicastUpdateMutex);
-	    }
-	    /* if requestedRegion is empty, this only sends auxiliary data */
-	    rfbSendFramebufferUpdate(cl, cl->copyRegion); 
-	  }
-
-	  if(mcRepairPending) {
-	    partUpdRgnBuf* buf = (partUpdRgnBuf*)screen->multicastPartUpdRgnBuf;
-	    size_t i, count = partUpdRgnBufCount(buf);
-	    for(i = 0; i < count; ++i) {
-	      partialUpdRegion* pur = partUpdRgnBufAt(buf, i);
-	      if(pur->pending) {
-#ifdef MULTICAST_DEBUG
-		rfbLog("MulticastVNC DEBUG: whole %d, partial %d was NACKed, resending now\n",
-		       pur->idWhole,pur->idPartial);
-#endif		
-		rfbSendMulticastPartialUpdate(cl, pur->idWhole, pur->idPartial, pur->region, FALSE);
-		pur->pending = FALSE;
-	      }
-	    }
-	    /* mark this pixelformat and encoding combination as done */
-	    rfbUnsetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
-	    rfbUnsetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredEncoding);
-	  }
-	    
-	  if(mcUpdPending)
-	    rfbSendMulticastFramebufferUpdate(cl, screen->multicastUpdateRegion);
+	  doMcast(cl);
 	}
       }
     }
@@ -1327,3 +1276,5 @@ void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground
   while(rfbIsActive(screen))
     rfbProcessEvents(screen,usec);
 }
+
+
