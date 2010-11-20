@@ -502,6 +502,7 @@ clientOutput(void *data)
     rfbClientPtr cl = (rfbClientPtr)data;
     rfbBool haveUpdate;
     sraRegion* updateRegion;
+    struct timeval tv;
 
     while (1) {
         haveUpdate = false;
@@ -518,24 +519,43 @@ clientOutput(void *data)
 
 		LOCK(cl->updateMutex);
 
-		if (sraRgnEmpty(cl->requestedRegion)) {
-			; /* always require a FB Update Request (otherwise can crash.) */
-		} else {
-			haveUpdate = FB_UPDATE_PENDING(cl);
-			if(!haveUpdate) {
-				updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
-				haveUpdate   = sraRgnAnd(updateRegion,cl->requestedRegion);
-				sraRgnDestroy(updateRegion);
-			}
+		haveUpdate = FB_UPDATE_PENDING(cl);
+		if(!haveUpdate) {
+		        updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
+		        haveUpdate   = sraRgnAnd(updateRegion,cl->requestedRegion);
+		        sraRgnDestroy(updateRegion);
 		}
-
 		if (!haveUpdate) {
+		        /* multicastVNC sends heartbeats when nothing changed,
+			   updateCond is triggered by a MulticastFramebufferUpdateRequest */
+		        haveUpdate = cl->screen->multicastVNC;
 			WAIT(cl->updateCond, cl->updateMutex);
 		}
 
 		UNLOCK(cl->updateMutex);
         }
         
+	/* do the multicast stuff if enabled */
+	if (cl->screen->multicastVNC && cl->screen->multicastSock >= 0 &&
+	    cl->useMulticastVNC && cl->sock >= 0 && !cl->onHold) {
+	  if(cl->screen->multicastDeferUpdateTime == 0) {
+	    doMcast(cl);
+	  } else if(cl->startMulticastDeferring.tv_usec == 0) {
+	    gettimeofday(&cl->startMulticastDeferring,NULL);
+	    if(cl->startMulticastDeferring.tv_usec == 0)
+	      cl->startMulticastDeferring.tv_usec++;
+	  } else {
+	    gettimeofday(&tv,NULL);
+	    if(tv.tv_sec < cl->startMulticastDeferring.tv_sec /* at midnight */
+	       || ((tv.tv_sec-cl->startMulticastDeferring.tv_sec)*1000
+		   +(tv.tv_usec-cl->startMulticastDeferring.tv_usec)/1000)
+	       > cl->screen->multicastDeferUpdateTime) {
+	      cl->startMulticastDeferring.tv_usec = 0;
+	      doMcast(cl);
+	    }
+	  }
+	}
+
         /* OK, now, to save bandwidth, wait a little while for more
            updates to come along. */
         usleep(cl->screen->deferUpdateTime * 1000);
@@ -548,12 +568,14 @@ clientOutput(void *data)
 	updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
         UNLOCK(cl->updateMutex);
 
-        /* Now actually send the update. */
-	rfbIncrClientRef(cl);
-        LOCK(cl->sendMutex);
-        rfbSendFramebufferUpdate(cl, updateRegion);
-        UNLOCK(cl->sendMutex);
-	rfbDecrClientRef(cl);
+	if (cl->sock >= 0 && !cl->onHold && FB_UPDATE_PENDING(cl) && !sraRgnEmpty(cl->requestedRegion)) {
+	  /* Now actually send the update. */
+	  rfbIncrClientRef(cl);
+	  LOCK(cl->sendMutex);
+	  rfbSendFramebufferUpdate(cl, updateRegion);
+	  UNLOCK(cl->sendMutex);
+	  rfbDecrClientRef(cl);
+	}
 
 	sraRgnDestroy(updateRegion);
     }
@@ -1197,6 +1219,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
       }
     }
 
+    /* do the multicast stuff if enabled */
     if (screen->multicastVNC && screen->multicastSock >= 0 && 
 	cl->useMulticastVNC && cl->sock >= 0 && !cl->onHold) {
       result=TRUE;
