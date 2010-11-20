@@ -3193,16 +3193,20 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     uint16_t nRects = 0;
     rfbBool otherUpdatesPending = FALSE;
     rfbBool result = TRUE;
-    uint32_t partialUpdIdSave = cl->screen->multicastPartialUpdId;
-    uint16_t wholeUpdIdSave = cl->screen->multicastWholeUpdId;
+    uint32_t partialUpdIdSave;
+    uint16_t wholeUpdIdSave;
 
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
 
+    LOCK(cl->screen->multicastUpdateMutex);
+
+    partialUpdIdSave = cl->screen->multicastPartialUpdId;
+    wholeUpdIdSave = cl->screen->multicastWholeUpdId;
+
     updateRegion = sraRgnCreateRgn(givenUpdateRegion);
     sraRgnOr(updateRegion, cl->screen->multicastUpdateRegion);
 
-    LOCK(cl->screen->multicastUpdateMutex);
 
     /* bail out if no one requested an update this (pixelformat,encoding) combination.
        note that we DO send an empty 'heartbeat' update if updateRegion is empty... */
