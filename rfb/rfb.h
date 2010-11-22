@@ -378,9 +378,10 @@ typedef struct _rfbScreenInfo
     SOCKET  multicastSock;
     struct sockaddr_storage multicastSockAddr;
     /*
-     * the multicast update buffer _must_ fit into a UDP packet, but even better into an MTU.
+     * the multicast update buffer _must_ fit into a UDP packet, but better be <= the MSS of the link.
+       so for ethernet, this is (MTU=1500 - IPv6-header=40 - UDP-header=8) = 1452
      */
-#define MULTICAST_UPDATE_BUF_SIZE 1460
+#define MULTICAST_UPDATE_BUF_SIZE 1452
     char multicastUpdateBuf[MULTICAST_UPDATE_BUF_SIZE];
     int  mcublen;
     uint16_t multicastWholeUpdId;
@@ -401,6 +402,10 @@ typedef struct _rfbScreenInfo
     rfbBool multicastPartUpdRgnsSaved; /* flag indicating that partial updates have been saved for a whole one */
     char multicastRepairPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
     char multicastRepairPendingForEncoding[32]; /* since non-pseudo encodings are all < 256 */
+    /* multicast send rate limiting stuff */
+    struct timeval lastMulticastSendCreditRefill;
+    uint32_t multicastSendCredit;
+    uint32_t multicastSendRate; /* bytes/s */
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 

@@ -620,27 +620,51 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 {
   int sock = rfbScreen->multicastSock;
   int n;
+  struct timeval now;
+  unsigned long elapsed_ms;
 
   if(sock < 0)
     return -1;
 
-#undef DEBUG_WRITE_EXACT
-#ifdef DEBUG_WRITE_EXACT
-  rfbLog("WriteExactMulticast %d bytes\n",len);
-  for(n=0;n<len;n++)
-    fprintf(stderr,"%02x ",(unsigned char)buf[n]);
-  fprintf(stderr,"\n");
-#endif
-
   LOCK(rfbScreen->multicastOutputMutex);
   while(len > 0) 
     {
+#ifdef MULTICAST_DEBUG
+      rfbLog("MulticastVNC DEBUG: wants to write %d, send credit %u\n", len, rfbScreen->multicastSendCredit);
+#endif
+      gettimeofday(&now,NULL);
+      if(now.tv_sec < rfbScreen->lastMulticastSendCreditRefill.tv_sec) /* at midnight on win32 */
+	now.tv_sec = rfbScreen->lastMulticastSendCreditRefill.tv_sec;
+
+      elapsed_ms = (now.tv_sec - rfbScreen->lastMulticastSendCreditRefill.tv_sec)*1000 + (now.tv_usec - rfbScreen->lastMulticastSendCreditRefill.tv_usec)/1000;
+
+      /* refill send credit */
+      rfbScreen->multicastSendCredit += (rfbScreen->multicastSendRate/1000) * elapsed_ms;
+      if(rfbScreen->multicastSendCredit > rfbScreen->multicastSendRate)
+	rfbScreen->multicastSendCredit = rfbScreen->multicastSendRate;
+
+      rfbScreen->lastMulticastSendCreditRefill = now;
+#ifdef MULTICAST_DEBUG
+      rfbLog("MulticastVNC DEBUG: send credit increased to %u after %lu ms\n", rfbScreen->multicastSendCredit, elapsed_ms);
+#endif
+
+      /* when the send credit is exceeded wait a short while and then try again */
+      if(len > rfbScreen->multicastSendCredit) {
+#ifndef WIN32
+        usleep (1000);
+#else
+	Sleep (1);
+#endif
+	continue;
+      }
+
       n = write(sock, buf, len);
       
       if(n > 0) 
 	{
 	  buf += n;
 	  len -= n;
+	  rfbScreen->multicastSendCredit -= n;
 	} 
       else 
 	if(n == 0)
