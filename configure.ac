@@ -714,6 +714,26 @@ if test "x$with_ipv6" != "xno"; then
                    ]))
 fi
 
+# MulticastVNC
+AH_TEMPLATE(WITH_MULTICASTVNC, [Enable MulticastVNC support])
+AC_ARG_WITH(multicastvnc,
+[  --without-multicastvnc          disable MulticastVNC support],,)
+if test "x$with_multicastvnc" != "xno"; then
+   # check if IPv6 check succeeded
+   if test "x$ac_cv_func_getaddrinfo" != xyes; then
+	AC_MSG_ERROR([
+==========================================================================
+*** IPv6 is required for MulticastVNC support ***
+
+If you want to build libvncserver/libvncclient without MulticastVNC
+support, specify the --without-multicastvnc configure option.
+==========================================================================
+])
+   else
+       AC_DEFINE(WITH_MULTICASTVNC)
+   fi
+fi
+
 
 
 # Checks for header files.
