@@ -731,6 +731,8 @@ support, specify the --without-multicastvnc configure option.
 ])
    else
        AC_DEFINE(WITH_MULTICASTVNC)
+       # this disables some warnings
+       CFLAGS="$CFLAGS -fno-strict-aliasing "
    fi
 fi
 
