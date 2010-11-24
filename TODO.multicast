@@ -17,7 +17,7 @@
      running on same host...) on server side, address and port
      transmitted to client, then a connect() at client side.
 
-- Implement other encodings than raw.
+- Implement other encodings than raw and ultra.
 
 - As there are many different ways of computing lost packet stats 
   (take a sample every time interval or every n packets or compute

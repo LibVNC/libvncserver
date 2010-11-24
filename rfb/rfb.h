@@ -655,6 +655,7 @@ typedef struct _rfbClientRec {
     rfbBool  enableMulticastVNC;      /* client supports multicast FramebufferUpdates messages */
     rfbBool  useMulticastVNC;         /* framebuffer updates should be sent via multicast socket*/
     uint16_t multicastPixelformatId;  /* identifier assigned to client's pixelformat */
+    int preferredMulticastEncoding;   /* client's preferred encoding for multicast */
     struct timeval startMulticastDeferring; /* this per-client tv is actually used per every combination
 					       of pixelformat and encoding, see main.c, each client is a
 					       representative of the (pixelformat, encoding) class it 
@@ -754,6 +755,7 @@ extern rfbBool rfbSendMulticastFramebufferUpdate(rfbClientPtr cl, sraRegionPtr u
 extern rfbBool rfbSendMulticastRepairUpdate(rfbClientPtr cl);
 extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern int rfbPutMulticastRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
+extern int rfbPutMulticastRectEncodingUltra(rfbClientPtr cl, int x,int y,int w,int h);
 extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);
 extern rfbBool rfbSendMulticastUpdateBuf(rfbScreenInfoPtr rfbScreen);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);

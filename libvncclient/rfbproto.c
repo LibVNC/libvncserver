@@ -220,9 +220,9 @@ static rfbBool HandleCoRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile32(rfbClient* client, int rx, int ry, int rw, int rh);
-static rfbBool HandleUltra8(rfbClient* client, int rx, int ry, int rw, int rh);
-static rfbBool HandleUltra16(rfbClient* client, int rx, int ry, int rw, int rh);
-static rfbBool HandleUltra32(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltra8(rfbClient* client, rfbBool multicast, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltra16(rfbClient* client, rfbBool multicast, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltra32(rfbClient* client, rfbBool multicast, int rx, int ry, int rw, int rh);
 static rfbBool HandleUltraZip8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleUltraZip16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleUltraZip32(rfbClient* client, int rx, int ry, int rw, int rh);
@@ -1668,6 +1668,9 @@ HandleRFBServerMessage(rfbClient* client)
 		  rect.r.w = rfbClientSwap16IfLE(rect.r.w);
 		  rect.r.h = rfbClientSwap16IfLE(rect.r.h);
 
+#ifdef MULTICAST_DEBUG
+		  rfbClientLog("MulticastVNC DEBUG: got rect (%d, %d, %d, %d)\n", rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+#endif
 		  client->SoftCursorLockArea(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
       
 		  switch (rect.encoding) 
@@ -1694,6 +1697,25 @@ HandleRFBServerMessage(rfbClient* client)
 			}
 		      }
 		      break;
+
+		    case rfbEncodingUltra:
+		      {
+			switch (client->format.bitsPerPixel) {
+			case 8:
+			  if (!HandleUltra8(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+			    return FALSE;
+			  break;
+			case 16:
+			  if (!HandleUltra16(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+			    return FALSE;
+			  break;
+			case 32:
+			  if (!HandleUltra32(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+			    return FALSE;
+			  break;
+			}
+			break;
+		      }
    
 		    default:
 		      {
@@ -2088,15 +2110,15 @@ HandleRFBServerMessage(rfbClient* client)
       {
         switch (client->format.bitsPerPixel) {
         case 8:
-          if (!HandleUltra8(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+          if (!HandleUltra8(client, FALSE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
             return FALSE;
           break;
         case 16:
-          if (!HandleUltra16(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+          if (!HandleUltra16(client, FALSE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
             return FALSE;
           break;
         case 32:
-          if (!HandleUltra32(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+          if (!HandleUltra32(client, FALSE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
             return FALSE;
           break;
         }

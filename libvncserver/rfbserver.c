@@ -334,6 +334,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->readyForSetColourMapEntries = FALSE;
       cl->useCopyRect = FALSE;
       cl->preferredEncoding = -1;
+      cl->preferredMulticastEncoding = -1;
       cl->correMaxWidth = 48;
       cl->correMaxHeight = 48;
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -1916,6 +1917,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     int i;
     uint32_t enc=0;
     uint32_t lastPreferredEncoding = -1;
+    uint32_t lastPreferredMulticastEncoding = -1;
     char encBuf[64];
     char encBuf2[64];
 
@@ -2001,9 +2003,12 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
          */
         if (cl->preferredEncoding!=-1)
             lastPreferredEncoding = cl->preferredEncoding;
+        if (cl->preferredMulticastEncoding!=-1)
+  	    lastPreferredMulticastEncoding = cl->preferredMulticastEncoding;
 
         /* Reset all flags to defaults (allows us to switch between PointerPos and Server Drawn Cursors) */
         cl->preferredEncoding=-1;
+        cl->preferredMulticastEncoding=-1;
         cl->useCopyRect              = FALSE;
         cl->useNewFBSize             = FALSE;
         cl->cursorWasChanged         = FALSE;
@@ -2027,6 +2032,14 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                 return;
             }
             enc = Swap32IfLE(enc);
+
+	    /* check multicast encodings */
+	    switch(enc) {
+	    case rfbEncodingRaw:
+	    case rfbEncodingUltra:
+	      if (cl->preferredMulticastEncoding == -1)
+                    cl->preferredMulticastEncoding = enc;
+	    }
 
             switch (enc) {
 
@@ -2243,6 +2256,27 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                   encodingName(cl->preferredEncoding,encBuf,sizeof(encBuf)), cl->host);
           }
         }
+	/* and for multicast */
+	if (cl->preferredMulticastEncoding == -1) {
+            if (lastPreferredMulticastEncoding==-1) {
+                cl->preferredMulticastEncoding = rfbEncodingRaw;
+                rfbLog("MulticastVNC defaulting to %s encoding for client %s\n", encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)),cl->host);
+            }
+            else {
+                cl->preferredMulticastEncoding = lastPreferredMulticastEncoding;
+                rfbLog("MulticastVNC sticking with %s encoding for client %s\n", encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)),cl->host);
+            }
+        }
+        else
+        {
+          if (lastPreferredMulticastEncoding==-1) {
+              rfbLog("MulticastVNC using %s encoding for client %s\n", encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)),cl->host);
+          } else {
+              rfbLog("MulticastVNC switching from %s to %s Encoding for client %s\n", 
+                  encodingName(lastPreferredMulticastEncoding,encBuf2,sizeof(encBuf2)),
+                  encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)), cl->host);
+          }
+        }
         
 	if (cl->enableCursorPosUpdates && !cl->enableCursorShapeUpdates) {
 	  rfbLog("Disabling cursor position updates for client %s\n",
@@ -2338,7 +2372,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	/* mark client's pixelformat and encoding as requested */
 	rfbSetBit(cl->screen->multicastUpdPendingForPixelformat, cl->multicastPixelformatId);
-	rfbSetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredEncoding);
+	rfbSetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredMulticastEncoding);
 
 	if (!msg.mfur.incremental) {
 	    sraRegionPtr tmpRegion = sraRgnCreateRect(0, 0, cl->screen->width, cl->screen->height);
@@ -2412,7 +2446,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	  /* mark this pixelformat and encoding as needing repair */
 	  rfbSetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
-	  rfbSetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredEncoding);
+	  rfbSetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredMulticastEncoding);
 	}
 #ifdef MULTICAST_DEBUG
 	else
@@ -3211,7 +3245,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     /* bail out if no one requested an update this (pixelformat,encoding) combination.
        note that we DO send an empty 'heartbeat' update if updateRegion is empty... */
     if(!((cl->screen->multicastUpdPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] & (1<<(cl->multicastPixelformatId % 8)))
-	 && (cl->screen->multicastUpdPendingForEncoding[((cl->preferredEncoding & 0xFF)/8)] & (1<<(cl->preferredEncoding % 8))))) {
+	 && (cl->screen->multicastUpdPendingForEncoding[((cl->preferredMulticastEncoding & 0xFF)/8)] & (1<<(cl->preferredMulticastEncoding % 8))))) {
       sraRgnDestroy(updateRegion);
       UNLOCK(cl->screen->multicastUpdateMutex);
       if(cl->screen->displayFinishedHook)
@@ -3402,7 +3436,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     if(result == TRUE) {/* no error while sending */
       /* mark this pixelformat and encoding combination as done */
       rfbUnsetBit(cl->screen->multicastUpdPendingForPixelformat, cl->multicastPixelformatId);
-      rfbUnsetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredEncoding);
+      rfbUnsetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredMulticastEncoding);
       
       /* empty multicastUpdateRegion if no updates are pending */
       for(j=0; j < sizeof(cl->screen->multicastUpdPendingForPixelformat); ++j)
@@ -3461,8 +3495,8 @@ rfbSendMulticastRepairUpdate(rfbClientPtr cl)
       
   if((cl->screen->multicastRepairPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] &
       (1<<(cl->multicastPixelformatId % 8))) &&
-     (cl->screen->multicastRepairPendingForEncoding[((cl->preferredEncoding & 0xFF)/8)] &
-      (1<<(cl->preferredEncoding % 8)))) {
+     (cl->screen->multicastRepairPendingForEncoding[((cl->preferredMulticastEncoding & 0xFF)/8)] &
+      (1<<(cl->preferredMulticastEncoding % 8)))) {
 
     partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
     size_t i, count = partUpdRgnBufCount(buf);
@@ -3512,7 +3546,7 @@ rfbSendMulticastRepairUpdate(rfbClientPtr cl)
 
     /* mark this pixelformat and encoding combination as done */
     rfbUnsetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
-    rfbUnsetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredEncoding);
+    rfbUnsetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredMulticastEncoding);
   }
 
   UNLOCK(cl->screen->multicastUpdateMutex);
@@ -3580,7 +3614,7 @@ rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h
 	 x, y, w, h, cl->screen->mcublen);
 #endif
 
-  switch (cl->preferredEncoding) {
+  switch (cl->preferredMulticastEncoding) {
   /*
       case rfbEncodingRRE:
       if (!rfbPutMulticastRectEncodingRRE(cl, x, y, w, h))
@@ -3593,11 +3627,11 @@ rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h
       case rfbEncodingHextile:
       if (!rfbPutMulticastRectEncodingHextile(cl, x, y, w, h))
       return FALSE;
-      break;
+      break;*/
       case rfbEncodingUltra:
-      if (!rfbPutMulticastRectEncodingUltra(cl, x, y, w, h))
-      return FALSE;
+	return rfbPutMulticastRectEncodingUltra(cl, x, y, w, h);
       break;
+      /*
       #ifdef LIBVNCSERVER_HAVE_LIBZ
       case rfbEncodingZlib:
       if (!rfbPutMulticastRectEncodingZlib(cl, x, y, w, h))

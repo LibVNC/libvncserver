@@ -32,15 +32,21 @@
 #define CARDBPP CONCAT3E(uint,BPP,_t)
 
 static rfbBool
-HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
+HandleUltraBPP (rfbClient* client, rfbBool multicast, int rx, int ry, int rw, int rh)
 {
   rfbZlibHeader hdr;
   int toRead=0;
   int inflateResult=0;
   int uncompressedBytes = (( rw * rh ) * ( BPP / 8 ));
 
-  if (!ReadFromRFBServer(client, (char *)&hdr, sz_rfbZlibHeader))
-    return FALSE;
+  if(multicast) {
+    if (!ReadFromRFBServerMulticast(client, (char *)&hdr, sz_rfbZlibHeader))
+      return FALSE;
+  }
+  else {
+    if (!ReadFromRFBServer(client, (char *)&hdr, sz_rfbZlibHeader))
+      return FALSE;
+  }
 
   toRead = rfbClientSwap32IfLE(hdr.nBytes);
   if (toRead==0) return TRUE;
@@ -81,8 +87,14 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   }
 
   /* Fill the buffer, obtaining data from the server. */
-  if (!ReadFromRFBServer(client, client->ultra_buffer, toRead))
+  if(multicast) {
+    if (!ReadFromRFBServerMulticast(client, client->ultra_buffer, toRead))
       return FALSE;
+  }
+  else {
+    if (!ReadFromRFBServer(client, client->ultra_buffer, toRead))
+      return FALSE;
+  }
 
   /* uncompress the data */
   uncompressedBytes = client->raw_buffer_size;
