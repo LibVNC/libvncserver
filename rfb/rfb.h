@@ -379,9 +379,10 @@ typedef struct _rfbScreenInfo
     struct sockaddr_storage multicastSockAddr;
     /*
      * the multicast update buffer _must_ fit into a UDP packet, but better be <= the MSS of the link.
-       so for ethernet, this is (MTU=1500 - IPv6-header=40 - UDP-header=8) = 1452
+       so for 802.11, this is (MTU=2272 - IPv6-header=40 - UDP-header=8) = 2224.
+       we rather optimize for that than for ethernet which is mainly switched today...
      */
-#define MULTICAST_UPDATE_BUF_SIZE 1452
+#define MULTICAST_UPDATE_BUF_SIZE 2224
     char multicastUpdateBuf[MULTICAST_UPDATE_BUF_SIZE];
     int  mcublen;
     uint16_t multicastWholeUpdId;
