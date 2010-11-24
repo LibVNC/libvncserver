@@ -2257,7 +2257,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
           }
         }
 	/* and for multicast */
-	if(cl->useMulticastVNC) {
+	if(cl->enableMulticastVNC) {
 	  if (cl->preferredMulticastEncoding == -1) {
             if (lastPreferredMulticastEncoding==-1) {
 	      cl->preferredMulticastEncoding = rfbEncodingRaw;
