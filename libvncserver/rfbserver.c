@@ -2257,26 +2257,28 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
           }
         }
 	/* and for multicast */
-	if (cl->preferredMulticastEncoding == -1) {
+	if(cl->enableMulticastVNC) {
+	  if (cl->preferredMulticastEncoding == -1) {
             if (lastPreferredMulticastEncoding==-1) {
-                cl->preferredMulticastEncoding = rfbEncodingRaw;
-                rfbLog("MulticastVNC defaulting to %s encoding for client %s\n", encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)),cl->host);
+	      cl->preferredMulticastEncoding = rfbEncodingRaw;
+	      rfbLog("MulticastVNC defaulting to %s encoding for client %s\n", encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)),cl->host);
             }
             else {
-                cl->preferredMulticastEncoding = lastPreferredMulticastEncoding;
-                rfbLog("MulticastVNC sticking with %s encoding for client %s\n", encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)),cl->host);
+	      cl->preferredMulticastEncoding = lastPreferredMulticastEncoding;
+	      rfbLog("MulticastVNC sticking with %s encoding for client %s\n", encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)),cl->host);
             }
-        }
-        else
-        {
-          if (lastPreferredMulticastEncoding==-1) {
-              rfbLog("MulticastVNC using %s encoding for client %s\n", encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)),cl->host);
-          } else {
-              rfbLog("MulticastVNC switching from %s to %s Encoding for client %s\n", 
-                  encodingName(lastPreferredMulticastEncoding,encBuf2,sizeof(encBuf2)),
-                  encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)), cl->host);
-          }
-        }
+	  }
+	  else
+	    {
+	      if (lastPreferredMulticastEncoding==-1) {
+		rfbLog("MulticastVNC using %s encoding for client %s\n", encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)),cl->host);
+	      } else {
+		rfbLog("MulticastVNC switching from %s to %s Encoding for client %s\n", 
+		       encodingName(lastPreferredMulticastEncoding,encBuf2,sizeof(encBuf2)),
+		       encodingName(cl->preferredMulticastEncoding,encBuf,sizeof(encBuf)), cl->host);
+	      }
+	    }
+	}
         
 	if (cl->enableCursorPosUpdates && !cl->enableCursorShapeUpdates) {
 	  rfbLog("Disabling cursor position updates for client %s\n",
