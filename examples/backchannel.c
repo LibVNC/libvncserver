@@ -1,6 +1,7 @@
 #include <rfb/rfb.h>
 
-/*
+/**
+ * @example backchannel.c
  * This is a simple example demonstrating a protocol extension.
  *
  * The "back channel" permits sending commands between client and server.
