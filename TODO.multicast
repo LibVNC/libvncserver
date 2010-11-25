@@ -3,7 +3,7 @@
 
 - more heartbeat messages if nothing changed?
 
-- add autoconf detection of used functions.
+- add #ifdef MULTICASTVNC around mcast code
 
 - make send rate adapt
 
@@ -29,11 +29,6 @@
 
 - What about multicast specific stats? Right now it's still all
   per-client.
-
-- client side: introduce a new multicast function for each unicast one
-  or use a solution with an internal flag that signals that a function
-  should behave the multicast way instead? actually, this also hold
-  true for the server side... hmm.
 
 - Leave the nRect calculation in rfbSendMulticastFramebufferUpdate()
   as it is (number of rects is returned by
