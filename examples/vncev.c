@@ -1,4 +1,7 @@
-/* This program is a simple server to show events coming from the client */
+/**
+ * @example vncev.c
+ * This program is a simple server to show events coming from the client
+*/
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #endif

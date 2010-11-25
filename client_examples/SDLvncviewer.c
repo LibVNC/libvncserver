@@ -1,3 +1,7 @@
+/**
+ * @example SDLvncviewer.c
+ */
+
 #include <SDL.h>
 #include <signal.h>
 #include <rfb/rfbclient.h>

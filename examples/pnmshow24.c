@@ -1,3 +1,7 @@
+/**
+ * @example pnmshow24.c
+ */
+
 #include <stdio.h>
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
