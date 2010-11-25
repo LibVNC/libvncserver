@@ -899,7 +899,6 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->udpClient=NULL;
 
    screen->multicastVNC=FALSE;
-   screen->multicastVNCdoNACK=FALSE;
    screen->multicastSock=-1;
    /* next one is some random default out of the AD-HOC Block (224.0.2.0/24 - 224.0.255.0/24) see RFC 3171 */
    screen->multicastAddr="224.0.42.138";

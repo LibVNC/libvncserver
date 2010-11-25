@@ -2426,10 +2426,6 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 				 sz_rfbMulticastFramebufferUpdateNACKMsg,
 				 sz_rfbMulticastFramebufferUpdateNACKMsg);
 
-	/* if NACK is disabled, process the msg, but do not act upon it */
-	if(!cl->screen->multicastVNCdoNACK)
-	  return;
-
 	LOCK(cl->screen->multicastUpdateMutex);
 
 	/* check if this partial update is in the buffer */
@@ -3459,14 +3455,12 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	/* indicate that these partial updates have been saved in the ringbuffer.
 	   the regions of each partial update are the same for every 
 	   pixel-format and encoding combination! */
-	if(cl->screen->multicastVNCdoNACK)
-	  cl->screen->multicastPartUpdRgnsSaved = TRUE;
+	cl->screen->multicastPartUpdRgnsSaved = TRUE;
       }
       else { /* all done */
 	sraRgnMakeEmpty(cl->screen->multicastUpdateRegion);
 	/* whole update done, indicate that partial updates can be saved again */
-	if(cl->screen->multicastVNCdoNACK)
-	  cl->screen->multicastPartUpdRgnsSaved = FALSE;
+	cl->screen->multicastPartUpdRgnsSaved = FALSE;
       }
     }
 
@@ -3564,7 +3558,7 @@ rfbSendMulticastRepairUpdate(rfbClientPtr cl)
 static rfbMulticastFramebufferUpdateMsg *
 rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUpd, uint16_t nRects)
 {
-  if(cl->screen->multicastVNCdoNACK && !cl->screen->multicastPartUpdRgnsSaved) {
+  if(!cl->screen->multicastPartUpdRgnsSaved) {
     partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
     partialUpdRegion tmp;
     tmp.idWhole = idWholeUpd;
@@ -3603,7 +3597,7 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
 static int
 rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h)
 {
-  if(cl->screen->multicastVNCdoNACK && !cl->screen->multicastPartUpdRgnsSaved) {
+  if(!cl->screen->multicastPartUpdRgnsSaved) {
     partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
     sraRegionPtr tmp = sraRgnCreateRect(x, y, x+w, y+h);
     partialUpdRegion* lastone = partUpdRgnBufAt(buf, partUpdRgnBufCount(buf)-1); 

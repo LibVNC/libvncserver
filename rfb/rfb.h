@@ -380,7 +380,6 @@ typedef struct _rfbScreenInfo
       multicast stuff 
     */
     rfbBool multicastVNC;
-    rfbBool multicastVNCdoNACK;
     char*   multicastAddr;
     int     multicastPort;
     char    multicastTTL;
