@@ -1,9 +1,9 @@
 project(libvncserver)
 
-find_package(ZLIB)
+macro_optional_find_package(ZLIB)
 macro_log_feature(ZLIB_FOUND "ZLib" "The Zlib compression library" "http://www.zlib.net" FALSE "" "Used by the vncserver library.")
 
-find_package(JPEG)
+macro_optional_find_package(JPEG)
 macro_log_feature(JPEG_FOUND "LibJPEG" "The JPEG library" "" FALSE "" "Used by the vncserver library")
 
 include(CheckIncludeFiles)
