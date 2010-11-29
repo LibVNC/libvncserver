@@ -34,7 +34,8 @@ typedef struct _partialUpdRegion {
   uint16_t idWhole;
   uint32_t idPartial;
   sraRegionPtr region;
-  rfbBool pending;
+  char pendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
+  char pendingForEncoding[32]; /* since non-pseudo encodings are all < 256 */
 } partialUpdRegion;
 
 

@@ -2439,10 +2439,12 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    rfbLog("MulticastVNC DEBUG: marking buffer position %u, partial id %u as NACKed\n",
 		   i, partUpdRgnBufAt(buf, i)->idPartial);
 #endif
-	    partUpdRgnBufAt(buf, i)->pending = TRUE;
+	    /* mark this pixelformat and encoding as needing repair */
+	    rfbSetBit(partUpdRgnBufAt(buf, i)->pendingForPixelformat, cl->multicastPixelformatId);
+	    rfbSetBit(partUpdRgnBufAt(buf, i)->pendingForEncoding, cl->preferredMulticastEncoding);
 	  }
 
-	  /* mark this pixelformat and encoding as needing repair */
+	  /* and set the per-screen marker as well */
 	  rfbSetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
 	  rfbSetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredMulticastEncoding);
 	}
@@ -3499,48 +3501,53 @@ rfbSendMulticastRepairUpdate(rfbClientPtr cl)
 
     for(i = 0; i < count; ++i) {
       partialUpdRegion* pur = partUpdRgnBufAt(buf, i);
-      if(pur->pending) {
-	sraRectangleIterator* i=NULL;
-	sraRect rect;
-	rfbBool partUpdRgnsSavesOld;
+      if((pur->pendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] & (1<<(cl->multicastPixelformatId % 8))) &&
+	 (pur->pendingForEncoding[((cl->preferredMulticastEncoding & 0xFF)/8)] & (1<<(cl->preferredMulticastEncoding % 8))))
+	{
+	  sraRectangleIterator* i=NULL;
+	  sraRect rect;
+	  rfbBool partUpdRgnsSavesOld;
 
-	/* flush buffer just for safety */
-	if(!rfbSendMulticastUpdateBuf(cl->screen)) {
-	  UNLOCK(cl->screen->multicastUpdateMutex);
-	  return FALSE;
-	}
+	  /* flush buffer just for safety */
+	  if(!rfbSendMulticastUpdateBuf(cl->screen)) {
+	    UNLOCK(cl->screen->multicastUpdateMutex);
+	    return FALSE;
+	  }
   
-	/* set flags so that this RESENT partial update is NOT put into the ringbuffer */
-	partUpdRgnsSavesOld = cl->screen->multicastPartUpdRgnsSaved;
-	cl->screen->multicastPartUpdRgnsSaved = TRUE;
+	  /* set flags so that this RESENT partial update is NOT put into the ringbuffer */
+	  partUpdRgnsSavesOld = cl->screen->multicastPartUpdRgnsSaved;
+	  cl->screen->multicastPartUpdRgnsSaved = TRUE;
 
-	rfbPutMulticastHeader(cl, 
-			      pur->idWhole,
-			      pur->idPartial,
-			      sraRgnCountRects(pur->region));
+	  rfbPutMulticastHeader(cl, 
+				pur->idWhole,
+				pur->idPartial,
+				sraRgnCountRects(pur->region));
 
-	for(i = sraRgnGetIterator(pur->region); sraRgnIteratorNext(i,&rect);){
-	  int x = rect.x1;
-	  int y = rect.y1;
-	  int w = rect.x2 - x;
-	  int h = rect.y2 - y;
-	  rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
-	}
+	  for(i = sraRgnGetIterator(pur->region); sraRgnIteratorNext(i,&rect);){
+	    int x = rect.x1;
+	    int y = rect.y1;
+	    int w = rect.x2 - x;
+	    int h = rect.y2 - y;
+	    rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
+	  }
   
-	cl->screen->multicastPartUpdRgnsSaved = partUpdRgnsSavesOld;
+	  cl->screen->multicastPartUpdRgnsSaved = partUpdRgnsSavesOld;
 
-	/* and send */
-	if(!rfbSendMulticastUpdateBuf(cl->screen)) {
-	  UNLOCK(cl->screen->multicastUpdateMutex);
-	  return FALSE;
-	}
+	  /* and send */
+	  if(!rfbSendMulticastUpdateBuf(cl->screen)) {
+	    UNLOCK(cl->screen->multicastUpdateMutex);
+	    return FALSE;
+	  }
 #ifdef MULTICAST_DEBUG
-	rfbLog("MulticastVNC DEBUG: sent repair partial upd: wholeId %d, partialId %d\n", pur->idWhole, pur->idPartial);
+	  rfbLog("MulticastVNC DEBUG: sent repair partial upd: wholeId %d, partialId %d\n", pur->idWhole, pur->idPartial);
 #endif  
-      }
+	  /* FIXME mark this pixelformat and encoding combination as done */
+	  rfbUnsetBit(pur->pendingForPixelformat, cl->multicastPixelformatId);
+	  rfbUnsetBit(pur->pendingForEncoding, cl->preferredMulticastEncoding);
+	}
     }
 
-    /* mark this pixelformat and encoding combination as done */
+    /* FIXME mark this pixelformat and encoding combination as done */
     rfbUnsetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
     rfbUnsetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredMulticastEncoding);
   }
@@ -3563,7 +3570,8 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
     partialUpdRegion tmp;
     tmp.idWhole = idWholeUpd;
     tmp.idPartial = idPartialUpd;
-    tmp.pending = FALSE;
+    memset(tmp.pendingForPixelformat, 0, sizeof(tmp.pendingForPixelformat));
+    memset(tmp.pendingForEncoding, 0, sizeof(tmp.pendingForEncoding));
     tmp.region = sraRgnCreate();
     partUpdRgnBufInsert(buf, tmp);
   }
