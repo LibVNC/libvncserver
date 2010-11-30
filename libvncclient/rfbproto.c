@@ -1617,10 +1617,9 @@ HandleRFBServerMessage(rfbClient* client)
 		    client->multicastLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
 
 		    /* tell server about missing partial updates */
-		    if(client->multicastVNCdoNACK) 
-		      SendMulticastFramebufferUpdateNACK(client, 
-							 client->multicastLastPartialUpd+1,
-							 msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1));
+		    SendMulticastFramebufferUpdateNACK(client, 
+						       client->multicastLastPartialUpd+1,
+						       msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1));
 		  }
 
 		  /* if a partial update arrives out of order (with a lower sequence number than the 
@@ -1962,9 +1961,6 @@ HandleRFBServerMessage(rfbClient* client)
 	client->multicastSock = CreateMulticastSocket(multicastSockAddr, client->multicastRcvBufSize);
 	client->multicastUpdInterval = rect.r.w;
   	client->multicastPixelformatId = rect.r.x;
-
-	if(client->multicastVNCdoNACK)
-	  rfbClientLog("MulticastVNC: NACK'ing of lost messages enabled\n");
 
 	rfbClientLog("MulticastVNC: Enabling multicast specific messages\n");
 	DefaultSupportedMessagesMulticastVNC(client);

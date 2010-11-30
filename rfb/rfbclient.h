@@ -334,7 +334,6 @@ typedef struct _rfbClient {
 
         /* all the multicast stuff */
         rfbBool canHandleMulticastVNC;
-        rfbBool multicastVNCdoNACK;
         int maxMulticastTimeouts;
         int multicastRcvBufSize;
         int multicastSock;

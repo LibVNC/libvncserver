@@ -132,8 +132,6 @@ int main(int argc,char** argv)
 
   /* enable MulticastVNC */
   server->multicastVNC = TRUE;
-  /* enable NACK as well */
-  server->multicastVNCdoNACK = TRUE;
   /* 
      If we said TRUE above, we can supply the address for the multicast group,
      port, TTL and a time interval in miliseconds by which to defer updates.

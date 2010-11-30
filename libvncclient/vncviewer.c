@@ -200,7 +200,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->multicastSock = -1;
 
   client->maxMulticastTimeouts = 100;
-  client->multicastRcvBufSize = 327675;   
+  client->multicastRcvBufSize = 5242880;
   client->multicastLastWholeUpd = -1;
   client->multicastLastPartialUpd = -1;
   gettimeofday(&client->multicastRequestTimestamp, NULL); /* to avoid an overflow later on */
@@ -289,7 +289,6 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 	j++;
       } else if (strcmp(argv[i], "-multicast") == 0) {
 	client->canHandleMulticastVNC = TRUE;
-	client->multicastVNCdoNACK = TRUE;
 	j++;
       } else if (i+1<*argc && strcmp(argv[i], "-encodings") == 0) {
 	client->appData.encodingsString = argv[i+1];
