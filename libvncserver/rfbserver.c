@@ -1080,34 +1080,6 @@ rfbSendMulticastVNCSessionInfo(rfbClientPtr cl)
 	 return FALSE;
        }
 
-
-   /* assign a pixelformat id */
-   if(! memcmp(&cl->screen->serverFormat, &cl->format, sizeof(rfbPixelFormat))) /* same as server's */
-     cl->multicastPixelformatId = 0;
-   else
-     {
-       uint16_t highest_id = 0; 
-       rfbClientPtr someclient = NULL;
-       rfbClientIteratorPtr it=rfbGetClientIterator(cl->screen);
-       while((someclient=rfbClientIteratorNext(it)))
-	 {
-	   if(someclient->multicastPixelformatId > highest_id)
-	     highest_id = someclient->multicastPixelformatId;
-
-	   if(someclient != cl && !memcmp(&someclient->format, &cl->format, sizeof(rfbPixelFormat))) 
-	     {
-	       cl->multicastPixelformatId = someclient->multicastPixelformatId; /* same as some other client's */
-	       break;
-	     }
-	 }
-
-       if(someclient == NULL)  /* no other client has this */
-	 cl->multicastPixelformatId = highest_id + 1;
-       
-       rfbReleaseClientIterator(it);
-     }
-
- 
    /* flush the buffer if messages wouldn't fit */
    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + addr_len > UPDATE_BUF_SIZE) {
      if (!rfbSendUpdateBuf(cl))
@@ -2856,7 +2828,30 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         sendMulticastVNCSessionInfo = TRUE;
 	/* set multicast use flag for this client */
 	cl->useMulticastVNC = TRUE;
+
+	/* and assign a MulticastVNC pixelformat id */
+	if(! memcmp(&cl->screen->serverFormat, &cl->format, sizeof(rfbPixelFormat))) /* same as server's */
+	  cl->multicastPixelformatId = 0;
+	else {
+	  uint16_t highest_id = 0; 
+	  rfbClientPtr someclient = NULL;
+	  rfbClientIteratorPtr it=rfbGetClientIterator(cl->screen);
+	  while((someclient=rfbClientIteratorNext(it))) {
+	    if(someclient->multicastPixelformatId > highest_id)
+	      highest_id = someclient->multicastPixelformatId;
+	    
+	    if(someclient != cl && !memcmp(&someclient->format, &cl->format, sizeof(rfbPixelFormat))) {
+	      cl->multicastPixelformatId = someclient->multicastPixelformatId; /* same as some other client's */
+	      break;
+	    }
+	  }
 	  
+	  if(someclient == NULL)  /* no other client has this */
+	    cl->multicastPixelformatId = highest_id + 1;
+	  
+	  rfbReleaseClientIterator(it);
+	}
+
         /* We only send this message ONCE <per setEncodings message received>
 	 * (We disable it here)
 	 */
