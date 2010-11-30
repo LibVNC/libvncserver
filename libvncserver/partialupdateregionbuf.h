@@ -46,6 +46,7 @@ typedef struct _partUpdRgnBuf {
   size_t len;
   size_t nextInsertAt;
   rfbBool wraparound;
+  rfbBool dirty;
 } partUpdRgnBuf;
 
 

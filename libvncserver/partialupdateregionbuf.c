@@ -29,6 +29,7 @@ partUpdRgnBuf* partUpdRgnBufCreate(size_t length)
 {
   partUpdRgnBuf* b = malloc(sizeof(partUpdRgnBuf));
 	
+  b->dirty = FALSE;
   b->len = length;
   b->nextInsertAt = 0;
   b->wraparound = FALSE;  
