@@ -347,16 +347,6 @@ DefaultSupportedMessagesTightVNC(rfbClient* client)
 }
 
 
-void
-DefaultSupportedMessagesMulticastVNC(rfbClient* client)
-{
-    DefaultSupportedMessages(client);
-    SetClient2Server(client, rfbMulticastFramebufferUpdateRequest);
-    SetClient2Server(client, rfbMulticastFramebufferUpdateNACK);
-    /* technically, we only care what we can *send* to the server */
-    SetServer2Client(client, rfbMulticastFramebufferUpdate);
-}
-
 
 #ifndef WIN32
 static rfbBool
@@ -1963,7 +1953,10 @@ HandleRFBServerMessage(rfbClient* client)
   	client->multicastPixelformatId = rect.r.x;
 
 	rfbClientLog("MulticastVNC: Enabling multicast specific messages\n");
-	DefaultSupportedMessagesMulticastVNC(client);
+	SetClient2Server(client, rfbMulticastFramebufferUpdateRequest);
+	SetClient2Server(client, rfbMulticastFramebufferUpdateNACK);
+	/* technically, we only care what we can *send* to the server */
+	SetServer2Client(client, rfbMulticastFramebufferUpdate);
  	
 	continue;
       }
