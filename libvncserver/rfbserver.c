@@ -539,36 +539,26 @@ rfbClientConnectionGone(rfbClientPtr cl)
     if (cl->screen->pointerClient == cl)
         cl->screen->pointerClient = NULL;
 
-    /* check if other clients are using the shared update-pending marker. 
-       if not, free it. (cl itself is not in the list anymore) */
-    if(cl->multicastUpdPendingPtr != NULL) {
-        rfbClientPtr someclient;
-	rfbClientIteratorPtr it =rfbGetClientIterator(cl->screen);
-	while((someclient=rfbClientIteratorNext(it))) {
-	  if(someclient->multicastUpdPendingPtr == cl->multicastUpdPendingPtr) 
-	    break;
-	}
 
-	if(someclient == NULL)  /* no other client has this, free it */
-	  free(cl->multicastUpdPendingPtr);
+    /* check if other clients are using the shared update-pending marker or
+       the shared ringbuffer. if not, free it. */
+    if(cl->multicastUpdPendingPtr != NULL || cl->multicastPartUpdRgnBuf != NULL) {
+      rfbBool pendingPtrShared = FALSE;
+      rfbBool partUpdRgnBufShared = FALSE;
+      rfbClientPtr someclient;
+      rfbClientIteratorPtr it =rfbGetClientIterator(cl->screen);
+      while((someclient=rfbClientIteratorNext(it))) {
+	if(someclient != cl && someclient->multicastUpdPendingPtr == cl->multicastUpdPendingPtr) 
+	  pendingPtrShared = TRUE;
+	if(someclient != cl && someclient->multicastPartUpdRgnBuf == cl->multicastPartUpdRgnBuf) 
+	  partUpdRgnBufShared = TRUE;
+      }
+      if(!pendingPtrShared) 
+	free(cl->multicastUpdPendingPtr);
+      if(!partUpdRgnBufShared)
+	partUpdRgnBufDestroy(cl->multicastPartUpdRgnBuf);
 
-	rfbReleaseClientIterator(it);
-    }
-
-    /* and check if other clients are using the shared ringbuffer. 
-       if not, free it. (cl itself is not in the list anymore) */
-    if(cl->multicastPartUpdRgnBuf != NULL) {
-        rfbClientPtr someclient;
-	rfbClientIteratorPtr it =rfbGetClientIterator(cl->screen);
-	while((someclient=rfbClientIteratorNext(it))) {
-	  if(someclient->multicastPartUpdRgnBuf == cl->multicastPartUpdRgnBuf) 
-	    break;
-	}
-
-	if(someclient == NULL)  /* no other client has this, free it */
-	  partUpdRgnBufDestroy(cl->multicastPartUpdRgnBuf);
-
-	rfbReleaseClientIterator(it);
+      rfbReleaseClientIterator(it);
     }
 
     sraRgnDestroy(cl->modifiedRegion);
@@ -1961,6 +1951,10 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
         rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbSetPixelFormatMsg, sz_rfbSetPixelFormatMsg);
 
+	/* when changing pixel-format, trigger a new MulticastVNC setup */
+	if(cl->useMulticastVNC)
+	  cl->enableMulticastVNC = TRUE;
+
         return;
 
 
@@ -2860,7 +2854,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         cl->enableServerIdentity = FALSE;
     }
     /*
-     * Do we plan to send MulticastVNC address?
+     * Do we plan to enable MulticastVNC?
      */
     if (cl->enableMulticastVNC)
     {
@@ -2890,6 +2884,26 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	  if(someclient == NULL)  /* no other client has this */
 	    cl->multicastPixelformatId = highest_id + 1;
 	  
+	  rfbReleaseClientIterator(it);
+	}
+
+	/* clean up in case the client switched its encoding or pixel-format */
+	if(cl->multicastUpdPendingPtr != NULL || cl->multicastPartUpdRgnBuf != NULL) {
+	  rfbBool pendingPtrShared = FALSE;
+	  rfbBool partUpdRgnBufShared = FALSE;
+	  rfbClientPtr someclient;
+	  rfbClientIteratorPtr it =rfbGetClientIterator(cl->screen);
+	  while((someclient=rfbClientIteratorNext(it))) {
+	    if(someclient != cl && someclient->multicastUpdPendingPtr == cl->multicastUpdPendingPtr) 
+	      pendingPtrShared = TRUE;
+	    if(someclient != cl && someclient->multicastPartUpdRgnBuf == cl->multicastPartUpdRgnBuf) 
+	      partUpdRgnBufShared = TRUE;
+	  }
+	  if(!pendingPtrShared) 
+	    free(cl->multicastUpdPendingPtr);
+	  if(!partUpdRgnBufShared)
+	    partUpdRgnBufDestroy(cl->multicastPartUpdRgnBuf);
+
 	  rfbReleaseClientIterator(it);
 	}
 
