@@ -25,8 +25,9 @@
   --> We have to do at least some of this if we want the server 
       throttling in the library...
 
-- What about multicast specific stats? Right now it's still all
-  per-client.
+- What about multicast specific stats? Right now all clients of one
+  (pixelformat,enc) group share the same stats, but there is no way
+  to tell if some encoding was sent via uni- or multicast.
 
 - Leave the nRect calculation in rfbSendMulticastFramebufferUpdate()
   as it is (number of rects is returned by

@@ -265,9 +265,10 @@ rfbPutMulticastRectEncodingUltra(rfbClientPtr cl,
     rfbScreenInfoPtr s = cl->screen;
     char *fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
 	   + (x * (cl->scaledScreen->bitsPerPixel / 8)));
-
     int maxCompSize;
     int maxRawSize = (w * h * (cl->format.bitsPerPixel / 8));
+    rfbClientPtr someclient;
+    rfbClientIteratorPtr it;
 
     if (lzoBeforeBufSize < maxRawSize) {
 	lzoBeforeBufSize = maxRawSize;
@@ -319,7 +320,14 @@ rfbPutMulticastRectEncodingUltra(rfbClientPtr cl,
     }
 
     /* Update statics */
-    rfbStatRecordEncodingSent(cl, rfbEncodingUltra, sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader + lzoAfterBufLen, maxRawSize);
+    it =rfbGetClientIterator(cl->screen);
+    while((someclient=rfbClientIteratorNext(it))) {
+      if(someclient->useMulticastVNC
+	 && someclient->preferredMulticastEncoding == cl->preferredMulticastEncoding
+	 && someclient->multicastPixelformatId == cl->multicastPixelformatId)
+	rfbStatRecordEncodingSent(someclient, rfbEncodingUltra, sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader + lzoAfterBufLen, maxRawSize);
+    }
+    rfbReleaseClientIterator(it);
 
     rect.r.x = Swap16IfLE(x);
     rect.r.y = Swap16IfLE(y);

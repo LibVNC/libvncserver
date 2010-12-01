@@ -3299,6 +3299,8 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     rfbBool result = TRUE;
     uint32_t partialUpdIdSave;
     uint16_t wholeUpdIdSave;
+    rfbClientPtr someclient;
+    rfbClientIteratorPtr it;
 
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
@@ -3335,9 +3337,16 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
       rfbShowCursor(cl);
     }
     
+    /* stats */
+    it =rfbGetClientIterator(cl->screen);
+    while((someclient=rfbClientIteratorNext(it))) {
+      if(someclient->useMulticastVNC
+	 && someclient->preferredMulticastEncoding == cl->preferredMulticastEncoding
+	 && someclient->multicastPixelformatId == cl->multicastPixelformatId)
+	rfbStatRecordMessageSent(someclient, rfbMulticastFramebufferUpdate, 0, 0);
+    }
+    rfbReleaseClientIterator(it);
 
-    /* FIXME make this per-screen ?*/
-    rfbStatRecordMessageSent(cl, rfbMulticastFramebufferUpdate, 0, 0);
      
 #ifdef MULTICAST_DEBUG
     rfbLog("MulticastVNC DEBUG: Update %d: Region has %d rects:\n", 
@@ -3862,6 +3871,8 @@ rfbPutMulticastRectEncodingRaw(rfbClientPtr cl,
     int bytesPerLine = w * (cl->format.bitsPerPixel / 8);
     rfbScreenInfoPtr s = cl->screen;
     char *fbptr = (s->frameBuffer + (s->paddedWidthInBytes * y) + (x * (s->bitsPerPixel / 8)));
+    rfbClientPtr someclient;
+    rfbClientIteratorPtr it;
 
     rect.r.x = Swap16IfLE(x);
     rect.r.y = Swap16IfLE(y);
@@ -3872,10 +3883,19 @@ rfbPutMulticastRectEncodingRaw(rfbClientPtr cl,
     memcpy(&s->multicastUpdateBuf[s->mcublen], (char *)&rect,sz_rfbFramebufferUpdateRectHeader);
     s->mcublen += sz_rfbFramebufferUpdateRectHeader;
 
-    /* FIXME maybe introduce extra multicast stats? */
-    rfbStatRecordEncodingSent(cl, rfbEncodingRaw,
-			      sz_rfbFramebufferUpdateRectHeader + bytesPerLine * h,
-			      sz_rfbFramebufferUpdateRectHeader + bytesPerLine * h);
+    /* stats */
+    it =rfbGetClientIterator(cl->screen);
+    while((someclient=rfbClientIteratorNext(it))) {
+      if(someclient->useMulticastVNC
+	 && someclient->preferredMulticastEncoding == cl->preferredMulticastEncoding
+	 && someclient->multicastPixelformatId == cl->multicastPixelformatId)
+	rfbStatRecordEncodingSent(someclient, rfbEncodingRaw,
+				  sz_rfbFramebufferUpdateRectHeader + bytesPerLine * h,
+				  sz_rfbFramebufferUpdateRectHeader + bytesPerLine * h);
+    }
+    rfbReleaseClientIterator(it);
+
+
 
     (*cl->translateFn)(cl->translateLookupTable,
 		       &(cl->screen->serverFormat),
