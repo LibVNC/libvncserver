@@ -539,14 +539,13 @@ rfbClientConnectionGone(rfbClientPtr cl)
     if (cl->screen->pointerClient == cl)
         cl->screen->pointerClient = NULL;
 
-
     /* check if other clients are using the shared update-pending marker or
        the shared ringbuffer. if not, free it. */
     if(cl->multicastUpdPendingPtr != NULL || cl->multicastPartUpdRgnBuf != NULL) {
       rfbBool pendingPtrShared = FALSE;
       rfbBool partUpdRgnBufShared = FALSE;
       rfbClientPtr someclient;
-      rfbClientIteratorPtr it =rfbGetClientIterator(cl->screen);
+      rfbClientIteratorPtr it =rfbGetClientIteratorWithClosed(cl->screen);
       while((someclient=rfbClientIteratorNext(it))) {
 	if(someclient != cl && someclient->multicastUpdPendingPtr == cl->multicastUpdPendingPtr) 
 	  pendingPtrShared = TRUE;
@@ -2892,7 +2891,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	  rfbBool pendingPtrShared = FALSE;
 	  rfbBool partUpdRgnBufShared = FALSE;
 	  rfbClientPtr someclient;
-	  rfbClientIteratorPtr it =rfbGetClientIterator(cl->screen);
+	  rfbClientIteratorPtr it =rfbGetClientIteratorWithClosed(cl->screen);
 	  while((someclient=rfbClientIteratorNext(it))) {
 	    if(someclient != cl && someclient->multicastUpdPendingPtr == cl->multicastUpdPendingPtr) 
 	      pendingPtrShared = TRUE;
