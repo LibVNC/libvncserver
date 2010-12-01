@@ -29,6 +29,7 @@ partUpdRgnBuf* partUpdRgnBufCreate(size_t length)
 {
   partUpdRgnBuf* b = malloc(sizeof(partUpdRgnBuf));
 	
+  b->dirty = FALSE;
   b->len = length;
   b->nextInsertAt = 0;
   b->wraparound = FALSE;  
@@ -41,17 +42,18 @@ partUpdRgnBuf* partUpdRgnBufCreate(size_t length)
 
 void partUpdRgnBufDestroy(partUpdRgnBuf* b)
 {
-  /* free all associated regions */
-  size_t i;
-  for(i = 0; i < b->len; ++i) 
-    if(b->partUpdRgns[i].region)
-      sraRgnDestroy(b->partUpdRgns[i].region);
-
-  /* free internal array */
-  free(b->partUpdRgns);
-
-  /* free the buffer object itself */
-  free(b);
+  if(b) { /* free all associated regions */
+    size_t i;
+    for(i = 0; i < b->len; ++i) 
+      if(b->partUpdRgns[i].region)
+	sraRgnDestroy(b->partUpdRgns[i].region);
+    
+    /* free internal array */
+    free(b->partUpdRgns);
+    
+    /* free the buffer object itself */
+    free(b);
+  }
 }
 
 

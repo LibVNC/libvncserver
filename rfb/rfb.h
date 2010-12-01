@@ -395,9 +395,6 @@ typedef struct _rfbScreenInfo
     int  mcublen;
     uint16_t multicastWholeUpdId;
     uint32_t multicastPartialUpdId;
-#define MULTICAST_MAX_CONCURRENT_PIXELFORMATS 256 
-    char multicastUpdPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
-    char multicastUpdPendingForEncoding[32]; /* since non-pseudo encodings are all < 256 */
     rfbBool multicastUseCopyRect;            /* all multicast clients support CopyRect */
     sraRegionPtr multicastUpdateRegion;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
@@ -405,12 +402,6 @@ typedef struct _rfbScreenInfo
     MUTEX(multicastUpdateMutex);
 #endif
     int multicastDeferUpdateTime;
-    /* multicast NACK stuff */ 
-#define MULTICAST_PART_UPD_RGN_BUF_SIZE 10000
-    void* multicastPartUpdRgnBuf;      /* a ringbuffer holding partial update <-> region mappings */
-    rfbBool multicastPartUpdRgnsSaved; /* flag indicating that partial updates have been saved for a whole one */
-    char multicastRepairPendingForPixelformat[(MULTICAST_MAX_CONCURRENT_PIXELFORMATS/8)+1];
-    char multicastRepairPendingForEncoding[32]; /* since non-pseudo encodings are all < 256 */
     /* multicast send rate limiting stuff */
     struct timeval lastMulticastSendCreditRefill;
     uint32_t multicastSendCredit;
@@ -669,6 +660,13 @@ typedef struct _rfbClientRec {
 					       of pixelformat and encoding, see main.c, each client is a
 					       representative of the (pixelformat, encoding) class it 
 					       belongs to */
+    rfbBool* multicastUpdPendingPtr;  /**< this bool on the heap is shared by all clients with the
+					 same pixelformat and encoding */
+    /* multicast NACK stuff */
+#define MULTICAST_PART_UPD_RGN_BUF_SIZE 10000
+  void* multicastPartUpdRgnBuf;      /**< a ringbuffer holding partial update <-> region mappings.
+					this is allocated on the heap and shared by all clients
+					with the same pixelformat and encoding*/
 } rfbClientRec, *rfbClientPtr;
 
 /**

@@ -90,8 +90,9 @@ static void rfbProcessClientInitMessage(rfbClientPtr cl);
 static rfbMulticastFramebufferUpdateMsg* rfbPutMulticastHeader(rfbClientPtr cl, 
 							       uint16_t idWholeUpd,
 							       uint32_t idPartialUpd, 
-							       uint16_t nRects);
-static int rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h);
+							       uint16_t nRects,
+							       rfbBool save);
+static int rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h, rfbBool save);
 
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
@@ -537,6 +538,28 @@ rfbClientConnectionGone(rfbClientPtr cl)
 
     if (cl->screen->pointerClient == cl)
         cl->screen->pointerClient = NULL;
+
+
+    /* check if other clients are using the shared update-pending marker or
+       the shared ringbuffer. if not, free it. */
+    if(cl->multicastUpdPendingPtr != NULL || cl->multicastPartUpdRgnBuf != NULL) {
+      rfbBool pendingPtrShared = FALSE;
+      rfbBool partUpdRgnBufShared = FALSE;
+      rfbClientPtr someclient;
+      rfbClientIteratorPtr it =rfbGetClientIterator(cl->screen);
+      while((someclient=rfbClientIteratorNext(it))) {
+	if(someclient != cl && someclient->multicastUpdPendingPtr == cl->multicastUpdPendingPtr) 
+	  pendingPtrShared = TRUE;
+	if(someclient != cl && someclient->multicastPartUpdRgnBuf == cl->multicastPartUpdRgnBuf) 
+	  partUpdRgnBufShared = TRUE;
+      }
+      if(!pendingPtrShared) 
+	free(cl->multicastUpdPendingPtr);
+      if(!partUpdRgnBufShared)
+	partUpdRgnBufDestroy(cl->multicastPartUpdRgnBuf);
+
+      rfbReleaseClientIterator(it);
+    }
 
     sraRgnDestroy(cl->modifiedRegion);
     sraRgnDestroy(cl->requestedRegion);
@@ -1080,34 +1103,6 @@ rfbSendMulticastVNCSessionInfo(rfbClientPtr cl)
 	 return FALSE;
        }
 
-
-   /* assign a pixelformat id */
-   if(! memcmp(&cl->screen->serverFormat, &cl->format, sizeof(rfbPixelFormat))) /* same as server's */
-     cl->multicastPixelformatId = 0;
-   else
-     {
-       uint16_t highest_id = 0; 
-       rfbClientPtr someclient = NULL;
-       rfbClientIteratorPtr it=rfbGetClientIterator(cl->screen);
-       while((someclient=rfbClientIteratorNext(it)))
-	 {
-	   if(someclient->multicastPixelformatId > highest_id)
-	     highest_id = someclient->multicastPixelformatId;
-
-	   if(someclient != cl && !memcmp(&someclient->format, &cl->format, sizeof(rfbPixelFormat))) 
-	     {
-	       cl->multicastPixelformatId = someclient->multicastPixelformatId; /* same as some other client's */
-	       break;
-	     }
-	 }
-
-       if(someclient == NULL)  /* no other client has this */
-	 cl->multicastPixelformatId = highest_id + 1;
-       
-       rfbReleaseClientIterator(it);
-     }
-
- 
    /* flush the buffer if messages wouldn't fit */
    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + addr_len > UPDATE_BUF_SIZE) {
      if (!rfbSendUpdateBuf(cl))
@@ -1956,6 +1951,10 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
         rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbSetPixelFormatMsg, sz_rfbSetPixelFormatMsg);
 
+	/* when changing pixel-format, trigger a new MulticastVNC setup */
+	if(cl->useMulticastVNC)
+	  cl->enableMulticastVNC = TRUE;
+
         return;
 
 
@@ -2373,8 +2372,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	LOCK(cl->screen->multicastUpdateMutex);
 
 	/* mark client's pixelformat and encoding as requested */
-	rfbSetBit(cl->screen->multicastUpdPendingForPixelformat, cl->multicastPixelformatId);
-	rfbSetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredMulticastEncoding);
+	if(cl->multicastUpdPendingPtr)
+	  *cl->multicastUpdPendingPtr = TRUE;
 
 	if (!msg.mfur.incremental) {
 	    sraRegionPtr tmpRegion = sraRgnCreateRect(0, 0, cl->screen->width, cl->screen->height);
@@ -2403,8 +2402,15 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
     case rfbMulticastFramebufferUpdateNACK:
     {
-	partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
-	uint32_t firstInBuf = partUpdRgnBufAt(buf, 0)->idPartial;
+	partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
+	uint32_t firstInBuf;
+
+	/* maybe this client sent a NACK without having registered for MulticastVNC? */
+	if(!buf) {
+	  rfbLogPerror("rfbProcessClientNormalMessage: got NACK from non-MulticastVNC client, disconnecting");
+	  rfbCloseClient(cl);
+	  return;
+	}
 
         if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
 			      sz_rfbMulticastFramebufferUpdateNACKMsg-1)) <= 0) {
@@ -2427,7 +2433,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 				 sz_rfbMulticastFramebufferUpdateNACKMsg);
 
 	LOCK(cl->screen->multicastUpdateMutex);
-
+	firstInBuf = partUpdRgnBufAt(buf, 0)->idPartial;
 	/* check if this partial update is in the buffer */
 	if(msg.mfun.idPartialUpd >= firstInBuf && msg.mfun.idPartialUpd < firstInBuf + partUpdRgnBufCount(buf)-1) {
 	  uint32_t start = msg.mfun.idPartialUpd - firstInBuf;
@@ -2439,14 +2445,11 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    rfbLog("MulticastVNC DEBUG: marking buffer position %u, partial id %u as NACKed\n",
 		   i, partUpdRgnBufAt(buf, i)->idPartial);
 #endif
-	    /* mark this pixelformat and encoding as needing repair */
-	    rfbSetBit(partUpdRgnBufAt(buf, i)->pendingForPixelformat, cl->multicastPixelformatId);
-	    rfbSetBit(partUpdRgnBufAt(buf, i)->pendingForEncoding, cl->preferredMulticastEncoding);
+	    partUpdRgnBufAt(buf, i)->pending = TRUE;
 	  }
 
-	  /* and set the per-screen marker as well */
-	  rfbSetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
-	  rfbSetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredMulticastEncoding);
+	  /* mark this pixelformat and encoding as needing repair */
+	  buf->dirty = TRUE;
 	}
 #ifdef MULTICAST_DEBUG
 	else
@@ -2851,14 +2854,83 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         cl->enableServerIdentity = FALSE;
     }
     /*
-     * Do we plan to send MulticastVNC address?
+     * Do we plan to enable MulticastVNC?
      */
     if (cl->enableMulticastVNC)
     {
+        rfbClientPtr someclient;
+	rfbClientIteratorPtr it;
+
         sendMulticastVNCSessionInfo = TRUE;
 	/* set multicast use flag for this client */
 	cl->useMulticastVNC = TRUE;
+
+	/* and assign a MulticastVNC pixelformat id */
+	if(! memcmp(&cl->screen->serverFormat, &cl->format, sizeof(rfbPixelFormat))) /* same as server's */
+	  cl->multicastPixelformatId = 0;
+	else {
+	  uint16_t highest_id = 0; 
+	  it=rfbGetClientIterator(cl->screen);
+	  while((someclient=rfbClientIteratorNext(it))) {
+	    if(someclient->multicastPixelformatId > highest_id)
+	      highest_id = someclient->multicastPixelformatId;
+	    
+	    if(someclient != cl && !memcmp(&someclient->format, &cl->format, sizeof(rfbPixelFormat))) {
+	      cl->multicastPixelformatId = someclient->multicastPixelformatId; /* same as some other client's */
+	      break;
+	    }
+	  }
 	  
+	  if(someclient == NULL)  /* no other client has this */
+	    cl->multicastPixelformatId = highest_id + 1;
+	  
+	  rfbReleaseClientIterator(it);
+	}
+
+	/* clean up in case the client switched its encoding or pixel-format */
+	if(cl->multicastUpdPendingPtr != NULL || cl->multicastPartUpdRgnBuf != NULL) {
+	  rfbBool pendingPtrShared = FALSE;
+	  rfbBool partUpdRgnBufShared = FALSE;
+	  rfbClientPtr someclient;
+	  rfbClientIteratorPtr it =rfbGetClientIterator(cl->screen);
+	  while((someclient=rfbClientIteratorNext(it))) {
+	    if(someclient != cl && someclient->multicastUpdPendingPtr == cl->multicastUpdPendingPtr) 
+	      pendingPtrShared = TRUE;
+	    if(someclient != cl && someclient->multicastPartUpdRgnBuf == cl->multicastPartUpdRgnBuf) 
+	      partUpdRgnBufShared = TRUE;
+	  }
+	  if(!pendingPtrShared) 
+	    free(cl->multicastUpdPendingPtr);
+	  if(!partUpdRgnBufShared)
+	    partUpdRgnBufDestroy(cl->multicastPartUpdRgnBuf);
+
+	  rfbReleaseClientIterator(it);
+	}
+
+	/* connect to the shared multicastUpdPending bool and multicastPartUpdRgnBuf
+	   or alloc new ones */
+	it=rfbGetClientIterator(cl->screen);
+	while((someclient=rfbClientIteratorNext(it))) {
+	  if(someclient != cl
+	     && someclient->multicastPixelformatId == cl->multicastPixelformatId
+	     && someclient->preferredMulticastEncoding == cl->preferredMulticastEncoding) {
+	    /* same as some other client's, share */
+	    cl->multicastUpdPendingPtr = someclient->multicastUpdPendingPtr; 
+	    cl->multicastPartUpdRgnBuf = someclient->multicastPartUpdRgnBuf;
+	    rfbLog("MulticastVNC encountered in-use pixelformat and encoding, re-using allocated data for client %s\n", cl->host);
+	    break;
+	  }
+	}
+
+	if(someclient == NULL) { /* no other client has this, alloc new ones on the heap */
+	  cl->multicastUpdPendingPtr = calloc(sizeof(rfbBool), 1);
+	  cl->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE);
+	  rfbLog("MulticastVNC encountered new pixelformat and/or encoding, allocating new data for client %s\n", cl->host);
+	}
+
+	rfbReleaseClientIterator(it);
+
+
         /* We only send this message ONCE <per setEncodings message received>
 	 * (We disable it here)
 	 */
@@ -3223,9 +3295,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     rfbMulticastFramebufferUpdateMsg* mfu = NULL;
     sraRect rect;
     sraRegionPtr updateRegion;
-    int j;
     uint16_t nRects = 0;
-    rfbBool otherUpdatesPending = FALSE;
     rfbBool result = TRUE;
     uint32_t partialUpdIdSave;
     uint16_t wholeUpdIdSave;
@@ -3242,10 +3312,9 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     sraRgnOr(updateRegion, cl->screen->multicastUpdateRegion);
 
 
-    /* bail out if no one requested an update this (pixelformat,encoding) combination.
+    /* bail out if no one requested an update for this (pixelformat,encoding) combination.
        note that we DO send an empty 'heartbeat' update if updateRegion is empty... */
-    if(!((cl->screen->multicastUpdPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] & (1<<(cl->multicastPixelformatId % 8)))
-	 && (cl->screen->multicastUpdPendingForEncoding[((cl->preferredMulticastEncoding & 0xFF)/8)] & (1<<(cl->preferredMulticastEncoding % 8))))) {
+    if(! *cl->multicastUpdPendingPtr ) {
       sraRgnDestroy(updateRegion);
       UNLOCK(cl->screen->multicastUpdateMutex);
       if(cl->screen->displayFinishedHook)
@@ -3279,7 +3348,8 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
     mfu = rfbPutMulticastHeader(cl, 
 				cl->screen->multicastWholeUpdId,
 				cl->screen->multicastPartialUpdId++,
-				0);
+				0,
+				TRUE);
   
     for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);) {
         int x = rect.x1;
@@ -3315,8 +3385,9 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	    mfu = rfbPutMulticastHeader(cl, 
 					cl->screen->multicastWholeUpdId,
 					cl->screen->multicastPartialUpdId++,
-					0);
-	    nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
+					0,
+					TRUE);
+	    nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h, TRUE);
 	  }
 
 	  else {                                        /* rect too large for buffer, must be split up */
@@ -3342,12 +3413,13 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 		mfu = rfbPutMulticastHeader(cl, 
 					    cl->screen->multicastWholeUpdId,
 					    cl->screen->multicastPartialUpdId++,
-					    0);
+					    0,
+					    TRUE);
 		
 		if(lineOffset*linesPerUpd + linesPerUpd <= h)
-		  nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+lineOffset*linesPerUpd, w, linesPerUpd);
+		  nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+lineOffset*linesPerUpd, w, linesPerUpd, TRUE);
 		else
-		  nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+lineOffset*linesPerUpd, w, h - lineOffset*linesPerUpd);
+		  nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y+lineOffset*linesPerUpd, w, h - lineOffset*linesPerUpd, TRUE);
 		
 		mfu->nRects = Swap16IfLE(nRects);
 #ifdef MULTICAST_DEBUG
@@ -3372,12 +3444,13 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 		  mfu = rfbPutMulticastHeader(cl, 
 					      cl->screen->multicastWholeUpdId,
 					      cl->screen->multicastPartialUpdId++,
-					      0);
+					      0,
+					      TRUE);
 		  
 		  if(subLineOffset*pixelsPerUpd + pixelsPerUpd <= w)
-		    nRects += rfbPutMulticastRectEncodingPreferred(cl, x+subLineOffset*pixelsPerUpd, y+lineOffset, pixelsPerUpd, 1);
+		    nRects += rfbPutMulticastRectEncodingPreferred(cl, x+subLineOffset*pixelsPerUpd, y+lineOffset, pixelsPerUpd, 1, TRUE);
 		  else
-		    nRects += rfbPutMulticastRectEncodingPreferred(cl, x+subLineOffset*pixelsPerUpd, y+lineOffset, w - subLineOffset*pixelsPerUpd, 1);
+		    nRects += rfbPutMulticastRectEncodingPreferred(cl, x+subLineOffset*pixelsPerUpd, y+lineOffset, w - subLineOffset*pixelsPerUpd, 1, TRUE);
 		  
 		  mfu->nRects = Swap16IfLE(nRects);
 #ifdef MULTICAST_DEBUG
@@ -3403,11 +3476,12 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	    mfu = rfbPutMulticastHeader(cl, 
 					cl->screen->multicastWholeUpdId,
 					cl->screen->multicastPartialUpdId++,
-					0);
+					0,
+					TRUE);
 	  }
 	}
 	else {                                            /* rect fits */  
-	  nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
+	  nRects += rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h, TRUE);
 #ifdef MULTICAST_DEBUG
 	  rfbLog("MulticastVNC DEBUG:   did put rect into buffer(now %d), now %d in there\n", cl->screen->mcublen, nRects);
 #endif
@@ -3434,36 +3508,29 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 
    
     if(result == TRUE) {/* no error while sending */
+      rfbClientPtr someclient;
+      rfbClientIteratorPtr it;
       /* mark this pixelformat and encoding combination as done */
-      rfbUnsetBit(cl->screen->multicastUpdPendingForPixelformat, cl->multicastPixelformatId);
-      rfbUnsetBit(cl->screen->multicastUpdPendingForEncoding, cl->preferredMulticastEncoding);
+      if(cl->multicastUpdPendingPtr)
+	*cl->multicastUpdPendingPtr = FALSE;
       
-      /* empty multicastUpdateRegion if no updates are pending */
-      for(j=0; j < sizeof(cl->screen->multicastUpdPendingForPixelformat); ++j)
-	if(cl->screen->multicastUpdPendingForPixelformat[j] != 0) {
-	  otherUpdatesPending = TRUE;
+      /* empty multicastUpdateRegion if no other (pixelformat,encoding) group has updates pending */
+      it =rfbGetClientIterator(cl->screen);
+      while((someclient=rfbClientIteratorNext(it))) {
+	if(someclient != cl
+	   && someclient->multicastUpdPendingPtr
+	   && *someclient->multicastUpdPendingPtr) {/* other updates are pending */
+	  /* reset sequence numbers */
+	  cl->screen->multicastWholeUpdId = wholeUpdIdSave;
+	  cl->screen->multicastPartialUpdId = partialUpdIdSave;
 	  break;
 	}
-      if(j == sizeof(cl->screen->multicastUpdPendingForPixelformat)-1) /* no pf pending */
-	for(j=0; j < sizeof(cl->screen->multicastUpdPendingForEncoding); ++j)
-	  if(cl->screen->multicastUpdPendingForEncoding[j] != 0) {
-	    otherUpdatesPending = TRUE;
-	    break;
-	  } 
-      if(otherUpdatesPending) {
-	/* reset sequence numbers */
-	cl->screen->multicastWholeUpdId = wholeUpdIdSave;
-	cl->screen->multicastPartialUpdId = partialUpdIdSave;
-	/* indicate that these partial updates have been saved in the ringbuffer.
-	   the regions of each partial update are the same for every 
-	   pixel-format and encoding combination! */
-	cl->screen->multicastPartUpdRgnsSaved = TRUE;
       }
-      else { /* all done */
+
+      if(someclient == NULL)  /* no other (pixelformat,encoding) group has updates pending */
 	sraRgnMakeEmpty(cl->screen->multicastUpdateRegion);
-	/* whole update done, indicate that partial updates can be saved again */
-	cl->screen->multicastPartUpdRgnsSaved = FALSE;
-      }
+      
+      rfbReleaseClientIterator(it);
     }
 
     UNLOCK(cl->screen->multicastUpdateMutex);
@@ -3490,66 +3557,52 @@ rfbBool
 rfbSendMulticastRepairUpdate(rfbClientPtr cl)
 {
   LOCK(cl->screen->multicastUpdateMutex);
-      
-  if((cl->screen->multicastRepairPendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] &
-      (1<<(cl->multicastPixelformatId % 8))) &&
-     (cl->screen->multicastRepairPendingForEncoding[((cl->preferredMulticastEncoding & 0xFF)/8)] &
-      (1<<(cl->preferredMulticastEncoding % 8)))) {
-
-    partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
+  
+  partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
+    
+  if(buf->dirty) {
     size_t i, count = partUpdRgnBufCount(buf);
 
     for(i = 0; i < count; ++i) {
       partialUpdRegion* pur = partUpdRgnBufAt(buf, i);
-      if((pur->pendingForPixelformat[((cl->multicastPixelformatId & 0xFF)/8)] & (1<<(cl->multicastPixelformatId % 8))) &&
-	 (pur->pendingForEncoding[((cl->preferredMulticastEncoding & 0xFF)/8)] & (1<<(cl->preferredMulticastEncoding % 8))))
-	{
-	  sraRectangleIterator* i=NULL;
-	  sraRect rect;
-	  rfbBool partUpdRgnsSavesOld;
+      if(pur->pending) {
+	sraRectangleIterator* i=NULL;
+	sraRect rect;
 
-	  /* flush buffer just for safety */
-	  if(!rfbSendMulticastUpdateBuf(cl->screen)) {
-	    UNLOCK(cl->screen->multicastUpdateMutex);
-	    return FALSE;
-	  }
-  
-	  /* set flags so that this RESENT partial update is NOT put into the ringbuffer */
-	  partUpdRgnsSavesOld = cl->screen->multicastPartUpdRgnsSaved;
-	  cl->screen->multicastPartUpdRgnsSaved = TRUE;
-
-	  rfbPutMulticastHeader(cl, 
-				pur->idWhole,
-				pur->idPartial,
-				sraRgnCountRects(pur->region));
-
-	  for(i = sraRgnGetIterator(pur->region); sraRgnIteratorNext(i,&rect);){
-	    int x = rect.x1;
-	    int y = rect.y1;
-	    int w = rect.x2 - x;
-	    int h = rect.y2 - y;
-	    rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h);
-	  }
-  
-	  cl->screen->multicastPartUpdRgnsSaved = partUpdRgnsSavesOld;
-
-	  /* and send */
-	  if(!rfbSendMulticastUpdateBuf(cl->screen)) {
-	    UNLOCK(cl->screen->multicastUpdateMutex);
-	    return FALSE;
-	  }
-#ifdef MULTICAST_DEBUG
-	  rfbLog("MulticastVNC DEBUG: sent repair partial upd: wholeId %d, partialId %d\n", pur->idWhole, pur->idPartial);
-#endif  
-	  /* FIXME mark this pixelformat and encoding combination as done */
-	  rfbUnsetBit(pur->pendingForPixelformat, cl->multicastPixelformatId);
-	  rfbUnsetBit(pur->pendingForEncoding, cl->preferredMulticastEncoding);
+	/* flush buffer just for safety */
+	if(!rfbSendMulticastUpdateBuf(cl->screen)) {
+	  UNLOCK(cl->screen->multicastUpdateMutex);
+	  return FALSE;
 	}
+  
+	rfbPutMulticastHeader(cl, 
+			      pur->idWhole,
+			      pur->idPartial,
+			      sraRgnCountRects(pur->region),
+			      FALSE);
+
+	for(i = sraRgnGetIterator(pur->region); sraRgnIteratorNext(i,&rect);){
+	  int x = rect.x1;
+	  int y = rect.y1;
+	  int w = rect.x2 - x;
+	  int h = rect.y2 - y;
+	  rfbPutMulticastRectEncodingPreferred(cl, x, y, w, h, FALSE);
+	}
+  
+	/* and send */
+	if(!rfbSendMulticastUpdateBuf(cl->screen)) {
+	  UNLOCK(cl->screen->multicastUpdateMutex);
+	  return FALSE;
+	}
+#ifdef MULTICAST_DEBUG
+	rfbLog("MulticastVNC DEBUG: sent repair partial upd: wholeId %d, partialId %d\n", pur->idWhole, pur->idPartial);
+#endif  
+	pur->pending = FALSE;
+      }
     }
 
-    /* FIXME mark this pixelformat and encoding combination as done */
-    rfbUnsetBit(cl->screen->multicastRepairPendingForPixelformat, cl->multicastPixelformatId);
-    rfbUnsetBit(cl->screen->multicastRepairPendingForEncoding, cl->preferredMulticastEncoding);
+    /* mark this pixelformat and encoding combination as done */
+    buf->dirty = FALSE;
   }
 
   UNLOCK(cl->screen->multicastUpdateMutex);
@@ -3563,15 +3616,14 @@ rfbSendMulticastRepairUpdate(rfbClientPtr cl)
  */
 
 static rfbMulticastFramebufferUpdateMsg *
-rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUpd, uint16_t nRects)
+rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUpd, uint16_t nRects, rfbBool save)
 {
-  if(!cl->screen->multicastPartUpdRgnsSaved) {
-    partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
+  if(save) {
+    partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
     partialUpdRegion tmp;
     tmp.idWhole = idWholeUpd;
     tmp.idPartial = idPartialUpd;
-    memset(tmp.pendingForPixelformat, 0, sizeof(tmp.pendingForPixelformat));
-    memset(tmp.pendingForEncoding, 0, sizeof(tmp.pendingForEncoding));
+    tmp.pending = FALSE;
     tmp.region = sraRgnCreate();
     partUpdRgnBufInsert(buf, tmp);
   }
@@ -3603,10 +3655,10 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
  */
 
 static int
-rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h)
+rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h, rfbBool save)
 {
-  if(!cl->screen->multicastPartUpdRgnsSaved) {
-    partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->screen->multicastPartUpdRgnBuf;
+  if(save) {
+    partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
     sraRegionPtr tmp = sraRgnCreateRect(x, y, x+w, y+h);
     partialUpdRegion* lastone = partUpdRgnBufAt(buf, partUpdRgnBufCount(buf)-1); 
     sraRgnOr(lastone->region, tmp);
