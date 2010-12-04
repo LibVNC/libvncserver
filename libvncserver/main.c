@@ -15,7 +15,6 @@
 #endif
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
-#include "partialupdateregionbuf.h"
 #include "private.h"
 
 #include <stdarg.h>
