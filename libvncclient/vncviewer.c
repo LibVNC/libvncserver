@@ -401,10 +401,10 @@ void rfbClientCleanup(rfbClient* client) {
 rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
 {
   int r;
+  struct timeval now;
 
   if(client->multicastSock >= 0 && !client->multicastDisabled) {
       /* see if it's time for a request */
-      struct timeval now;
       gettimeofday(&now, NULL);
       if(((now.tv_sec - client->multicastRequestTimestamp.tv_sec)*1000
 	  +(now.tv_usec - client->multicastRequestTimestamp.tv_usec)/1000)
@@ -419,28 +419,35 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
   if(r<0)  /* error while waiting */
     return FALSE;
   
-  if(r==0) /* timeout */
-    {
-      if(client->multicastSock >= 0 &&
-	 !client->multicastDisabled &&
-	 client->multicastRcvd > 0)
-	{
-	  client->multicastTimeouts++;
+  if(r==0) { /* timeout */
+    if(client->multicastSock >= 0 && !client->multicastDisabled
+       && (client->multicastPendingRequestTimestamp.tv_sec || client->multicastPendingRequestTimestamp.tv_usec)) {
+          /* check if the update interval has expired */
+	  gettimeofday(&now, NULL);
+	  if(((now.tv_sec - client->multicastPendingRequestTimestamp.tv_sec)*1000
+	      +(now.tv_usec - client->multicastPendingRequestTimestamp.tv_usec)/1000)
+	     > client->multicastUpdInterval) {
+	    client->multicastTimeouts =  ((now.tv_sec - client->multicastPendingRequestTimestamp.tv_sec)*1000
+					  +(now.tv_usec - client->multicastPendingRequestTimestamp.tv_usec)/1000) / client->multicastUpdInterval;
 #ifdef MULTICAST_DEBUG
-	  rfbClientLog("MulticastVNC DEBUG:   timeout, now %d!\n", client->multicastTimeouts);
+	    rfbClientLog("MulticastVNC DEBUG:   timeout, now %d!\n", client->multicastTimeouts);
 #endif
-	  if(client->multicastTimeouts > client->maxMulticastTimeouts)
-	    {
-	      rfbClientLog("MulticastVNC: too many timeouts (%d), falling back to unicast\n", client->multicastTimeouts);
-	      client->multicastDisabled = TRUE;
-	      SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
-	    }
+	  }
+
+	  if(client->multicastTimeouts > client->maxMulticastTimeouts) {
+	    rfbClientLog("MulticastVNC: too many timeouts (%d), falling back to unicast\n", client->multicastTimeouts);
+	    client->multicastDisabled = TRUE;
+	    SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
+	  }
 	}
       return TRUE; 
     }
   
   /* there are messages */
-  if(client->serverMsgMulticast)
+  if(client->serverMsgMulticast) {
     client->multicastTimeouts = 0;
+    client->multicastPendingRequestTimestamp.tv_sec = 0;
+    client->multicastPendingRequestTimestamp.tv_usec = 0;
+  }
   return HandleRFBServerMessage(client);
 }

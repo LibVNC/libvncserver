@@ -1318,6 +1318,8 @@ SendMulticastFramebufferUpdateRequest(rfbClient* client, rfbBool incremental)
   if (!WriteToRFBServer(client, (char *)&mfur, sz_rfbMulticastFramebufferUpdateRequestMsg))
     return FALSE;
 
+  gettimeofday(&client->multicastPendingRequestTimestamp, NULL);
+
   return TRUE;
 }
 
