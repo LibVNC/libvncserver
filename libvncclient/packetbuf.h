@@ -44,6 +44,7 @@ typedef struct _packetBuf {
   packet *tail;
   size_t maxlen;
   size_t len;
+  size_t count;
 } packetBuf;
 
 

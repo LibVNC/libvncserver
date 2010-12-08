@@ -67,6 +67,7 @@ int packetBufPush(packetBuf* b, packet *packet)
     b->tail->next = NULL;
   }
   b->len += packet->datalen;
+  b->count++;
   return 1;
 }
 
@@ -79,6 +80,7 @@ void packetBufPop(packetBuf* b)
     /* remove head */
     packet *newhead = b->head->next;
     b->len -= b->head->datalen;;
+    b->count--;
     free(b->head->data);
     free(b->head);
     b->head = newhead;
