@@ -48,7 +48,6 @@ extern "C"
 #endif
 
 #ifdef __MINGW32__
-#define WINVER 0x0501
 #undef SOCKET
 #undef socklen_t
 #include <ws2tcpip.h>
