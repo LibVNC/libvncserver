@@ -55,6 +55,7 @@
 
 #include "minilzo.h"
 #include "tls.h"
+#include "packetbuf.h"
 
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
@@ -1575,7 +1576,7 @@ HandleRFBServerMessage(rfbClient* client)
 
 	  /* 
 	     only handle this message if it's our pixelformat, 
-	     otherwise flush the multicast buffer since 
+	     otherwise discard the packet since 
 	     the data in there is useless for us.
 	  */
 	  if(rfbClientSwap16IfLE(msg.mfu.idPixelformat) != client->multicastPixelformatId)
@@ -1583,7 +1584,7 @@ HandleRFBServerMessage(rfbClient* client)
 #ifdef MULTICAST_DEBUG
 	      rfbClientLog("MulticastVNC DEBUG: discarding pf: %d\n", rfbClientSwap16IfLE(msg.mfu.idPixelformat));
 #endif
-	      client->multicastbufoutptr = client->multicastbuf;
+	      packetBufPop(client->multicastPacketBuf); 
 	      client->multicastbuffered = 0;
 	    }
 	  else
@@ -1951,6 +1952,7 @@ HandleRFBServerMessage(rfbClient* client)
 	client->multicastSock = CreateMulticastSocket(multicastSockAddr, client->multicastRcvBufSize);
 	client->multicastUpdInterval = rect.r.w;
   	client->multicastPixelformatId = rect.r.x;
+	client->multicastPacketBuf = packetBufCreate(client->multicastRcvBufSize);
 
 	rfbClientLog("MulticastVNC: Enabling multicast specific messages\n");
 	SetClient2Server(client, rfbMulticastFramebufferUpdateRequest);

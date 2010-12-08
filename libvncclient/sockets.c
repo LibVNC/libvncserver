@@ -50,6 +50,7 @@
 #include <netdb.h>
 #endif
 #include "tls.h"
+#include "packetbuf.h"
 
 void PrintInHex(char *buf, int len);
 
@@ -236,72 +237,95 @@ hexdump:
 
 
 
-/*
- * ReadFromRFBServerMulticast
- * This reads in one PDU from the multicast socket and 
- * provides it in cl->multicastbuf.
+/**
+ * This reads packets from the multicast socket into the packet buffer
+ * and writes n requested bytes into the out buffer.
  */
 
 rfbBool
 ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
 {
-  if(client->multicastSock < 0)
+  packetBuf *pbuf = client->multicastPacketBuf;
+
+  if(client->multicastSock < 0 || !pbuf)
     return FALSE;
 
-  /* enough data in buffer */
-  if (n <= client->multicastbuffered) 
-    {
-      memcpy(out, client->multicastbufoutptr, n);
-      client->multicastbufoutptr += n;
-      client->multicastbuffered -= n;
-      return TRUE;
+  /* 
+     read until packet buffer (potentially) full or nothing more to read 
+  */
+  while(pbuf->len + MULTICAST_READBUF_SZ <= pbuf->maxlen) {
+    int r;
+    r = recvfrom(client->multicastSock, client->multicastReadBuf, MULTICAST_READBUF_SZ, 0, NULL, NULL);
+    if (r <= 0) {
+      if (r < 0) { /* some error */
+#ifdef WIN32
+	errno=WSAGetLastError();
+#endif
+	if (errno == EWOULDBLOCK || errno == EAGAIN) { /* nothing more to read */
+	  r = 0;
+	  break;
+	}
+	else {
+	  rfbClientErr("ReadFromRFBServerMulticast (%d: %s)\n", errno, strerror(errno));
+	  return FALSE;
+	}
+      } 
+      else { /* read returned 0 */
+	if (errorMessageOnReadFailure) 
+	  rfbClientLog("VNC server closed connection\n");
+	return FALSE;
+      }
     }
 
-  /* not enough data left in buffer */
-  /* so flush buffer and read in another packet FIXME:really? */
-  memcpy(out, client->multicastbufoutptr, client->multicastbuffered);
-  out += client->multicastbuffered;
-  n -= client->multicastbuffered;
+    /* successfully read a packet at this point */
+    packet * p = calloc(sizeof(packet), 1);
+    p->datalen = r;
+    p->data = malloc(p->datalen);
+    memcpy(p->data, client->multicastReadBuf, p->datalen);
 
-  client->multicastbufoutptr = client->multicastbuf;
-  client->multicastbuffered = 0;
-
-  if (n <= RFB_MULTICAST_BUF_SIZE) 
-    {
-      int r;
-      r = recvfrom(client->multicastSock, client->multicastbuf, RFB_MULTICAST_BUF_SIZE, 0, NULL, NULL);
-      if(r <= 0) 
-	{
-	  if (r < 0) 
-	    {
-#ifdef WIN32
-	      errno=WSAGetLastError();
+    packetBufPush(client->multicastPacketBuf, p);
+#ifdef MULTICAST_DEBUG
+    rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() read %d bytes from socket.\n", r);
+    rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() %d packets buffered now.\n", pbuf->count);
 #endif
-	      if (errno == EWOULDBLOCK || errno == EAGAIN) 
-		r = 0;
-	      else 
-		{
-		  rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
-		  return FALSE;
-		}
-	    } 
-	  else 
-	    {
-	      if (errorMessageOnReadFailure) 
-		rfbClientLog("VNC server closed connection\n");
-	      return FALSE;
-	    }
-	}
-      client->multicastbuffered += r;
-	
+  }
+
+  /*
+    now service the request of n bytes (which have to be <= what's buffered of the packet)
+  */
+#ifdef MULTICAST_DEBUG
+  rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() bytes requested: %d \n", n);
+  rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() bytes in buffer: %d \n", pbuf->len);
+  rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() pckts in buffer: %d \n", pbuf->count);
+#endif
+
+  if (n) {
+    if(pbuf->head 
+       && n <= pbuf->head->datalen
+       && client->multicastbuffered ? n <= client->multicastbuffered : 1) {
+
+      if(client->multicastbuffered == 0) { /* new packet to be consumed */
+	client->multicastbuffered = pbuf->head->datalen;
+	client->multicastbufoutptr = pbuf->head->data;
+      }
+
+      /* copy requested number of bytes to out buffer */
       memcpy(out, client->multicastbufoutptr, n);
       client->multicastbufoutptr += n;
       client->multicastbuffered -= n;
-      return TRUE;
-    } 
-  else 
-    /* with UDP multicast, all application PDUs must fit into a UDP PDU */
-    return FALSE;
+
+      if(client->multicastbuffered == 0) { /* packet consumed */ 	
+	packetBufPop(pbuf);
+#ifdef MULTICAST_DEBUG
+	rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() packet consumed, now %d packets in buffer.\n", pbuf->count);
+#endif
+      }
+    }
+    else
+      return FALSE;
+  }
+
+  return TRUE;
 }
 
 
@@ -819,13 +843,19 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
     }
 
   num=select(maxfd+1, &fds, NULL, NULL, &timeout);
-  if(num<0)
+  if(num<0) {
     rfbClientLog("Waiting for message failed: %d (%s)\n",errno,strerror(errno));
+    return num;
+  }
 
   if(FD_ISSET(client->sock, &fds))
     client->serverMsg = TRUE;
   if(client->multicastSock >= 0 && FD_ISSET(client->multicastSock, &fds))
     client->serverMsgMulticast = TRUE;
+  if(client->multicastPacketBuf && ((packetBuf*)client->multicastPacketBuf)->head) {
+    client->serverMsgMulticast = TRUE;
+    ++num;
+  }
 
   return num;
 }
@@ -948,5 +978,11 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
 	return -1;
       }
 
+  /* this is important for ReadFromRFBServerMulticast() */
+  if(!SetNonBlocking(sock)) {
+    close(sock);
+    return -1;
+  }
+    
   return sock;
 }

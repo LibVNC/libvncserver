@@ -31,6 +31,7 @@
 #include <time.h>
 #include <rfb/rfbclient.h>
 #include "tls.h"
+#include "packetbuf.h"
 
 static void Dummy(rfbClient* client) {
 }
@@ -200,6 +201,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->multicastSock = -1;
 
   client->maxMulticastTimeouts = 100;
+  client->multicastSocketRcvBufSize = 5242880;
   client->multicastRcvBufSize = 5242880;
   client->multicastLastWholeUpd = -1;
   client->multicastLastPartialUpd = -1;
@@ -384,6 +386,7 @@ void rfbClientCleanup(rfbClient* client) {
     close(client->listenSock);
   if (client->multicastSock >= 0)
     close(client->multicastSock);
+  packetBufDestroy(client->multicastPacketBuf);
   free(client->desktopName);
   free(client->serverHost);
   if (client->destHost)
@@ -399,25 +402,19 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
 {
   int r;
 
-  if(client->multicastSock >= 0 && !client->multicastDisabled) 
-    { 
+  if(client->multicastSock >= 0 && !client->multicastDisabled) {
+      /* see if it's time for a request */
       struct timeval now;
-
-      /* then, see if it's time for a request */
       gettimeofday(&now, NULL);
       if(((now.tv_sec - client->multicastRequestTimestamp.tv_sec)*1000
 	  +(now.tv_usec - client->multicastRequestTimestamp.tv_usec)/1000)
-	 > client->multicastUpdInterval) 
-	{
-	  client->multicastRequestTimestamp = now;
-	  SendMulticastFramebufferUpdateRequest(client, TRUE);
-	}
-
-      r = WaitForMessage(client, 2*client->multicastUpdInterval*1000);
-    }
-  else
-    r = WaitForMessage(client, usec_timeout); 
-
+	 > client->multicastUpdInterval) {
+	client->multicastRequestTimestamp = now;
+	SendMulticastFramebufferUpdateRequest(client, TRUE);
+      }
+  }
+  
+  r = WaitForMessage(client, usec_timeout); 
 
   if(r<0)  /* error while waiting */
     return FALSE;

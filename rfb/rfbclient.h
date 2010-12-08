@@ -335,12 +335,14 @@ typedef struct _rfbClient {
         /* all the multicast stuff */
         rfbBool canHandleMulticastVNC;
         int maxMulticastTimeouts;
-        int multicastRcvBufSize;
         int multicastSock;
-#define RFB_MULTICAST_BUF_SIZE 65507 /* max payload of one UDP packet */
-        char multicastbuf[RFB_MULTICAST_BUF_SIZE];
+        int multicastSocketRcvBufSize;
+        int multicastRcvBufSize;
+        void *multicastPacketBuf;
         char *multicastbufoutptr;
-        int multicastbuffered;
+        size_t multicastbuffered;
+#define MULTICAST_READBUF_SZ 65507 /* max UDP payload */
+        char multicastReadBuf[MULTICAST_READBUF_SZ];
         int multicastUpdInterval;
         struct timeval multicastRequestTimestamp; /* gets set when multicast framebuffer update was requested */
         int multicastPixelformatId;
