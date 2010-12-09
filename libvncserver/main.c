@@ -897,18 +897,25 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->udpPort=0;
    screen->udpClient=NULL;
 
+   /*
+     set MulticastVNC defaults
+   */
    screen->multicastVNC=FALSE;
    screen->multicastSock=-1;
-   /* next one is some random default out of the AD-HOC Block (224.0.2.0/24 - 224.0.255.0/24) see RFC 3171 */
+   /* this is some random default out of the AD-HOC Block (224.0.2.0/24 - 224.0.255.0/24) see RFC 3171 */
    screen->multicastAddr="224.0.42.138";
    screen->multicastPort=5900;
    screen->multicastTTL=1;
    screen->multicastDeferUpdateTime=30;
    screen->multicastSendRate = 524288;
+   /* the multicast update buffer _must_ fit into a UDP packet, but better be <= the MSS of the link.
+      so for 802.11, this is (MTU=2272 - IPv6-header=40 - UDP-header=8) = 2224.
+      we rather optimize for that than for ethernet which is mainly switched today... */
+   screen->multicastUpdateBufSize = 2224;
 
    INIT_MUTEX(screen->multicastOutputMutex);
    INIT_MUTEX(screen->multicastUpdateMutex);
-   screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
+   screen->multicastUpdateRegion = sraRgnCreateRect(0, 0, screen->width, screen->height);
    screen->multicastUseCopyRect = TRUE;
 
    screen->maxFd=0;
@@ -1104,7 +1111,9 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
 
   TINI_MUTEX(screen->multicastOutputMutex);
   TINI_MUTEX(screen->multicastUpdateMutex);
-  sraRgnDestroy(screen->multicastUpdateRegion);  
+  sraRgnDestroy(screen->multicastUpdateRegion);
+  if(screen->multicastUpdateBuf)
+    free(screen->multicastUpdateBuf);
 
   rfbRRECleanup(screen);
   rfbCoRRECleanup(screen);
@@ -1141,6 +1150,8 @@ void rfbInitServer(rfbScreenInfoPtr screen)
   if(screen->ignoreSIGPIPE)
     signal(SIGPIPE,SIG_IGN);
 #endif
+  if(screen->multicastVNC)
+    screen->multicastUpdateBuf = malloc(screen->multicastUpdateBufSize);
 }
 
 void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
@@ -1156,6 +1167,9 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
 
   rfbShutdownSockets(screen);
   rfbHttpShutdownSockets(screen);
+
+  free(screen->multicastUpdateBuf);
+  screen->multicastUpdateBuf = NULL;
 }
 
 #ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY

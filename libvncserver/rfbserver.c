@@ -3372,7 +3372,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 #endif
 
 	if(cl->screen->mcublen + sz_rfbFramebufferUpdateRectHeader + maxSizeRect 
-	   > MULTICAST_UPDATE_BUF_SIZE) {                /* would overflow */
+	   > cl->screen->multicastUpdateBufSize) {                /* would overflow */
 	  if(mfu)
 	    mfu->nRects = Swap16IfLE(nRects);
 
@@ -3388,7 +3388,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	  nRects = 0;
 	 
 	  if(sz_rfbMulticastFramebufferUpdateMsg + sz_rfbFramebufferUpdateRectHeader + maxSizeRect 
-	     <= MULTICAST_UPDATE_BUF_SIZE) {            /* headers + rect fit into now empty buffer */
+	     <= cl->screen->multicastUpdateBufSize) {            /* headers + rect fit into now empty buffer */
 	    
 	    mfu = rfbPutMulticastHeader(cl, 
 					cl->screen->multicastWholeUpdId,
@@ -3401,7 +3401,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	  else {                                        /* rect too large for buffer, must be split up */
 	    const int bytesPerPixel = cl->format.bitsPerPixel/8;
 	    const int bytesPerLine = w * bytesPerPixel;
-	    const int payload = (MULTICAST_UPDATE_BUF_SIZE - sz_rfbMulticastFramebufferUpdateMsg) - sz_rfbFramebufferUpdateRectHeader;
+	    const int payload = (cl->screen->multicastUpdateBufSize - sz_rfbMulticastFramebufferUpdateMsg) - sz_rfbFramebufferUpdateRectHeader;
 	    const int linesPerUpd =  payload / bytesPerLine;
 	    int wholeLineSplitRects = 0;
 	    int lineOffset=0;
