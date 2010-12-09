@@ -1150,8 +1150,13 @@ void rfbInitServer(rfbScreenInfoPtr screen)
   if(screen->ignoreSIGPIPE)
     signal(SIGPIPE,SIG_IGN);
 #endif
-  if(screen->multicastVNC)
+  if(screen->multicastVNC) {
+    /* if smaller than any reasonable payload or bigger than the max UDP payload,
+       use default value. */
+    if(screen->multicastUpdateBufSize < 100 || screen->multicastUpdateBufSize > 65507)
+      screen->multicastUpdateBufSize = 2224;
     screen->multicastUpdateBuf = malloc(screen->multicastUpdateBufSize);
+  }
 }
 
 void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
