@@ -98,6 +98,91 @@ int deny_severity=LOG_WARNING;
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */
 
+
+/*
+  Create a multicast socket and saves addr and port in sockAddr.
+  Returns socket fd on success, -1 on failure.
+ */
+
+static int
+rfbCreateMulticastSocket(char *addr,
+			 int port,
+			 int ttl,
+			 in_addr_t iface,
+			 struct sockaddr_storage* sockAddr)
+{
+  int sock;
+  int r;
+  struct addrinfo *multicastAddrInfo;
+  struct addrinfo hints;
+  char serv[8];
+  snprintf(serv, sizeof(serv), "%d", port);
+
+  /* resolve parameters into multicastAddrInfo struct */
+  memset(&hints, 0, sizeof(struct addrinfo));
+  hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_flags = AI_NUMERICHOST;
+  
+  r = getaddrinfo(addr, serv, &hints, &multicastAddrInfo); 
+  if(r != 0)
+    {
+      rfbLog("rfbCreateMulticastSocket: %s", gai_strerror(r));
+      return -1;
+    }
+
+  /* save multicast address and port */
+  *sockAddr = *(struct sockaddr_storage*)multicastAddrInfo->ai_addr;
+  
+  /* create socket for sending multicast datagrams */
+  if((sock = socket(multicastAddrInfo->ai_family, multicastAddrInfo->ai_socktype, 0)) < 0)
+    {
+      rfbLogPerror("rfbCreateMulticastSocket socket()");
+      freeaddrinfo(multicastAddrInfo);  
+      return -1;
+    }
+
+  /* set multicast TTL */
+  if(setsockopt(sock,
+		multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
+		multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_HOPS : IP_MULTICAST_TTL,
+		(char*)&ttl, sizeof(ttl)) < 0 )
+    {
+      rfbLogPerror("rfbCreateMulticastSocket ttl setsockopt()");
+      freeaddrinfo(multicastAddrInfo);  
+      closesocket(sock);
+      return -1;
+    }
+   
+  /* connect the socket */
+  if(connect(sock,(struct sockaddr*)sockAddr, sizeof(*sockAddr)) < 0)
+    {
+      rfbLogPerror("rfbCreateMulticastSocket connect()");
+      freeaddrinfo(multicastAddrInfo);  
+      closesocket(sock);
+      return -1;
+    }
+
+  /* set the sending interface */
+  /* FIXME does it have to be a ipv6 iface in case we're doing ipv6? */
+  if(setsockopt (sock, 
+		 multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
+		 multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_IF : IP_MULTICAST_IF,
+		 (char*)&iface, sizeof(iface)) < 0)  
+    {
+      rfbLogPerror("rfbCreateMulticastSocket interface setsockopt()");
+      freeaddrinfo(multicastAddrInfo);  
+      closesocket(sock);
+      return -1;
+    }
+
+ 
+  freeaddrinfo(multicastAddrInfo);  
+  return sock;
+}
+
+
+
 /*
  * rfbInitSockets sets up the TCP and UDP sockets to listen for RFB
  * connections.  It does nothing if called again.
@@ -832,87 +917,5 @@ rfbSetNonBlocking(int sock)
   return TRUE;
 }
 
-
-/*
-  Create a multicast socket and saves addr and port in sockAddr.
-  Returns socket fd on success, -1 on failure.
- */
-
-int 
-rfbCreateMulticastSocket(char *addr,
-			 int port,
-			 int ttl,
-			 in_addr_t iface,
-			 struct sockaddr_storage* sockAddr)
-{
-  int sock;
-  int r;
-  struct addrinfo *multicastAddrInfo;
-  struct addrinfo hints;        
-  char serv[8];
-  snprintf(serv, sizeof(serv), "%d", port);
-
-  /* resolve parameters into multicastAddrInfo struct */
-  memset(&hints, 0, sizeof(struct addrinfo));
-  hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
-  hints.ai_socktype = SOCK_DGRAM;
-  hints.ai_flags = AI_NUMERICHOST;
-  
-  r = getaddrinfo(addr, serv, &hints, &multicastAddrInfo); 
-  if(r != 0)
-    {
-      rfbLog("rfbCreateMulticastSocket: %s", gai_strerror(r));
-      return -1;
-    }
-
-  /* save multicast address and port */
-  *sockAddr = *(struct sockaddr_storage*)multicastAddrInfo->ai_addr;
-  
-  /* create socket for sending multicast datagrams */
-  if((sock = socket(multicastAddrInfo->ai_family, multicastAddrInfo->ai_socktype, 0)) < 0)
-    {
-      rfbLogPerror("rfbCreateMulticastSocket socket()");
-      freeaddrinfo(multicastAddrInfo);  
-      return -1;
-    }
-
-  /* set multicast TTL */
-  if(setsockopt(sock,
-		multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
-		multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_HOPS : IP_MULTICAST_TTL,
-		(char*)&ttl, sizeof(ttl)) < 0 )
-    {
-      rfbLogPerror("rfbCreateMulticastSocket ttl setsockopt()");
-      freeaddrinfo(multicastAddrInfo);  
-      closesocket(sock);
-      return -1;
-    }
-   
-  /* connect the socket */
-  if(connect(sock,(struct sockaddr*)sockAddr, sizeof(*sockAddr)) < 0)
-    {
-      rfbLogPerror("rfbCreateMulticastSocket connect()");
-      freeaddrinfo(multicastAddrInfo);  
-      closesocket(sock);
-      return -1;
-    }
-
-  /* set the sending interface */
-  /* FIXME does it have to be a ipv6 iface in case we're doing ipv6? */
-  if(setsockopt (sock, 
-		 multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
-		 multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_IF : IP_MULTICAST_IF,
-		 (char*)&iface, sizeof(iface)) < 0)  
-    {
-      rfbLogPerror("rfbCreateMulticastSocket interface setsockopt()");
-      freeaddrinfo(multicastAddrInfo);  
-      closesocket(sock);
-      return -1;
-    }
-
- 
-  freeaddrinfo(multicastAddrInfo);  
-  return sock;
-}
 
 

@@ -254,6 +254,8 @@ static rfbBool HandleZRLE24Down(rfbClient* client, int rx, int ry, int rw, int r
 static rfbBool HandleZRLE32(rfbClient* client, int rx, int ry, int rw, int rh);
 #endif
 
+extern int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recvbuf);
+
 /*
  * Server Capability Functions
  */

@@ -435,7 +435,6 @@ extern int ConnectClientToUnixSock(const char *sockFile);
 extern int AcceptTcpConnection(int listenSock);
 extern rfbBool SetNonBlocking(int sock);
 extern rfbBool SetDSCP(int sock, int dscp);
-extern int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recvbuf);
 
 extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
 extern rfbBool SameMachine(int sock);
