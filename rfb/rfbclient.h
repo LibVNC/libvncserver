@@ -337,7 +337,8 @@ typedef struct _rfbClient {
         int maxMulticastTimeouts;
         int multicastSock;
         int multicastSocketRcvBufSize;
-        int multicastRcvBufSize;
+        int multicastRcvBufSize;   /**< Size of the multicast receive buffer */
+        int multicastRcvBufLen;    /**< Current fill of the multicast receive buffer */
         void *multicastPacketBuf;
         char *multicastbufoutptr;
         size_t multicastbuffered;

@@ -290,6 +290,8 @@ ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
 #endif
   }
 
+  client->multicastRcvBufLen = pbuf->len;
+
   /*
     now service the request of n bytes (which have to be <= what's buffered of the packet)
   */
