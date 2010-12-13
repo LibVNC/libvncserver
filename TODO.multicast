@@ -1,29 +1,11 @@
 
+SERVER:
+
 - some empty updates are sent in split rect case
 
 - more heartbeat messages if nothing changed?
 
-- add #ifdef MULTICASTVNC around mcast code
-
 - make send rate adapt
-
-- missing packets only NACKed once
-
-- verify sender address+port in  ReadFromRFBServerMulticast()?
-  -> would need bind() to address we got from getaddrinfo() 
-     (plus a SO_REUSEADDR setsockopt() if same port as client &
-     running on same host...) on server side, address and port
-     transmitted to client, then a connect() at client side.
-
-- Implement other encodings than raw and ultra.
-
-- As there are many different ways of computing lost packet stats 
-  (take a sample every time interval or every n packets or compute
-  global average), the loss-ratio handling is right now completely
-  left to the client app, the library just spits out some warnings.
-  Leave that so or provide someting in the library? 
-  --> We have to do at least some of this if we want the server 
-      throttling in the library...
 
 - What about multicast specific stats? Right now all clients of one
   (pixelformat,enc) group share the same stats, but there is no way
@@ -42,6 +24,39 @@
       rfbSendFramebufferUpdate(). Then we would need to turn of
       cl->lastrectenabled in the multicast case and re-enable it later
       on
+
+- right now send rates are logged using the partial region update buffer,
+  when a send rate is marked as decreased, the whole array is searched for
+  that send rate.
+
+
+CLIENT:
+
+- missing packets only NACKed once
+
+- verify sender address+port in  ReadFromRFBServerMulticast()?
+  -> would need bind() to address we got from getaddrinfo() 
+     (plus a SO_REUSEADDR setsockopt() if same port as client &
+     running on same host...) on server side, address and port
+     transmitted to client, then a connect() at client side.
+
+
+BOTH:
+
+- add #ifdef MULTICASTVNC around mcast code
+
+- Implement other encodings than raw and ultra.
+
+- As there are many different ways of computing lost packet stats 
+  (take a sample every time interval or every n packets or compute
+  global average), the loss-ratio handling is right now completely
+  left to the client app, the library just spits out some warnings.
+  Leave that so or provide someting in the library? 
+  --> We have to do at least some of this if we want the server 
+      throttling in the library...
+
+
+
 
 
 
