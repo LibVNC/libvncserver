@@ -915,7 +915,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    INIT_MUTEX(screen->multicastOutputMutex);
    INIT_MUTEX(screen->multicastUpdateMutex);
-   screen->multicastUpdateRegion = sraRgnCreateRect(0, 0, screen->width, screen->height);
+   screen->multicastUpdateRegion = sraRgnCreateRect(0, 0, width, height);
    screen->multicastUseCopyRect = TRUE;
 
    screen->maxFd=0;
