@@ -664,7 +664,7 @@ typedef struct _rfbClientRec {
     rfbBool* multicastUpdPendingPtr;  /**< this bool on the heap is shared by all clients with the
 					 same pixelformat and encoding */
     /* multicast NACK stuff */
-#define MULTICAST_PART_UPD_RGN_BUF_SIZE 10000
+#define MULTICAST_PART_UPD_RGN_BUF_SIZE 52428800 /**< Server should keep a backlog of at max this many sent bytes */
   void* multicastPartUpdRgnBuf;      /**< a ringbuffer holding partial update <-> region mappings.
 					this is allocated on the heap and shared by all clients
 					with the same pixelformat and encoding*/

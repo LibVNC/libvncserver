@@ -2452,7 +2452,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 #ifdef MULTICAST_DEBUG
 	      uint32_t oldrate = cl->screen->multicastMaxSendRate;
 	      uint32_t oldincr = cl->screen->multicastMaxSendRateIncrement;
-#endif 
+#endif
 	      /* decrease send rate */
 	      cl->screen->multicastMaxSendRate *= 1.0/MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
 	      /* adapt increment timer to send rate */
@@ -2469,7 +2469,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		     cl->screen->multicastMaxSendRate,
 		     oldincr,
 		     cl->screen->multicastMaxSendRateIncrement);
-#endif  
+#endif
 	      /* mark this sendrate as decreased */
 	      for(j=0; j < partUpdRgnBufCount(buf); ++j)
 		if(partUpdRgnBufAt(buf, j)->sendrate == partUpdRgnBufAt(buf, i)->sendrate)
@@ -2953,7 +2953,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 
 	if(someclient == NULL) { /* no other client has this, alloc new ones on the heap */
 	  cl->multicastUpdPendingPtr = calloc(sizeof(rfbBool), 1);
-	  cl->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE);
+	  cl->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE/cl->screen->multicastUpdateBufSize);
 	  rfbLog("MulticastVNC encountered new pixelformat and/or encoding, allocating new data for client %s\n", cl->host);
 	}
 
