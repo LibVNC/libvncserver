@@ -911,17 +911,10 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
       so for 802.11, this is (MTU=2272 - IPv6-header=40 - UDP-header=8) = 2224.
       we rather optimize for that than for ethernet which is mainly switched today... */
    screen->multicastUpdateBufSize = 2224;
-   screen->multicastMaxSendRate = 131072;
-   screen->multicastMaxSendRateIncrement = 1024;
 
-   /*
-     set MulticastVNC initial values FIXME move to initserver!
-    */
    INIT_MUTEX(screen->multicastOutputMutex);
    INIT_MUTEX(screen->multicastUpdateMutex);
    screen->multicastUpdateRegion = sraRgnCreateRect(0, 0, width, height);
-   screen->multicastUseCopyRect = TRUE;
-   screen->multicastMaxSendRateIncrementInterval = (1000*MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR*screen->multicastUpdateBufSize)/screen->multicastMaxSendRate;
 
    screen->maxFd=0;
    screen->listenSock=-1;
@@ -1156,11 +1149,16 @@ void rfbInitServer(rfbScreenInfoPtr screen)
     signal(SIGPIPE,SIG_IGN);
 #endif
   if(screen->multicastVNC) {
-    /* if smaller than any reasonable payload or bigger than the max UDP payload,
-       use default value. */
+    /* if smaller than any reasonable payload or bigger than the max UDP payload, use default value. */
     if(screen->multicastUpdateBufSize < 100 || screen->multicastUpdateBufSize > 65507)
       screen->multicastUpdateBufSize = 2224;
     screen->multicastUpdateBuf = malloc(screen->multicastUpdateBufSize);
+
+    screen->multicastUseCopyRect = TRUE;
+
+    screen->multicastMaxSendRate = 131072;
+    screen->multicastMaxSendRateIncrement = 1024;
+    screen->multicastMaxSendRateIncrementInterval = (1000*MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR*screen->multicastUpdateBufSize)/screen->multicastMaxSendRate;
   }
 }
 
@@ -1178,8 +1176,10 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
   rfbShutdownSockets(screen);
   rfbHttpShutdownSockets(screen);
 
-  free(screen->multicastUpdateBuf);
-  screen->multicastUpdateBuf = NULL;
+  if(screen->multicastUpdateBuf) {
+    free(screen->multicastUpdateBuf);
+    screen->multicastUpdateBuf = NULL;
+  }
 }
 
 #ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
