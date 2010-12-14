@@ -907,16 +907,21 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->multicastPort=5900;
    screen->multicastTTL=1;
    screen->multicastDeferUpdateTime=30;
-   screen->multicastSendRate = 524288;
    /* the multicast update buffer _must_ fit into a UDP packet, but better be <= the MSS of the link.
       so for 802.11, this is (MTU=2272 - IPv6-header=40 - UDP-header=8) = 2224.
       we rather optimize for that than for ethernet which is mainly switched today... */
    screen->multicastUpdateBufSize = 2224;
+   screen->multicastMaxSendRate = 131072;
+   screen->multicastMaxSendRateIncrement = 1024;
 
+   /*
+     set MulticastVNC initial values FIXME move to initserver!
+    */
    INIT_MUTEX(screen->multicastOutputMutex);
    INIT_MUTEX(screen->multicastUpdateMutex);
    screen->multicastUpdateRegion = sraRgnCreateRect(0, 0, width, height);
    screen->multicastUseCopyRect = TRUE;
+   screen->multicastMaxSendRateIncrementInterval = (1000*MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR*screen->multicastUpdateBufSize)/screen->multicastMaxSendRate;
 
    screen->maxFd=0;
    screen->listenSock=-1;

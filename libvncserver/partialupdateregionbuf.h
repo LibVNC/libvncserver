@@ -35,6 +35,8 @@ typedef struct _partialUpdRegion {
   uint32_t idPartial;
   sraRegionPtr region;
   rfbBool pending;
+  uint32_t sendrate;
+  rfbBool sendrate_decreased;
 } partialUpdRegion;
 
 

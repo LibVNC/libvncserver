@@ -5,8 +5,6 @@ SERVER:
 
 - more heartbeat messages if nothing changed?
 
-- make send rate adapt
-
 - What about multicast specific stats? Right now all clients of one
   (pixelformat,enc) group share the same stats, but there is no way
   to tell if some encoding was sent via uni- or multicast.
@@ -25,9 +23,8 @@ SERVER:
       cl->lastrectenabled in the multicast case and re-enable it later
       on
 
-- right now send rates are logged using the partial region update buffer,
-  when a send rate is marked as decreased, the whole array is searched for
-  that send rate.
+- right now send rates are logged per pf,enc group but there is only one
+  global send rate modified
 
 
 CLIENT:

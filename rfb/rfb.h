@@ -389,7 +389,7 @@ typedef struct _rfbScreenInfo
     uint16_t  mcublen;
     uint16_t multicastWholeUpdId;
     uint32_t multicastPartialUpdId;
-    rfbBool multicastUseCopyRect;            /* all multicast clients support CopyRect */
+    rfbBool multicastUseCopyRect;            /**< All multicast clients support CopyRect */
     sraRegionPtr multicastUpdateRegion;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     MUTEX(multicastOutputMutex);
@@ -399,7 +399,14 @@ typedef struct _rfbScreenInfo
     /* multicast send rate limiting stuff */
     struct timeval lastMulticastSendCreditRefill;
     uint32_t multicastSendCredit;
-    uint32_t multicastSendRate; /* bytes/s */
+    uint32_t multicastMaxSendRate;              /**< In bytes/s */
+#define MULTICAST_MAXSENDRATE_CHANGE_FACTOR 1.2 /**< Factor by which max send rate is decreased and increment value changed */
+#define MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER 10 /**< After this many consecutive increments the increment itself is increased */
+    uint32_t multicastMaxSendRateIncrement;
+    uint8_t multicastMaxSendRateIncrementCount;
+#define MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR 3 /**< This regulates how long to wait between send rate increments */
+    struct timeval lastMulticastMaxSendRateIncrement; 
+    int multicastMaxSendRateIncrementInterval;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 

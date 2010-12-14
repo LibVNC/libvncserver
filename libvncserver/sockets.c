@@ -718,6 +718,9 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
   LOCK(rfbScreen->multicastOutputMutex);
   while(len > 0) 
     {
+      /*
+	refill send credit based on elapsed time and max send rate
+       */
 #ifdef MULTICAST_DEBUG
       rfbLog("MulticastVNC DEBUG: wants to write %d, send credit %u\n", len, rfbScreen->multicastSendCredit);
 #endif
@@ -727,17 +730,19 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 
       elapsed_ms = (now.tv_sec - rfbScreen->lastMulticastSendCreditRefill.tv_sec)*1000 + (now.tv_usec - rfbScreen->lastMulticastSendCreditRefill.tv_usec)/1000;
 
-      /* refill send credit */
-      rfbScreen->multicastSendCredit += (rfbScreen->multicastSendRate/1000) * elapsed_ms;
-      if(rfbScreen->multicastSendCredit > rfbScreen->multicastSendRate)
-	rfbScreen->multicastSendCredit = rfbScreen->multicastSendRate;
+      rfbScreen->multicastSendCredit += (rfbScreen->multicastMaxSendRate/1000) * elapsed_ms;
+      if(rfbScreen->multicastSendCredit > rfbScreen->multicastMaxSendRate)
+	rfbScreen->multicastSendCredit = rfbScreen->multicastMaxSendRate;
 
       rfbScreen->lastMulticastSendCreditRefill = now;
 #ifdef MULTICAST_DEBUG
       rfbLog("MulticastVNC DEBUG: send credit increased to %u after %lu ms\n", rfbScreen->multicastSendCredit, elapsed_ms);
 #endif
 
-      /* when the send credit is exceeded wait a short while and then try again */
+
+      /* 
+	 when the send credit is exceeded wait a short while and then try again
+      */
       if(len > rfbScreen->multicastSendCredit) {
 #ifndef WIN32
         usleep (1000);
@@ -747,6 +752,38 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 	continue;
       }
 
+
+      /*
+	increase max send rate based on timer
+      */
+      gettimeofday(&now,NULL);
+      if(now.tv_sec < rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec) /* at midnight on win32 */
+	now.tv_sec = rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec;
+
+      if((now.tv_sec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec)*1000
+	 +(now.tv_usec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_usec)/1000
+	 >= rfbScreen->multicastMaxSendRateIncrementInterval) {
+	/* increment send rate */
+	rfbScreen->multicastMaxSendRate += rfbScreen->multicastMaxSendRateIncrement;
+	/* increase the increment itself */
+	if(++rfbScreen->multicastMaxSendRateIncrementCount % MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER == 0)
+	  rfbScreen->multicastMaxSendRateIncrement *= MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
+	/* adapt increment timer to send rate */
+	rfbScreen->multicastMaxSendRateIncrementInterval = (1000*MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR*rfbScreen->multicastUpdateBufSize)
+	  / rfbScreen->multicastMaxSendRate;
+#ifdef MULTICAST_DEBUG
+	rfbLog("MulticastVNC DEBUG: max send rate += %u to %u after %u ms timer interval\n", 
+	       rfbScreen->multicastMaxSendRateIncrement,
+	       rfbScreen->multicastMaxSendRate,
+	       rfbScreen->multicastMaxSendRateIncrementInterval);
+#endif
+	rfbScreen->lastMulticastMaxSendRateIncrement = now;
+      }
+
+
+      /*
+	enough send credit, go on sending
+      */
       n = write(sock, buf, len);
       
       if(n > 0) 

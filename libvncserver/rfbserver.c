@@ -2438,13 +2438,43 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	  uint32_t start = msg.mfun.idPartialUpd - firstInBuf;
 	  uint32_t i;
 
-	  /* mark the lost partial updates as requested */
 	  for(i = start; i < start+msg.mfun.nPartialUpds && i < buf->len; ++i) {
 #ifdef MULTICAST_DEBUG
 	    rfbLog("MulticastVNC DEBUG: marking buffer position %u, partial id %u as NACKed\n",
 		   i, partUpdRgnBufAt(buf, i)->idPartial);
 #endif
+	    /* mark the lost partial updates as requested */
 	    partUpdRgnBufAt(buf, i)->pending = TRUE;
+	    
+	    /* check whether we should decrease the send rate */
+	    if(!partUpdRgnBufAt(buf, i)->sendrate_decreased && cl->screen->multicastMaxSendRate >= partUpdRgnBufAt(buf, i)->sendrate) {
+	      uint32_t j;
+#ifdef MULTICAST_DEBUG
+	      uint32_t oldrate = cl->screen->multicastMaxSendRate;
+	      uint32_t oldincr = cl->screen->multicastMaxSendRateIncrement;
+#endif 
+	      /* decrease send rate */
+	      cl->screen->multicastMaxSendRate *= 1.0/MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
+	      /* adapt increment timer to send rate */
+	      cl->screen->multicastMaxSendRateIncrementInterval = (1000*MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR*cl->screen->multicastUpdateBufSize)
+		/ cl->screen->multicastMaxSendRate;
+	      /* decrease the increment itself */
+	      cl->screen->multicastMaxSendRateIncrement *= 1.0/MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
+	      /* reset increment increase counter: we increase the increment after MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER increments
+		 WITHOUT a send rate decrease in between */
+	      cl->screen->multicastMaxSendRateIncrementCount = 0;
+#ifdef MULTICAST_DEBUG
+	      rfbLog("MulticastVNC DEBUG: max send rate decreased from %u to %u, increment decreased from %u to %u\n", 
+		     oldrate,
+		     cl->screen->multicastMaxSendRate,
+		     oldincr,
+		     cl->screen->multicastMaxSendRateIncrement);
+#endif  
+	      /* mark this sendrate as decreased */
+	      for(j=0; j < partUpdRgnBufCount(buf); ++j)
+		if(partUpdRgnBufAt(buf, j)->sendrate == partUpdRgnBufAt(buf, i)->sendrate)
+		  partUpdRgnBufAt(buf, j)->sendrate_decreased = TRUE;
+	    }
 	  }
 
 	  /* mark this pixelformat and encoding as needing repair */
@@ -3631,8 +3661,10 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
     partialUpdRegion tmp;
     tmp.idWhole = idWholeUpd;
     tmp.idPartial = idPartialUpd;
-    tmp.pending = FALSE;
     tmp.region = sraRgnCreate();
+    tmp.pending = FALSE; 
+    tmp.sendrate = cl->screen->multicastMaxSendRate;
+    tmp.sendrate_decreased = FALSE;
     partUpdRgnBufInsert(buf, tmp);
   }
 
