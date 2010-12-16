@@ -44,15 +44,6 @@ BOTH:
 
 - Implement other encodings than raw and ultra.
 
-- As there are many different ways of computing lost packet stats 
-  (take a sample every time interval or every n packets or compute
-  global average), the loss-ratio handling is right now completely
-  left to the client app, the library just spits out some warnings.
-  Leave that so or provide someting in the library? 
-  --> We have to do at least some of this if we want the server 
-      throttling in the library...
-
-
 
 
 
