@@ -400,15 +400,17 @@ typedef struct _rfbScreenInfo
 						and multicastMaxSendRateIncrementInterval */
 #endif
     int multicastDeferUpdateTime;
-    /* multicast send rate limiting stuff */
+    /* multicast flow control stuff */
+#define MULTICAST_MAXSENDRATE_RATE_START 524288            /**< Initial maximum multicast send rate */
+#define MULTICAST_MAXSENDRATE_INCREMENT_START 1024         /**< Initial multicast send rate increment value*/
+#define MULTICAST_MAXSENDRATE_CHANGE_FACTOR 1.2            /**< Factor by which max send rate is decreased and increment value changed */
+#define MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER 15        /**< After this many consecutive increments the increment itself is increased */
+#define MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR 5  /**< This regulates how long to wait between send rate increments */
     struct timeval lastMulticastSendCreditRefill;
     uint32_t multicastSendCredit;
-    uint32_t multicastMaxSendRate;              /**< In bytes/s */
-#define MULTICAST_MAXSENDRATE_CHANGE_FACTOR 1.2 /**< Factor by which max send rate is decreased and increment value changed */
-#define MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER 10 /**< After this many consecutive increments the increment itself is increased */
+    uint32_t multicastMaxSendRate;
     uint32_t multicastMaxSendRateIncrement;
     uint8_t multicastMaxSendRateIncrementCount;
-#define MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR 3 /**< This regulates how long to wait between send rate increments */
     struct timeval lastMulticastMaxSendRateIncrement; 
     int multicastMaxSendRateIncrementInterval;
 } rfbScreenInfo, *rfbScreenInfoPtr;

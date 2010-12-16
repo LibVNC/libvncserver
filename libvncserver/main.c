@@ -1158,8 +1158,8 @@ void rfbInitServer(rfbScreenInfoPtr screen)
 
     screen->multicastUseCopyRect = TRUE;
 
-    screen->multicastMaxSendRate = 131072;
-    screen->multicastMaxSendRateIncrement = 1024;
+    screen->multicastMaxSendRate = MULTICAST_MAXSENDRATE_RATE_START;
+    screen->multicastMaxSendRateIncrement = MULTICAST_MAXSENDRATE_INCREMENT_START;
     screen->multicastMaxSendRateIncrementInterval = (1000*MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR*screen->multicastUpdateBufSize)/screen->multicastMaxSendRate;
   }
 }
