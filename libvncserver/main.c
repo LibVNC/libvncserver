@@ -401,9 +401,9 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr screen,sraRegionPtr modRegion)
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
 
-   LOCK(screen->multicastUpdateMutex);
+   LOCK(screen->multicastSharedMutex);
    sraRgnOr(screen->multicastUpdateRegion, modRegion);
-   UNLOCK(screen->multicastUpdateMutex);
+   UNLOCK(screen->multicastSharedMutex);
 
    iterator=rfbGetClientIterator(screen);
    while((cl=rfbClientIteratorNext(iterator))) {
@@ -463,7 +463,7 @@ static void doMcast(rfbClientPtr cl)
        We do this by preparing modifiedRegion and requestedRegion
        so rfbSendFramebufferUpdate only sends CopyRect.
     */
-    LOCK(cl->screen->multicastUpdateMutex);
+    LOCK(cl->screen->multicastSharedMutex);
     if(cl->screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion)) {
       sraRgnMakeEmpty(cl->modifiedRegion);
       sraRegionPtr tmp = sraRgnCreateRect(0, 0, cl->screen->width, cl->screen->height);
@@ -472,7 +472,7 @@ static void doMcast(rfbClientPtr cl)
       /* subtract copyRegion from the region to be sent via multicast */
       sraRgnSubtract(cl->screen->multicastUpdateRegion, cl->copyRegion);
     }
-    UNLOCK(cl->screen->multicastUpdateMutex);
+    UNLOCK(cl->screen->multicastSharedMutex);
   }
 
   UNLOCK(cl->updateMutex);
@@ -914,6 +914,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    INIT_MUTEX(screen->multicastOutputMutex);
    INIT_MUTEX(screen->multicastUpdateMutex);
+   INIT_MUTEX(screen->multicastSharedMutex);
    screen->multicastUpdateRegion = sraRgnCreateRect(0, 0, width, height);
 
    screen->maxFd=0;
@@ -1036,12 +1037,12 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
   screen->bitsPerPixel = screen->depth = 8*bytesPerPixel;
   screen->paddedWidthInBytes = width*bytesPerPixel;
 
-  LOCK(screen->multicastUpdateMutex);
+  LOCK(screen->multicastSharedMutex);
 
   sraRgnDestroy(screen->multicastUpdateRegion);  
   screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
 
-  UNLOCK(screen->multicastUpdateMutex);
+  UNLOCK(screen->multicastSharedMutex);
 
   rfbInitServerFormat(screen, bitsPerSample);
 
@@ -1109,6 +1110,7 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
 
   TINI_MUTEX(screen->multicastOutputMutex);
   TINI_MUTEX(screen->multicastUpdateMutex);
+  TINI_MUTEX(screen->multicastSharedMutex);
   sraRgnDestroy(screen->multicastUpdateRegion);
   if(screen->multicastUpdateBuf)
     free(screen->multicastUpdateBuf);

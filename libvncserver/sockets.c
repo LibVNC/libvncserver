@@ -730,11 +730,15 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 
       elapsed_ms = (now.tv_sec - rfbScreen->lastMulticastSendCreditRefill.tv_sec)*1000 + (now.tv_usec - rfbScreen->lastMulticastSendCreditRefill.tv_usec)/1000;
 
+      LOCK(rfbScreen->multicastSharedMutex);
+
       rfbScreen->multicastSendCredit += (rfbScreen->multicastMaxSendRate/1000) * elapsed_ms;
       if(rfbScreen->multicastSendCredit > rfbScreen->multicastMaxSendRate)
 	rfbScreen->multicastSendCredit = rfbScreen->multicastMaxSendRate;
 
       rfbScreen->lastMulticastSendCreditRefill = now;
+
+      UNLOCK(rfbScreen->multicastSharedMutex);
 #ifdef MULTICAST_DEBUG
       rfbLog("MulticastVNC DEBUG: send credit increased to %u after %lu ms\n", rfbScreen->multicastSendCredit, elapsed_ms);
 #endif
@@ -745,6 +749,7 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 	 see if it's okay to increase the max, then wait a short while for refill and try again.
       */
       if(len > rfbScreen->multicastSendCredit) {
+        LOCK(rfbScreen->multicastSharedMutex);
 	/* we do the send rate increase here because that's when current send rate at max send rate */
 	gettimeofday(&now,NULL);
 	if(now.tv_sec < rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec) /* at midnight on win32 */
@@ -769,6 +774,7 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 #endif
 	  rfbScreen->lastMulticastMaxSendRateIncrement = now;
 	}
+	UNLOCK(rfbScreen->multicastSharedMutex);
 #ifndef WIN32
         usleep (1000);
 #else

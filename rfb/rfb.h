@@ -392,8 +392,12 @@ typedef struct _rfbScreenInfo
     rfbBool multicastUseCopyRect;            /**< All multicast clients support CopyRect */
     sraRegionPtr multicastUpdateRegion;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-    MUTEX(multicastOutputMutex);
-    MUTEX(multicastUpdateMutex);
+    MUTEX(multicastOutputMutex);             /**< Ensures that exactly one thread is sending multicast output */
+    MUTEX(multicastUpdateMutex);             /**< Ensures that exactly one thread is processing a multicast framebuffer update */
+    MUTEX(multicastSharedMutex);             /**< Ensures that exactly one thread is modifying the shared variables
+						multicastUseCopyRect, multicastUpdateRegion, multicastUpdPendingPtr, multicastPartUpdRgnBuf,
+						multicastMaxSendRate, multicastMaxSendRateIncrement, multicastMaxSendRateIncrementCount
+						and multicastMaxSendRateIncrementInterval */
 #endif
     int multicastDeferUpdateTime;
     /* multicast send rate limiting stuff */
