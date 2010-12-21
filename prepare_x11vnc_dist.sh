@@ -19,7 +19,7 @@ sed -e "s/LibVNCServer, [^,)]*\([(,]\)*/x11vnc, $VERSION\1/g" \
 
 mv Makefile.am Makefile.am.LibVNCServer
 
-echo "EXTRA_DIST=tightvnc-1.3dev5-vncviewer-alpha-cursor.patch README.LibVNCServer" > Makefile.am
+echo "EXTRA_DIST=tightvnc-1.3dev5-vncviewer-alpha-cursor.patch RELEASE-NOTES README.LibVNCServer" > Makefile.am
 echo "" >> Makefile.am
 echo "if HAVE_SYSTEM_LIBVNCSERVER" >> Makefile.am
 echo "SUBDIRS=x11vnc classes" >> Makefile.am
@@ -41,6 +41,7 @@ sed -e "s/^SUBDIRS.*$/#SUBDIRS=libvncserver libvncclient x11vnc classes/" \
 
 mv README README.LibVNCServer
 cp x11vnc/README ./README
+cp x11vnc/RELEASE-NOTES ./RELEASE-NOTES
 
 cat LibVNCServer.spec.in | \
 sed -e "s/Johannes.Schindelin@gmx.de/runge@karlrunge.com/gi" \
@@ -134,4 +135,5 @@ make x11vnc-${VERSION}.tar.gz
 for f in configure.ac Makefile.am x11vnc/Makefile.am libvncserver/Makefile.am libvncclient/Makefile.am classes/Makefile.am classes/ssl/Makefile.am acinclude.m4 README; do
 	mv -f $f.LibVNCServer $f
 done
+rm -f ./RELEASE-NOTES
 
