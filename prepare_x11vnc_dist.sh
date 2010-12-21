@@ -15,6 +15,7 @@ sed -e "s/LibVNCServer, [^,)]*\([(,]\)*/x11vnc, $VERSION\1/g" \
     -e "s/AC_PROG_LIBTOOL/AC_PROG_RANLIB/" \
     -e "s/PKG_CHECK/#PKG_CHECK/" \
     -e 's/if test "x$with_gnutls/with_gnutls=no; if test "x$with_gnutls/' \
+    -e 's/if test "x$with_ipv6/with_ipv6=no; if test "x$with_ipv6/' \
 > configure.ac
 
 mv Makefile.am Makefile.am.LibVNCServer

@@ -831,6 +831,20 @@ if test "$build_x11vnc" = "yes"; then
 	# configure.ac:690: required file `x11vnc/Makefile.in' not found
 	#
 	AC_CONFIG_FILES([x11vnc/Makefile x11vnc/misc/Makefile x11vnc/misc/turbovnc/Makefile])
+
+	if test ! -z "$with_system_libvncserver" -a "x$with_system_libvncserver" != "xno"; then
+		# need to move local tarball rfb headers aside:
+		hdrs="rfb.h rfbclient.h rfbproto.h rfbregion.h rfbint.h"
+		echo "with-system-libvncserver: moving aside headers $hdrs"
+		for hdr in $hdrs
+		do
+			if test -f "rfb/$hdr"; then
+				echo "with-system-libvncserver: moving rfb/$hdr to rfb/$hdr.ORIG"
+				mv rfb/$hdr rfb/$hdr.ORIG
+			fi
+		done
+		echo "with-system-libvncserver: *NOTE* move them back manually to start over."
+	fi
 fi
 
 AC_CONFIG_COMMANDS([chmod-libvncserver-config],[chmod a+x libvncserver-config])
