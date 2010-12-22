@@ -26,6 +26,11 @@ SERVER:
 - right now send rates are logged per pf,enc group but there is only one
   global send rate modified
 
+- make the sent buffer smaller again?
+
+- make sent buffer save real payload instead of region?
+
+
 
 CLIENT:
 
