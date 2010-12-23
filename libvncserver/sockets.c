@@ -722,24 +722,27 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 	when not running multi-threaded, process client input in between
 	to check for NACKs influencing MulticastVNC flow control
       */
-      if(!rfbScreen->backgroundLoop) {
-	fd_set fds;
-	struct timeval tv;
-	memcpy((char *)&fds, (char *)&(rfbScreen->allFds), sizeof(fd_set));
-	tv.tv_sec = tv.tv_usec = 0;
-	n = select(rfbScreen->maxFd + 1, &fds, NULL, NULL, &tv);
-	if(n > 0) {
-	  rfbClientIteratorPtr i;
-	  rfbClientPtr cl;
-	  i = rfbGetClientIterator(rfbScreen);
-	  while((cl = rfbClientIteratorNext(i))) {
-	    /* only process normal RFB messages from MulticastVNC clients */
-	    if(FD_ISSET(cl->sock, &fds) && cl->useMulticastVNC && cl->state == RFB_NORMAL && !cl->onHold)
-	      rfbProcessClientMessage(cl);
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+      if(!rfbScreen->backgroundLoop)
+#endif
+	{
+	  fd_set fds;
+	  struct timeval tv;
+	  memcpy((char *)&fds, (char *)&(rfbScreen->allFds), sizeof(fd_set));
+	  tv.tv_sec = tv.tv_usec = 0;
+	  n = select(rfbScreen->maxFd + 1, &fds, NULL, NULL, &tv);
+	  if(n > 0) {
+	    rfbClientIteratorPtr i;
+	    rfbClientPtr cl;
+	    i = rfbGetClientIterator(rfbScreen);
+	    while((cl = rfbClientIteratorNext(i))) {
+	      /* only process normal RFB messages from MulticastVNC clients */
+	      if(FD_ISSET(cl->sock, &fds) && cl->useMulticastVNC && cl->state == RFB_NORMAL && !cl->onHold)
+		rfbProcessClientMessage(cl);
+	    }
+	    rfbReleaseClientIterator(i);
 	  }
-	  rfbReleaseClientIterator(i);
 	}
-      }
 
 
       /*
