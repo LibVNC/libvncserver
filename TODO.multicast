@@ -30,6 +30,7 @@ SERVER:
 
 - make sent buffer save real payload instead of region?
 
+- resent partial updates sometimes do not have wholeUpdId set
 
 
 CLIENT:
