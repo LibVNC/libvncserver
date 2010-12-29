@@ -107,7 +107,7 @@ packet* packetBufAt(packetBuf* b, size_t i)
 /* get number of buffered elements */
 size_t packetBufCount(packetBuf* b)
 {
-  return b->len;
+  return b->count;
 }
 
 
