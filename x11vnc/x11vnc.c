@@ -2026,7 +2026,6 @@ static void check_guess_auth_file(void)  {
 	}
 }
 
-extern int dragum(void);
 extern int is_decimal(char *);
 
 int main(int argc, char* argv[]) {
@@ -2530,9 +2529,17 @@ int main(int argc, char* argv[]) {
 			got_localhost = 1;
 			continue;
 		}
+		if (!strcmp(arg, "-unixsock")) {
+			CHECK_ARGC
+			unix_sock = strdup(argv[++i]);
+			continue;
+		}
 		if (!strcmp(arg, "-listen6")) {
+			CHECK_ARGC
 #if X11VNC_IPV6
 			listen_str6 = strdup(argv[++i]);
+#else
+			++i;
 #endif
 			continue;
 		}
@@ -3929,6 +3936,14 @@ int main(int argc, char* argv[]) {
 		}
 		if (!strcmp(arg, "-macuskbd")) {
 			macosx_us_kbd = 1;
+			continue;
+		}
+		if (!strcmp(arg, "-macnoopengl")) {
+			macosx_no_opengl = 1;
+			continue;
+		}
+		if (!strcmp(arg, "-macnorawfb")) {
+			macosx_no_rawfb = 1;
 			continue;
 		}
 		if (!strcmp(arg, "-gui")) {
@@ -5775,7 +5790,7 @@ int main(int argc, char* argv[]) {
 				waitms = 5;
 			}
 			if (!quiet) {
-				rfbLog("fast read: reset wait  ms to: %d\n", waitms);
+				rfbLog("fast read: reset -wait  ms to: %d\n", waitms);
 			}
 		}
 		if (! got_deferupdate && ! got_defer) {
@@ -5788,7 +5803,7 @@ int main(int argc, char* argv[]) {
 				if (screen) {
 					screen->deferUpdateTime = defer_update;
 				}
-				rfbLog("fast read: reset defer ms to: %d\n", defer_update);
+				rfbLog("fast read: reset -defer ms to: %d\n", defer_update);
 			}
 		}
 	}
@@ -5816,6 +5831,20 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
+
+#ifdef MACOSX
+	if (remote_cmd || query_cmd) {
+		;
+	} else if (macosx_console) {
+		double dt = dnow();
+		copy_screen();
+		dt = dnow() - dt;
+		rfbLog("macosx_console: copied screen in %.3f sec %.1f MB/sec\n",
+		    dt, dpy_x * dpy_y * bpp / (1e+6 * 8 * dt));
+
+	}
+#endif
+
 	if (! quiet) {
 		rfbLog("screen setup finished.\n");
 		if (SHOW_NO_PASSWORD_WARNING && !nopw) {

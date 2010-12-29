@@ -90,6 +90,7 @@ AH_TEMPLATE(HAVE_LINUX_FB_H, [linux fb device build environment present])
 AH_TEMPLATE(HAVE_LINUX_INPUT_H, [linux/input.h present])
 AH_TEMPLATE(HAVE_LINUX_UINPUT_H, [linux uinput device build environment present])
 AH_TEMPLATE(HAVE_MACOSX_NATIVE_DISPLAY, [build MacOS X native display support])
+AH_TEMPLATE(HAVE_MACOSX_OPENGL_H, [MacOS X OpenGL present])
 
 AC_ARG_WITH(xkeyboard,
 [  --without-xkeyboard     disable xkeyboard extension support],,)
@@ -399,6 +400,10 @@ if test "x$with_macosx_native" != "xno"; then
 	AC_DEFINE(HAVE_MACOSX_NATIVE_DISPLAY)
 fi
 
+# Check for OS X opengl header
+AC_CHECK_HEADER(OpenGL/OpenGL.h,
+	[AC_DEFINE(HAVE_MACOSX_OPENGL_H) HAVE_MACOSX_OPENGL_H="true"],,)
+
 AH_TEMPLATE(HAVE_AVAHI, [Avahi/mDNS client build environment present])
 AC_ARG_WITH(avahi,
 [  --without-avahi         disable support for Avahi/mDNS]
@@ -428,6 +433,9 @@ fi
 
 fi
 # end x11vnc only.
+
+# only used in x11vnc/Makefile.am but needs to always be defined:
+AM_CONDITIONAL(OSX_OPENGL, test "$HAVE_MACOSX_OPENGL_H" = "true")
 
 # Checks for libraries.
 
