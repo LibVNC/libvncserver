@@ -88,6 +88,21 @@ void packetBufPop(packetBuf* b)
 }
 
 
+/* Get packet at index i. */
+packet* packetBufAt(packetBuf* b, size_t i)
+{
+ if(b) {
+   packet *r = b->head;
+   while(r && i) {
+     r = r->next;
+     --i;
+   }
+   return r;
+ }
+ else
+   return NULL;
+}
+
 
 /* get number of buffered elements */
 size_t packetBufCount(packetBuf* b)
