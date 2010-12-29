@@ -2485,14 +2485,18 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	UNLOCK(cl->screen->multicastSharedMutex);
 
-	rfbLog("MulticastVNC: NACKed partial update not in send buffer! Increasing send buffer size helps\n");
+	rfbLog("MulticastVNC: NACKed partial update not in send buffer! Increasing send buffer size helps.\n");
 	/* resend empty updates, only lock when really running threaded */
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 	if(cl->screen->backgroundLoop) LOCK(cl->screen->multicastUpdateMutex);
 #endif
 	/* flush buffer just for safety */
-	if(!rfbSendMulticastUpdateBuf(cl->screen))
-	  break;
+	if(!rfbSendMulticastUpdateBuf(cl->screen)) {
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+	  if(cl->screen->backgroundLoop) UNLOCK(cl->screen->multicastUpdateMutex);
+#endif	
+	  return;
+	}
 
         for(i = msg.mfun.idPartialUpd; i < msg.mfun.nPartialUpds; ++i) {
 
@@ -3620,27 +3624,30 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 rfbBool
 rfbSendMulticastRepairUpdate(rfbClientPtr cl)
 {
+  partUpdRgnBuf* buf;
+  rfbBool repairPending;
+
   LOCK(cl->screen->multicastUpdateMutex);
 
-  partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
+  buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
   LOCK(cl->screen->multicastSharedMutex);
-  rfbBool repairPending = buf->dirty;
+  repairPending = buf->dirty;
   UNLOCK(cl->screen->multicastSharedMutex);
 
   if(repairPending) {
     size_t i, count = partUpdRgnBufCount(buf); /* multicastUpdateMutex above ensures the buffer size isn't modified by other threads */
+
+    /* flush buffer just for safety */
+    if(!rfbSendMulticastUpdateBuf(cl->screen)) {
+      UNLOCK(cl->screen->multicastUpdateMutex);
+      return FALSE;
+    }
 
     for(i = 0; i < count; ++i) {
       partialUpdRegion* pur = partUpdRgnBufAt(buf, i);
       if(pur->pending) {
 	sraRectangleIterator* i=NULL;
 	sraRect rect;
-
-	/* flush buffer just for safety */
-	if(!rfbSendMulticastUpdateBuf(cl->screen)) {
-	  UNLOCK(cl->screen->multicastUpdateMutex);
-	  return FALSE;
-	}
 
 	rfbPutMulticastHeader(cl,
 			      pur->idWhole,
