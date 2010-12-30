@@ -204,7 +204,6 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->multicastSocketRcvBufSize = 5242880;
   client->multicastRcvBufSize = 5242880;
   client->multicastLastWholeUpd = -1;
-  client->multicastLastPartialUpd = -1;
   gettimeofday(&client->multicastRequestTimestamp, NULL); /* to avoid an overflow later on */
 
   client->clientAuthSchemes = NULL;
@@ -409,6 +408,21 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
       if(((now.tv_sec - client->multicastRequestTimestamp.tv_sec)*1000
 	  +(now.tv_usec - client->multicastRequestTimestamp.tv_usec)/1000)
 	 > client->multicastUpdInterval) {
+	/* request missing partial updates */
+	packetBuf *pbuf = client->multicastPacketBuf;
+	int i, firstMissing = -1;
+	client->multicastPendingNACKs = 0;
+	for(i=0; i < packetBufCount(pbuf); ++i) {
+	  packet *p= packetBufAt(pbuf, i);
+	  if(!p->data && firstMissing == -1)
+	    firstMissing = i;
+	  if(firstMissing != -1 && p->data) {
+	    SendMulticastFramebufferUpdateNACK(client, packetBufAt(pbuf, firstMissing)->id, i-firstMissing);
+	    client->multicastPendingNACKs += i-firstMissing;
+	    firstMissing = -1;
+	  }
+	}
+	/* and request a new update */
 	client->multicastRequestTimestamp = now;
 	SendMulticastFramebufferUpdateRequest(client, TRUE);
       }

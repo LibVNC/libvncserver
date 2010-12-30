@@ -339,6 +339,7 @@ typedef struct _rfbClient {
         int multicastSocketRcvBufSize;
         int multicastRcvBufSize;   /**< Size of the multicast receive buffer */
         int multicastRcvBufLen;    /**< Current fill of the multicast receive buffer */
+        int multicastPendingNACKs; /**< Counts pending NACKed multicast packets */
         void *multicastPacketBuf;
         char *multicastbufoutptr;
         size_t multicastbuffered;
@@ -350,10 +351,7 @@ typedef struct _rfbClient {
         int multicastPixelformatId;
         rfbBool serverMsgMulticast; /* this flag is set by WaitForMessage() if there's multicast input */
         rfbBool serverMsg;          /* this flag is set by WaitForMessage() if there's unicast input */
-        int     multicastLastWholeUpd;
-        int64_t multicastLastPartialUpd;
-        uint32_t multicastRcvd;     /* counts received multicast packets */
-        uint32_t multicastLost;     /* counts lost multicast packets */
+        int multicastLastWholeUpd;
         int multicastTimeouts;
         rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
 } rfbClient;
