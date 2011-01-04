@@ -2964,6 +2964,10 @@ if [ "X$use_ssh" = "X1" ]; then
 	fi
 	echo "ssh_pid='$pssh'"; echo
 	if [ "X$use_sshssl" = "X" -a "X$getport" = "X" ]; then
+		if [ "X$SSVNC_EXTRA_COMMAND" != "X" ]; then
+			(sh -c "$SSVNC_EXTRA_COMMAND") &
+			echo "($SSVNC_EXTRA_COMMAND) &"; echo
+		fi
 		echo "Running viewer:"
 
 		trap "final" 0 2 15
@@ -3334,6 +3338,10 @@ if [ "X$direct_connect" != "X" ]; then
 		echo "T sleep $SSVNC_EXTRA_SLEEP"
 		sleep $SSVNC_EXTRA_SLEEP
 	fi
+	if [ "X$SSVNC_EXTRA_COMMAND" != "X" ]; then
+		(sh -c "$SSVNC_EXTRA_COMMAND") &
+		echo "($SSVNC_EXTRA_COMMAND) &"; echo
+	fi
 	if [ "X$reverse" = "X" ]; then
 		hostdisp="$host:$disp"
 		if [ "X$SSVNC_ULTRA_DSM" != "X" ]; then
@@ -3567,6 +3575,10 @@ echo ""
 if [ "X$SSVNC_EXTRA_SLEEP" != "X" ]; then
 	echo "sleep $SSVNC_EXTRA_SLEEP"
 	sleep $SSVNC_EXTRA_SLEEP
+fi
+if [ "X$SSVNC_EXTRA_COMMAND" != "X" ]; then
+	(sh -c "$SSVNC_EXTRA_COMMAND") &
+	echo "($SSVNC_EXTRA_COMMAND) &"; echo
 fi
 
 if [ "X$reverse" = "X" ]; then

@@ -26,6 +26,10 @@ x11vnc -pipeinput/-rawfb utilities:
    slide.pl	amusing example using x11vnc -rawfb for jpeg slideshow. 
    ranfb.pl	example -rawfb setup:./ranfb.pl to set up a framebuffer.
 
+   uinput.pl    test perl script for Linux uinput injection.
+
+   qt_tslib_inject.pl touchscreen -pipeinput helper for tslib on qtmoko.
+
 Misc. scripts:
 
    shm_clear	list or remove orphaned shm slots from hard x11vnc crashes.

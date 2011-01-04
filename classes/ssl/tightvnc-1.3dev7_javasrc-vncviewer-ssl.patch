@@ -1,4 +1,4 @@
-diff -x VncCanvas.java -Naur vnc_javasrc.orig/Makefile vnc_javasrc/Makefile
+diff -Naur vnc_javasrc.orig/Makefile vnc_javasrc/Makefile
 --- vnc_javasrc.orig/Makefile	2004-03-04 08:34:25.000000000 -0500
 +++ vnc_javasrc/Makefile	2010-05-18 20:56:26.000000000 -0400
 @@ -4,6 +4,7 @@
@@ -44,9 +44,9 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/Makefile vnc_javasrc/Makefile
  
  export:: $(CLASSES) $(ARCHIVE) $(PAGES)
  	@$(ExportJavaClasses)
-diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto.java
+diff -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto.java
 --- vnc_javasrc.orig/RfbProto.java	2004-03-04 08:34:25.000000000 -0500
-+++ vnc_javasrc/RfbProto.java	2010-03-27 17:58:37.000000000 -0400
++++ vnc_javasrc/RfbProto.java	2010-11-30 22:05:12.000000000 -0500
 @@ -199,7 +199,21 @@
      host = h;
      port = p;
@@ -79,7 +79,46 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      }
  
      serverMajor = (b[4] - '0') * 100 + (b[5] - '0') * 10 + (b[6] - '0');
-@@ -992,6 +1006,19 @@
+@@ -892,6 +906,38 @@
+   final static int ALT_MASK   = InputEvent.ALT_MASK;
+ 
+ 
++  void writeWheelEvent(MouseWheelEvent evt) throws IOException {
++
++    eventBufLen = 0;
++
++    int x = evt.getX();
++    int y = evt.getY();
++
++    if (x < 0) x = 0;
++    if (y < 0) y = 0;
++
++    int ptrmask;
++
++    int clicks = evt.getWheelRotation();
++    System.out.println("writeWheelEvent: clicks: " + clicks);
++    if (clicks > 0) {
++    	ptrmask = 16;
++    } else if (clicks < 0) {
++    	ptrmask = 8;
++    } else {
++    	return;
++    }
++
++    eventBuf[eventBufLen++] = (byte) PointerEvent;
++    eventBuf[eventBufLen++] = (byte) ptrmask;
++    eventBuf[eventBufLen++] = (byte) ((x >> 8) & 0xff);
++    eventBuf[eventBufLen++] = (byte) (x & 0xff);
++    eventBuf[eventBufLen++] = (byte) ((y >> 8) & 0xff);
++    eventBuf[eventBufLen++] = (byte) (y & 0xff);
++
++    os.write(eventBuf, 0, eventBufLen);
++  }
++
+   //
+   // Write a pointer event message.  We may need to send modifier key events
+   // around it to set the correct modifier state.
+@@ -992,6 +1038,19 @@
      boolean down = (evt.getID() == KeyEvent.KEY_PRESSED);
  
      int key;
@@ -99,7 +138,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      if (evt.isActionKey()) {
  
        //
-@@ -1025,6 +1052,13 @@
+@@ -1025,6 +1084,13 @@
          return;
        }
  
@@ -113,7 +152,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      } else {
  
        //
-@@ -1036,6 +1070,7 @@
+@@ -1036,6 +1102,7 @@
  
        key = keyChar;
  
@@ -121,7 +160,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
        if (key < 0x20) {
          if (evt.isControlDown()) {
            key += 0x60;
-@@ -1121,6 +1156,16 @@
+@@ -1121,6 +1188,16 @@
    int oldModifiers = 0;
  
    void writeModifierKeyEvents(int newModifiers) {
@@ -138,7 +177,7 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/RfbProto.java vnc_javasrc/RfbProto
      if ((newModifiers & CTRL_MASK) != (oldModifiers & CTRL_MASK))
        writeKeyEvent(0xffe3, (newModifiers & CTRL_MASK) != 0);
  
-diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
+diff -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSLSocketToMe.java
 --- vnc_javasrc.orig/SSLSocketToMe.java	1969-12-31 19:00:00.000000000 -0500
 +++ vnc_javasrc/SSLSocketToMe.java	2010-07-10 19:18:06.000000000 -0400
 @@ -0,0 +1,2067 @@
@@ -2209,7 +2248,119 @@ diff -x VncCanvas.java -Naur vnc_javasrc.orig/SSLSocketToMe.java vnc_javasrc/SSL
 +	private Base64Coder() {}
 +
 +}
-diff -x VncCanvas.java -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
+diff -Naur vnc_javasrc.orig/VncCanvas.java vnc_javasrc/VncCanvas.java
+--- vnc_javasrc.orig/VncCanvas.java	2004-10-10 02:15:54.000000000 -0400
++++ vnc_javasrc/VncCanvas.java	2010-11-30 21:01:15.000000000 -0500
+@@ -28,13 +28,14 @@
+ import java.lang.*;
+ import java.util.zip.*;
+ 
++import java.util.Collections;
+ 
+ //
+ // VncCanvas is a subclass of Canvas which draws a VNC desktop on it.
+ //
+ 
+ class VncCanvas extends Canvas
+-  implements KeyListener, MouseListener, MouseMotionListener {
++  implements KeyListener, MouseListener, MouseMotionListener, MouseWheelListener {
+ 
+   VncViewer viewer;
+   RfbProto rfb;
+@@ -81,6 +82,20 @@
+     cm8 = new DirectColorModel(8, 7, (7 << 3), (3 << 6));
+     cm24 = new DirectColorModel(24, 0xFF0000, 0x00FF00, 0x0000FF);
+ 
++    // kludge to not show any Java cursor in the canvas since we are
++    // showing the soft cursor (should be a user setting...)
++    Cursor dot = Toolkit.getDefaultToolkit().createCustomCursor(
++        Toolkit.getDefaultToolkit().createImage(new byte[4]), new Point(0,0),
++        "dot");
++    this.setCursor(dot);
++
++    // while we are at it... get rid of the keyboard traversals that
++    // make it so we can't type a Tab character:
++    this.setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS,
++        Collections.EMPTY_SET);
++    this.setFocusTraversalKeys(KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS,
++        Collections.EMPTY_SET);
++
+     colors = new Color[256];
+     for (int i = 0; i < 256; i++)
+       colors[i] = new Color(cm8.getRGB(i));
+@@ -169,6 +184,7 @@
+       inputEnabled = true;
+       addMouseListener(this);
+       addMouseMotionListener(this);
++      addMouseWheelListener(this);
+       if (viewer.showControls) {
+ 	viewer.buttonPanel.enableRemoteAccessControls(true);
+       }
+@@ -177,6 +193,7 @@
+       inputEnabled = false;
+       removeMouseListener(this);
+       removeMouseMotionListener(this);
++      removeMouseWheelListener(this);
+       if (viewer.showControls) {
+ 	viewer.buttonPanel.enableRemoteAccessControls(false);
+       }
+@@ -1190,6 +1207,9 @@
+   public void mouseDragged(MouseEvent evt) {
+     processLocalMouseEvent(evt, true);
+   }
++  public void mouseWheelMoved(MouseWheelEvent evt) {
++    processLocalMouseWheelEvent(evt);
++  }
+ 
+   public void processLocalKeyEvent(KeyEvent evt) {
+     if (viewer.rfb != null && rfb.inNormalProtocol) {
+@@ -1221,6 +1241,19 @@
+     evt.consume();
+   }
+ 
++  public void processLocalMouseWheelEvent(MouseWheelEvent evt) {
++    if (viewer.rfb != null && rfb.inNormalProtocol) {
++      synchronized(rfb) {
++	try {
++	  rfb.writeWheelEvent(evt);
++	} catch (Exception e) {
++	  e.printStackTrace();
++	}
++	rfb.notify();
++      }
++    }
++  }
++
+   public void processLocalMouseEvent(MouseEvent evt, boolean moved) {
+     if (viewer.rfb != null && rfb.inNormalProtocol) {
+       if (moved) {
+@@ -1387,9 +1420,9 @@
+ 		result = cm8.getRGB(pixBuf[i]);
+ 	      } else {
+ 		result = 0xFF000000 |
+-		  (pixBuf[i * 4 + 1] & 0xFF) << 16 |
+-		  (pixBuf[i * 4 + 2] & 0xFF) << 8 |
+-		  (pixBuf[i * 4 + 3] & 0xFF);
++		  (pixBuf[i * 4 + 2] & 0xFF) << 16 |
++		  (pixBuf[i * 4 + 1] & 0xFF) << 8 |
++		  (pixBuf[i * 4 + 0] & 0xFF);
+ 	      }
+ 	    } else {
+ 	      result = 0;	// Transparent pixel
+@@ -1403,9 +1436,9 @@
+ 	      result = cm8.getRGB(pixBuf[i]);
+ 	    } else {
+ 	      result = 0xFF000000 |
+-		(pixBuf[i * 4 + 1] & 0xFF) << 16 |
+-		(pixBuf[i * 4 + 2] & 0xFF) << 8 |
+-		(pixBuf[i * 4 + 3] & 0xFF);
++		(pixBuf[i * 4 + 2] & 0xFF) << 16 |
++		(pixBuf[i * 4 + 1] & 0xFF) << 8 |
++		(pixBuf[i * 4 + 0] & 0xFF);
+ 	    }
+ 	  } else {
+ 	    result = 0;		// Transparent pixel
+diff -Naur vnc_javasrc.orig/VncViewer.java vnc_javasrc/VncViewer.java
 --- vnc_javasrc.orig/VncViewer.java	2004-03-04 08:34:25.000000000 -0500
 +++ vnc_javasrc/VncViewer.java	2010-03-27 17:57:04.000000000 -0400
 @@ -29,6 +29,7 @@

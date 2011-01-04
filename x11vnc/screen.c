@@ -1028,6 +1028,11 @@ void do_new_fb(int reset_mem) {
 		settle_clients(1);
 	}
 
+#ifdef MACOSX
+	if (macosx_console) {
+		macosxCG_fini();
+	}
+#endif
 	if (reset_mem == 1) {
 		/* reset_mem == 2 is a hack for changing users... */
 		clean_shm(0);
@@ -1461,7 +1466,19 @@ char *vnc_reflect_guess(char *str, char **raw_fb_addr) {
 	char *str0 = strdup(str);
 
 	if (client == NULL) {
-		client = rfbGetClient(8, 3, 4);
+		int bitsPerSample = 8;
+		int samplesPerPixel = 3;
+		int bytesPerPixel = 4;
+		char *s;
+		s = getenv("X11VNC_REFLECT_bitsPerSample");
+		if (s) bitsPerSample = atoi(s);
+		s = getenv("X11VNC_REFLECT_samplesPerPixel");
+		if (s) samplesPerPixel = atoi(s);
+		s = getenv("X11VNC_REFLECT_bytesPerPixel");
+		if (s) bytesPerPixel = atoi(s);
+		rfbLog("rfbGetClient(bitsPerSample=%d, samplesPerPixel=%d, bytesPerPixel=%d)\n",
+		    bitsPerSample, samplesPerPixel, bytesPerPixel);
+		client = rfbGetClient(bitsPerSample, samplesPerPixel, bytesPerPixel);
 	}
 
 	rfbLog("rawfb: %s\n", str);
@@ -1682,7 +1699,7 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		raw_fb_addr = NULL;
 	}
 #endif
-	
+
 	if (raw_fb_addr || raw_fb_seek) {
 		if (raw_fb_shm) {
 			shmdt(raw_fb_addr);
@@ -2086,16 +2103,16 @@ if (db) fprintf(stderr, "initialize_raw_fb reset\n");
 		/* hmmm, not following directions, see if map: applies */
 		struct stat sbuf;
 		if (stat(str, &sbuf) == 0) {
-			char *new;
+			char *newstr;
 			int len = strlen("map:") + strlen(str) + 1;
 			rfbLog("no type prefix: %s\n", raw_fb_str);
 			rfbLog("  but file exists, so assuming: map:%s\n",
 			    raw_fb_str);
-			new = (char *) malloc(len);
-			strcpy(new, "map:");
-			strcat(new, str);
+			newstr = (char *) malloc(len);
+			strcpy(newstr, "map:");
+			strcat(newstr, str);
 			free(str);
-			str = new;
+			str = newstr;
 		}
 	}
 
@@ -3183,6 +3200,9 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 		    bits_per_color, 1, fb_bpp/8);
 		if (screen && http_dir) {
 			http_connections(1);
+		}
+		if (unix_sock) {
+			unix_sock_fd = listen_unix(unix_sock);
 		}
 	} else {
 		/* set set frameBuffer member below. */
