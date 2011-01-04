@@ -1066,6 +1066,7 @@ static void check_rcfile(int argc, char **argv) {
 		if (! home) {
 			norc = 1;
 		} else {
+			memset(rcfile, 0, sizeof(rcfile));
 			strncpy(rcfile, home, 500);
 			free(home);
 
@@ -1395,6 +1396,7 @@ static void quick_pw(char *str) {
 		if(fgets(tmp, 1024, in) == NULL) {
 			exit(2);
 		}
+		fclose(in);
 		q = strdup(tmp);
 	} else {
 		q = strdup(str+1);
@@ -2028,7 +2030,6 @@ static void check_guess_auth_file(void)  {
 	}
 }
 
-extern int dragum(void);
 extern int is_decimal(char *);
 
 int main(int argc, char* argv[]) {
@@ -2532,9 +2533,17 @@ int main(int argc, char* argv[]) {
 			got_localhost = 1;
 			continue;
 		}
+		if (!strcmp(arg, "-unixsock")) {
+			CHECK_ARGC
+			unix_sock = strdup(argv[++i]);
+			continue;
+		}
 		if (!strcmp(arg, "-listen6")) {
+			CHECK_ARGC
 #if X11VNC_IPV6
 			listen_str6 = strdup(argv[++i]);
+#else
+			++i;
 #endif
 			continue;
 		}
@@ -2576,6 +2585,10 @@ int main(int argc, char* argv[]) {
 		}
 		if (!strcmp(arg, "-grabptr")) {
 			grab_ptr = 1;
+			continue;
+		}
+		if (!strcmp(arg, "-ungrabboth")) {
+			ungrab_both = 1;
 			continue;
 		}
 		if (!strcmp(arg, "-grabalways")) {
@@ -3935,6 +3948,14 @@ int main(int argc, char* argv[]) {
 			macosx_us_kbd = 1;
 			continue;
 		}
+		if (!strcmp(arg, "-macnoopengl")) {
+			macosx_no_opengl = 1;
+			continue;
+		}
+		if (!strcmp(arg, "-macnorawfb")) {
+			macosx_no_rawfb = 1;
+			continue;
+		}
 		if (!strcmp(arg, "-gui")) {
 			launch_gui = 1;
 			if (i < argc-1) {
@@ -4284,7 +4305,7 @@ int main(int argc, char* argv[]) {
 		char *pstr = "%VNCDISPLAY";
 		if (strstr(logfile, pstr)) {
 			char *h = this_host();
-			char *s, *q, *new;
+			char *s, *q, *newlog;
 			int n, p = got_rfbport_val;
 			/* we don't really know the port yet... so guess */
 			if (p < 0) {
@@ -4303,23 +4324,23 @@ int main(int argc, char* argv[]) {
 				n++;
 				q = t+1; 
 			}
-			new = (char *) malloc(strlen(logfile) + n * strlen(pstr));
-			new[0] = '\0';
+			newlog = (char *) malloc(strlen(logfile) + n * strlen(pstr));
+			newlog[0] = '\0';
 
 			q = logfile;
 			while (1) {
 				char *t = strstr(q, pstr);
 				if (!t) {
-					strcat(new, q);
+					strcat(newlog, q);
 					break;
 				}
-				strncat(new, q, t - q);
-				strcat(new, s);
+				strncat(newlog, q, t - q);
+				strcat(newlog, s);
 				q = t + strlen(pstr); 
 			}
-			logfile = new;
+			logfile = newlog;
 			if (!quiet && !got_inetd) {
-				rfbLog("Expanded logfile to '%s'\n", new);
+				rfbLog("Expanded logfile to '%s'\n", newlog);
 				
 			}
 			free(s);
@@ -4327,7 +4348,7 @@ int main(int argc, char* argv[]) {
 		pstr = "%HOME";
 		if (strstr(logfile, pstr)) {
 			char *h = get_home_dir();
-			char *s, *q, *new;
+			char *s, *q, *newlog;
 
 			s = (char *) malloc(strlen(h) + 32);
 			sprintf(s, "%s", h);
@@ -4339,23 +4360,23 @@ int main(int argc, char* argv[]) {
 				n++;
 				q = t+1; 
 			}
-			new = (char *) malloc(strlen(logfile) + n * strlen(pstr));
-			new[0] = '\0';
+			newlog = (char *) malloc(strlen(logfile) + n * strlen(pstr));
+			newlog[0] = '\0';
 
 			q = logfile;
 			while (1) {
 				char *t = strstr(q, pstr);
 				if (!t) {
-					strcat(new, q);
+					strcat(newlog, q);
 					break;
 				}
-				strncat(new, q, t - q);
-				strcat(new, s);
+				strncat(newlog, q, t - q);
+				strcat(newlog, s);
 				q = t + strlen(pstr); 
 			}
-			logfile = new;
+			logfile = newlog;
 			if (!quiet && !got_inetd) {
-				rfbLog("Expanded logfile to '%s'\n", new);
+				rfbLog("Expanded logfile to '%s'\n", newlog);
 			}
 			free(s);
 		}
@@ -5812,7 +5833,7 @@ int main(int argc, char* argv[]) {
 				waitms = 5;
 			}
 			if (!quiet) {
-				rfbLog("fast read: reset wait  ms to: %d\n", waitms);
+				rfbLog("fast read: reset -wait  ms to: %d\n", waitms);
 			}
 		}
 		if (! got_deferupdate && ! got_defer) {
@@ -5825,7 +5846,7 @@ int main(int argc, char* argv[]) {
 				if (screen) {
 					screen->deferUpdateTime = defer_update;
 				}
-				rfbLog("fast read: reset defer ms to: %d\n", defer_update);
+				rfbLog("fast read: reset -defer ms to: %d\n", defer_update);
 			}
 		}
 	}
@@ -5853,6 +5874,20 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
+
+#ifdef MACOSX
+	if (remote_cmd || query_cmd) {
+		;
+	} else if (macosx_console) {
+		double dt = dnow();
+		copy_screen();
+		dt = dnow() - dt;
+		rfbLog("macosx_console: copied screen in %.3f sec %.1f MB/sec\n",
+		    dt, dpy_x * dpy_y * bpp / (1e+6 * 8 * dt));
+
+	}
+#endif
+
 	if (! quiet) {
 		rfbLog("screen setup finished.\n");
 		if (SHOW_NO_PASSWORD_WARNING && !nopw) {

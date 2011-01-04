@@ -1,4 +1,5 @@
-/*
+/**
+ * @example vnc2mpg.c
  * Simple movie writer for vnc; based on Libavformat API example from FFMPEG
  * 
  * Copyright (c) 2003 Fabrice Bellard, 2004 Johannes E. Schindelin

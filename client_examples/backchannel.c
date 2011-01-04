@@ -1,4 +1,7 @@
-/* A simple example of an RFB client */
+/**
+ * @example backchannel-client.c
+ * A simple example of an RFB client
+ */
 
 #include <stdio.h>
 #include <stdlib.h>

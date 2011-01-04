@@ -349,7 +349,15 @@ XImage *XCreateImage_wr(Display *disp, Visual *visual, unsigned int depth,
 		xi = (XImage *) malloc(sizeof(XImage));
 		memset(xi, 0, sizeof(XImage));
 		xi->depth = depth;
-		xi->bits_per_pixel = (depth == 24) ? 32 : depth;
+		if (depth >= 24) {
+			xi->bits_per_pixel = 32;
+		} else if (depth > 16) {
+			xi->bits_per_pixel = 24;
+		} else if (depth > 8) {
+			xi->bits_per_pixel = 16;
+		} else {
+			xi->bits_per_pixel = 8;
+		}
 		xi->format = format;
 		xi->xoffset = offset;
 		xi->data = data;
@@ -675,11 +683,22 @@ static void copy_raw_fb_24_to_32(XImage *dest, int x, int y, unsigned int w,
 	}
 }
 
+#ifdef MACOSX
+void macosx_copy_opengl(char *, int, int, unsigned int, unsigned int);
+#endif
+
 void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 	char *src, *dst;
 	unsigned int line;
 	int pixelsize = bpp/8;
 	static int db = -1;
+
+#ifdef MACOSX
+	if (macosx_console && macosx_read_opengl) {
+		macosx_copy_opengl(dest->data, x, y, w, h);
+		return;
+	}
+#endif
 
 	if (xform24to32) {
 		copy_raw_fb_24_to_32(dest, x, y, w, h);
@@ -708,7 +727,7 @@ void copy_raw_fb(XImage *dest, int x, int y, unsigned int w, unsigned int h) {
 		src = snap->data + snap->bytes_per_line*y + pixelsize*x;
 		dst = dest->data;
 
-if (db) fprintf(stderr, "snap->bytes_per_line: %d, dest->bytes_per_line: %d, w: %d h: %d dpy_x: %d wdpy_x: %d cdpy_x: %d\n", snap->bytes_per_line, dest->bytes_per_line, w, h, dpy_x, wdpy_x, cdpy_x);
+if (db) fprintf(stderr, "snap->bytes_per_line: %d, dest->bytes_per_line: %d, w: %d h: %d dpy_x: %d wdpy_x: %d cdpy_x: %d bpp: %d pixelsize: %d\n", snap->bytes_per_line, dest->bytes_per_line, w, h, dpy_x, wdpy_x, cdpy_x, bpp, pixelsize);
 
 		for (line = 0; line < h; line++) {
 			memcpy(dst, src, w * pixelsize);
@@ -727,7 +746,7 @@ if (db) fprintf(stderr, "snap->bytes_per_line: %d, dest->bytes_per_line: %d, w: 
 		src = raw_fb_addr + raw_fb_offset + bpl*y + pixelsize*x;
 		dst = dest->data;
 
-if (db) fprintf(stderr, "bpl: %d, dest->bytes_per_line: %d, w: %d h: %d dpy_x: %d wdpy_x: %d cdpy_x: %d\n", bpl, dest->bytes_per_line, w, h, dpy_x, wdpy_x, cdpy_x);
+if (db) fprintf(stderr, "bpl: %d, dest->bytes_per_line: %d, w: %d h: %d dpy_x: %d wdpy_x: %d cdpy_x: %d bpp: %d pixelsize: %d\n", bpl, dest->bytes_per_line, w, h, dpy_x, wdpy_x, cdpy_x, bpp, pixelsize);
 
 		for (line = 0; line < h; line++) {
 			memcpy(dst, src, w * pixelsize);
@@ -880,6 +899,7 @@ void XTRAP_FakeKeyEvent_wr(Display* dpy, KeyCode key, Bool down,
 void XTestFakeKeyEvent_wr(Display* dpy, int dev_id, KeyCode key, Bool down,
     unsigned long delay) {
 	static int first = 1;
+	int regrab = 0;
 
 	RAWFB_RET_VOID
 
@@ -905,11 +925,16 @@ void XTestFakeKeyEvent_wr(Display* dpy, int dev_id, KeyCode key, Bool down,
 
 	if (grab_kbd) {
 		XUngrabKeyboard(dpy, CurrentTime);
+		regrab = 1;
+	}
+	if (grab_ptr && ungrab_both) {
+		XUngrabPointer(dpy, CurrentTime);
+		regrab = 1;
 	}
 
 	if (xtrap_input) {
 		XTRAP_FakeKeyEvent_wr(dpy, key, down, delay);
-		if (grab_kbd) {
+		if (regrab) {
 			adjust_grabs(1, 1);
 		}
 		return;
@@ -934,8 +959,8 @@ void XTestFakeKeyEvent_wr(Display* dpy, int dev_id, KeyCode key, Bool down,
         else
 #endif
           XTestFakeKeyEvent(dpy, key, down, delay);
-        
-	if (grab_kbd) {
+
+	if (regrab) {
 		adjust_grabs(1, 1);
 	}
 	if (debug_keyboard) {
@@ -976,6 +1001,7 @@ void XTRAP_FakeButtonEvent_wr(Display* dpy, unsigned int button, Bool is_press,
 
 void XTestFakeButtonEvent_wr(Display* dpy, int dev_id, unsigned int button, Bool is_press,
     unsigned long delay) {
+	int regrab = 0;
 
 	RAWFB_RET_VOID
 #if NO_X11
@@ -986,11 +1012,16 @@ void XTestFakeButtonEvent_wr(Display* dpy, int dev_id, unsigned int button, Bool
 
 	if (grab_ptr) {
 		XUngrabPointer(dpy, CurrentTime);
+		regrab = 1;
+	}
+	if (grab_kbd && ungrab_both) {
+		XUngrabKeyboard(dpy, CurrentTime);
+		regrab = 1;
 	}
 
 	if (xtrap_input) {
 		XTRAP_FakeButtonEvent_wr(dpy, button, is_press, delay);
-		if (grab_ptr) {
+		if (regrab) {
 			adjust_grabs(1, 1);
 		}
 		return;
@@ -1016,7 +1047,7 @@ void XTestFakeButtonEvent_wr(Display* dpy, int dev_id, unsigned int button, Bool
 #endif
           XTestFakeButtonEvent(dpy, button, is_press, delay);
 #endif
-	if (grab_ptr) {
+	if (regrab) {
 		adjust_grabs(1, 1);
 	}
 #endif	/* NO_X11 */
@@ -1050,6 +1081,7 @@ void XTRAP_FakeMotionEvent_wr(Display* dpy, int screen, int x, int y,
 
 void XTestFakeMotionEvent_wr(Display* dpy, int dev_id, int screen, int x, int y,
     unsigned long delay) {
+	int regrab = 0;
 
 	RAWFB_RET_VOID
 #if NO_X11
@@ -1060,11 +1092,16 @@ void XTestFakeMotionEvent_wr(Display* dpy, int dev_id, int screen, int x, int y,
 
 	if (grab_ptr) {
 		XUngrabPointer(dpy, CurrentTime);
+		regrab = 1;
+	}
+	if (grab_kbd && ungrab_both) {
+		XUngrabKeyboard(dpy, CurrentTime);
+		regrab = 1;
 	}
 
 	if (xtrap_input) {
 		XTRAP_FakeMotionEvent_wr(dpy, screen, x, y, delay);
-		if (grab_ptr) {
+		if (regrab) {
 			adjust_grabs(1, 1);
 		}
 		return;
@@ -1087,7 +1124,7 @@ void XTestFakeMotionEvent_wr(Display* dpy, int dev_id, int screen, int x, int y,
 #endif
           XTestFakeMotionEvent(dpy, screen, x, y, delay);
 #endif
-	if (grab_ptr) {
+	if (regrab) {
 		adjust_grabs(1, 1);
 	}
 #endif	/* NO_X11 */

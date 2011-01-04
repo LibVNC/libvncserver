@@ -1,6 +1,17 @@
 #ifndef RFBPROTO_H
 #define RFBPROTO_H
 
+/**
+ @mainpage
+ @li @ref libvncserver_api
+ @li @ref libvncserver_doc
+
+
+ @li @ref libvncclient_api
+ @li @ref libvncclient_doc
+
+*/
+
 /*
  *  Copyright (C) 2005 Rohit Kumar, Johannes E. Schindelin
  *  Copyright (C) 2000-2002 Constantin Kaplinsky.  All Rights Reserved.

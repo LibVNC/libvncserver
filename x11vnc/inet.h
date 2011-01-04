@@ -52,6 +52,8 @@ extern int have_ssh_env(void);
 extern char *ipv6_getnameinfo(struct sockaddr *paddr, int addrlen);
 extern char *ipv6_getipaddr(struct sockaddr *paddr, int addrlen);
 extern int listen6(int port);
+extern int listen_unix(char *file);
+extern int accept_unix(int s);
 extern int connect_tcp(char *host, int port);
 extern int listen_tcp(int port, in_addr_t iface, int try6);
 

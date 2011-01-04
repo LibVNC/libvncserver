@@ -1,5 +1,6 @@
 
-/*
+/**
+ * @example camera.c
  * Question: I need to display a live camera image via VNC. Until now I just 
  * grab an image, set the rect to modified and do a 0.1 s sleep to give the 
  * system time to transfer the data.

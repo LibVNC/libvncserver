@@ -656,24 +656,24 @@ static void pipe_pointer(int mask, int x, int y, rfbClientPtr client) {
 	if (mask == cd->ptr_buttonmask) {
 		strcat(hint, "None");
 	} else {
-		int i, old, new, m = 1, cnt = 0;
+		int i, old, newb, m = 1, cnt = 0;
 		for (i=0; i<MAX_BUTTONS; i++) {
 			char s[20];
 
 			old = cd->ptr_buttonmask & m;
-			new = mask & m;
+			newb = mask & m;
 			m = m << 1;
 
-			if (old == new) {
+			if (old == newb) {
 				continue;
 			}
 			if (hint[0] != '\0') {
 				strcat(hint, ",");
 			}
-			if (new && ! old) {
+			if (newb && ! old) {
 				sprintf(s, "ButtonPress-%d", i+1);
 				cnt++;
-			} else if (! new && old)  {
+			} else if (! newb && old)  {
 				sprintf(s, "ButtonRelease-%d", i+1);
 				cnt++;
 			}
