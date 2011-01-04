@@ -2396,7 +2396,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
     case rfbMulticastFramebufferUpdateNACK:
     {
-        partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
+	partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
 	uint32_t firstInBuf;
 
 	/* maybe this client sent a NACK without having registered for MulticastVNC? */
@@ -2474,35 +2474,14 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	  /* mark this pixelformat and encoding as needing repair */
 	  buf->dirty = TRUE;
-	  UNLOCK(cl->screen->multicastSharedMutex);
-	  return;
 	}
+	else
+#ifdef MULTICAST_DEBUG
+	  rfbLog("MulticastVNC DEBUG: NACKed region not in buffer!\n");
+#endif
 
 	UNLOCK(cl->screen->multicastSharedMutex);
 
-	rfbLog("MulticastVNC: NACKed partial update not in send buffer! Increasing send buffer size helps.\n");
-	/* resend empty updates, only lock when really running threaded */
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-	if(cl->screen->backgroundLoop) LOCK(cl->screen->multicastUpdateMutex);
-#endif
-	/* flush buffer just for safety */
-	if(!rfbSendMulticastUpdateBuf(cl->screen)) {
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-	  if(cl->screen->backgroundLoop) UNLOCK(cl->screen->multicastUpdateMutex);
-#endif	
-	  return;
-	}
-
-        for(i = msg.mfun.idPartialUpd; i < msg.mfun.nPartialUpds; ++i) {
-
-	  rfbPutMulticastHeader(cl, 0, i, 0, FALSE);
-
-	  if(!rfbSendMulticastUpdateBuf(cl->screen))
-	    break;
-	}
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-	if(cl->screen->backgroundLoop) UNLOCK(cl->screen->multicastUpdateMutex);
-#endif
 	return;
     }
 
