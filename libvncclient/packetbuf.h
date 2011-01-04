@@ -24,6 +24,7 @@
 #define PACKETBUF_H
 
 #include <stdlib.h>
+#include "rfb/rfbint.h"
 
 
 /*
@@ -32,7 +33,7 @@
 typedef struct _packet {
   char *data;
   size_t datalen;
-  size_t id;
+  uint32_t id;
   struct _packet *next;
 } packet;
 
