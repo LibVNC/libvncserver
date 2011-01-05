@@ -410,23 +410,17 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
 	 > client->multicastUpdInterval) {
 	/* request missing partial updates */
 	packetBuf *pbuf = client->multicastPacketBuf;
-	int i=0, firstMissing = -1;
-	uint32_t startId=0;
-	packet *p= pbuf->head;;
+	int i, firstMissing = -1;
 	client->multicastPendingNACKs = 0;
-	while (p) {
-	  if(!p->data && firstMissing == -1) {
+	for(i=0; i < packetBufCount(pbuf); ++i) {
+	  packet *p= packetBufAt(pbuf, i);
+	  if(!p->data && firstMissing == -1)
 	    firstMissing = i;
-	    startId = p->id;
-	  }
-	  if(firstMissing != -1 && (p->data || !p->next)) {
-	    if(!p->next) ++i;
-	    SendMulticastFramebufferUpdateNACK(client, startId, i-firstMissing);
+	  if(firstMissing != -1 && p->data) {
+	    SendMulticastFramebufferUpdateNACK(client, packetBufAt(pbuf, firstMissing)->id, i-firstMissing);
 	    client->multicastPendingNACKs += i-firstMissing;
 	    firstMissing = -1;
 	  }
-	  p = p->next;
-	  ++i;
 	}
 	/* and request a new update */
 	client->multicastRequestTimestamp = now;

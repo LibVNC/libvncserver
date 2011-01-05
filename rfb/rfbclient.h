@@ -340,8 +340,6 @@ typedef struct _rfbClient {
         int multicastRcvBufSize;   /**< Size of the multicast receive buffer */
         int multicastRcvBufLen;    /**< Current fill of the multicast receive buffer */
         int multicastPendingNACKs; /**< Counts pending NACKed multicast packets */
-        int multicastRcvd;         /**< counts received multicast packets */
-        int multicastLost;         /**< counts lost multicast packets */
         void *multicastPacketBuf;
         char *multicastbufoutptr;
         size_t multicastbuffered;
