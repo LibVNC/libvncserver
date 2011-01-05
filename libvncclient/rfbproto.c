@@ -1578,109 +1578,168 @@ HandleRFBServerMessage(rfbClient* client)
 					  sz_rfbMulticastFramebufferUpdateMsg - 1))
 	    return FALSE;
 
-	  msg.mfu.idWholeUpd = rfbClientSwap16IfLE(msg.mfu.idWholeUpd);
-	  msg.mfu.idPartialUpd = rfbClientSwap32IfLE(msg.mfu.idPartialUpd);
-	  msg.mfu.nRects = rfbClientSwap16IfLE(msg.mfu.nRects);
-	      
-	  if(msg.mfu.idWholeUpd != client->multicastLastWholeUpd) {
-	    /* old one done */
-	    if (client->multicastLastWholeUpd != -1 && client->FinishedFrameBufferUpdate)
-	      client->FinishedFrameBufferUpdate(client);
-	    client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
-	  }
-
-#ifdef MULTICAST_DEBUG
-	  rfbClientLog("MulticastVNC DEBUG: --got message--\n");
-	  rfbClientLog("MulticastVNC DEBUG: id whole      %d\n", msg.mfu.idWholeUpd);
-	  rfbClientLog("MulticastVNC DEBUG: id partial    %d\n", msg.mfu.idPartialUpd);
-	  rfbClientLog("MulticastVNC DEBUG: pending NACKs %d\n", client->multicastPendingNACKs);
-	  rfbClientLog("MulticastVNC DEBUG: timeouts      %d\n", client->multicastTimeouts);
-#endif
-
-	  /* handle rects */
-	  for (i = 0; i < msg.mfu.nRects; i++)
+	  /* 
+	     only handle this message if it's our pixelformat, 
+	     otherwise discard the packet since 
+	     the data in there is useless for us.
+	  */
+	  if(rfbClientSwap16IfLE(msg.mfu.idPixelformat) != client->multicastPixelformatId)
 	    {
-	      if (!ReadFromRFBServerMulticast(client, (char *)&rect, sz_rfbFramebufferUpdateRectHeader))
-		return FALSE;
+#ifdef MULTICAST_DEBUG
+	      rfbClientLog("MulticastVNC DEBUG: discarding pf: %d\n", rfbClientSwap16IfLE(msg.mfu.idPixelformat));
+#endif
+	      packetBufPop(client->multicastPacketBuf); 
+	      client->multicastbuffered = 0;
+	    }
+	  else
+	    {
+	      msg.mfu.idWholeUpd = rfbClientSwap16IfLE(msg.mfu.idWholeUpd);
+	      msg.mfu.idPartialUpd = rfbClientSwap32IfLE(msg.mfu.idPartialUpd);
+	      msg.mfu.nRects = rfbClientSwap16IfLE(msg.mfu.nRects);	      
+	      
+	      /* calculate lost partial updates from sequence numbers */
+	      client->multicastRcvd++;
+	      if(client->multicastLastWholeUpd >= 0) /* only check on the second and later runs */
+		{
+		  /* it can happen that we get a mis-ordered partial update 
+		     with a sequence number near to overflow, consider a succession of
+		     (1021, 0, 1022, 1) in a [0...1023] example seq.no. range */
+		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 0x0FFF0000)
+		    client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
 
-	      rect.encoding = rfbClientSwap32IfLE(rect.encoding);
-	      rect.r.x = rfbClientSwap16IfLE(rect.r.x);
-	      rect.r.y = rfbClientSwap16IfLE(rect.r.y);
-	      rect.r.w = rfbClientSwap16IfLE(rect.r.w);
-	      rect.r.h = rfbClientSwap16IfLE(rect.r.h);
+		  /* partial update missing */
+		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1) {
+		    client->multicastLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
+
+		    /* tell server about missing partial updates */
+		    SendMulticastFramebufferUpdateNACK(client, 
+						       client->multicastLastPartialUpd+1,
+						       msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1));
+		  }
+
+		  /* if a partial update arrives out of order (with a lower sequence number than the 
+		     last, but not _much_ lower, as this would be a wrap-around), it was counted as 
+		     lost before, so revert this  */
+		  if(msg.mfu.idPartialUpd < client->multicastLastPartialUpd &&
+		     client->multicastLastPartialUpd - msg.mfu.idPartialUpd < 0x0FFF0000 &&
+		     client->multicastLost > 0)
+		    client->multicastLost--;
+		}
+	      
+	      /* save last received highest sequence numbers, care for wrap-around */
+	      if(msg.mfu.idPartialUpd > client->multicastLastPartialUpd || 
+		 client->multicastLastPartialUpd - msg.mfu.idPartialUpd > 0x0FFF0000)
+		client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
+
+	      if(msg.mfu.idWholeUpd > client->multicastLastWholeUpd || 
+		 client->multicastLastWholeUpd - msg.mfu.idWholeUpd > 0x7FFF) {
+		client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
+		/* old one done */
+		if (client->FinishedFrameBufferUpdate)
+		  client->FinishedFrameBufferUpdate(client);
+	      }
 
 #ifdef MULTICAST_DEBUG
-	      rfbClientLog("MulticastVNC DEBUG: got rect (%d, %d, %d, %d)\n", rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+	      rfbClientLog("MulticastVNC DEBUG: --got message--\n");
+	      rfbClientLog("MulticastVNC DEBUG: id whole:    %d\n", msg.mfu.idWholeUpd);
+	      rfbClientLog("MulticastVNC DEBUG: id partial:  %d\n", msg.mfu.idPartialUpd);
+	      rfbClientLog("MulticastVNC DEBUG: received:    %d\n", client->multicastRcvd);
+	      rfbClientLog("MulticastVNC DEBUG: lost:        %d\n", client->multicastLost);
+	      rfbClientLog("MulticastVNC DEBUG: loss ratio:  %f\n", client->multicastLost / 
+			   (double)(client->multicastRcvd+client->multicastLost));
+	      rfbClientLog("MulticastVNC DEBUG: timeouts     %d\n", client->multicastTimeouts);
 #endif
-	      client->SoftCursorLockArea(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
-      
-	      switch (rect.encoding)
+
+	      /* handle rects */
+	      for (i = 0; i < msg.mfu.nRects; i++) 
 		{
-		case rfbEncodingRaw:
-		  {
-		    int y=rect.r.y, h=rect.r.h;
-		    
-		    bytesPerLine = rect.r.w * client->format.bitsPerPixel / 8;
-		    linesToRead = RFB_BUFFER_SIZE / bytesPerLine;
-		    
-		    while (h > 0) {
-		      if (linesToRead > h)
-			linesToRead = h;
-		  
-		      if (!ReadFromRFBServerMulticast(client, client->buffer,bytesPerLine * linesToRead))
-			return FALSE;
-		      
-		      CopyRectangle(client, (uint8_t *)client->buffer,
-				    rect.r.x, y, rect.r.w,linesToRead);
-		      
-		      h -= linesToRead;
-		      y += linesToRead;
-		    }
-		  }
-		  break;
+		  if (!ReadFromRFBServerMulticast(client, (char *)&rect, sz_rfbFramebufferUpdateRectHeader))
+		    return FALSE;
 
-		case rfbEncodingUltra:
-		  {
-		    switch (client->format.bitsPerPixel) {
-		    case 8:
-		      if (!HandleUltra8(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-			return FALSE;
+		  rect.encoding = rfbClientSwap32IfLE(rect.encoding);
+		  rect.r.x = rfbClientSwap16IfLE(rect.r.x);
+		  rect.r.y = rfbClientSwap16IfLE(rect.r.y);
+		  rect.r.w = rfbClientSwap16IfLE(rect.r.w);
+		  rect.r.h = rfbClientSwap16IfLE(rect.r.h);
+
+#ifdef MULTICAST_DEBUG
+		  rfbClientLog("MulticastVNC DEBUG: got rect (%d, %d, %d, %d)\n", rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+#endif
+		  client->SoftCursorLockArea(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+      
+		  switch (rect.encoding) 
+		    {
+		    case rfbEncodingRaw: 
+		      {
+			int y=rect.r.y, h=rect.r.h;
+		    
+			bytesPerLine = rect.r.w * client->format.bitsPerPixel / 8;
+			linesToRead = RFB_BUFFER_SIZE / bytesPerLine;
+		    
+			while (h > 0) {
+			  if (linesToRead > h)
+			    linesToRead = h;
+		  
+			  if (!ReadFromRFBServerMulticast(client, client->buffer,bytesPerLine * linesToRead))
+			    return FALSE;
+		      
+			  CopyRectangle(client, (uint8_t *)client->buffer,
+					rect.r.x, y, rect.r.w,linesToRead);
+		      
+			  h -= linesToRead;
+			  y += linesToRead;
+			}
+		      }
 		      break;
-		    case 16:
-		      if (!HandleUltra16(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-			return FALSE;
-		      break;
-		    case 32:
-		      if (!HandleUltra32(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
-			return FALSE;
-		      break;
-		    }
-		    break;
-		  }
+
+		    case rfbEncodingUltra:
+		      {
+			switch (client->format.bitsPerPixel) {
+			case 8:
+			  if (!HandleUltra8(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+			    return FALSE;
+			  break;
+			case 16:
+			  if (!HandleUltra16(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+			    return FALSE;
+			  break;
+			case 32:
+			  if (!HandleUltra32(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+			    return FALSE;
+			  break;
+			}
+			break;
+		      }
    
-		default:
-		  {
-		    rfbBool handled = FALSE;
-		    rfbClientProtocolExtension* e;
+		    default:
+		      {
+			rfbBool handled = FALSE;
+			rfbClientProtocolExtension* e;
 		  
-		    for(e = rfbClientExtensions; !handled && e; e = e->next)
-		      if(e->handleEncoding && e->handleEncoding(client, &rect))
-			handled = TRUE;
+			for(e = rfbClientExtensions; !handled && e; e = e->next)
+			  if(e->handleEncoding && e->handleEncoding(client, &rect))
+			    handled = TRUE;
 		  
-		    if(!handled) {
-		      rfbClientLog("Unknown rect encoding %d\n",
-				   (int)rect.encoding);
-		      return FALSE;
+			if(!handled) {
+			  rfbClientLog("Unknown rect encoding %d\n",
+				       (int)rect.encoding);
+			  return FALSE;
+			}
+		      }
 		    }
-		  }
+	      
+
+		  /* Now we may discard "soft cursor locks". */
+		  client->SoftCursorUnlockScreen(client);
+
+		  client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 		}
-
-	      /* Now we may discard "soft cursor locks". */
-	      client->SoftCursorUnlockScreen(client);
-
-	      client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 	    }
-	    
+	}
+      else
+	{
+	  rfbClientLog("Got unsupported multicast message type %d from VNC server\n",msg.type);
+	  return FALSE;
 	}
     }
   

@@ -245,8 +245,6 @@ hexdump:
 rfbBool
 ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
 {
-  rfbServerToClientMsg *msg;
-  int64_t thisPartialUpd;
   packetBuf *pbuf = client->multicastPacketBuf;
 
   if(client->multicastSock < 0 || !pbuf)
@@ -279,96 +277,17 @@ ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
       }
     }
 
+    /* successfully read a packet at this point */
+    packet * p = calloc(sizeof(packet), 1);
+    p->datalen = r;
+    p->data = malloc(p->datalen);
+    memcpy(p->data, client->multicastReadBuf, p->datalen);
+
+    packetBufPush(client->multicastPacketBuf, p);
 #ifdef MULTICAST_DEBUG
     rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() read %d bytes from socket.\n", r);
+    rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() %d packets buffered now.\n", pbuf->count);
 #endif
-
-    /*
-      successfully read a packet at this point,
-      check that it's a MulticastFramebufferUpdate
-    */
-    msg = (rfbServerToClientMsg*)client->multicastReadBuf;
-    if(msg->type != rfbMulticastFramebufferUpdate) {
-      rfbClientLog("Got unsupported multicast message type %d from VNC server\n", msg->type);
-      return FALSE;
-    }
-
-    /*
-       only handle this message if it's our pixelformat, otherwise
-       discard the packet since the data in there is useless for us.
-    */
-    if(rfbClientSwap16IfLE(msg->mfu.idPixelformat) != client->multicastPixelformatId) {
-#ifdef MULTICAST_DEBUG
-      rfbClientLog("MulticastVNC DEBUG: discarding pf: %d\n", rfbClientSwap16IfLE(msg->mfu.idPixelformat));
-#endif
-      continue;
-    }
-
-    /*
-      got a valid MulticastFramebufferUpdate
-    */
-    thisPartialUpd = rfbClientSwap32IfLE(msg->mfu.idPartialUpd);
-
-    /*
-       check for missing packets
-    */
-    if(packetBufCount(pbuf)
-       && (thisPartialUpd - pbuf->tail->id > 1
-	   || pbuf->tail->id - thisPartialUpd > 0x0FFF0000)) { /* partial update(s) missing between this and the last received one */
-      uint32_t lastPartialUpd = pbuf->tail->id; /* the last one is always a valid one */
-
-      /* insert empty placeholder packets into recv buffer */
-      uint32_t i;
-      for(i=lastPartialUpd+1; i < thisPartialUpd || i - thisPartialUpd > 0x0FFF0000; ++i) {
-	packet *p = calloc(sizeof(packet), 1);
-	p->id = i;
-	if(!packetBufPush(client->multicastPacketBuf, p))
-	  break;
-      }
-
-      /* tell server about missing partial updates */
-      SendMulticastFramebufferUpdateNACK(client,
-					 lastPartialUpd+1,
-					 thisPartialUpd-(lastPartialUpd+1));
-      client->multicastPendingNACKs += thisPartialUpd-(lastPartialUpd+1);
-    }
-
-    /*
-      insert packet at the right position in receive queue
-    */
-    if(packetBufCount(pbuf)
-       && thisPartialUpd <= pbuf->tail->id
-       && pbuf->tail->id - thisPartialUpd < 0x0FFF0000) { /* old one, check */
-      packet *p = packetBufAt(pbuf, thisPartialUpd - pbuf->head->id);
-      if(p && !p->data) { /* a placeholder, this one was missing before */
-	p->datalen = r;
-	p->data = malloc(p->datalen);
-	memcpy(p->data, client->multicastReadBuf, p->datalen);
-#ifdef MULTICAST_DEBUG
-	rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() got NACKed packet %d (%d).\n", p->id, thisPartialUpd);
-#endif
-      }
-      else { /* already data present */
-#ifdef MULTICAST_DEBUG
-	rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() got duplicate packet, discarding.\n");
-#endif	
-      }
-    }
-    else { /* new one, buffer it */
-      packet *p = calloc(sizeof(packet), 1);
-      p->id = thisPartialUpd;
-      p->datalen = r;
-      p->data = malloc(p->datalen);
-      memcpy(p->data, client->multicastReadBuf, p->datalen);
-      
-      if(!packetBufPush(client->multicastPacketBuf, p)) { /* can be that we filled the buffer with to-be-NACKed packets */
-	free(p->data);
-	free(p);
-      }
-#ifdef MULTICAST_DEBUG
-      rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() buffering new packet, %d buffered now.\n", pbuf->count);
-#endif
-    }
   }
 
   client->multicastRcvBufLen = pbuf->len;
@@ -383,29 +302,6 @@ ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
 #endif
 
   if (n) {
-    while(pbuf->head && !pbuf->head->data) { /* first packet in queue is missing */
-      int i, firstMissing = -1;
-      client->multicastPendingNACKs = 0;
-      for(i=0; i < packetBufCount(pbuf); ++i) {
-	packet *p= packetBufAt(pbuf, i);
-	if(!p->data && firstMissing == -1)
-	  firstMissing = i;
-	if(firstMissing != -1 && p->data) {
-	  SendMulticastFramebufferUpdateNACK(client, packetBufAt(pbuf, firstMissing)->id, i-firstMissing);
-	  client->multicastPendingNACKs += i-firstMissing;
-	  firstMissing = -1;
-	}
-      }
-#ifdef MULTICAST_DEBUG
-      rfbClientLog("MulticastVNC DEBUG: first partial update in queue is missing, waiting for it");
-#endif
-#ifndef WIN32
-      usleep (client->multicastUpdInterval*1000);
-#else
-      Sleep (client->multicastUpdInterval);
-#endif
-    }
-
     if(pbuf->head 
        && n <= pbuf->head->datalen
        && client->multicastbuffered ? n <= client->multicastbuffered : 1) {
