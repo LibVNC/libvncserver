@@ -199,16 +199,15 @@
  If a client notices lost messages by examining sequence numbers of
  received partial updates, it can choose to request retransmission of
  consecutive missing partial updates by sending a 'Multicast-
- FramebufferUpdateNACK' client-to-server message (message type 247).
+ FramebufferUpdateNACK' client-to-server message (message type 247). 
  This message contains the sequence number of a missing partial update
  which optionally indexes the start of a consecution of further
  partial updates. The total number of consecutive partial updates is
  counted including the first indexing partial update.
 
- When the server receives a 'MulticastFramebufferUpdateNACK', it must
- resend the requested partial updates. However, the server is free to
- choose the contents of this updates. For instance, it can send empty
- repair updates if it does not maintain a send buffer.
+ If the server receives a 'MulticastFramebufferUpdateNACK', it can
+ choose to resend the requested partial updates or simply do
+ nothing, clients are not guarenteed to get repair data back.
 
 
  +--------------------+--------------------+-------------------------+
