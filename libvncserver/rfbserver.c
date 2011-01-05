@@ -2476,9 +2476,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	  buf->dirty = TRUE;
 	}
 	else
-#ifdef MULTICAST_DEBUG
-	  rfbLog("MulticastVNC DEBUG: NACKed region not in buffer!\n");
-#endif
+	  rfbLog("MulticastVNC: partial update %d NACKed by client %s not in sent buffer! Increasing sent buffer size helps.\n",
+		 msg.mfun.idPartialUpd,
+		 cl->host);
 
 	UNLOCK(cl->screen->multicastSharedMutex);
 
