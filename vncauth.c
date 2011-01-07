@@ -118,9 +118,9 @@ rfbDecryptPasswdFromFile(char *fname)
 {
     FILE *fp;
     int i, ch;
-    unsigned char *passwd = (unsigned char *)malloc(9);
-
     if ((fp = fopen(fname,"r")) == NULL) return NULL;
+
+    unsigned char *passwd = (unsigned char *)malloc(9);
 
     for (i = 0; i < 8; i++) {
 	ch = getc(fp);
