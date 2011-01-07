@@ -28,7 +28,8 @@ SERVER:
 
 - make the sent buffer smaller again?
 
-- make sent buffer save real payload instead of region?
+- make sent buffer save real payload instead of region? would need to have
+  a sent buffer for each pixelformat,encoding group then.
 
 
 CLIENT:
