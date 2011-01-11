@@ -302,9 +302,9 @@ ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
 #endif
 
   if (n) {
-    if(pbuf->head 
+    if(pbuf->head
        && n <= pbuf->head->datalen
-       && client->multicastbuffered ? n <= client->multicastbuffered : 1) {
+       && (client->multicastbuffered ? n <= client->multicastbuffered : 1)) {
 
       if(client->multicastbuffered == 0) { /* new packet to be consumed */
 	client->multicastbuffered = pbuf->head->datalen;
