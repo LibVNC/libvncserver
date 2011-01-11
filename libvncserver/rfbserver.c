@@ -2429,7 +2429,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	LOCK(cl->screen->multicastSharedMutex);
 	firstInBuf = partUpdRgnBufAt(buf, 0)->idPartial;
 	/* check if this partial update is in the buffer */
-	if(msg.mfun.idPartialUpd >= firstInBuf && msg.mfun.idPartialUpd < firstInBuf + partUpdRgnBufCount(buf)-1) {
+	if(msg.mfun.idPartialUpd >= firstInBuf && msg.mfun.idPartialUpd < firstInBuf + partUpdRgnBufCount(buf)) {
 	  uint32_t start = msg.mfun.idPartialUpd - firstInBuf;
 	  uint32_t i;
 
@@ -2437,12 +2437,16 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 #ifdef MULTICAST_DEBUG
 	    rfbLog("MulticastVNC DEBUG: marking buffer position %u, partial id %u as NACKed\n",
 		   i, partUpdRgnBufAt(buf, i)->idPartial);
+	    rfbLog("                    its sendrate was %d, was decreased %d\n",
+		   partUpdRgnBufAt(buf, i)->sendrate, partUpdRgnBufAt(buf, i)->sendrate_decreased);
 #endif
 	    /* mark the lost partial updates as requested */
 	    partUpdRgnBufAt(buf, i)->pending = TRUE;
 	    
 	    /* check whether we should decrease the send rate */
-	    if(!partUpdRgnBufAt(buf, i)->sendrate_decreased && cl->screen->multicastMaxSendRate >= partUpdRgnBufAt(buf, i)->sendrate) {
+	    if(msg.mfun.nPartialUpds >= MULTICAST_MAXSENDRATE_NACKS_REQUIRED
+	       && !partUpdRgnBufAt(buf, i)->sendrate_decreased
+	       && cl->screen->multicastMaxSendRate >= partUpdRgnBufAt(buf, i)->sendrate) {
 	      uint32_t j;
 #ifdef MULTICAST_DEBUG
 	      uint32_t oldrate = cl->screen->multicastMaxSendRate;
@@ -2450,16 +2454,13 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 #endif
 	      /* decrease send rate */
 	      cl->screen->multicastMaxSendRate *= 1.0/MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
-	      /* adapt increment timer to send rate */
-	      cl->screen->multicastMaxSendRateIncrementInterval = (1000*MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR*cl->screen->multicastUpdateBufSize)
-		/ cl->screen->multicastMaxSendRate;
 	      /* decrease the increment itself */
 	      cl->screen->multicastMaxSendRateIncrement *= 1.0/MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
 	      /* reset increment increase counter: we increase the increment after MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER increments
 		 WITHOUT a send rate decrease in between */
 	      cl->screen->multicastMaxSendRateIncrementCount = 0;
 #ifdef MULTICAST_DEBUG
-	      rfbLog("MulticastVNC DEBUG: max send rate decreased from %u to %u, increment decreased from %u to %u\n", 
+	      rfbLog("MulticastVNC DEBUG: max send rate decreased from %u to %u, increment decreased from %u to %u\n",
 		     oldrate,
 		     cl->screen->multicastMaxSendRate,
 		     oldincr,

@@ -784,20 +784,17 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 
 	if((now.tv_sec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec)*1000
 	   +(now.tv_usec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_usec)/1000
-	   >= rfbScreen->multicastMaxSendRateIncrementInterval) {
+	   >= MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL) {
 	  /* increment send rate */
 	  rfbScreen->multicastMaxSendRate += rfbScreen->multicastMaxSendRateIncrement;
 	  /* increase the increment itself */
 	  if(++rfbScreen->multicastMaxSendRateIncrementCount % MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER == 0)
 	    rfbScreen->multicastMaxSendRateIncrement *= MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
-	  /* adapt increment timer to send rate */
-	  rfbScreen->multicastMaxSendRateIncrementInterval = (1000*MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL_FACTOR*rfbScreen->multicastUpdateBufSize)
-	    / rfbScreen->multicastMaxSendRate;
+
 #ifdef MULTICAST_DEBUG
-	  rfbLog("MulticastVNC DEBUG: max send rate += %u to %u after %u ms timer interval\n",
+	  rfbLog("MulticastVNC DEBUG: max send rate += %u to %u\n",
 		 rfbScreen->multicastMaxSendRateIncrement,
-		 rfbScreen->multicastMaxSendRate,
-		 rfbScreen->multicastMaxSendRateIncrementInterval);
+		 rfbScreen->multicastMaxSendRate);
 #endif
 	  rfbScreen->lastMulticastMaxSendRateIncrement = now;
 	}
