@@ -30,14 +30,15 @@
  2.1 Synopsis
 
  The MulticastVNC Extension to the RFB protocol introduces two new
- pseudo-encodings as well as one new client-to-server message and one
+ pseudo-encodings as well as tow new client-to-server messages and one
  new server-to-client message, respectively:
 
  MulticastVNC pseudo encoding (-831) or IPv6MulticastVNC pseudo
  encoding (-832) are used by a client to indicate that it is able to
  receive multicast framebuffer updates. The server responds by sending
  multicast address plus port and also its multicast update interval
- and an ID assigned to the client's pixel-format (see below).
+ and an ID assigned to the client's pixel-format and encoding (see
+ below).
  
  Clients then ask for multicast framebuffer updates by issuing
  'MulticastFramebufferUpdateRequest' client-to-server messages
@@ -59,14 +60,15 @@
  updates to send. To keep the client implementation as simple as
  possible, the server sends one framebuffer update for each
  combination of pixel-format and encoding it has to provide. Thus,
- each multicast framebuffer update carries a pixel-format ID of which
- the client was told when sending the multicast address (see
- above). Furthermore, since UDP is based on datagrams with a fixed
- maximum size, the whole update may have to be packed into several UDP
- packets. Therefore the framebuffer contents are sent using (maybe
- several) 'MulticastFramebufferUpdate' server-to-client messages
- (message type 248). These contain sequence numbers identifying the
- update as a whole and also the individual partial updates.
+ each multicast framebuffer update carries a pixel-format and encoding
+ ID of which the client was told when sending the multicast address
+ (see above). Furthermore, since UDP is based on datagrams with a
+ fixed maximum size, the whole update may have to be packed into
+ several UDP packets. Therefore the framebuffer contents are sent
+ using (maybe several) 'MulticastFramebufferUpdate' server-to-client
+ messages (message type 248). These contain sequence numbers
+ identifying the whole logical update and the individual partial
+ updates.
 
  Using these sequence numbers and the server's multicast update
  interval mentioned above, it is possible for clients to reorder
@@ -80,7 +82,7 @@
  Note that 'MulticastFramebufferUpdate's are the only messages sent
  via multicast. Handshaking messages, client-to-server messages and
  all other server-to-client messages are sent via the traditional
- unicast channel!
+ unicast channel.
 
 
  2.2 Session Setup
@@ -93,15 +95,13 @@
  If the server supports the requested feature, it tells the client
  about the multicast address and port to listen on for framebuffer
  updates and also adds its multicast update interval and a unique ID
- bigger than 0 assigned to the pixel-format the client requested (if
- any) or 0 if the client was content with the server's default
- pixel-format.
+ assigned to the pixel-format and encoding the client requested.
 
- So, the server sends back a 'FramebufferUpdate' message consisting of
- one rectangle with:
+ Thus, the server sends back a 'FramebufferUpdate' message consisting
+ of one rectangle with:
 
     * 'encoding-type' set to MulticastVNC (or IPv6MulticastVNC)
-    * 'x-position' set to the pixel-format identifier
+    * 'x-position' set to the pixel-format and encoding identifier
     * 'y-position' set to the UDP port to listen on
     * 'width' set to the multicast update interval in milliseconds
     * the pixel data set to an IPv4 address (or IPv6 address) in
@@ -149,31 +149,40 @@
  consists of a sequence of rectangles of pixel data. If the multicast
  update interval has expired and there were multicast framebuffer
  update requests, the server sends out the update via UDP multicast to
- the multicast destination it has notified the client about. If at
- this point no updates were pending because the server's framebuffer
- did not change, it instead sends an empty MulticastFramebufferUpdate
+ the multicast destination it has notified clients about. If at this
+ point no updates were pending because the server's framebuffer did
+ not change, it instead sends an empty MulticastFramebufferUpdate
  heartbeat message containing no rectangles.
 
  To allow any kind of multicast client and to be as flexible as
  possible, the server is required to keep track of which combinations
  of pixel-format and encoding it has to provide. For each registered
- combination, it sends out a whole multicast framebuffer update. 
- Therefore, 'MulticastFramebufferUpdate' messages have a field
- identifying the pixel-format of the pixel data sent. This id gets
- assigned to the client's wanted pixel-format at multicast session
- setup, see 2.2. Note that the encoding of the pixel data is specified
- in each of the update's rectangles.
+ combination, it sends out a whole multicast framebuffer update if
+ requested by one or more clients belonging to this pixel-format and
+ encoding group. Therefore, 'MulticastFramebufferUpdate' messages have
+ a field identifying the pixel-format and encoding of the pixel data
+ sent. This ID gets assigned to the client's wanted pixel-format and
+ encoding at multicast session setup, see 2.2. Note that because
+ pixel-format and encoding are specified in the message header all of
+ the messages's rectangles have to carry pixel data in the specified
+ pixel-format and encoding.
 
  Since multicast is based on UDP datagrams with a fixed maximum size,
  the whole update may have to be packed into several UDP datagrams.
  Therefore the framebuffer contents are sent using (maybe several)
  'MulticastFramebufferUpdate' server-to-client messages (message type
- 248). These contain consecutive sequence numbers (starting with 0)
- identifying whole and partial updates. A whole update number
- identifies a response to a 'MulticastFramebufferUpdateRequest', which
- may have to be split into several MulticastFramebufferUpdate' server
- to client messages. Each of these is identified by a partial update
- sequence number.
+ 248). These contain consecutive sequence numbers identifying whole
+ and partial updates. A whole update number identifies a logical
+ update, i.e. the response to a 'MulticastFramebufferUpdateRequest',
+ which may have to be split into several 'MulticastFramebufferUpdate'
+ server to client messages. Each of these is identified by a partial
+ update sequence number. Note that for each registered pixel-format
+ and encoding combination, the server has to maintain an individual
+ succession of sequence numbers in order to prevent clients from
+ NACKing messages not belonging to their pixel-format and encoding
+ group and avoid useless retransmissions. This also means that clients
+ should not NACK messages with a pixel-format and encoding id
+ different from their own, see 2.3.3.
 
  The header is padded so that it is an exact multiple of 4 bytes (to
  help with alignment of 32-bit pixels).
@@ -184,7 +193,7 @@
  +--------------------+--------------------+-------------------------+
  |1     	      |U8            248   |message-type             |
  |1                   |                    |padding  		     |
- |2                   |U16                 |id-of-pixel-format	     |
+ |2                   |U16                 |id-of-pf-and-enc	     |
  |4                   |U32                 |id-of-partial-update     | 
  |2                   |U16                 |id-of-whole-update	     |
  |2                   |U16                 |number-of-rectangles     |
@@ -199,11 +208,15 @@
  If a client notices lost messages by examining sequence numbers of
  received partial updates, it can choose to request retransmission of
  consecutive missing partial updates by sending a 'Multicast-
- FramebufferUpdateNACK' client-to-server message (message type 247). 
+ FramebufferUpdateNACK' client-to-server message (message type 247).
  This message contains the sequence number of a missing partial update
  which optionally indexes the start of a consecution of further
  partial updates. The total number of consecutive partial updates is
- counted including the first indexing partial update.
+ counted including the first indexing partial update. Note that
+ clients should not request retransmission of partial updates based on
+ receipt of a 'MulticastFramebufferUpdate' message tagged with a
+ pixel-format and encoding ID different from their own in order to
+ avoid useless retransmissions.
 
  If the server receives a 'MulticastFramebufferUpdateNACK', it can
  choose to resend the requested partial updates or simply do
