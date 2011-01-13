@@ -30,6 +30,8 @@ SERVER:
 
 - make sent buffer save real payload instead of region?
 
+- really fill partial update packets when using other than raw encoding
+
 
 CLIENT:
 

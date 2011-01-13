@@ -1579,14 +1579,14 @@ HandleRFBServerMessage(rfbClient* client)
 	    return FALSE;
 
 	  /* 
-	     only handle this message if it's our pixelformat, 
+	     only handle this message if it's our pixelformat and encoding,
 	     otherwise discard the packet since 
 	     the data in there is useless for us.
 	  */
-	  if(rfbClientSwap16IfLE(msg.mfu.idPixelformat) != client->multicastPixelformatId)
+	  if(rfbClientSwap16IfLE(msg.mfu.idPixelformatEnc) != client->multicastPixelformatEncId)
 	    {
 #ifdef MULTICAST_DEBUG
-	      rfbClientLog("MulticastVNC DEBUG: discarding pf: %d\n", rfbClientSwap16IfLE(msg.mfu.idPixelformat));
+	      rfbClientLog("MulticastVNC DEBUG: discarding pf,enc: %d\n", rfbClientSwap16IfLE(msg.mfu.idPixelformatEnc));
 #endif
 	      packetBufPop(client->multicastPacketBuf); 
 	      client->multicastbuffered = 0;
@@ -1951,11 +1951,11 @@ HandleRFBServerMessage(rfbClient* client)
 
 	rfbClientLog("MulticastVNC: received multicast address %s:%s\n", host, serv);
 	rfbClientLog("MulticastVNC: received multicast update interval: %dms\n", rect.r.w);
-	rfbClientLog("MulticastVNC: received pixelformat identifier: %d\n", rect.r.x);
+	rfbClientLog("MulticastVNC: received pixelformat,encoding identifier: %d\n", rect.r.x);
 
 	client->multicastSock = CreateMulticastSocket(multicastSockAddr, client->multicastRcvBufSize);
 	client->multicastUpdInterval = rect.r.w;
-  	client->multicastPixelformatId = rect.r.x;
+	client->multicastPixelformatEncId = rect.r.x;
 	client->multicastPacketBuf = packetBufCreate(client->multicastRcvBufSize);
 
 	rfbClientLog("MulticastVNC: Enabling multicast specific messages\n");

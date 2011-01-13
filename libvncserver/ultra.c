@@ -322,9 +322,7 @@ rfbPutMulticastRectEncodingUltra(rfbClientPtr cl,
     /* Update statics */
     it =rfbGetClientIterator(cl->screen);
     while((someclient=rfbClientIteratorNext(it))) {
-      if(someclient->useMulticastVNC
-	 && someclient->preferredMulticastEncoding == cl->preferredMulticastEncoding
-	 && someclient->multicastPixelformatId == cl->multicastPixelformatId)
+      if(someclient->useMulticastVNC && someclient->multicastPixelformatEncId == cl->multicastPixelformatEncId)
 	rfbStatRecordEncodingSent(someclient, rfbEncodingUltra, sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader + lzoAfterBufLen, maxRawSize);
     }
     rfbReleaseClientIterator(it);

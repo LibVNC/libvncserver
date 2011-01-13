@@ -347,7 +347,7 @@ typedef struct _rfbClient {
         int multicastUpdInterval;
         struct timeval multicastRequestTimestamp; /* gets set when multicast framebuffer update was requested */
         struct timeval multicastPendingRequestTimestamp; /* time when last unanswered request was sent */
-        int multicastPixelformatId;
+        int multicastPixelformatEncId;
         rfbBool serverMsgMulticast; /* this flag is set by WaitForMessage() if there's multicast input */
         rfbBool serverMsg;          /* this flag is set by WaitForMessage() if there's unicast input */
         int     multicastLastWholeUpd;

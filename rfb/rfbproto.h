@@ -566,7 +566,7 @@ typedef struct {
 typedef struct {
     uint8_t type;			/* always rfbMulticastFramebufferUpdate */
     uint8_t pad;
-    uint16_t idPixelformat;             /* pixelformat id assigned at sending session info */
+    uint16_t idPixelformatEnc;          /* pixelformat and encoding id assigned at sending session info */
     uint32_t idPartialUpd;              /* id of this partial update */
     uint16_t idWholeUpd;                /* id of the update as a whole */
     uint16_t nRects;                    /* number of rectangles per message, not per whole update */

@@ -387,8 +387,6 @@ typedef struct _rfbScreenInfo
     uint16_t multicastUpdateBufSize;
     char *multicastUpdateBuf;
     uint16_t  mcublen;
-    uint16_t multicastWholeUpdId;
-    uint32_t multicastPartialUpdId;
     rfbBool multicastUseCopyRect;            /**< All multicast clients support CopyRect */
     sraRegionPtr multicastUpdateRegion;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
@@ -396,6 +394,7 @@ typedef struct _rfbScreenInfo
     MUTEX(multicastUpdateMutex);             /**< Ensures that exactly one thread is processing a multicast framebuffer update */
     MUTEX(multicastSharedMutex);             /**< Ensures that exactly one thread is modifying the shared variables
 						multicastUseCopyRect, multicastUpdateRegion, multicastUpdPendingPtr, multicastPartUpdRgnBuf,
+						multicastWholeUpdId, multicastPartialUpdId,
 						multicastMaxSendRate, multicastMaxSendRateIncrement, multicastMaxSendRateIncrementCount
 						and multicastMaxSendRateIncrementInterval */
 #endif
@@ -661,7 +660,7 @@ typedef struct _rfbClientRec {
     /* multicast stuff */
     rfbBool  enableMulticastVNC;      /* client supports multicast FramebufferUpdates messages */
     rfbBool  useMulticastVNC;         /* framebuffer updates should be sent via multicast socket*/
-    uint16_t multicastPixelformatId;  /* identifier assigned to client's pixelformat */
+    uint16_t multicastPixelformatEncId;  /* identifier assigned to client's pixelformat and encoding */
     int preferredMulticastEncoding;   /* client's preferred encoding for multicast */
     struct timeval startMulticastDeferring; /* this per-client tv is actually used per every combination
 					       of pixelformat and encoding, see main.c, each client is a
@@ -669,9 +668,11 @@ typedef struct _rfbClientRec {
 					       belongs to */
     rfbBool* multicastUpdPendingPtr;  /**< this bool on the heap is shared by all clients with the
 					 same pixelformat and encoding */
+    uint16_t* multicastWholeUpdId;    /**< shared by all clients with the same pixelformat and encoding */
+    uint32_t* multicastPartialUpdId;  /**< shared by all clients with the same pixelformat and encoding */
     /* multicast NACK stuff */
 #define MULTICAST_PART_UPD_RGN_BUF_SIZE 52428800 /**< Server should keep a backlog of at max this many sent bytes */
-  void* multicastPartUpdRgnBuf;      /**< a ringbuffer holding partial update <-> region mappings.
+    void* multicastPartUpdRgnBuf;      /**< a ringbuffer holding partial update <-> region mappings.
 					this is allocated on the heap and shared by all clients
 					with the same pixelformat and encoding*/
 } rfbClientRec, *rfbClientPtr;
