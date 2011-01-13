@@ -68,7 +68,10 @@
  using (maybe several) 'MulticastFramebufferUpdate' server-to-client
  messages (message type 248). These contain sequence numbers
  identifying the whole logical update and the individual partial
- updates.
+ updates. By tagging updates with pixel-format and encoding
+ identifiers, several logical data streams with different sequence
+ numbers destined for different groups of clients can be multiplexed
+ onto one connection.
 
  Using these sequence numbers and the server's multicast update
  interval mentioned above, it is possible for clients to reorder
@@ -181,7 +184,7 @@
  succession of sequence numbers in order to prevent clients from
  NACKing messages not belonging to their pixel-format and encoding
  group and avoid useless retransmissions. This also means that clients
- should not NACK messages with a pixel-format and encoding id
+ should not NACK messages with a pixel-format and encoding ID
  different from their own, see 2.3.3.
 
  The header is padded so that it is an exact multiple of 4 bytes (to
