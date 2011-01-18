@@ -241,23 +241,21 @@
  3. How to use it with libvncserver
 
  You can enable MulticastVNC by setting the 'multicastVNC' member of
- your rfbScreenInfoPtr to TRUE. Optionally, you can turn on resending
- of missing partial updates by setting the 'multicastVNCdoNACK' member
- to TRUE. If you want to, you can specify multicast address and port
- and TTL via the 'multicastAddr', 'multicastPort' and 'multicastTTL'
- members. The defaults are 224.0.42.138, 5900 and  1. 'multicastDefer-
- UpdateTime' lets you set the multicast update interval in milliseconds.
+ your rfbScreenInfoPtr to TRUE. If you want to, you can specify
+ multicast address and port and TTL via the 'multicastAddr',
+ 'multicastPort' and 'multicastTTL' members. The defaults are
+ 224.0.42.138, 5900 and 1. 'multicastDefer- UpdateTime' lets you set
+ the multicast update interval in milliseconds.
 
  See examples/multicast.c for a sample MulticastVNC server.
 
 
  To enable MulticastVNC for a client set the 'canHandleMulticastVNC'
- member of your rfbClient* to TRUE. The NACK mechanism can be enabled
- by setting the 'multicastVNCdoNACK' member to TRUE. To get going, the
- most simple way is to call rfbProcessServerMsgs() in your main loop,
- which includes requesting multicast framebuffer updates, waiting for
- messages and handling them. It also includes some default actions
- regarding packet loss and timeouts.
+ member of your rfbClient* to TRUE. To get going, the most simple way
+ is to call rfbProcessServerMsgs() in your main loop, which includes
+ requesting multicast framebuffer updates, waiting for messages and
+ handling them. It also includes some default actions regarding packet
+ loss and timeouts.
 
  Note that you don't have to use rfbProcessServerMsgs(), you can also
  call all the functions it uses from your main loop, thus implementing
