@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir)
+INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/common
 
 if WITH_TIGHTVNC_FILETRANSFER
 TIGHTVNCFILETRANSFERHDRS=tightvnc-filetransfer/filelistinfo.h \
@@ -18,8 +18,8 @@ includedir=$(prefix)/include/rfb
 include_HEADERS=../rfb/rfb.h ../rfb/rfbconfig.h ../rfb/rfbint.h \
 	../rfb/rfbproto.h ../rfb/keysym.h ../rfb/rfbregion.h ../rfb/rfbclient.h
 
-noinst_HEADERS=d3des.h ../rfb/default8x16.h zrleoutstream.h \
-	zrlepalettehelper.h zrletypes.h private.h minilzo.h lzoconf.h scale.h \
+noinst_HEADERS=../common/d3des.h ../rfb/default8x16.h zrleoutstream.h \
+	zrlepalettehelper.h zrletypes.h private.h ../common/minilzo.h ../common/lzoconf.h scale.h \
 	$(TIGHTVNCFILETRANSFERHDRS)
 
 EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
@@ -27,7 +27,7 @@ EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
 	zrleencodetemplate.c
 
 if HAVE_LIBZ
-ZLIBSRCS = zlib.c zrle.c zrleoutstream.c zrlepalettehelper.c zywrletemplate.c
+ZLIBSRCS = zlib.c zrle.c zrleoutstream.c zrlepalettehelper.c ../common/zywrletemplate.c
 if HAVE_LIBJPEG
 JPEGSRCS = tight.c
 endif
@@ -36,7 +36,7 @@ endif
 LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	httpd.c cursor.c font.c \
-	draw.c selbox.c d3des.c vncauth.c cargs.c minilzo.c ultra.c scale.c \
+	draw.c selbox.c ../common/d3des.c ../common/vncauth.c cargs.c ../common/minilzo.c ultra.c scale.c \
 	$(ZLIBSRCS) $(JPEGSRCS) $(TIGHTVNCFILETRANSFERSRCS)
 
 libvncserver_la_SOURCES=$(LIB_SRCS)

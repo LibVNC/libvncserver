@@ -11,7 +11,7 @@ set(FULL_PACKAGE_NAME      "LibVNCServer")
 set(PACKAGE_VERSION        "0.9.7")
 set(PROJECT_BUGREPORT_PATH "http://sourceforge.net/projects/libvncserver")
 
-include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/libvncserver)
+include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/libvncserver ${CMAKE_SOURCE_DIR}/common)
 
 find_package(ZLIB)
 find_package(JPEG)
@@ -80,6 +80,7 @@ configure_file(${CMAKE_SOURCE_DIR}/rfb/rfbconfig.h.cmake ${CMAKE_BINARY_DIR}/rfb
 configure_file(${CMAKE_SOURCE_DIR}/rfb/rfbint.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbint.h)
 
 set(LIBVNCSERVER_DIR ${CMAKE_SOURCE_DIR}/libvncserver)
+set(COMMON_DIR ${CMAKE_SOURCE_DIR}/common)
 set(LIBVNCCLIENT_DIR ${CMAKE_SOURCE_DIR}/libvncclient)
 set(LIBVNCSRVTEST_DIR ${CMAKE_SOURCE_DIR}/examples)
 set(LIBVNCCLITEST_DIR ${CMAKE_SOURCE_DIR}/client_examples)
@@ -101,10 +102,10 @@ set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/font.c
     ${LIBVNCSERVER_DIR}/draw.c
     ${LIBVNCSERVER_DIR}/selbox.c
-    ${LIBVNCSERVER_DIR}/d3des.c
-    ${LIBVNCSERVER_DIR}/vncauth.c
+    ${COMMON_DIR}/d3des.c
+    ${COMMON_DIR}/vncauth.c
     ${LIBVNCSERVER_DIR}/cargs.c
-    ${LIBVNCSERVER_DIR}/minilzo.c
+    ${COMMON_DIR}/minilzo.c
     ${LIBVNCSERVER_DIR}/ultra.c
     ${LIBVNCSERVER_DIR}/scale.c
 )
@@ -115,7 +116,7 @@ set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/rfbproto.c
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
-    ${LIBVNCCLIENT_DIR}/minilzo.c
+    ${COMMON_DIR}/minilzo.c
     ${LIBVNCCLIENT_DIR}/tls.c
 )
 
