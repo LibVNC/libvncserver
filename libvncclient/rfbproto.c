@@ -2503,5 +2503,5 @@ PrintPixelFormat(rfbPixelFormat *format)
 #define rfbUseKey rfbClientUseKey
 #define rfbCPKey rfbClientCPKey
 
-#include "../libvncserver/vncauth.c"
-#include "../libvncserver/d3des.c"
+#include "vncauth.c"
+#include "d3des.c"
