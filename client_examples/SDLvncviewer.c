@@ -5,7 +5,7 @@
 #include <SDL.h>
 #include <signal.h>
 #include <rfb/rfbclient.h>
-#include "scrap.c"
+#include "scrap.h"
 
 struct { int sdl; int rfb; } buttonMapping[]={
 	{1, rfbButton1Mask},

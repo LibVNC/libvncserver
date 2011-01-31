@@ -18,6 +18,7 @@ if HAVE_LIBSDL
 SDLVIEWER=SDLvncviewer
 
 SDLvncviewer_CFLAGS=$(SDL_CFLAGS)
+SDLvncviewer_SOURCES=SDLvncviewer.c scrap.c scrap.h
 
 if HAVE_X11
 X11_LIB=-lX11
