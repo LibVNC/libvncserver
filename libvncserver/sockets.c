@@ -782,8 +782,8 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 	if(now.tv_sec < rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec) /* at midnight on win32 */
 	  now.tv_sec = rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec;
 
-	if((now.tv_sec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec)*1000
-	   +(now.tv_usec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_usec)/1000
+	if((size_t)((now.tv_sec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec)*1000
+		    +(now.tv_usec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_usec)/1000)
 	   >= MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL) {
 	  /* increment send rate */
 	  rfbScreen->multicastMaxSendRate += rfbScreen->multicastMaxSendRateIncrement;

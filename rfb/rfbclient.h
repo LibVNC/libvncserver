@@ -344,7 +344,7 @@ typedef struct _rfbClient {
         size_t multicastbuffered;
 #define MULTICAST_READBUF_SZ 65507 /* max UDP payload */
         char multicastReadBuf[MULTICAST_READBUF_SZ];
-        int multicastUpdInterval;
+        size_t multicastUpdInterval;
         struct timeval multicastRequestTimestamp; /* gets set when multicast framebuffer update was requested */
         struct timeval multicastPendingRequestTimestamp; /* time when last unanswered request was sent */
         int multicastPixelformatEncId;
@@ -354,7 +354,7 @@ typedef struct _rfbClient {
         int64_t multicastLastPartialUpd;
         uint32_t multicastRcvd;     /* counts received multicast packets */
         uint32_t multicastLost;     /* counts lost multicast packets */
-        int multicastTimeouts;
+        size_t multicastTimeouts;
         rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
 } rfbClient;
 

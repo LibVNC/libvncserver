@@ -205,7 +205,6 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->multicastRcvBufSize = 5242880;
   client->multicastLastWholeUpd = -1;
   client->multicastLastPartialUpd = -1;
-  gettimeofday(&client->multicastRequestTimestamp, NULL); /* to avoid an overflow later on */
 
   client->clientAuthSchemes = NULL;
 
@@ -406,9 +405,9 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
   if(client->multicastSock >= 0 && !client->multicastDisabled) {
       /* see if it's time for a request */
       gettimeofday(&now, NULL);
-      if(((now.tv_sec - client->multicastRequestTimestamp.tv_sec)*1000
-	  +(now.tv_usec - client->multicastRequestTimestamp.tv_usec)/1000)
-	 > client->multicastUpdInterval) {
+      if(now.tv_sec < client->multicastRequestTimestamp.tv_sec /* at midnight on win32 */
+	 || (size_t)((now.tv_sec - client->multicastRequestTimestamp.tv_sec)*1000
+		     + (now.tv_usec - client->multicastRequestTimestamp.tv_usec)/1000) > client->multicastUpdInterval) {
 	client->multicastRequestTimestamp = now;
 	SendMulticastFramebufferUpdateRequest(client, TRUE);
       }
@@ -424,11 +423,11 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
        && (client->multicastPendingRequestTimestamp.tv_sec || client->multicastPendingRequestTimestamp.tv_usec)) {
           /* check if the update interval has expired */
 	  gettimeofday(&now, NULL);
-	  if(((now.tv_sec - client->multicastPendingRequestTimestamp.tv_sec)*1000
-	      +(now.tv_usec - client->multicastPendingRequestTimestamp.tv_usec)/1000)
-	     > client->multicastUpdInterval) {
-	    client->multicastTimeouts =  ((now.tv_sec - client->multicastPendingRequestTimestamp.tv_sec)*1000
-					  +(now.tv_usec - client->multicastPendingRequestTimestamp.tv_usec)/1000) / client->multicastUpdInterval;
+	  if(now.tv_sec < client->multicastPendingRequestTimestamp.tv_sec /* at midnight on win32 */
+	     || (size_t)((now.tv_sec - client->multicastPendingRequestTimestamp.tv_sec)*1000
+			 +(now.tv_usec - client->multicastPendingRequestTimestamp.tv_usec)/1000) > client->multicastUpdInterval) {
+	    client->multicastTimeouts = (size_t)((now.tv_sec - client->multicastPendingRequestTimestamp.tv_sec)*1000
+						 +(now.tv_usec - client->multicastPendingRequestTimestamp.tv_usec)/1000) / client->multicastUpdInterval;
 #ifdef MULTICAST_DEBUG
 	    rfbClientLog("MulticastVNC DEBUG:   timeout, now %d!\n", client->multicastTimeouts);
 #endif
