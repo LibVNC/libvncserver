@@ -1115,9 +1115,6 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   if(screen->multicastUpdateBuf)
     free(screen->multicastUpdateBuf);
 
-  rfbRRECleanup(screen);
-  rfbCoRRECleanup(screen);
-  rfbUltraCleanup(screen);
 #ifdef LIBVNCSERVER_HAVE_LIBZ
   rfbZlibCleanup(screen);
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG

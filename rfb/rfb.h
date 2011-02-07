@@ -657,6 +657,14 @@ typedef struct _rfbClientRec {
     MUTEX(sendMutex);
 #endif
 
+    /* buffers to hold pixel data before and after encoding.
+       per-client for thread safety */
+    char *beforeEncBuf;
+    int beforeEncBufSize;
+    char *afterEncBuf;
+    int afterEncBufSize;
+    int afterEncBufLen;
+
     /* multicast stuff */
     rfbBool  enableMulticastVNC;      /* client supports multicast FramebufferUpdates messages */
     rfbBool  useMulticastVNC;         /* framebuffer updates should be sent via multicast socket*/
