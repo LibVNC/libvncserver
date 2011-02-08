@@ -2936,7 +2936,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	/* connect to the shared variables or alloc new ones */
 	it=rfbGetClientIterator(cl->screen);
 	while((someclient=rfbClientIteratorNext(it))) {
-	  if(someclient != cl && someclient->multicastPixelformatEncId == cl->multicastPixelformatEncId) {
+	  if(someclient != cl && someclient->useMulticastVNC && someclient->multicastPixelformatEncId == cl->multicastPixelformatEncId) {
 	    /* same as some other client's, share */
 	    cl->multicastUpdPendingPtr = someclient->multicastUpdPendingPtr; 
 	    cl->multicastPartUpdRgnBuf = someclient->multicastPartUpdRgnBuf;
