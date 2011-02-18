@@ -2448,7 +2448,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    partUpdRgnBufAt(buf, i)->pending = TRUE;
 	    
 	    /* check whether we should decrease the send rate */
-	    if(msg.mfun.nPartialUpds >= MULTICAST_MAXSENDRATE_NACKS_REQUIRED
+	    if(!cl->screen->multicastMaxSendRateFixed
+	       && msg.mfun.nPartialUpds >= MULTICAST_MAXSENDRATE_NACKS_REQUIRED
 	       && !partUpdRgnBufAt(buf, i)->sendrate_decreased
 	       && cl->screen->multicastMaxSendRate >= partUpdRgnBufAt(buf, i)->sendrate) {
 	      uint32_t j;

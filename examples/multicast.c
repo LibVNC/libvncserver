@@ -142,6 +142,7 @@ int main(int argc,char** argv)
   server->multicastPort = 5901;
   server->multicastTTL = 32;
   server->multicastDeferUpdateTime = 50;
+  server->multicastMaxSendRateFixed= 1048576;
   */
 
   /* Initialize the server */

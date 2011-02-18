@@ -776,29 +776,33 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
 	 see if it's okay to increase the max, then wait a short while for refill and try again.
       */
       if(len > rfbScreen->multicastSendCredit) {
-        LOCK(rfbScreen->multicastSharedMutex);
-	/* we do the send rate increase here because that's when current send rate at max send rate */
-	gettimeofday(&now,NULL);
-	if(now.tv_sec < rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec) /* at midnight on win32 */
-	  now.tv_sec = rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec;
 
-	if((size_t)((now.tv_sec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec)*1000
-		    +(now.tv_usec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_usec)/1000)
-	   >= MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL) {
-	  /* increment send rate */
-	  rfbScreen->multicastMaxSendRate += rfbScreen->multicastMaxSendRateIncrement;
-	  /* increase the increment itself */
-	  if(++rfbScreen->multicastMaxSendRateIncrementCount % MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER == 0)
-	    rfbScreen->multicastMaxSendRateIncrement *= MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
+	if(!rfbScreen->multicastMaxSendRateFixed) {
+	  LOCK(rfbScreen->multicastSharedMutex);
+	  /* we do the send rate increase here because that's when current send rate at max send rate */
+	  gettimeofday(&now,NULL);
+	  if(now.tv_sec < rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec) /* at midnight on win32 */
+	    now.tv_sec = rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec;
+
+	  if((size_t)((now.tv_sec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec)*1000
+		      +(now.tv_usec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_usec)/1000)
+	     >= MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL) {
+	    /* increment send rate */
+	    rfbScreen->multicastMaxSendRate += rfbScreen->multicastMaxSendRateIncrement;
+	    /* increase the increment itself */
+	    if(++rfbScreen->multicastMaxSendRateIncrementCount % MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER == 0)
+	      rfbScreen->multicastMaxSendRateIncrement *= MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
 
 #ifdef MULTICAST_DEBUG
-	  rfbLog("MulticastVNC DEBUG: max send rate += %u to %u\n",
-		 rfbScreen->multicastMaxSendRateIncrement,
-		 rfbScreen->multicastMaxSendRate);
+	      rfbLog("MulticastVNC DEBUG: max send rate += %u to %u\n",
+		     rfbScreen->multicastMaxSendRateIncrement,
+		     rfbScreen->multicastMaxSendRate);
 #endif
-	  rfbScreen->lastMulticastMaxSendRateIncrement = now;
-	}
+		rfbScreen->lastMulticastMaxSendRateIncrement = now;
+	  }
 	UNLOCK(rfbScreen->multicastSharedMutex);
+	}
+
 #ifndef WIN32
         usleep (1000);
 #else

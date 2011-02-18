@@ -412,6 +412,7 @@ typedef struct _rfbScreenInfo
     uint32_t multicastMaxSendRateIncrement;
     uint8_t multicastMaxSendRateIncrementCount;
     struct timeval lastMulticastMaxSendRateIncrement; 
+    uint32_t multicastMaxSendRateFixed;     /**< Set this to a fixed maximum send rate in bytes/s to disable multicast flow  control */
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
