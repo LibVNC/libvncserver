@@ -261,18 +261,21 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
     }
 
     if (rfbScreen->multicastVNC) {
-        rfbLog("Enabling MulticastVNC on %s:%d with a TTL of %d, update interval %dms.\n", 
-	       rfbScreen->multicastAddr, rfbScreen->multicastPort,
-	       rfbScreen->multicastTTL, rfbScreen->multicastDeferUpdateTime);
-
 	if ((rfbScreen->multicastSock = rfbCreateMulticastSocket(rfbScreen->multicastAddr,
 								 rfbScreen->multicastPort,
 								 rfbScreen->multicastTTL,
 								 iface,
 								 &rfbScreen->multicastSockAddr)) < 0) 
 	  {
-	    rfbLogPerror("CreateMulticastSocket");
+	    rfbLogPerror("Error enabling MulticastVNC");
+	    rfbScreen->multicastVNC = FALSE;
 	    return;
+	  }
+	else
+	  {
+	    rfbLog("Enabled MulticastVNC on %s:%d with a TTL of %d, update interval %dms.\n",
+		   rfbScreen->multicastAddr, rfbScreen->multicastPort,
+		   rfbScreen->multicastTTL, rfbScreen->multicastDeferUpdateTime);
 	  }
     }
 }
