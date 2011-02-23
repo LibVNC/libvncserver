@@ -4062,10 +4062,10 @@ rfbSendMulticastUpdateBuf(rfbScreenInfoPtr rfbScreen)
       rfbLog("MulticastVNC DEBUG:     about to send message %d bytes big\n", rfbScreen->mcublen);
       rfbMulticastFramebufferUpdateMsg *mfu =
 	(rfbMulticastFramebufferUpdateMsg *)rfbScreen->multicastUpdateBuf;
-      rfbLog("MulticastVNC DEBUG:        pixelformat: %d\n", Swap16IfLE(mfu->idPixelformat));
-      rfbLog("MulticastVNC DEBUG:        id whole:    %d\n", Swap16IfLE(mfu->idWholeUpd)); 
-      rfbLog("MulticastVNC DEBUG:        id partial:  %d\n", Swap32IfLE(mfu->idPartialUpd)); 
-      rfbLog("MulticastVNC DEBUG:        nrects:      %d\n", Swap16IfLE(mfu->nRects)); 
+      rfbLog("MulticastVNC DEBUG:        pixelfmt/enc: %d\n", Swap16IfLE(mfu->idPixelformatEnc));
+      rfbLog("MulticastVNC DEBUG:        id whole:     %d\n", Swap16IfLE(mfu->idWholeUpd)); 
+      rfbLog("MulticastVNC DEBUG:        id partial:   %d\n", Swap32IfLE(mfu->idPartialUpd)); 
+      rfbLog("MulticastVNC DEBUG:        nrects:       %d\n", Swap16IfLE(mfu->nRects)); 
     }
 #endif
   if (rfbWriteExactMulticast(rfbScreen, rfbScreen->multicastUpdateBuf, rfbScreen->mcublen) < 0) {
