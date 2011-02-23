@@ -1,6 +1,6 @@
 
 /*
- * a simple MulticastVNC example server to measure unicast vs. multicast.
+ * a simple MulticastVNC example server
  * 
  * some code taken from the camera example.
  * 
@@ -130,8 +130,6 @@ int main(int argc,char** argv)
 
   server->desktopName = "MulticastVNC example";
 
-  server->maxRectsPerUpdate = WIDTH*HEIGHT;
-
   /* enable MulticastVNC */
   server->multicastVNC = TRUE;
   /* 
@@ -158,12 +156,8 @@ int main(int argc,char** argv)
     {
       if(UpdateIntervalOver())
 	{
-	  int i, j;
 	  UpdateFramebuffer(server);
-	  /* hack to have small rects sent in unicast mode */
-	  for(i=0; i < HEIGHT; i+=10)
-	    for(j=0; j < WIDTH; j+=10)
-	      rfbMarkRectAsModified(server,i,j,i+9,j+9);
+	  rfbMarkRectAsModified(server,0,0,WIDTH,HEIGHT);
 	}
       rfbProcessEvents(server, server->deferUpdateTime*1000);
     }
