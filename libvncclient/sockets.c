@@ -360,6 +360,9 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
     j = write(client->sock, buf + i, (n - i));
     if (j <= 0) {
       if (j < 0) {
+#ifdef WIN32
+	 errno=WSAGetLastError();
+#endif
 	if (errno == EWOULDBLOCK ||
 #ifdef LIBVNCSERVER_ENOENT_WORKAROUND
 		errno == ENOENT ||
@@ -846,6 +849,9 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 
   num=select(maxfd+1, &fds, NULL, NULL, &timeout);
   if(num<0) {
+#ifdef WIN32
+    errno=WSAGetLastError();
+#endif
     rfbClientLog("Waiting for message failed: %d (%s)\n",errno,strerror(errno));
     return num;
   }
