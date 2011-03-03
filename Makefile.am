@@ -4,6 +4,7 @@ endif
 
 SUBDIRS=libvncserver examples contrib libvncclient vncterm classes client_examples test $(X11VNC)
 DIST_SUBDIRS=libvncserver examples contrib libvncclient vncterm classes client_examples test
+EXTRA_DIST = CMakeLists.txt
 
 bin_SCRIPTS = libvncserver-config
 
