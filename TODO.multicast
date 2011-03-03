@@ -35,6 +35,9 @@ SERVER:
 
 CLIENT:
 
+- join multicast group on every interface (INADDR_ANY only joins on default
+  interface which may not be the right one...)
+
 - missing packets only NACKed once
 
 - verify sender address+port in  ReadFromRFBServerMulticast()?
