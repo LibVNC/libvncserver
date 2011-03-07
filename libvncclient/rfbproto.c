@@ -52,6 +52,10 @@
 #include <time.h>
 
 #ifdef LIBVNCSERVER_WITH_CLIENT_GCRYPT
+#ifdef WIN32
+#undef SOCKET
+#undef socklen_t
+#endif
 #include <gcrypt.h>
 #endif
 
