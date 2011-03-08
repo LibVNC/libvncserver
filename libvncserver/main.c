@@ -537,9 +537,7 @@ clientOutput(void *data)
 	/* do the multicast stuff if enabled */
 	if (cl->screen->multicastVNC && cl->screen->multicastSock >= 0 &&
 	    cl->useMulticastVNC && cl->sock >= 0 && !cl->onHold) {
-	  if(cl->screen->multicastDeferUpdateTime == 0) {
-	    doMcast(cl);
-	  } else if(cl->startMulticastDeferring.tv_usec == 0) {
+	  if(cl->startMulticastDeferring.tv_usec == 0) {
 	    gettimeofday(&cl->startMulticastDeferring,NULL);
 	    if(cl->startMulticastDeferring.tv_usec == 0)
 	      cl->startMulticastDeferring.tv_usec++;
@@ -1137,16 +1135,6 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
 
 void rfbInitServer(rfbScreenInfoPtr screen)
 {
-#ifdef WIN32
-  WSADATA trash;
-  WSAStartup(MAKEWORD(2,2),&trash);
-#endif
-  rfbInitSockets(screen);
-  rfbHttpInitSockets(screen);
-#ifndef __MINGW32__
-  if(screen->ignoreSIGPIPE)
-    signal(SIGPIPE,SIG_IGN);
-#endif
   if(screen->multicastVNC) {
     /* if smaller than any reasonable payload or bigger than the max UDP payload, use default value. */
     if(screen->multicastUpdateBufSize < 100 || screen->multicastUpdateBufSize > 65507)
@@ -1165,6 +1153,16 @@ void rfbInitServer(rfbScreenInfoPtr screen)
       screen->multicastMaxSendRate = MULTICAST_MAXSENDRATE_RATE_START;
     screen->multicastMaxSendRateIncrement = MULTICAST_MAXSENDRATE_INCREMENT_START;
   }
+#ifdef WIN32
+  WSADATA trash;
+  WSAStartup(MAKEWORD(2,2),&trash);
+#endif
+  rfbInitSockets(screen);
+  rfbHttpInitSockets(screen);
+#ifndef __MINGW32__
+  if(screen->ignoreSIGPIPE)
+    signal(SIGPIPE,SIG_IGN);
+#endif
 }
 
 void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
@@ -1245,9 +1243,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
     if (screen->multicastVNC && screen->multicastSock >= 0 && 
 	cl->useMulticastVNC && cl->sock >= 0 && !cl->onHold) {
       result=TRUE;
-      if(screen->multicastDeferUpdateTime == 0) {
-	doMcast(cl);
-      } else if(cl->startMulticastDeferring.tv_usec == 0) {
+      if(cl->startMulticastDeferring.tv_usec == 0) {
 	gettimeofday(&cl->startMulticastDeferring,NULL);
 	if(cl->startMulticastDeferring.tv_usec == 0)
 	  cl->startMulticastDeferring.tv_usec++;
