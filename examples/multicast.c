@@ -1,6 +1,7 @@
 
 /*
- * a simple MulticastVNC example server
+ * a simple MulticastVNC example server that is set up to compare
+ * unicast and multicast VNC.
  * 
  * some code taken from the camera example.
  * 
@@ -132,6 +133,8 @@ int main(int argc,char** argv)
 
   /* enable MulticastVNC */
   server->multicastVNC = TRUE;
+  /* and make sure unicast and multicast VNC are comparable */
+  server->multicastDeferUpdateTime = screen->deferUpdateTime = 10;
   /* 
      If we said TRUE above, we can supply the address for the multicast group,
      port, TTL and a time interval in miliseconds by which to defer updates.
@@ -144,6 +147,7 @@ int main(int argc,char** argv)
   server->multicastDeferUpdateTime = 50;
   server->multicastMaxSendRateFixed= 1048576;
   */
+
 
   /* Initialize the server */
   rfbInitServer(server);           
