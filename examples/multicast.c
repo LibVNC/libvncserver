@@ -134,7 +134,7 @@ int main(int argc,char** argv)
   /* enable MulticastVNC */
   server->multicastVNC = TRUE;
   /* and make sure unicast and multicast VNC are comparable */
-  server->multicastDeferUpdateTime = screen->deferUpdateTime = 10;
+  server->multicastDeferUpdateTime = server->deferUpdateTime = 10;
   /* 
      If we said TRUE above, we can supply the address for the multicast group,
      port, TTL and a time interval in miliseconds by which to defer updates.
