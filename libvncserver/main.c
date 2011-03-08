@@ -1136,8 +1136,8 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
 void rfbInitServer(rfbScreenInfoPtr screen)
 {
   if(screen->multicastVNC) {
-    /* if smaller than any reasonable payload or bigger than the max UDP payload, use default value. */
-    if(screen->multicastUpdateBufSize < 100 || screen->multicastUpdateBufSize > 65507)
+    /* if smaller than minimum allowed by IP (576-60) or bigger than the max UDP payload, use default value. */
+    if(screen->multicastUpdateBufSize < 516 || screen->multicastUpdateBufSize > 65507)
       screen->multicastUpdateBufSize = 2224;
     screen->multicastUpdateBuf = malloc(screen->multicastUpdateBufSize);
 
