@@ -1153,6 +1153,10 @@ void rfbInitServer(rfbScreenInfoPtr screen)
       screen->multicastUpdateBufSize = 2224;
     screen->multicastUpdateBuf = malloc(screen->multicastUpdateBufSize);
 
+    /* check this to be > 0 */
+    if(screen->multicastDeferUpdateTime <= 0)
+      screen->multicastDeferUpdateTime = 1;
+
     screen->multicastUseCopyRect = TRUE;
 
     if(screen->multicastMaxSendRateFixed)

@@ -97,8 +97,9 @@
 
  If the server supports the requested feature, it tells the client
  about the multicast address and port to listen on for framebuffer
- updates and also adds its multicast update interval and a unique ID
- assigned to the pixel-format and encoding the client requested.
+ updates and also adds its (bigger than zero) multicast update
+ interval and a unique ID assigned to the pixel-format and encoding
+ the client requested.
 
  Thus, the server sends back a 'FramebufferUpdate' message consisting
  of one rectangle with:
@@ -106,7 +107,8 @@
     * 'encoding-type' set to MulticastVNC (or IPv6MulticastVNC)
     * 'x-position' set to the pixel-format and encoding identifier
     * 'y-position' set to the UDP port to listen on
-    * 'width' set to the multicast update interval in milliseconds
+    * 'width' set to the multicast update interval in milliseconds,
+      which must be bigger than zero
     * the pixel data set to an IPv4 address (or IPv6 address) in
       network byte order, 4 (or 16) bytes long.
 
