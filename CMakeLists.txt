@@ -8,7 +8,7 @@ include(TestBigEndian)
 
 set(PACKAGE_NAME           "LibVNCServer")
 set(FULL_PACKAGE_NAME      "LibVNCServer")
-set(PACKAGE_VERSION        "0.9.7")
+set(PACKAGE_VERSION        "0.9.8")
 set(PROJECT_BUGREPORT_PATH "http://sourceforge.net/projects/libvncserver")
 
 include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/libvncserver ${CMAKE_SOURCE_DIR}/common)
