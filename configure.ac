@@ -830,7 +830,6 @@ AC_SUBST(RPMSOURCEDIR)
 
 AC_CONFIG_FILES([Makefile
 	libvncserver/Makefile
-	contrib/Makefile
 	examples/Makefile
 	vncterm/Makefile
 	classes/Makefile
