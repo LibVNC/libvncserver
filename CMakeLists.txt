@@ -18,6 +18,7 @@ find_package(JPEG)
 find_package(SDL)
 find_package(GnuTLS)
 find_package(Threads)
+find_package(X11)
 
 if(SDL_FOUND)   # == pthread.h available
   option(TIGHTVNC_FILETRANSFER "Enable filetransfer" ON)
@@ -219,6 +220,7 @@ if(SDL_FOUND)
     ${LIBVNCCLIENT_TESTS}
     SDLvncviewer
   )
+  set(SDLvncviewer_EXTRA_SOURCES scrap.c)
 endif(SDL_FOUND)
 
 if(HAVE_FFMPEG)
@@ -237,8 +239,8 @@ endforeach(test ${LIBVNCSERVER_TESTS})
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/client_examples)
 foreach(test ${LIBVNCCLIENT_TESTS})
-  add_executable(client_examples/${test} ${LIBVNCCLITEST_DIR}/${test}.c)
-  target_link_libraries(client_examples/${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${GNUTLS_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
+  add_executable(client_examples/${test} ${LIBVNCCLITEST_DIR}/${test}.c ${LIBVNCCLITEST_DIR}/${${test}_EXTRA_SOURCES} )
+  target_link_libraries(client_examples/${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${GNUTLS_LIBRARIES} ${X11_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
 endforeach(test ${LIBVNCCLIENT_TESTS})
 
 install_targets(/lib vncserver)
