@@ -394,7 +394,7 @@ typedef struct {
 /* Modif sf@2002 */
 #define rfbResizeFrameBuffer 4
 #define rfbPalmVNCReSizeFrameBuffer 0xF
-#define rfbMulticastFramebufferUpdate 248
+#define rfbMulticastFramebufferUpdate 241
 
 
 /* client -> server */
@@ -419,8 +419,8 @@ typedef struct {
 /* Modif cs@2005 */
 /* PalmVNC 1.4 & 2.0 SetScale Factor message */
 #define rfbPalmVNCSetScaleFactor 0xF
-#define rfbMulticastFramebufferUpdateRequest 249
-#define rfbMulticastFramebufferUpdateNACK 247
+#define rfbMulticastFramebufferUpdateRequest 242
+#define rfbMulticastFramebufferUpdateNACK 240
 /* Xvp message - bidirectional */
 #define rfbXvp 250
 
