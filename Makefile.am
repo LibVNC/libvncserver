@@ -2,9 +2,9 @@ if WITH_X11VNC
 X11VNC=x11vnc
 endif
 
-SUBDIRS=libvncserver examples contrib libvncclient vncterm classes client_examples test $(X11VNC)
-DIST_SUBDIRS=libvncserver examples contrib libvncclient vncterm classes client_examples test
-EXTRA_DIST = CMakeLists.txt
+SUBDIRS=libvncserver examples libvncclient vncterm classes client_examples test $(X11VNC)
+DIST_SUBDIRS=libvncserver examples libvncclient vncterm classes client_examples test
+EXTRA_DIST = CMakeLists.txt rfb/rfbint.h.cmake rfb/rfbconfig.h.cmake
 
 bin_SCRIPTS = libvncserver-config
 
