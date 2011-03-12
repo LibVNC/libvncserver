@@ -42,7 +42,7 @@
  
  Clients then ask for multicast framebuffer updates by issuing
  'MulticastFramebufferUpdateRequest' client-to-server messages
- (message type 249).
+ (message type 242).
 
  When the VNC server receives such a request, it does not reply
  immediately, instead it schedules the multicast framebuffer update to
@@ -66,7 +66,7 @@
  fixed maximum size, the whole update may have to be packed into
  several UDP packets. Therefore the framebuffer contents are sent
  using (maybe several) 'MulticastFramebufferUpdate' server-to-client
- messages (message type 248). These contain sequence numbers
+ messages (message type 241). These contain sequence numbers
  identifying the whole logical update and the individual partial
  updates. By tagging updates with pixel-format and encoding
  identifiers, several logical data streams with different sequence
@@ -79,7 +79,7 @@
  update or of the update as a whole. They can then resort to whatever
  strategy they think is best, i.e. do nothing, request resending of
  missing messages by sending a 'MulticastFramebufferUpdateNACK'
- client-to-server message (message type 247) or request a full
+ client-to-server message (message type 240) or request a full
  non-incremental multicast framebuffer update.
 
  Note that 'MulticastFramebufferUpdate's are the only messages sent
@@ -125,7 +125,7 @@
 
  After successful session setup, the client(s) ask for a multicast
  framebuffer update by sending a 'MulticastFramebufferUpdateRequest'
- client-to-server message (message type 249). This exists so clients
+ client-to-server message (message type 242). This exists so clients
  can explicitly ask for multicast framebuffer updates or for normal
  framebuffer updates via TCP using 'FramebufferUpdateRequest'.
 
@@ -143,7 +143,7 @@
  +--------------------+--------------------+-------------------------+
  |No. of bytes        |Type        [Value] |Description              |
  +--------------------+--------------------+-------------------------+
- |1                   |U8            249   |message-type             |
+ |1                   |U8            242   |message-type             |
  |1                   |U8                  |incremental              |
  +--------------------+--------------------+-------------------------+
 
@@ -176,7 +176,7 @@
  the whole update may have to be packed into several UDP datagrams.
  Therefore the framebuffer contents are sent using (maybe several)
  'MulticastFramebufferUpdate' server-to-client messages (message type
- 248). These contain consecutive sequence numbers identifying whole
+ 241). These contain consecutive sequence numbers identifying whole
  and partial updates. A whole update number identifies a logical
  update, i.e. the response to a 'MulticastFramebufferUpdateRequest',
  which may have to be split into several 'MulticastFramebufferUpdate'
@@ -196,7 +196,7 @@
  +--------------------+--------------------+-------------------------+
  |No. of bytes        |Type        [Value] |Description		     |
  +--------------------+--------------------+-------------------------+
- |1     	      |U8            248   |message-type             |
+ |1     	      |U8            241   |message-type             |
  |1                   |                    |padding  		     |
  |2                   |U16                 |id-of-pf-and-enc	     |
  |4                   |U32                 |id-of-partial-update     | 
@@ -213,7 +213,7 @@
  If a client notices lost messages by examining sequence numbers of
  received partial updates, it can choose to request retransmission of
  consecutive missing partial updates by sending a 'Multicast-
- FramebufferUpdateNACK' client-to-server message (message type 247).
+ FramebufferUpdateNACK' client-to-server message (message type 240).
  This message contains the sequence number of a missing partial update
  which optionally indexes the start of a consecution of further
  partial updates. The total number of consecutive partial updates is
@@ -231,7 +231,7 @@
  +--------------------+--------------------+-------------------------+
  |No. of bytes        |Type        [Value] |Description              |
  +--------------------+--------------------+-------------------------+
- |1                   |U8            247   |message-type             |
+ |1                   |U8            240   |message-type             |
  |1                   |U8                  |padding                  |
  |2                   |U16                 |number-of-partial-upds   |
  |4                   |U32                 |id-of-partial-update     |
