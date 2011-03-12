@@ -20,9 +20,9 @@ find_package(GnuTLS)
 find_package(Threads)
 find_package(X11)
 
-if(SDL_FOUND)   # == pthread.h available
+if(Threads_FOUND)
   option(TIGHTVNC_FILETRANSFER "Enable filetransfer" ON)
-endif(SDL_FOUND)
+endif(Threads_FOUND)
 if(ZLIB_FOUND)
   set(LIBVNCSERVER_HAVE_LIBZ 1)
 endif(ZLIB_FOUND)
@@ -188,12 +188,12 @@ set(LIBVNCSERVER_TESTS
     vncev
   )
 
-if(SDL_FOUND)
+if(Threads_FOUND)
   set(LIBVNCSERVER_TESTS
     ${LIBVNCSERVER_TESTS}
     blooptest
   )
-endif(SDL_FOUND)
+endif(Threads_FOUND)
 
 if(TIGHTVNC_FILETRANSFER)
   set(LIBVNCSERVER_TESTS
