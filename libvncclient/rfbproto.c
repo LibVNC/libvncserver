@@ -1830,6 +1830,7 @@ HandleRFBServerMessage(rfbClient* client)
 		  /* partial update missing */
 		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1) {
 		    client->multicastLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
+		    client->multicastNACKed += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
 
 		    /* tell server about missing partial updates */
 		    SendMulticastFramebufferUpdateNACK(client, 
@@ -1864,9 +1865,8 @@ HandleRFBServerMessage(rfbClient* client)
 	      rfbClientLog("MulticastVNC DEBUG: id whole:    %d\n", msg.mfu.idWholeUpd);
 	      rfbClientLog("MulticastVNC DEBUG: id partial:  %d\n", msg.mfu.idPartialUpd);
 	      rfbClientLog("MulticastVNC DEBUG: received:    %d\n", client->multicastRcvd);
+	      rfbClientLog("MulticastVNC DEBUG: NACKed:      %d\n", client->multicastNACKed);
 	      rfbClientLog("MulticastVNC DEBUG: lost:        %d\n", client->multicastLost);
-	      rfbClientLog("MulticastVNC DEBUG: loss ratio:  %f\n", client->multicastLost / 
-			   (double)(client->multicastRcvd+client->multicastLost));
 	      rfbClientLog("MulticastVNC DEBUG: timeouts     %d\n", client->multicastTimeouts);
 #endif
 

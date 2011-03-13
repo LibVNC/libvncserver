@@ -353,6 +353,7 @@ typedef struct _rfbClient {
         int     multicastLastWholeUpd;
         int64_t multicastLastPartialUpd;
         uint32_t multicastRcvd;     /* counts received multicast packets */
+        uint32_t multicastNACKed;   /* counts NACKed multicast packets */
         uint32_t multicastLost;     /* counts lost multicast packets */
         size_t multicastTimeouts;
         rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
