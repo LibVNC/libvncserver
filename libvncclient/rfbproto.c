@@ -1818,7 +1818,7 @@ HandleRFBServerMessage(rfbClient* client)
 	      msg.mfu.nRects = rfbClientSwap16IfLE(msg.mfu.nRects);	      
 	      
 	      /* calculate lost partial updates from sequence numbers */
-	      client->multicastRcvd++;
+	      client->multicastPktsRcvd++;
 	      if(client->multicastLastWholeUpd >= 0) /* only check on the second and later runs */
 		{
 		  /* it can happen that we get a mis-ordered partial update 
@@ -1829,8 +1829,8 @@ HandleRFBServerMessage(rfbClient* client)
 
 		  /* partial update missing */
 		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1) {
-		    client->multicastLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
-		    client->multicastNACKed += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
+		    client->multicastPktsLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
+		    client->multicastPktsNACKed += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
 
 		    /* tell server about missing partial updates */
 		    SendMulticastFramebufferUpdateNACK(client, 
@@ -1843,8 +1843,8 @@ HandleRFBServerMessage(rfbClient* client)
 		     lost before, so revert this  */
 		  if(msg.mfu.idPartialUpd < client->multicastLastPartialUpd &&
 		     client->multicastLastPartialUpd - msg.mfu.idPartialUpd < 0x0FFF0000 &&
-		     client->multicastLost > 0)
-		    client->multicastLost--;
+		     client->multicastPktsLost > 0)
+		    client->multicastPktsLost--;
 		}
 	      
 	      /* save last received highest sequence numbers, care for wrap-around */
@@ -1864,9 +1864,9 @@ HandleRFBServerMessage(rfbClient* client)
 	      rfbClientLog("MulticastVNC DEBUG: --got message--\n");
 	      rfbClientLog("MulticastVNC DEBUG: id whole:    %d\n", msg.mfu.idWholeUpd);
 	      rfbClientLog("MulticastVNC DEBUG: id partial:  %d\n", msg.mfu.idPartialUpd);
-	      rfbClientLog("MulticastVNC DEBUG: received:    %d\n", client->multicastRcvd);
-	      rfbClientLog("MulticastVNC DEBUG: NACKed:      %d\n", client->multicastNACKed);
-	      rfbClientLog("MulticastVNC DEBUG: lost:        %d\n", client->multicastLost);
+	      rfbClientLog("MulticastVNC DEBUG: received:    %d\n", client->multicastPktRcvd);
+	      rfbClientLog("MulticastVNC DEBUG: NACKed:      %d\n", client->multicastPktsNACKed);
+	      rfbClientLog("MulticastVNC DEBUG: lost:        %d\n", client->multicastPktsLost);
 	      rfbClientLog("MulticastVNC DEBUG: timeouts     %d\n", client->multicastTimeouts);
 #endif
 

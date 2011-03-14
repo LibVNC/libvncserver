@@ -270,6 +270,7 @@ ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
     }
 
     /* successfully read a packet at this point */
+    client->multicastBytesRcvd += r;
     packet * p = calloc(sizeof(packet), 1);
     p->datalen = r;
     p->data = malloc(p->datalen);

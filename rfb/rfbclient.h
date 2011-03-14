@@ -352,10 +352,11 @@ typedef struct _rfbClient {
         rfbBool serverMsg;          /* this flag is set by WaitForMessage() if there's unicast input */
         int     multicastLastWholeUpd;
         int64_t multicastLastPartialUpd;
-        uint32_t multicastRcvd;     /* counts received multicast packets */
-        uint32_t multicastNACKed;   /* counts NACKed multicast packets */
-        uint32_t multicastLost;     /* counts lost multicast packets */
-        size_t multicastTimeouts;
+        size_t  multicastBytesRcvd;    /* counts received multicast bytes */
+        size_t  multicastPktsRcvd;     /* counts received multicast packets */
+        size_t  multicastPktsNACKed;   /* counts NACKed multicast packets */
+        size_t  multicastPktsLost;     /* counts lost multicast packets */
+        size_t  multicastTimeouts;
         rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
 } rfbClient;
 
