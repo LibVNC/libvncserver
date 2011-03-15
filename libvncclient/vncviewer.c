@@ -200,7 +200,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->listenSock = -1;
   client->multicastSock = -1;
 
-  client->maxMulticastTimeouts = 300;
+  client->multicastTimeout = 10;
   client->multicastSocketRcvBufSize = 5242880;
   client->multicastRcvBufSize = 5242880;
   client->multicastLastWholeUpd = -1;
@@ -420,21 +420,14 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
   
   if(r==0) { /* timeout */
     if(client->multicastSock >= 0 && !client->multicastDisabled
+       && client->multicastTimeout
        && (client->multicastPendingRequestTimestamp.tv_sec || client->multicastPendingRequestTimestamp.tv_usec)) {
-          /* check if the update interval has expired */
+          /* check if the fallback timeout has expired */
 	  gettimeofday(&now, NULL);
 	  if(now.tv_sec < client->multicastPendingRequestTimestamp.tv_sec /* at midnight on win32 */
 	     || (size_t)((now.tv_sec - client->multicastPendingRequestTimestamp.tv_sec)*1000
-			 +(now.tv_usec - client->multicastPendingRequestTimestamp.tv_usec)/1000) > client->multicastUpdInterval) {
-	    client->multicastTimeouts = (size_t)((now.tv_sec - client->multicastPendingRequestTimestamp.tv_sec)*1000
-						 +(now.tv_usec - client->multicastPendingRequestTimestamp.tv_usec)/1000) / client->multicastUpdInterval;
-#ifdef MULTICAST_DEBUG
-	    rfbClientLog("MulticastVNC DEBUG:   timeout, now %d!\n", client->multicastTimeouts);
-#endif
-	  }
-
-	  if(client->multicastTimeouts > client->maxMulticastTimeouts) {
-	    rfbClientLog("MulticastVNC: too many timeouts (%d), falling back to unicast\n", client->multicastTimeouts);
+			 +(now.tv_usec - client->multicastPendingRequestTimestamp.tv_usec)/1000) > client->multicastTimeout*1000) {
+	    rfbClientLog("MulticastVNC: Timed out after %ds, falling back to unicast\n", client->multicastTimeout);
 	    client->multicastDisabled = TRUE;
 	    SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
 	  }
@@ -444,7 +437,6 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
   
   /* there are messages */
   if(client->serverMsgMulticast) {
-    client->multicastTimeouts = 0;
     client->multicastPendingRequestTimestamp.tv_sec = 0;
     client->multicastPendingRequestTimestamp.tv_usec = 0;
   }

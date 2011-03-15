@@ -334,11 +334,11 @@ typedef struct _rfbClient {
 
         /* all the multicast stuff */
         rfbBool canHandleMulticastVNC;
-        int maxMulticastTimeouts;
         int multicastSock;
         int multicastSocketRcvBufSize;
         int multicastRcvBufSize;   /**< Size of the multicast receive buffer */
         int multicastRcvBufLen;    /**< Current fill of the multicast receive buffer */
+        size_t multicastTimeout;   /**< Fall back to unicast this many seconds after unanswered multicast framebuffer request. Set to 0 to disable fallback. */
         void *multicastPacketBuf;
         char *multicastbufoutptr;
         size_t multicastbuffered;
@@ -356,7 +356,6 @@ typedef struct _rfbClient {
         size_t  multicastPktsRcvd;     /* counts received multicast packets */
         size_t  multicastPktsNACKed;   /* counts NACKed multicast packets */
         size_t  multicastPktsLost;     /* counts lost multicast packets */
-        size_t  multicastTimeouts;
         rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
 } rfbClient;
 

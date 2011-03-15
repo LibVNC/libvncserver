@@ -1868,7 +1868,6 @@ HandleRFBServerMessage(rfbClient* client)
 	      rfbClientLog("MulticastVNC DEBUG: received:    %d\n", client->multicastPktRcvd);
 	      rfbClientLog("MulticastVNC DEBUG: NACKed:      %d\n", client->multicastPktsNACKed);
 	      rfbClientLog("MulticastVNC DEBUG: lost:        %d\n", client->multicastPktsLost);
-	      rfbClientLog("MulticastVNC DEBUG: timeouts     %d\n", client->multicastTimeouts);
 #endif
 
 	      /* handle rects */
@@ -2166,18 +2165,25 @@ HandleRFBServerMessage(rfbClient* client)
 			host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
 	if (r != 0)
 	  {
-	    rfbClientErr("MulticastVNC: received malformed address: %s\n", gai_strerror(r));
+	    rfbClientErr("MulticastVNC: Received malformed address: %s\n", gai_strerror(r));
 	    return FALSE;
 	  }
 
-	rfbClientLog("MulticastVNC: received multicast address %s:%s\n", host, serv);
-	rfbClientLog("MulticastVNC: received multicast update interval: %dms\n", rect.r.w);
-	rfbClientLog("MulticastVNC: received pixelformat,encoding identifier: %d\n", rect.r.x);
+	rfbClientLog("MulticastVNC: Received multicast address %s:%s\n", host, serv);
+	rfbClientLog("MulticastVNC: Received multicast update interval: %dms\n", rect.r.w);
+	rfbClientLog("MulticastVNC: Received pixelformat,encoding identifier: %d\n", rect.r.x);
 
 	client->multicastSock = CreateMulticastSocket(multicastSockAddr, client->multicastRcvBufSize);
 	client->multicastUpdInterval = rect.r.w > 0 ? rect.r.w : 1;
 	client->multicastPixelformatEncId = rect.r.x;
 	client->multicastPacketBuf = packetBufCreate(client->multicastRcvBufSize);
+
+	if(client->multicastUpdInterval > client->multicastTimeout*1000) {
+	  rfbClientLog("MulticastVNC: Fallback timeout (%d) smaller than server's multicast update interval (%d). This won't work, disabling timeout.\n",
+		       client->multicastTimeout,
+		       client->multicastUpdInterval);
+	  client->multicastTimeout = 0;
+	}
 
 	rfbClientLog("MulticastVNC: Enabling multicast specific messages\n");
 	SetClient2Server(client, rfbMulticastFramebufferUpdateRequest);
