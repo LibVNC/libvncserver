@@ -1865,7 +1865,7 @@ HandleRFBServerMessage(rfbClient* client)
 	      rfbClientLog("MulticastVNC DEBUG: --got message--\n");
 	      rfbClientLog("MulticastVNC DEBUG: id whole:    %d\n", msg.mfu.idWholeUpd);
 	      rfbClientLog("MulticastVNC DEBUG: id partial:  %d\n", msg.mfu.idPartialUpd);
-	      rfbClientLog("MulticastVNC DEBUG: received:    %d\n", client->multicastPktRcvd);
+	      rfbClientLog("MulticastVNC DEBUG: received:    %d\n", client->multicastPktsRcvd);
 	      rfbClientLog("MulticastVNC DEBUG: NACKed:      %d\n", client->multicastPktsNACKed);
 	      rfbClientLog("MulticastVNC DEBUG: lost:        %d\n", client->multicastPktsLost);
 #endif
