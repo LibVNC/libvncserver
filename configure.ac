@@ -731,6 +731,7 @@ if test "x$with_ipv6" != "xno"; then
 			AC_MSG_CHECKING([for getaddrinfo in -lws2_32])
 		        LIBS="$LIBS -lws2_32"
 		        AC_TRY_LINK([#include <ws2tcpip.h>], [getaddrinfo(0, 0, 0, 0);], [
+				      ac_cv_func_getaddrinfo="yes"
 				      AC_DEFINE(IPv6,1)
 		                      AC_MSG_RESULT([yes])
 				      ],
