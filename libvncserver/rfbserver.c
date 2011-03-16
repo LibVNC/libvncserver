@@ -2150,7 +2150,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                 break;
             case rfbEncodingMulticastVNC:
      	       /* do we have the right type of multicast socket? */
-	       if(cl->screen->multicastSockAddr.ss_family == AF_INET)
+	      if(cl->screen->multicastVNC && cl->screen->multicastSockAddr.ss_family == AF_INET)
 		 {
 		   if (!cl->enableMulticastVNC) {
 		     rfbLog("Enabling MulticastVNC protocol extension for client "
@@ -2161,7 +2161,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                 break; 
 	    case rfbEncodingIPv6MulticastVNC:
 	       /* do we have the right type of multicast socket? */
-	       if(cl->screen->multicastSockAddr.ss_family == AF_INET6)
+	       if(cl->screen->multicastVNC && cl->screen->multicastSockAddr.ss_family == AF_INET6)
 		 {
 		   if (!cl->enableMulticastVNC) {
 		     rfbLog("Enabling IPv6MulticastVNC protocol extension for client "
