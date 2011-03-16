@@ -891,14 +891,20 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
   optval = 1;
   if((sock = socket(localAddr.ss_family, SOCK_DGRAM, 0)) < 0)
     {
-      rfbClientErr("CreateMulticastSocket socket(): %s\n", strerror(errno));
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error creating socket: %s\n", strerror(errno));
       return -1;
     }
 
   optval = 1;
   if(setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,(char*)&optval,sizeof(optval)) < 0) 
     {
-      rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error setting reuse addr: %s\n", strerror(errno));
       close(sock);
       return -1;
     } 
@@ -906,7 +912,10 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
   /* get/set socket receive buffer */
   if(getsockopt(sock, SOL_SOCKET, SO_RCVBUF,(char*)&optval, &optval_len) <0)
     {
-      rfbClientErr("CreateMulticastSocket getsockopt(): %s\n", strerror(errno));
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error getting rcv buf size: %s\n", strerror(errno));
       close(sock);
       return -1;
     } 
@@ -914,13 +923,19 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
   optval = so_recvbuf;
   if(setsockopt(sock,SOL_SOCKET,SO_RCVBUF,(char*)&optval,sizeof(optval)) < 0) 
     {
-      rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error setting rcv buf size: %s\n", strerror(errno));
       close(sock);
       return -1;
     } 
   if(getsockopt(sock, SOL_SOCKET, SO_RCVBUF,(char*)&optval, &optval_len) <0)
     {
-      rfbClientErr("CreateMulticastSocket getsockopt(): %s\n", strerror(errno));
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error getting set rcv buf size: %s\n", strerror(errno));
       close(sock);
       return -1;
     } 
@@ -930,7 +945,10 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
 
   if(bind(sock, (struct sockaddr*)&localAddr, sizeof(localAddr)) < 0)
     {
-      rfbClientErr("CreateMulticastSocket bind(): %s\n", strerror(errno));
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error binding socket: %s\n", strerror(errno));
       close(sock);
       return -1;
     }
@@ -949,7 +967,10 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
 
       if(setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) < 0)
         {
-	  rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
+#ifdef WIN32
+	  errno=WSAGetLastError();
+#endif
+	  rfbClientErr("CreateMulticastSocket: error joining IPv4 multicast group: %s\n", strerror(errno));
 	  close(sock);
 	  return -1;
         }
@@ -967,7 +988,10 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
 
 	if(setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char*) &multicastRequest, sizeof(multicastRequest)) < 0)
 	  {
-	    rfbClientErr("CreateMulticastSocket setsockopt(): %s\n", strerror(errno));
+#ifdef WIN32
+  	    errno=WSAGetLastError();
+#endif
+	    rfbClientErr("CreateMulticastSocket: error joining IPv6 multicast group: %s\n", strerror(errno));
 	    close(sock);
 	    return -1;
 	  }

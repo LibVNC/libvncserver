@@ -137,7 +137,10 @@ rfbCreateMulticastSocket(char *addr,
   /* create socket for sending multicast datagrams */
   if((sock = socket(multicastAddrInfo->ai_family, multicastAddrInfo->ai_socktype, 0)) < 0)
     {
-      rfbLogPerror("rfbCreateMulticastSocket socket()");
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbLogPerror("rfbCreateMulticastSocket: error creating socket");
       freeaddrinfo(multicastAddrInfo);  
       return -1;
     }
@@ -148,7 +151,10 @@ rfbCreateMulticastSocket(char *addr,
 		multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_HOPS : IP_MULTICAST_TTL,
 		(char*)&ttl, sizeof(ttl)) < 0 )
     {
-      rfbLogPerror("rfbCreateMulticastSocket ttl setsockopt()");
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbLogPerror("rfbCreateMulticastSocket: error setting TTL");
       freeaddrinfo(multicastAddrInfo);  
       closesocket(sock);
       return -1;
@@ -157,7 +163,10 @@ rfbCreateMulticastSocket(char *addr,
   /* connect the socket */
   if(connect(sock,(struct sockaddr*)sockAddr, sizeof(*sockAddr)) < 0)
     {
-      rfbLogPerror("rfbCreateMulticastSocket connect()");
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbLogPerror("rfbCreateMulticastSocket: error connecting socket");
       freeaddrinfo(multicastAddrInfo);  
       closesocket(sock);
       return -1;
@@ -170,7 +179,10 @@ rfbCreateMulticastSocket(char *addr,
 		 multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_IF : IP_MULTICAST_IF,
 		 (char*)&iface, sizeof(iface)) < 0)  
     {
-      rfbLogPerror("rfbCreateMulticastSocket interface setsockopt()");
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbLogPerror("rfbCreateMulticastSocket: error setting interface");
       freeaddrinfo(multicastAddrInfo);  
       closesocket(sock);
       return -1;
