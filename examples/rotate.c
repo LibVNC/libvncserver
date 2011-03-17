@@ -10,22 +10,22 @@
 #define FUNCNAME rfbRotate
 #define FUNC(i, j) (h - 1 - j + i * h)
 #define SWAPDIMENSIONS
-#define OUT 8
+#define OUTBITS 8
 #include "rotatetemplate.c"
-#define OUT 16
+#define OUTBITS 16
 #include "rotatetemplate.c"
-#define OUT 32
+#define OUTBITS 32
 #include "rotatetemplate.c"
 #undef FUNCNAME
 #undef FUNC
 
 #define FUNCNAME rfbRotateCounterClockwise
 #define FUNC(i, j) (j + (w - 1 - i) * h)
-#define OUT 8
+#define OUTBITS 8
 #include "rotatetemplate.c"
-#define OUT 16
+#define OUTBITS 16
 #include "rotatetemplate.c"
-#define OUT 32
+#define OUTBITS 32
 #include "rotatetemplate.c"
 #undef FUNCNAME
 #undef FUNC
@@ -33,33 +33,33 @@
 
 #define FUNCNAME rfbFlipHorizontally
 #define FUNC(i, j) ((w - 1 - i) + j * w)
-#define OUT 8
+#define OUTBITS 8
 #include "rotatetemplate.c"
-#define OUT 16
+#define OUTBITS 16
 #include "rotatetemplate.c"
-#define OUT 32
+#define OUTBITS 32
 #include "rotatetemplate.c"
 #undef FUNCNAME
 #undef FUNC
 
 #define FUNCNAME rfbFlipVertically
 #define FUNC(i, j) (i + (h - 1 - j) * w)
-#define OUT 8
+#define OUTBITS 8
 #include "rotatetemplate.c"
-#define OUT 16
+#define OUTBITS 16
 #include "rotatetemplate.c"
-#define OUT 32
+#define OUTBITS 32
 #include "rotatetemplate.c"
 #undef FUNCNAME
 #undef FUNC
 
 #define FUNCNAME rfbRotateHundredAndEighty
 #define FUNC(i, j) ((w - 1 - i) + (h - 1 - j) * w)
-#define OUT 8
+#define OUTBITS 8
 #include "rotatetemplate.c"
-#define OUT 16
+#define OUTBITS 16
 #include "rotatetemplate.c"
-#define OUT 32
+#define OUTBITS 32
 #include "rotatetemplate.c"
 #undef FUNCNAME
 #undef FUNC

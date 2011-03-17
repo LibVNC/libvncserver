@@ -37,7 +37,7 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   rfbZlibHeader hdr;
   int toRead=0;
   int inflateResult=0;
-  int uncompressedBytes = (( rw * rh ) * ( BPP / 8 ));
+  lzo_uint uncompressedBytes = (( rw * rh ) * ( BPP / 8 ));
 
   if (!ReadFromRFBServer(client, (char *)&hdr, sz_rfbZlibHeader))
     return FALSE;
@@ -119,7 +119,7 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   int toRead=0;
   int inflateResult=0;
   unsigned char *ptr=NULL;
-  int uncompressedBytes = ry + (rw * 65535);
+  lzo_uint uncompressedBytes = ry + (rw * 65535);
   unsigned int numCacheRects = rx;
 
   if (!ReadFromRFBServer(client, (char *)&hdr, sz_rfbZlibHeader))
@@ -170,7 +170,7 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   uncompressedBytes = client->raw_buffer_size;
   inflateResult = lzo1x_decompress(
               (lzo_byte *)client->ultra_buffer, toRead,
-              (lzo_byte *)client->raw_buffer, (lzo_uintp) &uncompressedBytes, NULL);
+              (lzo_byte *)client->raw_buffer, &uncompressedBytes, NULL);
   if ( inflateResult != LZO_E_OK ) 
   {
     rfbClientLog("ultra decompress returned error: %d\n",

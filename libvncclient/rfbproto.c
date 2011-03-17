@@ -1045,7 +1045,9 @@ InitialiseRFBConnection(rfbClient* client)
   rfbProtocolVersionMsg pv;
   int major,minor;
   uint32_t authScheme;
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
   uint32_t subAuthScheme;
+#endif
   rfbClientInitMsg ci;
 
   /* if the connection is immediately closed, don't report anything, so

@@ -99,7 +99,8 @@ static enum rfbNewClientAction newclient(rfbClientPtr cl)
 {
    char buffer[1024];
    struct sockaddr_in addr;
-   unsigned int len=sizeof(addr),ip;
+   socklen_t len=sizeof(addr);
+   unsigned int ip;
    
    getpeername(cl->sock,(struct sockaddr*)&addr,&len);
    ip=ntohl(addr.sin_addr.s_addr);
