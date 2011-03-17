@@ -298,6 +298,8 @@ int main(int argc,char** argv)
 
 	/* Initialize server */
 	server=rfbGetScreen(&argc,argv,width,height,8,3,4);
+        if(!server)
+          return 0;
 
 	server->frameBuffer=malloc(400*300*4);
 	server->cursor=NULL;

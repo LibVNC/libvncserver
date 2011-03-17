@@ -27,6 +27,8 @@ int main (int argc, char **argv)
 	  return 1;
 	  
         server = rfbGetScreen (&argc, argv, maxx, maxy, 8, 3, bpp);
+        if(!server)
+          return 0;
 	server->desktopName = "Zippy das wundersquirrel\'s VNC server";
 	server->frameBuffer = (char*)malloc(maxx*maxy*bpp);
 	server->alwaysShared = TRUE;

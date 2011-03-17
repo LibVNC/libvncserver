@@ -112,6 +112,8 @@ static enum rfbNewClientAction newclient(rfbClientPtr cl)
 int main(int argc,char** argv)
 {
    rfbScreenInfoPtr s=rfbGetScreen(&argc,argv,width,height,8,1,1);
+   if(!s)
+     return 0;
    s->colourMap.is16=FALSE;
    s->colourMap.count=2;
    s->colourMap.data.bytes=(unsigned char*)"\xd0\xd0\xd0\x30\x01\xe0";
