@@ -27,7 +27,7 @@ rfbUsage(void)
                     "                       (use 'storepasswd' to create a password file)\n");
     fprintf(stderr, "-rfbversion 3.x        Set the version of the RFB we choose to advertise\n");
     fprintf(stderr, "-mcast                 Enable MulticastVNC extension\n");
-    fprintf(stderr, "-mcastpktsz            size in bytes of MulticastVNC packets (default 2224)\n");
+    fprintf(stderr, "-mcastpktsz            size in bytes of MulticastVNC packets (default %d)\n", MULTICAST_DFLT_PACKETSIZE);
     fprintf(stderr, "-permitfiletransfer    permit file transfer support\n");
     fprintf(stderr, "-passwd plain-password use authentication \n"
                     "                       (use plain-password as password, USE AT YOUR RISK)\n");
@@ -106,7 +106,7 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		rfbUsage();
 		return FALSE;
 	    }
-            rfbScreen->multicastUpdateBufSize = atoi(argv[++i]);
+            rfbScreen->multicastPacketSize = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-rfbversion") == 0) {  /* -rfbversion 3.6  */
             if (i + 1 >= *argc) {
 		rfbUsage();

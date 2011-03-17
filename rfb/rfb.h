@@ -384,7 +384,8 @@ typedef struct _rfbScreenInfo
     char    multicastTTL;
     SOCKET  multicastSock;
     struct sockaddr_storage multicastSockAddr;
-    uint16_t multicastUpdateBufSize;
+    uint16_t multicastPacketSize;
+#define MULTICAST_DFLT_PACKETSIZE 1452
     char *multicastUpdateBuf;
     uint16_t  mcublen;
     rfbBool multicastUseCopyRect;            /**< All multicast clients support CopyRect */

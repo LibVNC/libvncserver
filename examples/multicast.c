@@ -146,7 +146,7 @@ int main(int argc,char** argv)
   server->multicastTTL = 32;
   server->multicastDeferUpdateTime = 50;
   server->multicastMaxSendRateFixed= 1048576;
-  server->multicastUpdateBufSize = 1500;
+  server->multicastPacketSize = 15000;
   */
 
 

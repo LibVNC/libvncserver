@@ -2957,7 +2957,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 
 	if(someclient == NULL) { /* no other client has this, alloc new ones on the heap */
 	  cl->multicastUpdPendingPtr = calloc(sizeof(rfbBool), 1);
-	  cl->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE/cl->screen->multicastUpdateBufSize);
+	  cl->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE/cl->screen->multicastPacketSize);
 	  cl->multicastWholeUpdId = calloc(sizeof(uint16_t), 1);
 	  cl->multicastPartialUpdId = calloc(sizeof(uint32_t), 1);
 	  rfbLog("MulticastVNC encountered new pixelformat and/or encoding, allocating new data for client %s\n", cl->host);
@@ -3406,7 +3406,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 #endif
 
 	if(cl->screen->mcublen + sz_rfbFramebufferUpdateRectHeader + maxSizeRect 
-	   > cl->screen->multicastUpdateBufSize) {                /* would overflow */
+	   > cl->screen->multicastPacketSize) {                /* would overflow */
 	  if(mfu)
 	    mfu->nRects = Swap16IfLE(nRects);
 
@@ -3422,7 +3422,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	  nRects = 0;
 	 
 	  if(sz_rfbMulticastFramebufferUpdateMsg + sz_rfbFramebufferUpdateRectHeader + maxSizeRect 
-	     <= cl->screen->multicastUpdateBufSize) {            /* headers + rect fit into now empty buffer */
+	     <= cl->screen->multicastPacketSize) {            /* headers + rect fit into now empty buffer */
 	    
 	    mfu = rfbPutMulticastHeader(cl, 
 					*cl->multicastWholeUpdId,
@@ -3435,7 +3435,7 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 	  else {                                        /* rect too large for buffer, must be split up */
 	    const int bytesPerPixel = cl->format.bitsPerPixel/8;
 	    const int bytesPerLine = w * bytesPerPixel;
-	    const int payload = (cl->screen->multicastUpdateBufSize - sz_rfbMulticastFramebufferUpdateMsg) - sz_rfbFramebufferUpdateRectHeader;
+	    const int payload = (cl->screen->multicastPacketSize - sz_rfbMulticastFramebufferUpdateMsg) - sz_rfbFramebufferUpdateRectHeader;
 	    const int linesPerUpd =  payload / bytesPerLine;
 	    int wholeLineSplitRects = 0;
 	    int lineOffset=0;

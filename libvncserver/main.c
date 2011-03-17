@@ -905,10 +905,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->multicastPort=5900;
    screen->multicastTTL=1;
    screen->multicastDeferUpdateTime=30;
-   /* the multicast update buffer _must_ fit into a UDP packet, but better be <= the MSS of the link.
-      so for 802.11, this is (MTU=2272 - IPv6-header=40 - UDP-header=8) = 2224.
-      we rather optimize for that than for ethernet which is mainly switched today... */
-   screen->multicastUpdateBufSize = 2224;
+   screen->multicastPacketSize = MULTICAST_DFLT_PACKETSIZE;
 
    INIT_MUTEX(screen->multicastOutputMutex);
    INIT_MUTEX(screen->multicastUpdateMutex);
@@ -1137,9 +1134,9 @@ void rfbInitServer(rfbScreenInfoPtr screen)
 {
   if(screen->multicastVNC) {
     /* if smaller than minimum allowed by IP (576-60) or bigger than the max UDP payload, use default value. */
-    if(screen->multicastUpdateBufSize < 516 || screen->multicastUpdateBufSize > 65507)
-      screen->multicastUpdateBufSize = 2224;
-    screen->multicastUpdateBuf = malloc(screen->multicastUpdateBufSize);
+    if(screen->multicastPacketSize < 516 || screen->multicastPacketSize > 65507)
+      screen->multicastPacketSize = MULTICAST_DFLT_PACKETSIZE;
+    screen->multicastUpdateBuf = malloc(screen->multicastPacketSize);
 
     /* check this to be > 0 */
     if(screen->multicastDeferUpdateTime <= 0)
