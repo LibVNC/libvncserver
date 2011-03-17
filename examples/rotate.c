@@ -2,13 +2,6 @@
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
 
-static int gcd(int x, int y)
-{
-	if (x == 0)
-		return y;
-	return gcd((y % x), x);
-}
-
 #define CONCAT2(a,b) a##b
 #define CONCAT2E(a,b) CONCAT2(a,b)
 #define CONCAT3(a,b,c) a##b##c
