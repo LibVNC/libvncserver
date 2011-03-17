@@ -55,7 +55,9 @@ BOTH:
 
 - Implement other encodings than raw and ultra.
 
-
+- have an optional server-push mode that's announced by the server
+  and stops client's from periodically requesting updates? this
+  would stop constant request flow from clients.
 
 
 
