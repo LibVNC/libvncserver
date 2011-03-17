@@ -10,6 +10,9 @@ int main(int argc,char** argv)
 	rfbBool ret=0;
 
 	screen = rfbGetScreen(&fake_argc,fake_argv,1024,768,8,3,1);
+	if(!screen)
+          return 0;
+
 #define CHECK(a,b) if(screen->a!=b) { fprintf(stderr,#a " is %d (should be " #b ")\n",screen->a); ret=1; }
 	CHECK(width,1024);
 	CHECK(height,768);

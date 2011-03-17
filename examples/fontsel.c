@@ -41,6 +41,9 @@ int main(int argc,char** argv)
   rfbScreenInfoPtr s=rfbGetScreen(&argc,argv,640,480,8,3,3);
   int i,j;
 
+  if(!s)
+    return 0;
+
   s->frameBuffer=(char*)malloc(640*480*3);
   rfbInitServer(s);
 
