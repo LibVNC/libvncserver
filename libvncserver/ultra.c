@@ -68,7 +68,7 @@ rfbSendOneRectEncodingUltra(rfbClientPtr cl,
      */
     maxCompSize = (maxRawSize + maxRawSize / 16 + 64 + 3);
 
-    if (cl->afterEncBufSize < maxCompSize) {
+    if (cl->afterEncBufSize < (int)maxCompSize) {
 	cl->afterEncBufSize = maxCompSize;
 	if (cl->afterEncBuf == NULL)
 	    cl->afterEncBuf = (char *)malloc(cl->afterEncBufSize);

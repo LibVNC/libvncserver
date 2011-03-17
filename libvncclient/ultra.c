@@ -57,7 +57,7 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
    * buffer, this buffer allocation should only happen once, on the
    * first update.
    */
-  if ( client->raw_buffer_size < uncompressedBytes) {
+  if ( client->raw_buffer_size < (int)uncompressedBytes) {
     if ( client->raw_buffer != NULL ) {
       free( client->raw_buffer );
     }
@@ -141,7 +141,7 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
    * buffer, this buffer allocation should only happen once, on the
    * first update.
    */
-  if ( client->raw_buffer_size < (uncompressedBytes + 500)) {
+  if ( client->raw_buffer_size < (int)(uncompressedBytes + 500)) {
     if ( client->raw_buffer != NULL ) {
       free( client->raw_buffer );
     }
