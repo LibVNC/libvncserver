@@ -122,6 +122,7 @@ void UpdateFramebuffer(rfbScreenInfoPtr rfbScreen)
 int main(int argc,char** argv)
 {                                                                
   rfbScreenInfoPtr server;
+  rfbBool splitrects = FALSE;
   if(!(server = rfbGetScreen(&argc,argv,WIDTH,HEIGHT,8,3,BYTESPERPIXEL)))
     {
       rfbErr("Could not get server.\n");
@@ -135,6 +136,8 @@ int main(int argc,char** argv)
   server->multicastVNC = TRUE;
   /* and make sure unicast and multicast VNC are comparable */
   server->multicastDeferUpdateTime = server->deferUpdateTime = 10;
+  server->maxRectsPerUpdate = WIDTH*HEIGHT;
+
   /* 
      If we said TRUE above, we can supply the address for the multicast group,
      port, TTL and a time interval in miliseconds by which to defer updates.
@@ -161,8 +164,16 @@ int main(int argc,char** argv)
     {
       if(UpdateIntervalOver())
 	{
-	  UpdateFramebuffer(server);
-	  rfbMarkRectAsModified(server,0,0,WIDTH,HEIGHT);
+          UpdateFramebuffer(server);
+          if(splitrects) {
+             int i,j;
+             /* hack to have small rects sent in unicast mode */
+             for(i=0; i < WIDTH; i+=20)
+               for(j=0; j < HEIGHT; j+=20)
+                 rfbMarkRectAsModified(server,i,j,i+19,j+19);
+          }
+          else
+             rfbMarkRectAsModified(server,0,0,WIDTH,HEIGHT);
 	}
       rfbProcessEvents(server, server->deferUpdateTime*1000);
     }
