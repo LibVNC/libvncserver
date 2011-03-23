@@ -331,6 +331,8 @@ typedef struct _rfbClient {
         /** hook to handle xvp server messages */
 	HandleXvpMsgProc           HandleXvpMsg;
 
+        /** Counts bytes received by this client. */
+        size_t  bytesRcvd;
 
         /* all the multicast stuff */
         rfbBool canHandleMulticastVNC;

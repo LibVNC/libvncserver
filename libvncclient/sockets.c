@@ -168,6 +168,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	}
       }
       client->buffered += i;
+      client->bytesRcvd += i;
     }
 
     memcpy(out, client->bufoutptr, n);
@@ -211,6 +212,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       }
       out += i;
       n -= i;
+      client->bytesRcvd += i;
     }
   }
 
