@@ -8,6 +8,9 @@ EXTRA_DIST = CMakeLists.txt
 
 bin_SCRIPTS = libvncserver-config
 
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = libvncserver.pc libvncclient.pc
+
 includedir=$(prefix)/include/rfb
 #include_HEADERS=rfb.h rfbconfig.h rfbint.h rfbproto.h keysym.h rfbregion.h
 

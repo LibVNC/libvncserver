@@ -829,6 +829,8 @@ AM_CONDITIONAL(WITH_X11VNC,  test "$build_x11vnc" = "yes")
 AC_SUBST(RPMSOURCEDIR)
 
 AC_CONFIG_FILES([Makefile
+	libvncserver.pc
+	libvncclient.pc
 	libvncserver/Makefile
 	examples/Makefile
 	vncterm/Makefile
