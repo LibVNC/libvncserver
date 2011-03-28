@@ -13,6 +13,8 @@ static int maxx=400, maxy=400, bpp=4;
 void blank_framebuffer(char* frame_buffer, int x1, int y1, int x2, int y2);
 /* displays a red bar, a green bar, and a blue bar */
 void draw_primary_colors (char* frame_buffer, int x1, int y1, int x2, int y2);
+void draw_primary_colours_generic(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2);
+void draw_primary_colours_generic_fast(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2);
 void linecount (char* frame_buffer);
 /* handles mouse events */
 void on_mouse_event (int buttonMask,int x,int y,rfbClientPtr cl);
@@ -27,6 +29,8 @@ int main (int argc, char **argv)
 	  return 1;
 	  
         server = rfbGetScreen (&argc, argv, maxx, maxy, 8, 3, bpp);
+        if(!server)
+          return 0;
 	server->desktopName = "Zippy das wundersquirrel\'s VNC server";
 	server->frameBuffer = (char*)malloc(maxx*maxy*bpp);
 	server->alwaysShared = TRUE;
@@ -74,7 +78,7 @@ void draw_primary_colors (char* frame_buffer, int x1, int y1, int x2, int y2)
  }
 
 /* Dscho's versions (slower, but works for bpp != 3 or 4) */
-static void draw_primary_colours_generic(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
+void draw_primary_colours_generic(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
 {
   rfbPixelFormat f=s->serverFormat;
   int i,j;
@@ -88,7 +92,7 @@ static void draw_primary_colours_generic(rfbScreenInfoPtr s,int x1,int y1,int x2
 	rfbDrawPixel(s,i,j,f.blueMax<<f.blueShift);
 }
 
-static void draw_primary_colours_generic_fast(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
+void draw_primary_colours_generic_fast(rfbScreenInfoPtr s,int x1,int y1,int x2,int y2)
 {
   rfbPixelFormat f=s->serverFormat;
   int i,j,y3=(y1*2+y2)/3,y4=(y1+y2*2)/3;

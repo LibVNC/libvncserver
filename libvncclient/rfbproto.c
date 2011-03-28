@@ -559,11 +559,6 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
         ReadReason(client);
         return FALSE;
     }
-    if (count>sizeof(tAuth))
-    {
-        rfbClientLog("%d security types are too many; maximum is %d\n", count, sizeof(tAuth));
-        return FALSE;
-    }
 
     rfbClientLog("We have %d security types to read\n", count);
     authScheme=0;
@@ -573,7 +568,7 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
         rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
         if (flag) continue;
-        if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth || tAuth[loop]==rfbMSLogon ||
+        if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth ||
             tAuth[loop]==rfbARD ||
             (!subAuth && (tAuth[loop]==rfbTLS || tAuth[loop]==rfbVeNCrypt)))
         {
@@ -1045,7 +1040,9 @@ InitialiseRFBConnection(rfbClient* client)
   rfbProtocolVersionMsg pv;
   int major,minor;
   uint32_t authScheme;
+#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
   uint32_t subAuthScheme;
+#endif
   rfbClientInitMsg ci;
 
   /* if the connection is immediately closed, don't report anything, so

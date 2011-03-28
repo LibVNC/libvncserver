@@ -1,5 +1,5 @@
-#define OUT_T CONCAT3E(uint,OUT,_t)
-#define FUNCTION CONCAT2E(FUNCNAME,OUT)
+#define OUT_T CONCAT3E(uint,OUTBITS,_t)
+#define FUNCTION CONCAT2E(FUNCNAME,OUTBITS)
 
 static void FUNCTION(rfbScreenInfoPtr screen)
 {
@@ -16,7 +16,7 @@ static void FUNCTION(rfbScreenInfoPtr screen)
 
 #ifdef SWAPDIMENSIONS
 	screen->width = h;
-	screen->paddedWidthInBytes = h * OUT / 8;
+	screen->paddedWidthInBytes = h * OUTBITS / 8;
 	screen->height = w;
 
 	{
@@ -31,7 +31,7 @@ static void FUNCTION(rfbScreenInfoPtr screen)
 	rfbMarkRectAsModified(screen, 0, 0, screen->width, screen->height);
 }
 
-#if OUT == 32
+#if OUTBITS == 32
 void FUNCNAME(rfbScreenInfoPtr screen) {
 	if (screen->serverFormat.bitsPerPixel == 32)
 		CONCAT2E(FUNCNAME,32)(screen);
@@ -48,5 +48,5 @@ void FUNCNAME(rfbScreenInfoPtr screen) {
 #endif
 
 #undef FUNCTION
-#undef OUT
+#undef OUTBITS
 

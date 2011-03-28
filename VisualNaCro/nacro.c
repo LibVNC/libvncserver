@@ -121,6 +121,8 @@ static rfbBool malloc_frame_buffer(rfbClient* cl)
 		res->client->frameBuffer=malloc(w*4*h);
 		
 		res->server=rfbGetScreen(NULL,NULL,w,h,8,3,4);
+		if(!res->server)
+                  return FALSE;
 		res->server->screenData=res;
 		res->server->port=res->listen_port;
 		res->server->frameBuffer=res->client->frameBuffer;

@@ -322,8 +322,10 @@ static void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 
 int main(int argc,char** argv)
 {
-	rfbScreenInfoPtr rfbScreen =
-		rfbGetScreen(&argc,argv,maxx,maxy,8,3,bpp);
+	rfbScreenInfoPtr rfbScreen = rfbGetScreen(&argc,argv,maxx,maxy,8,3,bpp);
+        if(!rfbScreen)
+          return 0;
+
 	rfbScreen->desktopName = "Cursor Test";
 	rfbScreen->frameBuffer = (char*)malloc(maxx*maxy*bpp);
 	rfbScreen->ptrAddEvent = doptr;

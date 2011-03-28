@@ -17,15 +17,16 @@ static MUTEX(frameBufferMutex);
 
 typedef struct { int id; char* str; } encoding_t;
 static encoding_t testEncodings[]={
-	{ rfbEncodingRaw, "raw" },
+        { rfbEncodingRaw, "raw" },
 	{ rfbEncodingRRE, "rre" },
-	/* TODO: fix corre */
-	/* { rfbEncodingCoRRE, "corre" }, */
+	{ rfbEncodingCoRRE, "corre" },
 	{ rfbEncodingHextile, "hextile" },
+	{ rfbEncodingUltra, "ultra" },
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	{ rfbEncodingZlib, "zlib" },
 	{ rfbEncodingZlibHex, "zlibhex" },
 	{ rfbEncodingZRLE, "zrle" },
+	{ rfbEncodingZYWRLE, "zywrle" },
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	{ rfbEncodingTight, "tight" },
 #endif
@@ -39,7 +40,6 @@ static encoding_t testEncodings[]={
 /* Here come the variables/functions to handle the test output */
 
 static const int width=400,height=300;
-static struct { int x1,y1,x2,y2; } lastUpdateRect;
 static unsigned int statistics[2][NUMBER_OF_ENCODINGS_TO_TEST];
 static unsigned int totalFailed,totalCount;
 static unsigned int countGotUpdate;
@@ -49,22 +49,9 @@ static void initStatistics(void) {
 	memset(statistics[0],0,sizeof(int)*NUMBER_OF_ENCODINGS_TO_TEST);
 	memset(statistics[1],0,sizeof(int)*NUMBER_OF_ENCODINGS_TO_TEST);
 	totalFailed=totalCount=0;
-	lastUpdateRect.x1=0;
-	lastUpdateRect.y1=0;
-	lastUpdateRect.x2=width;
-	lastUpdateRect.y2=height;
 	INIT_MUTEX(statisticsMutex);
 }
 
-static void updateServerStatistics(int x1,int y1,int x2,int y2) {
-	LOCK(statisticsMutex);
-	countGotUpdate=0;
-	lastUpdateRect.x1=x1;
-	lastUpdateRect.y1=y1;
-	lastUpdateRect.x2=x2;
-	lastUpdateRect.y2=y2;
-	UNLOCK(statisticsMutex);
-}
 
 static void updateStatistics(int encodingIndex,rfbBool failed) {
 	LOCK(statisticsMutex);
@@ -115,7 +102,7 @@ static rfbBool doFramebuffersMatch(rfbScreenInfo* server,rfbClient* client,
 static rfbBool resize(rfbClient* cl) {
 	if(cl->frameBuffer)
 		free(cl->frameBuffer);
-	cl->frameBuffer=(char*)malloc(cl->width*cl->height*cl->format.bitsPerPixel/8);
+	cl->frameBuffer=malloc(cl->width*cl->height*cl->format.bitsPerPixel/8);
 	if(!cl->frameBuffer)
 		return FALSE;
 	SendFramebufferUpdateRequest(cl,0,0,cl->width,cl->height,FALSE);
@@ -129,44 +116,44 @@ typedef struct clientData {
 } clientData;
 
 static void update(rfbClient* client,int x,int y,int w,int h) {
-	clientData* cd=(clientData*)client->clientData;
-	int maxDelta=0;
-
 #ifndef VERY_VERBOSE
+
 	static const char* progress="|/-\\";
 	static int counter=0;
 
 	if(++counter>sizeof(progress)) counter=0;
 	fprintf(stderr,"%c\r",progress[counter]);
 #else
+	clientData* cd=(clientData*)client->clientData;
 	rfbClientLog("Got update (encoding=%s): (%d,%d)-(%d,%d)\n",
 			testEncodings[cd->encodingIndex].str,
 			x,y,x+w,y+h);
 #endif
+}
 
-	/* only check if this was the last update */
-	if(x+w!=lastUpdateRect.x2 || y+h!=lastUpdateRect.y2) {
-#ifdef VERY_VERBOSE
-		rfbClientLog("Waiting (%d!=%d or %d!=%d)\n",
-				x+w,lastUpdateRect.x2,y+h,lastUpdateRect.y2);
-#endif
-		return;
-	}
+static void update_finished(rfbClient* client) {
+	clientData* cd=(clientData*)client->clientData;
+        int maxDelta=0;
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
+	if(testEncodings[cd->encodingIndex].id==rfbEncodingZYWRLE)
+		maxDelta=5;
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	if(testEncodings[cd->encodingIndex].id==rfbEncodingTight)
 		maxDelta=5;
 #endif
-
+#endif
 	updateStatistics(cd->encodingIndex,
 			!doFramebuffersMatch(cd->server,client,maxDelta));
 }
+
 
 static void* clientLoop(void* data) {
 	rfbClient* client=(rfbClient*)data;
 	clientData* cd=(clientData*)client->clientData;
 
 	client->appData.encodingsString=strdup(testEncodings[cd->encodingIndex].str);
+	client->appData.qualityLevel = 7; /* ZYWRLE fails the test with standard settings */
 
 	sleep(1);
 	rfbClientLog("Starting client (encoding %s, display %s)\n",
@@ -201,16 +188,13 @@ static void startClient(int encodingIndex,rfbScreenInfo* server) {
 	client->clientData=malloc(sizeof(clientData));
 	client->MallocFrameBuffer=resize;
 	client->GotFrameBufferUpdate=update;
+	client->FinishedFrameBufferUpdate=update_finished;
 
 	cd=(clientData*)client->clientData;
 	cd->encodingIndex=encodingIndex;
 	cd->server=server;
 	cd->display=(char*)malloc(6);
 	sprintf(cd->display,":%d",server->port-5900);
-
-	lastUpdateRect.x1=lastUpdateRect.y1=0;
-	lastUpdateRect.x2=server->width;
-	lastUpdateRect.y2=server->height;
 
 	pthread_create(&all_threads[thread_counter++],NULL,clientLoop,(void*)client);
 }
@@ -228,11 +212,10 @@ static void idle(rfbScreenInfo* server)
 #else
 	goForward=(countGotUpdate==1);
 #endif
-	/* if(lastUpdateRect.x2==354)
-		rfbLog("server checked: countGotUpdate=%d\n",countGotUpdate); */
+
 	UNLOCK(statisticsMutex);
 	if(!goForward)
-		return;
+	  return;
 	countGotUpdate=0;
 
 	LOCK(frameBufferMutex);
@@ -250,10 +233,6 @@ static void idle(rfbScreenInfo* server)
 		}
 		rfbMarkRectAsModified(server,x1,y1,x2,y2);
 
-		lastUpdateRect.x1=x1;
-		lastUpdateRect.y1=y1;
-		lastUpdateRect.x2=x2;
-		lastUpdateRect.y2=y2;
 #ifdef VERY_VERBOSE
 		rfbLog("Sent update (%d,%d)-(%d,%d)\n",x1,y1,x2,y2);
 #endif
@@ -298,6 +277,8 @@ int main(int argc,char** argv)
 
 	/* Initialize server */
 	server=rfbGetScreen(&argc,argv,width,height,8,3,4);
+        if(!server)
+          return 0;
 
 	server->frameBuffer=malloc(400*300*4);
 	server->cursor=NULL;
@@ -336,10 +317,14 @@ int main(int argc,char** argv)
 	}
 #endif
 
-	rfbScreenCleanup(server);
+	/* shut down server, disconnecting all clients */
+	rfbShutdownServer(server, TRUE);
+
 	for(i=0;i<thread_counter;i++)
 		pthread_join(all_threads[i], NULL);
+
 	free(server->frameBuffer);
+	rfbScreenCleanup(server);
 
 	rfbLog("Statistics:\n");
 	for(i=0;i<NUMBER_OF_ENCODINGS_TO_TEST;i++)

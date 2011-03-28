@@ -18,10 +18,12 @@ find_package(JPEG)
 find_package(SDL)
 find_package(GnuTLS)
 find_package(Threads)
+find_package(X11)
+find_library(LIBGCRYPT_LIBRARIES gcrypt)
 
-if(SDL_FOUND)   # == pthread.h available
+if(Threads_FOUND)
   option(TIGHTVNC_FILETRANSFER "Enable filetransfer" ON)
-endif(SDL_FOUND)
+endif(Threads_FOUND)
 if(ZLIB_FOUND)
   set(LIBVNCSERVER_HAVE_LIBZ 1)
 endif(ZLIB_FOUND)
@@ -32,6 +34,11 @@ option(LIBVNCSERVER_ALLOW24BPP "Allow 24 bpp" ON)
 if(GNUTLS_FOUND)
   set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
 endif(GNUTLS_FOUND)
+if(LIBGCRYPT_LIBRARIES)
+  message(STATUS "Found libgcrypt: ${LIBGCRYPT_LIBRARIES}")
+  set(LIBVNCSERVER_WITH_CLIENT_GCRYPT 1)
+endif(LIBGCRYPT_LIBRARIES)
+
 
 check_include_file("fcntl.h"       LIBVNCSERVER_HAVE_FCNTL_H)
 check_include_file("netinet/in.h"  LIBVNCSERVER_HAVE_NETINET_IN_H)
@@ -187,12 +194,12 @@ set(LIBVNCSERVER_TESTS
     vncev
   )
 
-if(SDL_FOUND)
+if(Threads_FOUND)
   set(LIBVNCSERVER_TESTS
     ${LIBVNCSERVER_TESTS}
     blooptest
   )
-endif(SDL_FOUND)
+endif(Threads_FOUND)
 
 if(TIGHTVNC_FILETRANSFER)
   set(LIBVNCSERVER_TESTS
@@ -219,6 +226,7 @@ if(SDL_FOUND)
     ${LIBVNCCLIENT_TESTS}
     SDLvncviewer
   )
+  set(SDLvncviewer_EXTRA_SOURCES scrap.c)
 endif(SDL_FOUND)
 
 if(HAVE_FFMPEG)
@@ -237,8 +245,8 @@ endforeach(test ${LIBVNCSERVER_TESTS})
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/client_examples)
 foreach(test ${LIBVNCCLIENT_TESTS})
-  add_executable(client_examples/${test} ${LIBVNCCLITEST_DIR}/${test}.c)
-  target_link_libraries(client_examples/${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${GNUTLS_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
+  add_executable(client_examples/${test} ${LIBVNCCLITEST_DIR}/${test}.c ${LIBVNCCLITEST_DIR}/${${test}_EXTRA_SOURCES} )
+  target_link_libraries(client_examples/${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${GNUTLS_LIBRARIES} ${X11_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
 endforeach(test ${LIBVNCCLIENT_TESTS})
 
 install_targets(/lib vncserver)

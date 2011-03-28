@@ -455,6 +455,8 @@ ScreenInit(int argc, char**argv)
 			   CGDisplayPixelsHigh(kCGDirectMainDisplay),
 			   bitsPerSample,
 			   CGDisplaySamplesPerPixel(kCGDirectMainDisplay),4);
+  if(!rfbScreen)
+    exit(0);
   rfbScreen->serverFormat.redShift = bitsPerSample*2;
   rfbScreen->serverFormat.greenShift = bitsPerSample*1;
   rfbScreen->serverFormat.blueShift = 0;
