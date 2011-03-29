@@ -321,9 +321,10 @@ while (my $_l = <$fh>) {
         # Luis Mondesi <lemsx1@gmail.com>
         my $_s = $_l;
 	$_s =~ s/^    //g;
-        if ($_s =~ m/^Merge branch/)
+        if ($_s =~ m/^Merge branch|^Merge remote branch/)
         {
             $state=0;
+            $author=0;
             next;
         }
 	$comment = $comment . $_s;
