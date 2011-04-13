@@ -2442,6 +2442,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	if(msg.mfun.idPartialUpd >= firstInBuf && msg.mfun.idPartialUpd < firstInBuf + partUpdRgnBufCount(buf)) {
 	  uint32_t start = msg.mfun.idPartialUpd - firstInBuf;
 	  uint32_t i;
+	  uint32_t significantNACKsInPast = 0;
 
 	  for(i = start; i < start+msg.mfun.nPartialUpds && i < buf->len; ++i) {
 #ifdef MULTICAST_DEBUG
@@ -2452,10 +2453,28 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 #endif
 	    /* mark the lost partial updates as requested */
 	    partUpdRgnBufAt(buf, i)->pending = TRUE;
-	    
+
+
+	    /* this NACK CANNOT be part of a 'tightly packed' burst of sufficient size,
+	       so take a look back to see if it's maybe part of a 'sparse' burst that
+	       occured within a 'lookback'-sized window */
+	    if(msg.mfun.nPartialUpds < MULTICAST_MAXSENDRATE_NACKS_REQUIRED) {
+	      uint32_t lookback = 2 * MULTICAST_MAXSENDRATE_NACKS_REQUIRED;
+	      while(lookback) {
+		partialUpdRegion* p = partUpdRgnBufAt(buf, i - lookback);
+		if(p
+		   && p->pending
+		   && !p->sendrate_decreased
+		   && cl->screen->multicastMaxSendRate >= p->sendrate)
+		  ++significantNACKsInPast;
+		--lookback;
+	      }
+	    }
+
 	    /* check whether we should decrease the send rate */
 	    if(!cl->screen->multicastMaxSendRateFixed
-	       && msg.mfun.nPartialUpds >= MULTICAST_MAXSENDRATE_NACKS_REQUIRED
+	       && ( msg.mfun.nPartialUpds >= MULTICAST_MAXSENDRATE_NACKS_REQUIRED          /* this NACK belongs to a 'packed' burst of required size */
+		    || significantNACKsInPast+1  >= MULTICAST_MAXSENDRATE_NACKS_REQUIRED ) /* this NACK belongs to a 'sparse' burst of required size */
 	       && !partUpdRgnBufAt(buf, i)->sendrate_decreased
 	       && cl->screen->multicastMaxSendRate >= partUpdRgnBufAt(buf, i)->sendrate) {
 	      uint32_t j;
