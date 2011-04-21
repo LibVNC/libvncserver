@@ -1,6 +1,7 @@
 0.9.8
    - Overall changes:
      * Automagically generated API documentation using doxygen.
+     * Added support for pkg-config.
      * Fixed Mingw32 cross compilation.
      * Fixed CMake build system.
 
