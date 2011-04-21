@@ -15,6 +15,7 @@ x11vnc.spec.in
 aclocal.m4
 autom4te.cache
 libvncserver-config
+*.pc
 _configs.sed
 config.h
 LibVNCServer*.tar.gz

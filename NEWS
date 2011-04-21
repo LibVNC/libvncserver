@@ -1,3 +1,54 @@
+0.9.8
+   - Overall changes:
+     * Automagically generated API documentation using doxygen.
+     * Added support for pkg-config.
+     * Fixed Mingw32 cross compilation.
+     * Fixed CMake build system.
+
+   - LibVNCServer/LibVNCClient:
+     * All files used by _both_ LibVNCServer and LibVNCClient were put into
+       a 'common' directory, reducing code duplication.
+     * Implemented xvp VNC extension.
+     * Updated minilzo library used for Ultra encoding to ver 2.04.
+       According to the minilzo README, this brings a significant
+       speedup on 64-bit architechtures.
+
+   - LibVNCServer:
+     * Thread safety for ZRLE, Zlib, Tight, RRE, CoRRE and Ultra encodings.
+       This makes all VNC encodings safe to use with a multithreaded server.
+     * A DisplayFinishedHook for LibVNCServer. If set, this hook gets called
+       just before rfbSendFrameBufferUpdate() returns.
+     * Fix for tight security type for RFB 3.8 in TightVNC file transfer
+       (Debian Bug #517422).
+
+   - LibVNCClient:
+     * Unix sockets support.
+     * Anonymous TLS security type support.
+     * VeNCrypt security type support.
+     * MSLogon security type support.
+     * ARD (Apple Remote Desktop) security type support.
+     * UltraVNC Repeater support.
+     * A new FinishedFrameBufferUpdate callback that is invoked after each
+       complete framebuffer update.
+     * A new non-forking listen (reverse VNC) function that works under
+       Windows.
+     * IPv6 support. LibVNCClient is now able to connect to IPv6 VNC servers.
+     * IP QoS support. This enables setting the DSCP/Traffic Class field of
+       IP/IPv6 packets sent by a client. For example starting a client with
+       -qosdscp 184 marks all outgoing traffic for expedited forwarding.
+       Implementation for Win32 is still a TODO, though.
+     * Fixed hostname resolution problems under Windows.
+
+   - SDLvncviewer
+     * Is now resizable and can do key repeat, mouse wheel scrolling
+       and clipboard copy and paste.
+
+   - LinuxVNC:
+     * Fix for no input possible because of ctrl key being stuck.
+       Issue was reported as Debian bug #555988.
+
+
+0.9.7
    Mark sent me patches to no longer need C++ for ZRLE encoding!
    added --disable-cxx Option for configure
    x11vnc changes from Karl Runge:

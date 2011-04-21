@@ -150,14 +150,10 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	  errno=WSAGetLastError();
 #endif
 	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
-#ifndef WIN32
-        usleep (10000);
-#else
-	 Sleep (10);
-#endif
 	    /* TODO:
 	       ProcessXtEvents();
 	    */
+	    WaitForMessage(client, 100000);
 	    i = 0;
 	  } else {
 	    rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
@@ -196,14 +192,10 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	  errno=WSAGetLastError();
 #endif
 	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
-#ifndef WIN32
-        usleep (10000);
-#else
-	 Sleep (10);
-#endif
 	    /* TODO:
 	       ProcessXtEvents();
 	    */
+	    WaitForMessage(client, 100000);
 	    i = 0;
 	  } else {
 	    rfbClientErr("read (%s)\n",strerror(errno));

@@ -65,6 +65,8 @@ int main(int argc,char** argv)
 
   /* initialize data for vnc server */
   rfbScreen = rfbGetScreen(&argc,argv,paddedWidth,height,8,(bitsPerPixelInFile+7)/8,bytesPerPixel);
+  if(!rfbScreen)
+    return 0;
   if(argc>1)
     rfbScreen->desktopName = argv[1];
   else

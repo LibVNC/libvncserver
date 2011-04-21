@@ -54,6 +54,9 @@
 /* Define to the version of this package. */
 #define LIBVNCSERVER_PACKAGE_VERSION  "@PACKAGE_VERSION@"
 
+/* Define to 1 if libgcrypt is present */
+#cmakedefine LIBVNCSERVER_WITH_CLIENT_GCRYPT 1
+
 /* Define to 1 if GnuTLS is present */
 #cmakedefine LIBVNCSERVER_WITH_CLIENT_TLS 1
 

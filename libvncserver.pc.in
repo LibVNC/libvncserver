@@ -1,0 +1,12 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: LibVNCServer
+Description: A library for easy implementation of a VNC server.
+Version: @VERSION@
+Requires:
+Libs: -L${libdir} -lvncserver @LIBS@ @WSOCKLIB@
+Cflags: -I${includedir}
+

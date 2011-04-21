@@ -1,6 +1,6 @@
 # Process this file with autoconf to produce a configure script.
-AC_INIT(LibVNCServer, 0.9.7, http://sourceforge.net/projects/libvncserver)
-AM_INIT_AUTOMAKE(LibVNCServer, 0.9.7)
+AC_INIT(LibVNCServer, 0.9.8, http://sourceforge.net/projects/libvncserver)
+AM_INIT_AUTOMAKE(LibVNCServer, 0.9.8)
 AM_CONFIG_HEADER(rfbconfig.h)
 AX_PREFIX_CONFIG_H([rfb/rfbconfig.h])
 
@@ -878,8 +878,9 @@ AM_CONDITIONAL(WITH_X11VNC,  test "$build_x11vnc" = "yes")
 AC_SUBST(RPMSOURCEDIR)
 
 AC_CONFIG_FILES([Makefile
+	libvncserver.pc
+	libvncclient.pc
 	libvncserver/Makefile
-	contrib/Makefile
 	examples/Makefile
 	vncterm/Makefile
 	classes/Makefile
