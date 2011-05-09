@@ -475,6 +475,15 @@ int main(int argc, char** argv)
 		    pexit("not on a known screen");
 		}
 	      root = RootWindow(display,screen);
+
+	      /* somehow the XIChangeHierarchy event below is missed, check here as well if dev still exists */
+	      devinfo = XIQueryDevice(display, dev, &num);
+	      if(!devinfo)
+		{
+		  fprintf(stderr, "device %d gone, ", dev);
+		  pexit("exiting.\n");
+		}
+	      XIFreeDeviceInfo(devinfo);
 	    }
 	  else 
 	    /* check if any bit is set */
