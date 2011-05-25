@@ -393,7 +393,7 @@ FileTransferMsg
 CreateFileDownloadZeroSizeDataMsg(unsigned long mTime)
 {
 	FileTransferMsg fileDownloadZeroSizeDataMsg;
-	int length = sz_rfbFileDownloadDataMsg + sizeof(int);
+	int length = sz_rfbFileDownloadDataMsg + sizeof(unsigned long);
 	rfbFileDownloadDataMsg *pFDD = NULL;
 	char *pFollow = NULL;
 	
