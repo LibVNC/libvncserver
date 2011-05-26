@@ -353,7 +353,7 @@ int main(int argc, char** argv)
   /* get error code */
   BadDevice(display, baddevice_err);
   
-  // query XI and XI2
+  /* query XI and XI2 */
   int major = 2, minor = 0;
   if(! XQueryExtension (display, "XInputExtension", &xi2opcode, &ignore, &ignore))
     pexit("No XInput Extension!");
@@ -585,7 +585,7 @@ int main(int argc, char** argv)
 	    event.xcrossing.mode = NotifyNormal;
 	    event.xcrossing.same_screen = True;
 	    event.xcrossing.focus = True;
-	    //event.xcrossing.state = modifs;
+	    /* event.xcrossing.state = modifs; */
 	    (void)XSendEvent(display,windowin,
 			     True/*propagate*/,EnterWindowMask,&event);
 	  }

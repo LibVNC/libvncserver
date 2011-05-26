@@ -190,7 +190,7 @@ void clear_modifiers(int init) {
 			rfbLog("clear_modifiers: up: %-10s (0x%x) "
 			    "keycode=0x%x\n", keystrs[i], keysym, keycode);
 		}
-		XTestFakeKeyEvent_wr(dpy, -1, keycode, False, CurrentTime); //multipointer FIXME?
+		XTestFakeKeyEvent_wr(dpy, -1, keycode, False, CurrentTime); /* multipointer FIXME? */
 	}
 	XFlush_wr(dpy);
 #endif	/* NO_X11 */
@@ -279,7 +279,7 @@ void clear_keys(void) {
 		if (keystate[k]) {
 			KeyCode keycode = (KeyCode) k;
 			rfbLog("clear_keys: keycode=%d\n", keycode);
-			XTestFakeKeyEvent_wr(dpy, -1, keycode, False, CurrentTime);//multipointer FIXME?
+			XTestFakeKeyEvent_wr(dpy, -1, keycode, False, CurrentTime);/* multipointer FIXME? */
 		}
 	}
 	XFlush_wr(dpy);
@@ -333,7 +333,7 @@ void clear_locks(void) {
 					char *nm = XKeysymToString(ks);
 					rfbLog("toggling: %03d / %03d -- %s\n", key, ks, nm ? nm : "BadKey");
 					did = 1;
-					XTestFakeKeyEvent_wr(dpy, -1, key, True, CurrentTime);//multipointer FIXME?
+					XTestFakeKeyEvent_wr(dpy, -1, key, True, CurrentTime); /* multipointer FIXME? */
 					usleep(10*1000);
 					XTestFakeKeyEvent_wr(dpy, -1, key, False, CurrentTime);
 					XFlush_wr(dpy);
