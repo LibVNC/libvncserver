@@ -692,7 +692,6 @@ typedef struct _ClientData {
 	int cmp_bytes_sent;
 	int raw_bytes_sent;
 
-        size_t last_bytes_rcvd;
         int ptr_id; /* pointer and keyboard device ids used in multipointer mode */ 
         int kbd_id;
         int ptr_buttonmask;
