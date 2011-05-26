@@ -192,7 +192,7 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
 #else
 #ifndef LIBVNCSERVER_HAVE_CAIRO
   return NULL;
-#endif
+#else
 
   /* label setup */
   const int idFontSize = 18;
@@ -287,6 +287,7 @@ rfbCursorPtr setClientCursor(Display *dpy, int dev_id, float r, float g, float b
   X_UNLOCK;
 
   return rfbcursor;
+#endif
 #endif
 }
 
