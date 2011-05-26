@@ -4558,7 +4558,7 @@ void watch_loop(void) {
 			}
 
 			check_new_clients();
-			check_kick_idle_clients(120);
+			check_kick_idle_clients(15);
 			check_ncache(0, 0);
 			check_xevents(0);
 			check_autorepeat();
