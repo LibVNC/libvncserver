@@ -218,8 +218,6 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);
     char buf[6];
-    const int one = 1;
-    int sock;
     rfbClientIteratorPtr i;
     rfbClientPtr cl;
     int result = 0;

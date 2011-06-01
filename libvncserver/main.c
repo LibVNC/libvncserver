@@ -1071,7 +1071,6 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 {
   rfbClientIteratorPtr i;
   rfbClientPtr cl,clPrev;
-  struct timeval tv;
   rfbBool result=FALSE;
   extern rfbClientIteratorPtr
     rfbGetClientIteratorWithClosed(rfbScreenInfoPtr rfbScreen);
