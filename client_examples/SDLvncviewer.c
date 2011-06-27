@@ -535,18 +535,11 @@ int main(int argc,char** argv) {
 		break;
 	    }
 	    else {
-	      i=WaitForMessage(cl,500);
-	      if(i<0)
+	      if(!rfbProcessServerMessage(cl, 500))
 		{
-		  cleanup(cl);
+ 		  cleanup(cl);
 		  break;
 		}
-	      if(i)
-		if(!HandleRFBServerMessage(cl))
-		  {
-		    cleanup(cl);
-		    break;
-		  }
 	    }
 	  }
 	}

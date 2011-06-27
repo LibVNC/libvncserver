@@ -401,6 +401,10 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr screen,sraRegionPtr modRegion)
    rfbClientIteratorPtr iterator;
    rfbClientPtr cl;
 
+   LOCK(screen->multicastSharedMutex);
+   sraRgnOr(screen->multicastUpdateRegion, modRegion);
+   UNLOCK(screen->multicastSharedMutex);
+
    iterator=rfbGetClientIterator(screen);
    while((cl=rfbClientIteratorNext(iterator))) {
      LOCK(cl->updateMutex);
@@ -436,6 +440,58 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
    sraRgnDestroy(region);
 }
 
+
+
+
+static void doMcast(rfbClientPtr cl)
+{
+  /* Sends cursor shape, cursor position, newFBsize and copyRect updates
+     if these updates are pending to be sent via unicast.
+   */
+  rfbBool haveAuxUpd = FALSE;
+
+  LOCK(cl->updateMutex);
+
+  if(((cl->enableCursorShapeUpdates && cl->cursorWasChanged) ||
+      (cl->useNewFBSize && cl->newFBSizePending) ||
+      (cl->enableCursorPosUpdates && cl->cursorWasMoved) ||
+      !sraRgnEmpty(cl->copyRegion))) {
+
+    haveAuxUpd = TRUE;
+
+    /* Do CopyRect only if  _every_ multicast client supports it.
+       We do this by preparing modifiedRegion and requestedRegion
+       so rfbSendFramebufferUpdate only sends CopyRect.
+    */
+    LOCK(cl->screen->multicastSharedMutex);
+    if(cl->screen->multicastUseCopyRect && !sraRgnEmpty(cl->copyRegion)) {
+      sraRgnMakeEmpty(cl->modifiedRegion);
+      sraRegionPtr tmp = sraRgnCreateRect(0, 0, cl->screen->width, cl->screen->height);
+      sraRgnOr(cl->requestedRegion, tmp);
+      sraRgnDestroy(tmp);
+      /* subtract copyRegion from the region to be sent via multicast */
+      sraRgnSubtract(cl->screen->multicastUpdateRegion, cl->copyRegion);
+    }
+    UNLOCK(cl->screen->multicastSharedMutex);
+  }
+
+  UNLOCK(cl->updateMutex);
+
+  if(haveAuxUpd) {
+    /* if requestedRegion is empty, this only sends auxiliary data */
+    LOCK(cl->sendMutex);
+    rfbSendFramebufferUpdate(cl, cl->copyRegion);
+    UNLOCK(cl->sendMutex);
+  }
+
+  /*
+    and the real multicast stuff
+  */
+  rfbSendMulticastRepairUpdate(cl);
+  rfbSendMulticastFramebufferUpdate(cl, cl->screen->multicastUpdateRegion);
+}
+
+
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 #include <unistd.h>
 
@@ -445,6 +501,7 @@ clientOutput(void *data)
     rfbClientPtr cl = (rfbClientPtr)data;
     rfbBool haveUpdate;
     sraRegion* updateRegion;
+    struct timeval tv;
 
     while (1) {
         haveUpdate = false;
@@ -461,24 +518,41 @@ clientOutput(void *data)
 
 		LOCK(cl->updateMutex);
 
-		if (sraRgnEmpty(cl->requestedRegion)) {
-			; /* always require a FB Update Request (otherwise can crash.) */
-		} else {
-			haveUpdate = FB_UPDATE_PENDING(cl);
-			if(!haveUpdate) {
-				updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
-				haveUpdate   = sraRgnAnd(updateRegion,cl->requestedRegion);
-				sraRgnDestroy(updateRegion);
-			}
+		haveUpdate = FB_UPDATE_PENDING(cl);
+		if(!haveUpdate) {
+		        updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
+		        haveUpdate   = sraRgnAnd(updateRegion,cl->requestedRegion);
+		        sraRgnDestroy(updateRegion);
 		}
-
 		if (!haveUpdate) {
+		        /* multicastVNC sends heartbeats when nothing changed,
+			   updateCond is triggered by a MulticastFramebufferUpdateRequest */
+		        haveUpdate = cl->screen->multicastVNC;
 			WAIT(cl->updateCond, cl->updateMutex);
 		}
 
 		UNLOCK(cl->updateMutex);
         }
         
+	/* do the multicast stuff if enabled */
+	if (cl->screen->multicastVNC && cl->screen->multicastSock >= 0 &&
+	    cl->useMulticastVNC && cl->sock >= 0 && !cl->onHold) {
+	  if(cl->startMulticastDeferring.tv_usec == 0) {
+	    gettimeofday(&cl->startMulticastDeferring,NULL);
+	    if(cl->startMulticastDeferring.tv_usec == 0)
+	      cl->startMulticastDeferring.tv_usec++;
+	  } else {
+	    gettimeofday(&tv,NULL);
+	    if(tv.tv_sec < cl->startMulticastDeferring.tv_sec /* at midnight */
+	       || ((tv.tv_sec-cl->startMulticastDeferring.tv_sec)*1000
+		   +(tv.tv_usec-cl->startMulticastDeferring.tv_usec)/1000)
+	       > cl->screen->multicastDeferUpdateTime) {
+	      cl->startMulticastDeferring.tv_usec = 0;
+	      doMcast(cl);
+	    }
+	  }
+	}
+
         /* OK, now, to save bandwidth, wait a little while for more
            updates to come along. */
         usleep(cl->screen->deferUpdateTime * 1000);
@@ -491,12 +565,14 @@ clientOutput(void *data)
 	updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
         UNLOCK(cl->updateMutex);
 
-        /* Now actually send the update. */
-	rfbIncrClientRef(cl);
-        LOCK(cl->sendMutex);
-        rfbSendFramebufferUpdate(cl, updateRegion);
-        UNLOCK(cl->sendMutex);
-	rfbDecrClientRef(cl);
+	if (cl->sock >= 0 && !cl->onHold && FB_UPDATE_PENDING(cl) && !sraRgnEmpty(cl->requestedRegion)) {
+	  /* Now actually send the update. */
+	  rfbIncrClientRef(cl);
+	  LOCK(cl->sendMutex);
+	  rfbSendFramebufferUpdate(cl, updateRegion);
+	  UNLOCK(cl->sendMutex);
+	  rfbDecrClientRef(cl);
+	}
 
 	sraRgnDestroy(updateRegion);
     }
@@ -819,6 +895,23 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->udpPort=0;
    screen->udpClient=NULL;
 
+   /*
+     set MulticastVNC defaults
+   */
+   screen->multicastVNC=FALSE;
+   screen->multicastSock=-1;
+   /* this is some random default out of the AD-HOC Block (224.0.2.0/24 - 224.0.255.0/24) see RFC 3171 */
+   screen->multicastAddr="224.0.42.138";
+   screen->multicastPort=5900;
+   screen->multicastTTL=1;
+   screen->multicastDeferUpdateTime=30;
+   screen->multicastPacketSize = MULTICAST_DFLT_PACKETSIZE;
+
+   INIT_MUTEX(screen->multicastOutputMutex);
+   INIT_MUTEX(screen->multicastUpdateMutex);
+   INIT_MUTEX(screen->multicastSharedMutex);
+   screen->multicastUpdateRegion = sraRgnCreateRect(0, 0, width, height);
+
    screen->maxFd=0;
    screen->listenSock=-1;
 
@@ -939,6 +1032,13 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
   screen->bitsPerPixel = screen->depth = 8*bytesPerPixel;
   screen->paddedWidthInBytes = width*bytesPerPixel;
 
+  LOCK(screen->multicastSharedMutex);
+
+  sraRgnDestroy(screen->multicastUpdateRegion);  
+  screen->multicastUpdateRegion = sraRgnCreateRect(0,0, width, height);
+
+  UNLOCK(screen->multicastSharedMutex);
+
   rfbInitServerFormat(screen, bitsPerSample);
 
   if (memcmp(&screen->serverFormat, &old_format,
@@ -1003,6 +1103,13 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   if(screen->cursor && screen->cursor->cleanup)
     rfbFreeCursor(screen->cursor);
 
+  TINI_MUTEX(screen->multicastOutputMutex);
+  TINI_MUTEX(screen->multicastUpdateMutex);
+  TINI_MUTEX(screen->multicastSharedMutex);
+  sraRgnDestroy(screen->multicastUpdateRegion);
+  if(screen->multicastUpdateBuf)
+    free(screen->multicastUpdateBuf);
+
 #ifdef LIBVNCSERVER_HAVE_LIBZ
   rfbZlibCleanup(screen);
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
@@ -1025,6 +1132,24 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
 
 void rfbInitServer(rfbScreenInfoPtr screen)
 {
+  if(screen->multicastVNC) {
+    /* if smaller than minimum allowed by IP (576-60) or bigger than the max UDP payload, use default value. */
+    if(screen->multicastPacketSize < 516 || screen->multicastPacketSize > 65507)
+      screen->multicastPacketSize = MULTICAST_DFLT_PACKETSIZE;
+    screen->multicastUpdateBuf = malloc(screen->multicastPacketSize);
+
+    /* check this to be > 0 */
+    if(screen->multicastDeferUpdateTime <= 0)
+      screen->multicastDeferUpdateTime = 1;
+
+    screen->multicastUseCopyRect = TRUE;
+
+    if(screen->multicastMaxSendRateFixed)
+      screen->multicastMaxSendRate = screen->multicastMaxSendRateFixed;
+    else
+      screen->multicastMaxSendRate = MULTICAST_MAXSENDRATE_RATE_START;
+    screen->multicastMaxSendRateIncrement = MULTICAST_MAXSENDRATE_INCREMENT_START;
+  }
 #ifdef WIN32
   WSADATA trash;
   WSAStartup(MAKEWORD(2,2),&trash);
@@ -1050,6 +1175,11 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
 
   rfbShutdownSockets(screen);
   rfbHttpShutdownSockets(screen);
+
+  if(screen->multicastUpdateBuf) {
+    free(screen->multicastUpdateBuf);
+    screen->multicastUpdateBuf = NULL;
+  }
 }
 
 #ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
@@ -1102,6 +1232,26 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 	     > screen->deferUpdateTime) {
 	  cl->startDeferring.tv_usec = 0;
 	  rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
+	}
+      }
+    }
+
+    /* do the multicast stuff if enabled */
+    if (screen->multicastVNC && screen->multicastSock >= 0 && 
+	cl->useMulticastVNC && cl->sock >= 0 && !cl->onHold) {
+      result=TRUE;
+      if(cl->startMulticastDeferring.tv_usec == 0) {
+	gettimeofday(&cl->startMulticastDeferring,NULL);
+	if(cl->startMulticastDeferring.tv_usec == 0)
+	  cl->startMulticastDeferring.tv_usec++;
+      } else {
+	gettimeofday(&tv,NULL);
+	if(tv.tv_sec < cl->startMulticastDeferring.tv_sec /* at midnight */
+	   || ((tv.tv_sec-cl->startMulticastDeferring.tv_sec)*1000
+	       +(tv.tv_usec-cl->startMulticastDeferring.tv_usec)/1000)
+	   > screen->multicastDeferUpdateTime) {
+	  cl->startMulticastDeferring.tv_usec = 0;
+	  doMcast(cl);
 	}
       }
     }
@@ -1164,3 +1314,5 @@ void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground
   while(rfbIsActive(screen))
     rfbProcessEvents(screen,usec);
 }
+
+

@@ -229,3 +229,105 @@ rfbSendRectEncodingUltra(rfbClientPtr cl,
     return TRUE;
 
 }
+
+
+/**
+ *  Puts the specified rectangle into the multicast update buffer
+ *  with ultra encoding. Returns -1 on error.
+ */
+int
+rfbPutMulticastRectEncodingUltra(rfbClientPtr cl,
+				 int x,
+				 int y,
+				 int w,
+				 int h)
+{
+    rfbFramebufferUpdateRectHeader rect;
+    rfbZlibHeader hdr;
+    int deflateResult;
+    rfbScreenInfoPtr s = cl->screen;
+    char *fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
+	   + (x * (cl->scaledScreen->bitsPerPixel / 8)));
+    int maxCompSize;
+    int maxRawSize = (w * h * (cl->format.bitsPerPixel / 8));
+    rfbClientPtr someclient;
+    rfbClientIteratorPtr it;
+
+    if (cl->beforeEncBufSize < maxRawSize) {
+	cl->beforeEncBufSize = maxRawSize;
+	cl->beforeEncBuf = (char *)realloc(cl->beforeEncBuf, cl->beforeEncBufSize);
+    }
+
+    /*
+     * lzo requires output buffer to be slightly larger than the input
+     * buffer, in the worst case.
+     */
+    maxCompSize = (maxRawSize + maxRawSize / 16 + 64 + 3);
+
+    if (cl->afterEncBufSize < maxCompSize) {
+	cl->afterEncBufSize = maxCompSize;
+	cl->afterEncBuf = (char *)realloc(cl->afterEncBuf, cl->afterEncBufSize);
+    }
+
+    /*
+     * Convert pixel data to client format.
+     */
+    (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
+		       &cl->format, fbptr, cl->beforeEncBuf,
+		       cl->scaledScreen->paddedWidthInBytes, w, h);
+
+    if ( cl->compStreamInitedLZO == FALSE ) {
+        cl->compStreamInitedLZO = TRUE;
+        /* Work-memory needed for compression. Allocate memory in units
+         * of `lzo_align_t' (instead of `char') to make sure it is properly aligned.
+         */
+        cl->lzoWrkMem = malloc(sizeof(lzo_align_t) * (((LZO1X_1_MEM_COMPRESS) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t)));
+    }
+
+    /* Perform the compression here. */
+    deflateResult = lzo1x_1_compress((unsigned char *)cl->beforeEncBuf, (lzo_uint)(w * h * (cl->format.bitsPerPixel / 8)),
+				     (unsigned char *)cl->afterEncBuf, (lzo_uint *)&maxCompSize, cl->lzoWrkMem);
+    /* maxCompSize now contains the compressed size */
+    
+    /* Find the total size of the resulting compressed data. */
+    cl->afterEncBufLen = maxCompSize;
+
+    /* cater for the (unlikely) case where lzo instead expanded the data */
+    if(cl->afterEncBufLen > maxRawSize) {
+      return rfbPutMulticastRectEncodingRaw(cl, x, y, w, h);
+    }
+
+    if ( deflateResult != LZO_E_OK ) {
+        rfbErr("lzo deflation error: %d\n", deflateResult);
+        return -1;
+    }
+
+    /* Update statics */
+    it =rfbGetClientIterator(cl->screen);
+    while((someclient=rfbClientIteratorNext(it))) {
+      if(someclient->useMulticastVNC && someclient->multicastPixelformatEncId == cl->multicastPixelformatEncId)
+	rfbStatRecordEncodingSent(someclient, rfbEncodingUltra, sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader + cl->afterEncBufLen, maxRawSize);
+    }
+    rfbReleaseClientIterator(it);
+
+    rect.r.x = Swap16IfLE(x);
+    rect.r.y = Swap16IfLE(y);
+    rect.r.w = Swap16IfLE(w);
+    rect.r.h = Swap16IfLE(h);
+    rect.encoding = Swap32IfLE(rfbEncodingUltra);
+
+    /* write rect header */
+    memcpy(&s->multicastUpdateBuf[s->mcublen], (char *)&rect, sz_rfbFramebufferUpdateRectHeader);
+    s->mcublen += sz_rfbFramebufferUpdateRectHeader;
+
+    /* write zlib header, used for ultra as well */
+    hdr.nBytes = Swap32IfLE(cl->afterEncBufLen);
+    memcpy(&s->multicastUpdateBuf[s->mcublen], (char *)&hdr, sz_rfbZlibHeader);
+    s->mcublen += sz_rfbZlibHeader;
+
+    /* write payload */
+    memcpy(&s->multicastUpdateBuf[s->mcublen], cl->afterEncBuf, cl->afterEncBufLen);
+    s->mcublen += cl->afterEncBufLen;
+
+    return 1;
+}

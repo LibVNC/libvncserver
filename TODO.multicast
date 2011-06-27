@@ -1,0 +1,71 @@
+
+SERVER:
+
+- some empty updates are sent in split rect case
+
+- more heartbeat messages if nothing changed?
+
+- What about multicast specific stats? Right now all clients of one
+  (pixelformat,enc) group share the same stats, but there is no way
+  to tell if some encoding was sent via uni- or multicast.
+
+- Leave the nRect calculation in rfbSendMulticastFramebufferUpdate()
+  as it is (number of rects is returned by
+  rfbPutMulticastEndcodingPreferred)?
+  --> We're not able to catch some obscure errors in the encoding
+      specific functions. but what errors? It's guaranteed beforehand
+      that the rects always fit, so that leaves us with some deflate
+      errors and stuff. do these ever happen?
+  --> Other possibility would be to have sth like a
+      rfbGetNrRectsPreferredEncoding() which would be used by
+      rfbSendMulticastFramebufferUpdate() and
+      rfbSendFramebufferUpdate(). Then we would need to turn of
+      cl->lastrectenabled in the multicast case and re-enable it later
+      on
+
+- right now send rates are logged per pf,enc group but there is only one
+  global send rate modified
+
+- make the sent buffer smaller again?
+
+- make sent buffer save real payload instead of region?
+
+- really fill partial update packets when using other than raw encoding
+
+- When operating with maxSendRateFixed, actual send rate is much lower.
+  The problem shows up at higher transmission rates like 10MB/s. Really
+  no idea what's causing this.
+
+CLIENT:
+
+- join multicast group on every interface (INADDR_ANY only joins on default
+  interface which may not be the right one...)
+
+- missing packets only NACKed once
+
+- verify sender address+port in  ReadFromRFBServerMulticast()?
+  -> would need bind() to address we got from getaddrinfo() 
+     (plus a SO_REUSEADDR setsockopt() if same port as client &
+     running on same host...) on server side, address and port
+     transmitted to client, then a connect() at client side.
+
+
+BOTH:
+
+- add #ifdef MULTICASTVNC around mcast code
+
+- unify client and server buffer implementation
+
+- Implement other encodings than raw and ultra.
+
+- have an optional server-push mode that's announced by the server
+  and stops client's from periodically requesting updates? this
+  would stop constant request flow from clients.
+
+
+
+
+  
+
+
+

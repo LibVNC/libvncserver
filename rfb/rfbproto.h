@@ -91,6 +91,7 @@
 #endif
 
 #if !defined(WIN32) || defined(__MINGW32__)
+#undef max
 #define max(a,b) (((a)>(b))?(a):(b))
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -117,7 +118,8 @@ typedef uint32_t in_addr_t;
 #define                INADDR_NONE     ((in_addr_t) 0xffffffff)
 #endif
 
-#define MAX_ENCODINGS 21
+#define MAX_ENCODINGS 23
+
 
 /*****************************************************************************
  *
@@ -392,6 +394,8 @@ typedef struct {
 /* Modif sf@2002 */
 #define rfbResizeFrameBuffer 4
 #define rfbPalmVNCReSizeFrameBuffer 0xF
+#define rfbMulticastFramebufferUpdate 241
+
 
 /* client -> server */
 
@@ -415,6 +419,8 @@ typedef struct {
 /* Modif cs@2005 */
 /* PalmVNC 1.4 & 2.0 SetScale Factor message */
 #define rfbPalmVNCSetScaleFactor 0xF
+#define rfbMulticastFramebufferUpdateRequest 242
+#define rfbMulticastFramebufferUpdateNACK 240
 /* Xvp message - bidirectional */
 #define rfbXvp 250
 
@@ -500,6 +506,10 @@ typedef struct {
 #define rfbEncodingSupportedEncodings 0xFFFE0002
 #define rfbEncodingServerIdentity     0xFFFE0003
 
+/* MulticastVNC pseudo encodings */
+#define rfbEncodingMulticastVNC       0xFFFFFCC1
+#define rfbEncodingIPv6MulticastVNC   0xFFFFFCC0
+
 
 /*****************************************************************************
  *
@@ -525,6 +535,47 @@ typedef struct {
 } rfbFramebufferUpdateMsg;
 
 #define sz_rfbFramebufferUpdateMsg 4
+
+
+/*-----------------------------------------------------------------------------
+ * MulticastFramebufferUpdate 
+ 
+ * Like conventional framebuffer updates, a multicast framebuffer update
+ * consists of a sequence of rectangles of pixel data.
+
+ * To allow any kind of multicast client the server is required to keep track
+ * of which combinations of pixelformat and encoding it has to provide. For 
+ * each registered combination, it sends out a whole multicast framebuffer 
+ * update. Therefore, 'MulticastFramebufferUpdate' messages have a field
+ * identifying the pixelformat of the pixel data sent. The encoding of the 
+ * pixel data is specified in each of the update's rectangles.
+
+ * Since multicast is based on UDP datagrams with a fixed maximum size,
+ * the whole update may have to be packed into several UDP packets.
+ * Thus, framebuffer contents have to be sent using (maybe several)
+ * 'MulticastFramebufferUpdate' messages. These contain consecutive sequence 
+ * numbers (starting with 0) identifying whole and partial updates. A whole 
+ * update number identifies a response to a 'MulticastFramebufferUpdateRequest', 
+ * which may have to be split into several MulticastFramebufferUpdate' server
+ * to client messages. Each of these is identified by a partial update
+ * sequence number.
+
+ * The header is padded so that it is an exact multiple of 4 bytes (to
+ * help with alignment of 32-bit pixels).
+ */
+
+typedef struct {
+    uint8_t type;			/* always rfbMulticastFramebufferUpdate */
+    uint8_t pad;
+    uint16_t idPixelformatEnc;          /* pixelformat and encoding id assigned at sending session info */
+    uint32_t idPartialUpd;              /* id of this partial update */
+    uint16_t idWholeUpd;                /* id of the update as a whole */
+    uint16_t nRects;                    /* number of rectangles per message, not per whole update */
+    /* followed by nRects rectangles */
+} rfbMulticastFramebufferUpdateMsg;
+
+#define sz_rfbMulticastFramebufferUpdateMsg 12
+
 
 /*
  * Each rectangle of pixel data consists of a header describing the position
@@ -1157,6 +1208,7 @@ typedef union {
 	rfbFileTransferMsg ft;
 	rfbTextChatMsg tc;
         rfbXvpMsg xvp;
+        rfbMulticastFramebufferUpdateMsg mfu;
 } rfbServerToClientMsg;
 
 
@@ -1251,6 +1303,39 @@ typedef struct {
 } rfbFramebufferUpdateRequestMsg;
 
 #define sz_rfbFramebufferUpdateRequestMsg 10
+
+/*-----------------------------------------------------------------------------
+ * MulticastFramebufferUpdateRequest - request for a framebuffer update via 
+ * multicast. If incremental is true then the client just wants the changes 
+ * since the last update. If false then it wants the whole screen. Does not 
+ * contain rectangle specification: Because the purpose of sending framebuffer
+ * updates via multicast is to send them _once_ for _all_ connected multicast 
+ * clients, it is  not desirable to serve the needs of a single client. In case
+ * a client wants a particular subregion of the framebuffer, it can always 
+ * resort to a traditional 'FramebufferUpdateRequest'.
+ */
+
+typedef struct {
+    uint8_t type;			/* always rfbMulticastFramebufferUpdateRequest */
+    uint8_t incremental;
+} rfbMulticastFramebufferUpdateRequestMsg;
+
+#define sz_rfbMulticastFramebufferUpdateRequestMsg 2
+
+/*-----------------------------------------------------------------------------
+ * MulticastFramebufferUpdateNACK - indicate that the specified partial 
+ * multicast updates were missing. 
+ */
+
+typedef struct {
+    uint8_t type;			/* always rfbMulticastFramebufferUpdateNACK */
+    uint8_t pad;
+    uint16_t nPartialUpds;              /* number of missing partial updates */
+    uint32_t idPartialUpd;              /* id of first missing partial update */
+} rfbMulticastFramebufferUpdateNACKMsg;
+
+#define sz_rfbMulticastFramebufferUpdateNACKMsg 8
+
 
 
 /*-----------------------------------------------------------------------------
@@ -1413,6 +1498,8 @@ typedef union {
 	rfbSetSWMsg sw;
 	rfbTextChatMsg tc;
         rfbXvpMsg xvp;
+        rfbMulticastFramebufferUpdateRequestMsg mfur;
+        rfbMulticastFramebufferUpdateNACKMsg mfun;
 } rfbClientToServerMsg;
 
 /* 

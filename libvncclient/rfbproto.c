@@ -31,6 +31,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include <pwd.h>
 #endif
 #include <errno.h>
@@ -61,6 +63,7 @@
 
 #include "minilzo.h"
 #include "tls.h"
+#include "packetbuf.h"
 
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
@@ -226,9 +229,9 @@ static rfbBool HandleCoRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile32(rfbClient* client, int rx, int ry, int rw, int rh);
-static rfbBool HandleUltra8(rfbClient* client, int rx, int ry, int rw, int rh);
-static rfbBool HandleUltra16(rfbClient* client, int rx, int ry, int rw, int rh);
-static rfbBool HandleUltra32(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltra8(rfbClient* client, rfbBool multicast, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltra16(rfbClient* client, rfbBool multicast, int rx, int ry, int rw, int rh);
+static rfbBool HandleUltra32(rfbClient* client, rfbBool multicast, int rx, int ry, int rw, int rh);
 static rfbBool HandleUltraZip8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleUltraZip16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleUltraZip32(rfbClient* client, int rx, int ry, int rw, int rh);
@@ -258,6 +261,8 @@ static rfbBool HandleZRLE24Up(rfbClient* client, int rx, int ry, int rw, int rh)
 static rfbBool HandleZRLE24Down(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZRLE32(rfbClient* client, int rx, int ry, int rw, int rh);
 #endif
+
+extern int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recvbuf);
 
 /*
  * Server Capability Functions
@@ -351,6 +356,8 @@ DefaultSupportedMessagesTightVNC(rfbClient* client)
     SetServer2Client(client, rfbFileTransfer);
     SetServer2Client(client, rfbTextChat);
 }
+
+
 
 #ifndef WIN32
 static rfbBool
@@ -1451,6 +1458,12 @@ SetFormatAndEncodings(rfbClient* client)
   if (se->nEncodings < MAX_ENCODINGS)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingXvp);
 
+  /* Multicast framebuffer updates */
+  if (se->nEncodings < MAX_ENCODINGS && client->canHandleMulticastVNC)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingMulticastVNC);
+  if (se->nEncodings < MAX_ENCODINGS && client->canHandleMulticastVNC)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingIPv6MulticastVNC);
+
   /* client extensions */
   for(e = rfbClientExtensions; e; e = e->next)
     if(e->encodings) {
@@ -1505,6 +1518,57 @@ SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, rfbB
 
   return TRUE;
 }
+
+
+/*
+ * SendMulticastFramebufferUpdateRequest.
+ */
+
+rfbBool
+SendMulticastFramebufferUpdateRequest(rfbClient* client, rfbBool incremental)
+{
+  rfbMulticastFramebufferUpdateRequestMsg mfur;
+
+  if (!SupportsClient2Server(client, rfbMulticastFramebufferUpdateRequest)) return TRUE;
+
+  mfur.type = rfbMulticastFramebufferUpdateRequest;
+  mfur.incremental = incremental ? 1 : 0;
+
+  if (!WriteToRFBServer(client, (char *)&mfur, sz_rfbMulticastFramebufferUpdateRequestMsg))
+    return FALSE;
+
+  if(!client->multicastPendingRequestTimestamp.tv_sec && !client->multicastPendingRequestTimestamp.tv_usec) 
+    gettimeofday(&client->multicastPendingRequestTimestamp, NULL);
+
+  return TRUE;
+}
+
+
+/*
+ * SendMulticastFramebufferUpdateNACK.
+ */
+
+rfbBool
+SendMulticastFramebufferUpdateNACK(rfbClient* client, uint32_t idPartialUpd, uint16_t nPartialUpds)
+{
+  rfbMulticastFramebufferUpdateNACKMsg mfun;
+
+  if (!SupportsClient2Server(client, rfbMulticastFramebufferUpdateNACK)) return TRUE;
+
+#ifdef MULTICAST_DEBUG
+  rfbClientLog("MulticastVNC DEBUG: sending NACK: start partial upd %d, count %d\n", idPartialUpd, nPartialUpds);
+#endif
+
+  mfun.type = rfbMulticastFramebufferUpdateNACK;
+  mfun.idPartialUpd = rfbClientSwap32IfLE(idPartialUpd);
+  mfun.nPartialUpds = rfbClientSwap16IfLE(nPartialUpds);
+
+  if (!WriteToRFBServer(client, (char *)&mfun, sz_rfbMulticastFramebufferUpdateNACKMsg))
+    return FALSE;
+
+  return TRUE;
+}
+
 
 
 /*
@@ -1715,6 +1779,191 @@ HandleRFBServerMessage(rfbClient* client)
 
   if (client->serverPort==-1)
     client->vncRec->readTimestamp = TRUE;
+  
+  if(client->serverMsgMulticast)
+    {
+      if (!ReadFromRFBServerMulticast(client, (char *)&msg, 1))
+	return FALSE;
+      
+      if(msg.type == rfbMulticastFramebufferUpdate)
+	{
+	  rfbFramebufferUpdateRectHeader rect;
+	  int linesToRead;
+	  int bytesPerLine;
+	  int i;
+
+	  if (!ReadFromRFBServerMulticast(client, ((char *)&msg.mfu) + 1,
+					  sz_rfbMulticastFramebufferUpdateMsg - 1))
+	    return FALSE;
+
+	  /* 
+	     only handle this message if it's our pixelformat and encoding,
+	     otherwise discard the packet since 
+	     the data in there is useless for us.
+	  */
+	  if(rfbClientSwap16IfLE(msg.mfu.idPixelformatEnc) != client->multicastPixelformatEncId)
+	    {
+#ifdef MULTICAST_DEBUG
+	      rfbClientLog("MulticastVNC DEBUG: discarding pf,enc: %d\n", rfbClientSwap16IfLE(msg.mfu.idPixelformatEnc));
+#endif
+	      packetBufPop(client->multicastPacketBuf); 
+	      client->multicastbuffered = 0;
+	    }
+	  else
+	    {
+	      msg.mfu.idWholeUpd = rfbClientSwap16IfLE(msg.mfu.idWholeUpd);
+	      msg.mfu.idPartialUpd = rfbClientSwap32IfLE(msg.mfu.idPartialUpd);
+	      msg.mfu.nRects = rfbClientSwap16IfLE(msg.mfu.nRects);	      
+	      
+	      /* calculate lost partial updates from sequence numbers */
+	      client->multicastPktsRcvd++;
+	      if(client->multicastLastWholeUpd >= 0) /* only check on the second and later runs */
+		{
+		  /* it can happen that we get a mis-ordered partial update 
+		     with a sequence number near to overflow, consider a succession of
+		     (1021, 0, 1022, 1) in a [0...1023] example seq.no. range */
+		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 0x0FFF0000)
+		    client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
+
+		  /* partial update missing */
+		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1) {
+		    client->multicastPktsLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
+		    client->multicastPktsNACKed += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
+
+		    /* tell server about missing partial updates */
+		    SendMulticastFramebufferUpdateNACK(client, 
+						       client->multicastLastPartialUpd+1,
+						       msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1));
+		  }
+
+		  /* if a partial update arrives out of order (with a lower sequence number than the 
+		     last, but not _much_ lower, as this would be a wrap-around), it was counted as 
+		     lost before, so revert this  */
+		  if(msg.mfu.idPartialUpd < client->multicastLastPartialUpd &&
+		     client->multicastLastPartialUpd - msg.mfu.idPartialUpd < 0x0FFF0000 &&
+		     client->multicastPktsLost > 0)
+		    client->multicastPktsLost--;
+		}
+	      
+	      /* save last received highest sequence numbers, care for wrap-around */
+	      if(msg.mfu.idPartialUpd > client->multicastLastPartialUpd || 
+		 client->multicastLastPartialUpd - msg.mfu.idPartialUpd > 0x0FFF0000)
+		client->multicastLastPartialUpd = msg.mfu.idPartialUpd;
+
+	      if(msg.mfu.idWholeUpd > client->multicastLastWholeUpd || 
+		 client->multicastLastWholeUpd - msg.mfu.idWholeUpd > 0x7FFF) {
+		client->multicastLastWholeUpd = msg.mfu.idWholeUpd;
+		/* old one done */
+		if (client->FinishedFrameBufferUpdate)
+		  client->FinishedFrameBufferUpdate(client);
+	      }
+
+#ifdef MULTICAST_DEBUG
+	      rfbClientLog("MulticastVNC DEBUG: --got message--\n");
+	      rfbClientLog("MulticastVNC DEBUG: id whole:    %d\n", msg.mfu.idWholeUpd);
+	      rfbClientLog("MulticastVNC DEBUG: id partial:  %d\n", msg.mfu.idPartialUpd);
+	      rfbClientLog("MulticastVNC DEBUG: received:    %d\n", client->multicastPktsRcvd);
+	      rfbClientLog("MulticastVNC DEBUG: NACKed:      %d\n", client->multicastPktsNACKed);
+	      rfbClientLog("MulticastVNC DEBUG: lost:        %d\n", client->multicastPktsLost);
+#endif
+
+	      /* handle rects */
+	      for (i = 0; i < msg.mfu.nRects; i++) 
+		{
+		  if (!ReadFromRFBServerMulticast(client, (char *)&rect, sz_rfbFramebufferUpdateRectHeader))
+		    return FALSE;
+
+		  rect.encoding = rfbClientSwap32IfLE(rect.encoding);
+		  rect.r.x = rfbClientSwap16IfLE(rect.r.x);
+		  rect.r.y = rfbClientSwap16IfLE(rect.r.y);
+		  rect.r.w = rfbClientSwap16IfLE(rect.r.w);
+		  rect.r.h = rfbClientSwap16IfLE(rect.r.h);
+
+#ifdef MULTICAST_DEBUG
+		  rfbClientLog("MulticastVNC DEBUG: got rect (%d, %d, %d, %d)\n", rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+#endif
+		  client->SoftCursorLockArea(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+      
+		  switch (rect.encoding) 
+		    {
+		    case rfbEncodingRaw: 
+		      {
+			int y=rect.r.y, h=rect.r.h;
+		    
+			bytesPerLine = rect.r.w * client->format.bitsPerPixel / 8;
+			linesToRead = RFB_BUFFER_SIZE / bytesPerLine;
+		    
+			while (h > 0) {
+			  if (linesToRead > h)
+			    linesToRead = h;
+		  
+			  if (!ReadFromRFBServerMulticast(client, client->buffer,bytesPerLine * linesToRead))
+			    return FALSE;
+		      
+			  CopyRectangle(client, (uint8_t *)client->buffer,
+					rect.r.x, y, rect.r.w,linesToRead);
+		      
+			  h -= linesToRead;
+			  y += linesToRead;
+			}
+		      }
+		      break;
+
+		    case rfbEncodingUltra:
+		      {
+			switch (client->format.bitsPerPixel) {
+			case 8:
+			  if (!HandleUltra8(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+			    return FALSE;
+			  break;
+			case 16:
+			  if (!HandleUltra16(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+			    return FALSE;
+			  break;
+			case 32:
+			  if (!HandleUltra32(client, TRUE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+			    return FALSE;
+			  break;
+			}
+			break;
+		      }
+   
+		    default:
+		      {
+			rfbBool handled = FALSE;
+			rfbClientProtocolExtension* e;
+		  
+			for(e = rfbClientExtensions; !handled && e; e = e->next)
+			  if(e->handleEncoding && e->handleEncoding(client, &rect))
+			    handled = TRUE;
+		  
+			if(!handled) {
+			  rfbClientLog("Unknown rect encoding %d\n",
+				       (int)rect.encoding);
+			  return FALSE;
+			}
+		      }
+		    }
+	      
+
+		  /* Now we may discard "soft cursor locks". */
+		  client->SoftCursorUnlockScreen(client);
+
+		  client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+		}
+	    }
+	}
+      else
+	{
+	  rfbClientLog("Got unsupported multicast message type %d from VNC server\n",msg.type);
+	  return FALSE;
+	}
+    }
+  
+  /* if there's no unicast msg pending, we can bail out here */
+  if(!client->serverMsg) 
+    return TRUE;
+
   if (!ReadFromRFBServer(client, (char *)&msg, 1))
     return FALSE;
 
@@ -1874,6 +2123,74 @@ HandleRFBServerMessage(rfbClient* client)
           continue;
       }
 
+      /* 
+	 rect.r.x = our pixelformat's identifier 
+         rect.r.y = port
+	 rect.r.w = multicast update interval
+      */
+      if (rect.encoding == rfbEncodingMulticastVNC || rect.encoding == rfbEncodingIPv6MulticastVNC) {
+	char buffer[16];
+	struct sockaddr_storage multicastSockAddr;
+	char host[512], serv[128];
+	int r;
+
+	if(rect.encoding  == rfbEncodingMulticastVNC)
+	  {
+	    if (!ReadFromRFBServer(client, buffer, 4))
+	      return FALSE;
+
+	    struct sockaddr_in* ipv4sock = (struct sockaddr_in*) &multicastSockAddr;
+	    ipv4sock->sin_family = AF_INET;
+	    ipv4sock->sin_addr.s_addr = *(in_addr_t*)buffer;
+	    /* port has to be in NBO, but was swapped before, so swap again */
+	    ipv4sock->sin_port = rfbClientSwap16IfLE(rect.r.y); 
+	  }
+	else /* v6 case */
+	   {
+	     if (!ReadFromRFBServer(client, buffer, 16))
+	       return FALSE;
+
+	     struct sockaddr_in6* ipv6sock = (struct sockaddr_in6*) &multicastSockAddr;
+	     ipv6sock->sin6_family = AF_INET6;
+	     ipv6sock->sin6_addr = *(struct in6_addr*)buffer;
+	     /* port has to be in NBO, but was swapped before, so swap again */
+	     ipv6sock->sin6_port = rfbClientSwap16IfLE(rect.r.y); 
+	  }
+
+	/* check if received data translates to an address */
+	r = getnameinfo((struct sockaddr*) &multicastSockAddr, sizeof(multicastSockAddr), 
+			host, sizeof(host), serv, sizeof(serv), NI_NUMERICHOST | NI_NUMERICSERV);
+	if (r != 0)
+	  {
+	    rfbClientErr("MulticastVNC: Received malformed address: %s\n", gai_strerror(r));
+	    return FALSE;
+	  }
+
+	rfbClientLog("MulticastVNC: Received multicast address %s:%s\n", host, serv);
+	rfbClientLog("MulticastVNC: Received multicast update interval: %dms\n", rect.r.w);
+	rfbClientLog("MulticastVNC: Received pixelformat,encoding identifier: %d\n", rect.r.x);
+
+	client->multicastSock = CreateMulticastSocket(multicastSockAddr, client->multicastSocketRcvBufSize);
+	client->multicastUpdInterval = rect.r.w > 0 ? rect.r.w : 1;
+	client->multicastPixelformatEncId = rect.r.x;
+	client->multicastPacketBuf = packetBufCreate(client->multicastRcvBufSize);
+
+	if(client->multicastUpdInterval > client->multicastTimeout*1000) {
+	  rfbClientLog("MulticastVNC: Fallback timeout (%d) smaller than server's multicast update interval (%d). This won't work, disabling timeout.\n",
+		       client->multicastTimeout,
+		       client->multicastUpdInterval);
+	  client->multicastTimeout = 0;
+	}
+
+	rfbClientLog("MulticastVNC: Enabling multicast specific messages\n");
+	SetClient2Server(client, rfbMulticastFramebufferUpdateRequest);
+	SetClient2Server(client, rfbMulticastFramebufferUpdateNACK);
+	/* technically, we only care what we can *send* to the server */
+	SetServer2Client(client, rfbMulticastFramebufferUpdate);
+ 	
+	continue;
+      }
+
       /* rfbEncodingUltraZip is a collection of subrects.   x = # of subrects, and h is always 0 */
       if (rect.encoding != rfbEncodingUltraZip)
       {
@@ -2012,15 +2329,15 @@ HandleRFBServerMessage(rfbClient* client)
       {
         switch (client->format.bitsPerPixel) {
         case 8:
-          if (!HandleUltra8(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+          if (!HandleUltra8(client, FALSE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
             return FALSE;
           break;
         case 16:
-          if (!HandleUltra16(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+          if (!HandleUltra16(client, FALSE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
             return FALSE;
           break;
         case 32:
-          if (!HandleUltra32(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
+          if (!HandleUltra32(client, FALSE, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
             return FALSE;
           break;
         }
@@ -2153,8 +2470,16 @@ HandleRFBServerMessage(rfbClient* client)
       client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
     }
 
-    if (!SendIncrementalFramebufferUpdateRequest(client))
-      return FALSE;
+    if(client->multicastSock >= 0 && !client->multicastDisabled) 
+      {
+	if (!SendMulticastFramebufferUpdateRequest(client, TRUE))
+	  return FALSE;
+      }
+    else
+      {
+	if (!SendIncrementalFramebufferUpdateRequest(client))
+	  return FALSE;
+      }
 
     if (client->FinishedFrameBufferUpdate)
       client->FinishedFrameBufferUpdate(client);

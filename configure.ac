@@ -780,11 +780,34 @@ if test "x$with_ipv6" != "xno"; then
 			AC_MSG_CHECKING([for getaddrinfo in -lws2_32])
 		        LIBS="$LIBS -lws2_32"
 		        AC_TRY_LINK([#include <ws2tcpip.h>], [getaddrinfo(0, 0, 0, 0);], [
+				      ac_cv_func_getaddrinfo="yes"
 				      AC_DEFINE(IPv6,1)
 		                      AC_MSG_RESULT([yes])
 				      ],
 				    AC_MSG_RESULT([no]))
                    ]))
+fi
+
+# MulticastVNC
+AH_TEMPLATE(WITH_MULTICASTVNC, [Enable MulticastVNC support])
+AC_ARG_WITH(multicastvnc,
+[  --without-multicastvnc          disable MulticastVNC support],,)
+if test "x$with_multicastvnc" != "xno"; then
+   # check if IPv6 check succeeded
+   if test "x$ac_cv_func_getaddrinfo" != xyes; then
+	AC_MSG_ERROR([
+==========================================================================
+*** IPv6 is required for MulticastVNC support ***
+
+If you want to build libvncserver/libvncclient without MulticastVNC
+support, specify the --without-multicastvnc configure option.
+==========================================================================
+])
+   else
+       AC_DEFINE(WITH_MULTICASTVNC)
+       # this disables some warnings
+       CFLAGS="$CFLAGS -fno-strict-aliasing "
+   fi
 fi
 
 

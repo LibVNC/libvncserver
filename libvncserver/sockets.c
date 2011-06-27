@@ -98,6 +98,103 @@ int deny_severity=LOG_WARNING;
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */
 
+
+/*
+  Create a multicast socket and saves addr and port in sockAddr.
+  Returns socket fd on success, -1 on failure.
+ */
+
+static int
+rfbCreateMulticastSocket(char *addr,
+			 int port,
+			 int ttl,
+			 in_addr_t iface,
+			 struct sockaddr_storage* sockAddr)
+{
+  int sock;
+  int r;
+  struct addrinfo *multicastAddrInfo;
+  struct addrinfo hints;
+  char serv[8];
+  snprintf(serv, sizeof(serv), "%d", port);
+
+  /* resolve parameters into multicastAddrInfo struct */
+  memset(&hints, 0, sizeof(struct addrinfo));
+  hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_flags = AI_NUMERICHOST;
+  
+  r = getaddrinfo(addr, serv, &hints, &multicastAddrInfo); 
+  if(r != 0)
+    {
+      rfbLog("rfbCreateMulticastSocket: %s", gai_strerror(r));
+      return -1;
+    }
+
+  /* save multicast address and port */
+  *sockAddr = *(struct sockaddr_storage*)multicastAddrInfo->ai_addr;
+  
+  /* create socket for sending multicast datagrams */
+  if((sock = socket(multicastAddrInfo->ai_family, multicastAddrInfo->ai_socktype, 0)) < 0)
+    {
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbLogPerror("rfbCreateMulticastSocket: error creating socket");
+      freeaddrinfo(multicastAddrInfo);  
+      return -1;
+    }
+
+  /* set multicast TTL */
+  if(setsockopt(sock,
+		multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
+		multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_HOPS : IP_MULTICAST_TTL,
+		(char*)&ttl, sizeof(ttl)) < 0 )
+    {
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbLogPerror("rfbCreateMulticastSocket: error setting TTL");
+      freeaddrinfo(multicastAddrInfo);  
+      closesocket(sock);
+      return -1;
+    }
+   
+  /* connect the socket */
+  if(connect(sock,(struct sockaddr*)sockAddr, sizeof(*sockAddr)) < 0)
+    {
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbLogPerror("rfbCreateMulticastSocket: error connecting socket");
+      freeaddrinfo(multicastAddrInfo);  
+      closesocket(sock);
+      return -1;
+    }
+
+  /* set the sending interface */
+  /* FIXME does it have to be a ipv6 iface in case we're doing ipv6? */
+  if(setsockopt (sock, 
+		 multicastAddrInfo->ai_family == AF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
+		 multicastAddrInfo->ai_family == AF_INET6 ? IPV6_MULTICAST_IF : IP_MULTICAST_IF,
+		 (char*)&iface, sizeof(iface)) < 0)  
+    {
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbLogPerror("rfbCreateMulticastSocket: error setting interface");
+      freeaddrinfo(multicastAddrInfo);  
+      closesocket(sock);
+      return -1;
+    }
+
+ 
+  freeaddrinfo(multicastAddrInfo);  
+  return sock;
+}
+
+
+
 /*
  * rfbInitSockets sets up the TCP and UDP sockets to listen for RFB
  * connections.  It does nothing if called again.
@@ -174,6 +271,25 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	FD_SET(rfbScreen->udpSock, &(rfbScreen->allFds));
 	rfbScreen->maxFd = max((int)rfbScreen->udpSock,rfbScreen->maxFd);
     }
+
+    if (rfbScreen->multicastVNC) {
+	if ((rfbScreen->multicastSock = rfbCreateMulticastSocket(rfbScreen->multicastAddr,
+								 rfbScreen->multicastPort,
+								 rfbScreen->multicastTTL,
+								 iface,
+								 &rfbScreen->multicastSockAddr)) < 0) 
+	  {
+	    rfbLogPerror("Error enabling MulticastVNC");
+	    rfbScreen->multicastVNC = FALSE;
+	    return;
+	  }
+	else
+	  {
+	    rfbLog("Enabled MulticastVNC on %s:%d with a TTL of %d, update interval %dms.\n",
+		   rfbScreen->multicastAddr, rfbScreen->multicastPort,
+		   rfbScreen->multicastTTL, rfbScreen->multicastDeferUpdateTime);
+	  }
+    }
 }
 
 void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
@@ -199,6 +315,11 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
 	closesocket(rfbScreen->udpSock);
 	FD_CLR(rfbScreen->udpSock,&rfbScreen->allFds);
 	rfbScreen->udpSock=-1;
+    }
+
+    if(rfbScreen->multicastSock>-1) {
+	closesocket(rfbScreen->multicastSock);
+	rfbScreen->multicastSock=-1;
     }
 }
 
@@ -592,6 +713,164 @@ rfbWriteExact(rfbClientPtr cl,
     return 1;
 }
 
+
+
+/*
+ * WriteExactMulticast writes an exact number of bytes to the 
+ * screen's multicast socket.
+ * Returns 1 if those bytes have been written, or -1 if an error
+ * occurred (errno is set to ETIMEDOUT if it timed out).
+ */
+
+int
+rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
+{
+  int sock = rfbScreen->multicastSock;
+  int n;
+  struct timeval now;
+  unsigned long elapsed_ms;
+
+  if(sock < 0)
+    return -1;
+
+  LOCK(rfbScreen->multicastOutputMutex);
+  while(len > 0) 
+    {
+      /*
+	when not running multi-threaded, process client input in between
+	to check for NACKs influencing MulticastVNC flow control
+      */
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+      if(!rfbScreen->backgroundLoop)
+#endif
+	{
+	  fd_set fds;
+	  struct timeval tv;
+	  memcpy((char *)&fds, (char *)&(rfbScreen->allFds), sizeof(fd_set));
+	  tv.tv_sec = tv.tv_usec = 0;
+	  n = select(rfbScreen->maxFd + 1, &fds, NULL, NULL, &tv);
+	  if(n > 0) {
+	    rfbClientIteratorPtr i;
+	    rfbClientPtr cl;
+	    i = rfbGetClientIterator(rfbScreen);
+	    while((cl = rfbClientIteratorNext(i))) {
+	      /* only process normal RFB messages from MulticastVNC clients */
+	      if(FD_ISSET(cl->sock, &fds) && cl->useMulticastVNC && cl->state == RFB_NORMAL && !cl->onHold)
+		rfbProcessClientMessage(cl);
+	    }
+	    rfbReleaseClientIterator(i);
+	  }
+	}
+
+
+      /*
+	refill send credit based on elapsed time and max send rate
+      */
+#ifdef MULTICAST_DEBUG
+      rfbLog("MulticastVNC DEBUG: wants to write %d, send credit %u\n", len, rfbScreen->multicastSendCredit);
+#endif
+      gettimeofday(&now,NULL);
+      if(now.tv_sec < rfbScreen->lastMulticastSendCreditRefill.tv_sec) /* at midnight on win32 */
+	now.tv_sec = rfbScreen->lastMulticastSendCreditRefill.tv_sec;
+
+      elapsed_ms = (now.tv_sec - rfbScreen->lastMulticastSendCreditRefill.tv_sec)*1000 + (now.tv_usec - rfbScreen->lastMulticastSendCreditRefill.tv_usec)/1000;
+
+      LOCK(rfbScreen->multicastSharedMutex);
+
+      rfbScreen->multicastSendCredit += (rfbScreen->multicastMaxSendRate/1000) * elapsed_ms;
+      if(rfbScreen->multicastSendCredit > rfbScreen->multicastMaxSendRate)
+	rfbScreen->multicastSendCredit = rfbScreen->multicastMaxSendRate;
+
+      rfbScreen->lastMulticastSendCreditRefill = now;
+
+      UNLOCK(rfbScreen->multicastSharedMutex);
+#ifdef MULTICAST_DEBUG
+      rfbLog("MulticastVNC DEBUG: send credit increased to %u after %lu ms\n", rfbScreen->multicastSendCredit, elapsed_ms);
+#endif
+
+
+      /* 
+	 when the send credit is exceeded, current send rate is at max send rate.
+	 see if it's okay to increase the max, then wait a short while for refill and try again.
+      */
+      if(len > rfbScreen->multicastSendCredit) {
+
+	if(!rfbScreen->multicastMaxSendRateFixed) {
+	  LOCK(rfbScreen->multicastSharedMutex);
+	  /* we do the send rate increase here because that's when current send rate at max send rate */
+	  gettimeofday(&now,NULL);
+	  if(now.tv_sec < rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec) /* at midnight on win32 */
+	    now.tv_sec = rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec;
+
+	  if((size_t)((now.tv_sec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec)*1000
+		      +(now.tv_usec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_usec)/1000)
+	     >= MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL) {
+	    /* increment send rate */
+	    rfbScreen->multicastMaxSendRate += rfbScreen->multicastMaxSendRateIncrement;
+	    /* increase the increment itself */
+	    if(++rfbScreen->multicastMaxSendRateIncrementCount % MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER == 0)
+	      rfbScreen->multicastMaxSendRateIncrement *= MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
+
+#ifdef MULTICAST_DEBUG
+	      rfbLog("MulticastVNC DEBUG: max send rate += %u to %u\n",
+		     rfbScreen->multicastMaxSendRateIncrement,
+		     rfbScreen->multicastMaxSendRate);
+#endif
+		rfbScreen->lastMulticastMaxSendRateIncrement = now;
+	  }
+	UNLOCK(rfbScreen->multicastSharedMutex);
+	}
+
+#ifndef WIN32
+        usleep (1000);
+#else
+	Sleep (1);
+#endif
+	continue;
+      }
+
+
+
+      /*
+	enough send credit, go on sending
+      */
+      n = write(sock, buf, len);
+      
+      if(n > 0) 
+	{
+	  buf += n;
+	  len -= n;
+	  rfbScreen->multicastSendCredit -= n;
+	} 
+      else 
+	if(n == 0)
+	  {
+	    rfbErr("WriteExactMulticast: sendto returned 0?\n");
+	    UNLOCK(rfbScreen->multicastOutputMutex);
+	    return 0;
+	  }
+	else 
+	  {
+#ifdef WIN32
+	    errno = WSAGetLastError();
+#endif
+	    if (errno == EINTR)
+	      continue;
+
+	    if (errno != EWOULDBLOCK && errno != EAGAIN) 
+	      {
+		UNLOCK(rfbScreen->multicastOutputMutex);
+		return n;
+	      }
+	  }
+    }
+  
+  UNLOCK(rfbScreen->multicastOutputMutex);
+  return 1;
+}
+
+
+
 /* currently private, called by rfbProcessArguments() */
 int
 rfbStringToAddr(char *str, in_addr_t *addr)  {
@@ -704,6 +983,7 @@ rfbListenOnUDPPort(int port,
     return sock;
 }
 
+
 /*
  * rfbSetNonBlocking sets a socket into non-blocking mode.
  */
@@ -723,3 +1003,6 @@ rfbSetNonBlocking(int sock)
   }
   return TRUE;
 }
+
+
+

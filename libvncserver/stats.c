@@ -55,6 +55,8 @@ char *messageNameServer2Client(uint32_t type, char *buf, int len) {
     case rfbTextChat:                 snprintf(buf, len, "TextChat"); break;
     case rfbPalmVNCReSizeFrameBuffer: snprintf(buf, len, "PalmVNCReSize"); break;
     case rfbXvp:                      snprintf(buf, len, "XvpServerMessage"); break;
+    case rfbMulticastFramebufferUpdate:
+                                      snprintf(buf, len, "MulticastFBUpd"); break;
     default:
         snprintf(buf, len, "svr2cli-0x%08X", 0xFF);
     }
@@ -78,6 +80,10 @@ char *messageNameClient2Server(uint32_t type, char *buf, int len) {
     case rfbTextChat:                 snprintf(buf, len, "TextChat"); break;
     case rfbPalmVNCSetScaleFactor:    snprintf(buf, len, "PalmVNCSetScale"); break;
     case rfbXvp:                      snprintf(buf, len, "XvpClientMessage"); break;
+    case rfbMulticastFramebufferUpdateRequest:
+                                      snprintf(buf, len, "MulticastFBUpdReq"); break;
+    case rfbMulticastFramebufferUpdateNACK:
+                                      snprintf(buf, len, "MulticastFBUpdNACK"); break;
     default:
         snprintf(buf, len, "cli2svr-0x%08X", type);
 
@@ -125,6 +131,8 @@ char *encodingName(uint32_t type, char *buf, int len) {
     case rfbEncodingSupportedMessages:  snprintf(buf, len, "SupportedMessage");  break;
     case rfbEncodingSupportedEncodings: snprintf(buf, len, "SupportedEncoding"); break;
     case rfbEncodingServerIdentity:     snprintf(buf, len, "ServerIdentify");    break;
+    case rfbEncodingMulticastVNC:       snprintf(buf, len, "MulticastVNC");    break;
+    case rfbEncodingIPv6MulticastVNC:   snprintf(buf, len, "IPv6MulticastVNC");    break;
 
     /* The following lookups do not report in stats */
     case rfbEncodingCompressLevel0: snprintf(buf, len, "CompressLevel0");  break;
