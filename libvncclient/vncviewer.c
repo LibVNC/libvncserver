@@ -31,7 +31,7 @@
 #include <time.h>
 #include <rfb/rfbclient.h>
 #include "tls.h"
-#include "packetbuf.h"
+#include "ghpringbuf.h"
 
 static void Dummy(rfbClient* client) {
 }
@@ -385,7 +385,7 @@ void rfbClientCleanup(rfbClient* client) {
     close(client->listenSock);
   if (client->multicastSock >= 0)
     close(client->multicastSock);
-  packetBufDestroy(client->multicastPacketBuf);
+  ghpringbuf_destroy(client->multicastPacketBuf);
   free(client->desktopName);
   free(client->serverHost);
   if (client->destHost)

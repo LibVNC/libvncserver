@@ -50,7 +50,8 @@
 #include <netdb.h>
 #endif
 #include "tls.h"
-#include "packetbuf.h"
+#include "ghpringbuf.h"
+#include "packet.h"
 
 void PrintInHex(char *buf, int len);
 
@@ -239,15 +240,17 @@ hexdump:
 rfbBool
 ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
 {
-  packetBuf *pbuf = client->multicastPacketBuf;
-
+  ghpringbuf *pbuf = client->multicastPacketBuf;
+  Packet p;
+  
   if(client->multicastSock < 0 || !pbuf)
     return FALSE;
 
   /* 
      read until packet buffer (potentially) full or nothing more to read 
   */
-  while(pbuf->len + MULTICAST_READBUF_SZ <= pbuf->maxlen) {
+  while(client->multicastRcvBufLen + MULTICAST_READBUF_SZ <= client->multicastRcvBufSize
+	&& ghpringbuf_count(pbuf) < pbuf->capacity) {
     int r;
     r = recvfrom(client->multicastSock, client->multicastReadBuf, MULTICAST_READBUF_SZ, 0, NULL, NULL);
     if (r <= 0) {
@@ -273,37 +276,39 @@ ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
 
     /* successfully read a packet at this point */
     client->multicastBytesRcvd += r;
-    packet * p = calloc(sizeof(packet), 1);
-    p->datalen = r;
-    p->data = malloc(p->datalen);
-    memcpy(p->data, client->multicastReadBuf, p->datalen);
+    p.datalen = r;
+    p.data = malloc(p.datalen);
+    memcpy(p.data, client->multicastReadBuf, p.datalen);
 
-    packetBufPush(client->multicastPacketBuf, p);
+    ghpringbuf_put(pbuf, &p);
+
+    client->multicastRcvBufLen += p.datalen;
+   
 #ifdef MULTICAST_DEBUG
     rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() read %d bytes from socket.\n", r);
     rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() %d packets buffered now.\n", pbuf->count);
 #endif
   }
 
-  client->multicastRcvBufLen = pbuf->len;
+ 
 
   /*
     now service the request of n bytes (which have to be <= what's buffered of the packet)
   */
 #ifdef MULTICAST_DEBUG
   rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() bytes requested: %d \n", n);
-  rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() bytes in buffer: %d \n", pbuf->len);
-  rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() pckts in buffer: %d \n", pbuf->count);
+  rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() bytes in buffer: %d \n", client->multicastRcvBufLen);
+  rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() pckts in buffer: %d \n", ghpringbuf_count(pbuf));
 #endif
 
   if (n) {
-    if(pbuf->head
-       && n <= pbuf->head->datalen
+    if(ghpringbuf_at(pbuf, 0, &p)
+       && n <= p.datalen
        && (client->multicastbuffered ? n <= client->multicastbuffered : 1)) {
 
       if(client->multicastbuffered == 0) { /* new packet to be consumed */
-	client->multicastbuffered = pbuf->head->datalen;
-	client->multicastbufoutptr = pbuf->head->data;
+	client->multicastbuffered = p.datalen;
+	client->multicastbufoutptr = p.data;
       }
 
       /* copy requested number of bytes to out buffer */
@@ -311,8 +316,9 @@ ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
       client->multicastbufoutptr += n;
       client->multicastbuffered -= n;
 
-      if(client->multicastbuffered == 0) { /* packet consumed */ 	
-	packetBufPop(pbuf);
+      if(client->multicastbuffered == 0) { /* packet consumed */ 
+	client->multicastRcvBufLen -= p.datalen;
+	ghpringbuf_pop(pbuf);
 #ifdef MULTICAST_DEBUG
 	rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() packet consumed, now %d packets in buffer.\n", pbuf->count);
 #endif
@@ -855,7 +861,7 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
     client->serverMsg = TRUE;
   if(client->multicastSock >= 0 && FD_ISSET(client->multicastSock, &fds))
     client->serverMsgMulticast = TRUE;
-  if(client->multicastPacketBuf && ((packetBuf*)client->multicastPacketBuf)->head) {
+  if(client->multicastPacketBuf && ghpringbuf_count(client->multicastPacketBuf)) {
     client->serverMsgMulticast = TRUE;
     ++num;
   }

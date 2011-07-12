@@ -1,8 +1,8 @@
 INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/common
 
-libvncclient_la_SOURCES=cursor.c listen.c rfbproto.c sockets.c vncviewer.c ../common/minilzo.c tls.c packetbuf.c
+libvncclient_la_SOURCES=cursor.c listen.c rfbproto.c sockets.c vncviewer.c ../common/minilzo.c ../common/ghpringbuf.c tls.c
 
-noinst_HEADERS=../common/lzodefs.h ../common/lzoconf.h ../common/minilzo.h tls.h packetbuf.h
+noinst_HEADERS=../common/lzodefs.h ../common/lzoconf.h ../common/minilzo.h tls.h ../common/ghpringbuf.h packet.h
 
 rfbproto.o: rfbproto.c corre.c hextile.c rre.c tight.c zlib.c zrle.c ultra.c
 

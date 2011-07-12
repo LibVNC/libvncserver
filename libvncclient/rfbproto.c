@@ -63,7 +63,8 @@
 
 #include "minilzo.h"
 #include "tls.h"
-#include "packetbuf.h"
+#include "ghpringbuf.h"
+#include "packet.h"
 
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
@@ -1806,7 +1807,7 @@ HandleRFBServerMessage(rfbClient* client)
 #ifdef MULTICAST_DEBUG
 	      rfbClientLog("MulticastVNC DEBUG: discarding pf,enc: %d\n", rfbClientSwap16IfLE(msg.mfu.idPixelformatEnc));
 #endif
-	      packetBufPop(client->multicastPacketBuf); 
+	      ghpringbuf_pop(client->multicastPacketBuf); 
 	      client->multicastbuffered = 0;
 	    }
 	  else
@@ -2173,8 +2174,11 @@ HandleRFBServerMessage(rfbClient* client)
 	client->multicastSock = CreateMulticastSocket(multicastSockAddr, client->multicastSocketRcvBufSize);
 	client->multicastUpdInterval = rect.r.w > 0 ? rect.r.w : 1;
 	client->multicastPixelformatEncId = rect.r.x;
-	client->multicastPacketBuf = packetBufCreate(client->multicastRcvBufSize);
-
+	client->multicastPacketBuf = ghpringbuf_create(client->multicastRcvBufSize/516 + 1, /* 576 is the minimum evry host is required to handle. 576-60header=516. */
+						       sizeof(Packet),
+						       0,
+						       clean_packet);
+						       
 	if(client->multicastUpdInterval > client->multicastTimeout*1000) {
 	  rfbClientLog("MulticastVNC: Fallback timeout (%d) smaller than server's multicast update interval (%d). This won't work, disabling timeout.\n",
 		       client->multicastTimeout,
