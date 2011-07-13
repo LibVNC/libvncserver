@@ -58,8 +58,11 @@ ghpringbuf* ghpringbuf_create(size_t capacity, size_t item_size, int is_overwrit
 /** destroys a ghpringbuf, deallocating all internal data */
 void ghpringbuf_destroy(ghpringbuf* b);
 
-/** put item into ringbuffer. returns 1 on success, 0 if buffer full */
+/** put item at end of ringbuffer. returns 1 on success, 0 if buffer full */
 int ghpringbuf_put(ghpringbuf* b, void* item);
+
+/** insert item at index, will be copied from src. returns 1 on success, 0 if index out of bounds */
+int ghpringbuf_insert(ghpringbuf* b, size_t index, void* src);
 
 /** access item at index, will be copied to dst. returns 1 on success, 0 if index out of bounds */
 int ghpringbuf_at(ghpringbuf* b, size_t index, void* dst);
