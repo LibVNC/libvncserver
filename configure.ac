@@ -578,6 +578,60 @@ ftp://ftp.uu.net/graphics/jpeg/
 	fi
 fi
 
+AC_ARG_WITH(png,
+[  --without-png           disable support for png]
+[  --with-png=DIR          use png include/library files in DIR],,)
+
+# At this point:
+#	no png on command line    with_png=""
+#	-with-png                 with_png="yes"
+#	-without-png              with_png="no"
+#	-with-png=/foo/dir        with_png="/foo/dir"
+
+if test "x$with_png" != "xno"; then
+	if test ! -z "$with_png" -a "x$with_png" != "xyes"; then
+		# add user supplied directory to flags:
+		saved_CPPFLAGS="$CPPFLAGS"
+		saved_LDFLAGS="$LDFLAGS"
+		CPPFLAGS="$CPPFLAGS -I$with_png/include"
+		LDFLAGS="$LDFLAGS -L$with_png/lib"
+		if test "x$ld_minus_R" = "xno"; then
+			:
+		elif test "x$GCC" = "xyes"; then
+			# this is not complete... in general a rat's nest.
+			LDFLAGS="$LDFLAGS -Xlinker -R$with_png/lib"
+		else
+			LDFLAGS="$LDFLAGS -R$with_png/lib"
+		fi
+	fi
+	AC_CHECK_HEADER(png.h, HAVE_PNGLIB_H="true")
+	if test "x$HAVE_PNGLIB_H" = "xtrue"; then
+		AC_CHECK_LIB(png, png_create_write_struct, , HAVE_PNGLIB_H="")
+	fi
+	if test ! -z "$with_png" -a "x$with_png" != "xyes"; then
+		if test "x$HAVE_PNGLIB_H" != "xtrue"; then
+			# restore old flags on failure:
+			CPPFLAGS="$saved_CPPFLAGS"
+			LDFLAGS="$saved_LDFLAGS"
+		fi
+	fi
+	if test "$build_x11vnc" = "yes"; then
+		if test "x$HAVE_PNGLIB_H" != "xtrue"; then
+			AC_MSG_WARN([
+==========================================================================
+*** The libpng compression library was not found. ***
+This may lead to reduced performance, especially over slow links.
+If libpng is in a non-standard location use --with-png=DIR to
+indicate the header file is in DIR/include/png.h and the library
+in DIR/lib/libpng.a.  A copy of libpng may be obtained from:
+http://www.libpng.org/pub/png/libpng.html
+==========================================================================
+])
+			sleep 5
+		fi
+	fi
+fi
+
 AC_ARG_WITH(libz,
 [  --without-libz          disable support for deflate],,)
 AC_ARG_WITH(zlib,
@@ -654,6 +708,7 @@ AM_CONDITIONAL(WITH_TIGHTVNC_FILETRANSFER, test "$with_tightvnc_filetransfer" = 
 
 AM_CONDITIONAL(HAVE_LIBZ, test ! -z "$HAVE_ZLIB_H")
 AM_CONDITIONAL(HAVE_LIBJPEG, test ! -z "$HAVE_JPEGLIB_H")
+AM_CONDITIONAL(HAVE_LIBPNG, test ! -z "$HAVE_PNGLIB_H")
 
 
 SDLCONFIG="sdl-config"

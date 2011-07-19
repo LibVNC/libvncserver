@@ -15,6 +15,7 @@ include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/
 
 find_package(ZLIB)
 find_package(JPEG)
+find_package(PNG)
 find_package(SDL)
 find_package(GnuTLS)
 find_package(Threads)
@@ -30,6 +31,9 @@ endif(ZLIB_FOUND)
 if(JPEG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBJPEG 1)
 endif(JPEG_FOUND)
+if(PNG_FOUND)
+  set(LIBVNCSERVER_HAVE_LIBPNG 1)
+endif(PNG_FOUND)
 option(LIBVNCSERVER_ALLOW24BPP "Allow 24 bpp" ON)
 if(GNUTLS_FOUND)
   set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
@@ -142,11 +146,20 @@ endif(ZLIB_FOUND)
 if(JPEG_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBJPEG)
   include_directories(${JPEG_INCLUDE_DIR})
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
-    ${LIBVNCSERVER_DIR}/tight.c
-  )
+  set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c)
 endif(JPEG_FOUND)
+
+if(PNG_FOUND)
+  add_definitions(-DLIBVNCSERVER_HAVE_LIBPNG)
+  include_directories(${PNG_INCLUDE_DIR})
+  set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c)
+endif(PNG_FOUND)
+
+
+set(LIBVNCSERVER_SOURCES
+    ${LIBVNCSERVER_SOURCES}
+    ${TIGHT_C}
+)
 
 if(TIGHTVNC_FILETRANSFER)
   set(LIBVNCSERVER_SOURCES
@@ -174,6 +187,7 @@ target_link_libraries(vncserver
                       ${ADDITIONAL_LIBS}
                       ${ZLIB_LIBRARIES}
                       ${JPEG_LIBRARIES}
+		      ${PNG_LIBRARIES}
                       ${SDL_LIBRARY}
 )
 

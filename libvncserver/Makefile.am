@@ -29,7 +29,11 @@ EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
 if HAVE_LIBZ
 ZLIBSRCS = zlib.c zrle.c zrleoutstream.c zrlepalettehelper.c ../common/zywrletemplate.c
 if HAVE_LIBJPEG
-JPEGSRCS = tight.c
+TIGHTSRCS = tight.c
+else
+if HAVE_LIBPNG
+TIGHTSRCS = tight.c
+endif
 endif
 endif
 
@@ -37,7 +41,7 @@ LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	httpd.c cursor.c font.c \
 	draw.c selbox.c ../common/d3des.c ../common/vncauth.c cargs.c ../common/minilzo.c ultra.c scale.c \
-	$(ZLIBSRCS) $(JPEGSRCS) $(TIGHTVNCFILETRANSFERSRCS)
+	$(ZLIBSRCS) $(TIGHTSRCS) $(TIGHTVNCFILETRANSFERSRCS)
 
 libvncserver_la_SOURCES=$(LIB_SRCS)
 

@@ -358,10 +358,12 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       rfbScreen->clientHead = cl;
       UNLOCK(rfbClientListMutex);
 
-#ifdef LIBVNCSERVER_HAVE_LIBZ
+#if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
       cl->tightQualityLevel = -1;
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
       cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
+#endif
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
       {
 	int i;
 	for (i = 0; i < 4; i++)
@@ -917,6 +919,9 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	rfbEncodingTight,
+#endif
+#ifdef LIBVNCSERVER_HAVE_LIBPNG
+	rfbEncodingTightPng,
 #endif
 	rfbEncodingUltra,
 	rfbEncodingUltraZip,
@@ -1938,6 +1943,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    case rfbEncodingTight:
 #endif
 #endif
+#ifdef LIBVNCSERVER_HAVE_LIBPNG
+	    case rfbEncodingTightPng:
+#endif
             /* The first supported encoding is the 'preferred' encoding */
                 if (cl->preferredEncoding == -1)
                     cl->preferredEncoding = enc;
@@ -2026,11 +2034,11 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		}
                 break;
             default:
-#ifdef LIBVNCSERVER_HAVE_LIBZ
+#if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
 		if ( enc >= (uint32_t)rfbEncodingCompressLevel0 &&
 		     enc <= (uint32_t)rfbEncodingCompressLevel9 ) {
 		    cl->zlibCompressLevel = enc & 0x0F;
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
 		    cl->tightCompressLevel = enc & 0x0F;
 		    rfbLog("Using compression level %d for client %s\n",
 			   cl->tightCompressLevel, cl->host);
@@ -2755,6 +2763,28 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	sraRgnReleaseIterator(i); i=NULL;
 #endif
 #endif
+#ifdef LIBVNCSERVER_HAVE_LIBPNG
+    } else if (cl->preferredEncoding == rfbEncodingTightPng) {
+	nUpdateRegionRects = 0;
+
+        for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
+            int x = rect.x1;
+            int y = rect.y1;
+            int w = rect.x2 - x;
+            int h = rect.y2 - y;
+            int n;
+            /* We need to count the number of rects in the scaled screen */
+            if (cl->screen!=cl->scaledScreen)
+                rfbScaledCorrection(cl->screen, cl->scaledScreen, &x, &y, &w, &h, "rfbSendFramebufferUpdate");
+	    n = rfbNumCodedRectsTight(cl, x, y, w, h);
+	    if (n == 0) {
+		nUpdateRegionRects = 0xFFFF;
+		break;
+	    }
+	    nUpdateRegionRects += n;
+	}
+	sraRgnReleaseIterator(i); i=NULL;
+#endif
     } else {
         nUpdateRegionRects = sraRgnCountRects(updateRegion);
     }
@@ -2773,6 +2803,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	   /* Tight encoding counts the rectangles differently */
 	   && cl->preferredEncoding != rfbEncodingTight
 #endif
+#endif
+#ifdef LIBVNCSERVER_HAVE_LIBPNG
+	   /* Tight encoding counts the rectangles differently */
+	   && cl->preferredEncoding != rfbEncodingTightPng
 #endif
 	   && nUpdateRegionRects>cl->screen->maxRectsPerUpdate) {
 	    sraRegion* newUpdateRegion = sraRgnBBox(updateRegion);
@@ -2867,6 +2901,13 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	        goto updateFailed;
 	    break;
 #endif
+#endif
+#ifdef LIBVNCSERVER_HAVE_LIBPNG
+	case rfbEncodingTightPng:
+            /* TODO */
+	    if (!rfbSendRectEncodingTightPng(cl, x, y, w, h))
+	        goto updateFailed;
+	    break;
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
        case rfbEncodingZRLE:

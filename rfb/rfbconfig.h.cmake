@@ -18,6 +18,9 @@
 /* Define to 1 if you have the `jpeg' library (-ljpeg). */
 #cmakedefine LIBVNCSERVER_HAVE_LIBJPEG  1 
 
+/* Define if you have the `png' library (-lpng). */
+#cmakedefine LIBVNCSERVER_HAVE_LIBPNG  1
+
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #cmakedefine LIBVNCSERVER_HAVE_LIBPTHREAD  1 
 
