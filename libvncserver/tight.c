@@ -958,6 +958,12 @@ SendGradientRect(rfbClientPtr cl,
     int streamId = 3;
     int len;
 
+#ifdef LIBVNCSERVER_HAVE_LIBPNG
+    if (CanSendPngRect(cl, w, h)) {
+        return SendPngRect(cl, x, y, w, h);
+    }
+#endif
+
     if (cl->format.bitsPerPixel == 8)
         return SendFullColorRect(cl, x, y, w, h);
 
