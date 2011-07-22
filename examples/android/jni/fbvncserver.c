@@ -180,12 +180,12 @@ static void init_fb_server(int argc, char **argv)
 
 	/* Allocate the VNC server buffer to be managed (not manipulated) by 
 	 * libvncserver. */
-	vncbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 2);
+	vncbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 8);
 	assert(vncbuf != NULL);
 
 	/* Allocate the comparison buffer for detecting drawing updates from frame
 	 * to frame. */
-	fbbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 2);
+	fbbuf = calloc(scrinfo.xres * scrinfo.yres, scrinfo.bits_per_pixel / 8);
 	assert(fbbuf != NULL);
 
 	/* TODO: This assumes scrinfo.bits_per_pixel is 16. */
