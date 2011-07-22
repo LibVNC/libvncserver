@@ -189,7 +189,7 @@ static void init_fb_server(int argc, char **argv)
 	assert(fbbuf != NULL);
 
 	/* TODO: This assumes scrinfo.bits_per_pixel is 16. */
-	vncscr = rfbGetScreen(&argc, argv, scrinfo.xres, scrinfo.yres, 5, 2, 2);
+	vncscr = rfbGetScreen(&argc, argv, scrinfo.xres, scrinfo.yres, 5, 2, (scrinfo.bits_per_pixel / 8));
 	assert(vncscr != NULL);
 
 	vncscr->desktopName = "Android";
