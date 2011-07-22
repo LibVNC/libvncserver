@@ -43,6 +43,11 @@ extern "C"
 #include <string.h>
 #include <rfb/rfbproto.h>
 
+#ifdef ANDROID
+#include <arpa/inet.h>
+#include <sys/select.h>
+#endif
+
 #ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
