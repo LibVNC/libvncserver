@@ -807,6 +807,13 @@ AM_CONDITIONAL(LINUX, test -c /dev/vcsa1)
 AC_CHECK_HEADER(ApplicationServices/ApplicationServices.h, HAVE_OSX="true")
 AM_CONDITIONAL(OSX, test "$HAVE_OSX" = "true")
 
+# Check for Android specific header
+AC_CHECK_HEADER(android/api-level.h, HAVE_ANDROID="true")
+AM_CONDITIONAL(ANDROID, test "$HAVE_ANDROID" = "true")
+if test "$HAVE_ANDROID" = "true"; then
+	AC_DEFINE(HAVE_ANDROID, 1, [Android host system detected])
+fi
+
 # On Solaris 2.7, write() returns ENOENT when it really means EAGAIN
 AH_TEMPLATE(ENOENT_WORKAROUND, [work around when write() returns ENOENT but does not mean it])
 case `(uname -sr) 2>/dev/null` in
@@ -833,6 +840,7 @@ AC_CONFIG_FILES([Makefile
 	libvncclient.pc
 	libvncserver/Makefile
 	examples/Makefile
+	examples/android/Makefile
 	vncterm/Makefile
 	classes/Makefile
 	classes/ssl/Makefile
