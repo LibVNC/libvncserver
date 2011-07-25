@@ -52,3 +52,12 @@ some files manually.
 
 
 
+Installing && Running
+---------------------
+
+This can be done via
+
+ adb push androidvncserver /data/local/
+ adb shell /data/local/androidvncserver
+
+
