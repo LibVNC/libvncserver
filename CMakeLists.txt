@@ -20,11 +20,17 @@ find_package(SDL)
 find_package(GnuTLS)
 find_package(Threads)
 find_package(X11)
+find_package(OpenSSL)
 find_library(LIBGCRYPT_LIBRARIES gcrypt)
+
+set(CMAKE_REQUIRED_LIBRARIES resolv)
+check_function_exists(__b64_ntop HAVE_B64)
 
 if(Threads_FOUND)
   option(TIGHTVNC_FILETRANSFER "Enable filetransfer" ON)
 endif(Threads_FOUND)
+if (HAVE_B64)
+endif(HAVE_B64)
 if(ZLIB_FOUND)
   set(LIBVNCSERVER_HAVE_LIBZ 1)
 endif(ZLIB_FOUND)
@@ -35,9 +41,18 @@ if(PNG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBPNG 1)
 endif(PNG_FOUND)
 option(LIBVNCSERVER_ALLOW24BPP "Allow 24 bpp" ON)
+
 if(GNUTLS_FOUND)
   set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
-endif(GNUTLS_FOUND)
+  option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (gnutls)" ON)
+  set(WEBSOCKET_LIBRARIES -lresolv ${GNUTLS_LIBRARIES})
+  set(WSSRCS rfbssl_gnutls)
+elseif(OPENSSL_FOUND)
+  option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (openssl)" ON)
+  set(WEBSOCKET_LIBRARIES -lresolv ${OPENSSL_LIBRARIES})
+  set(WSSRCS rfbssl_openssl)
+endif()
+
 if(LIBGCRYPT_LIBRARIES)
   message(STATUS "Found libgcrypt: ${LIBGCRYPT_LIBRARIES}")
   set(LIBVNCSERVER_WITH_CLIENT_GCRYPT 1)
@@ -155,7 +170,6 @@ if(PNG_FOUND)
   set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c)
 endif(PNG_FOUND)
 
-
 set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_SOURCES}
     ${TIGHT_C}
@@ -170,6 +184,17 @@ if(TIGHTVNC_FILETRANSFER)
     ${LIBVNCSERVER_DIR}/tightvnc-filetransfer/filelistinfo.c
   )
 endif(TIGHTVNC_FILETRANSFER)
+
+if(LIBVNCSERVER_WITH_WEBSOCKETS)
+  add_definitions(-DLIBVNCSERVER_WITH_WEBSOCKETS)
+  set(LIBVNCSERVER_SOURCES
+    ${LIBVNCSERVER_SOURCES}
+    ${LIBVNCSERVER_DIR}/websockets.c
+    ${LIBVNCSERVER_DIR}/${WSSRCS}
+    ${LIBVNCSERVER_DIR}/md5.c
+  )
+endif(LIBVNCSERVER_WITH_WEBSOCKETS)
+
 
 add_library(vncclient SHARED ${LIBVNCCLIENT_SOURCES})
 add_library(vncserver SHARED ${LIBVNCSERVER_SOURCES})
@@ -189,6 +214,7 @@ target_link_libraries(vncserver
                       ${JPEG_LIBRARIES}
 		      ${PNG_LIBRARIES}
                       ${SDL_LIBRARY}
+		      ${WEBSOCKET_LIBRARIES}
 )
 
 # tests
