@@ -358,6 +358,14 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       rfbScreen->clientHead = cl;
       UNLOCK(rfbClientListMutex);
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+      cl->webSockets       = FALSE;
+      cl->webSocketsSSL    = FALSE;
+      cl->webSocketsBase64 = FALSE;
+      cl->dblen= 0;
+      cl->carrylen = 0;
+#endif
+
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
       cl->tightQualityLevel = -1;
 #if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
@@ -403,6 +411,20 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->extensions = NULL;
 
       cl->lastPtrX = -1;
+
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+      /*
+       * Wait a few ms for the client to send one of:
+       * - Flash policy request
+       * - WebSockets connection (TLS/SSL or plain)
+       */
+      if (!webSocketsCheck(cl)) {
+        /* Error reporting handled in webSocketsHandshake */
+        rfbCloseClient(cl);
+        rfbClientConnectionGone(cl);
+        return NULL;
+      }
+#endif
 
       sprintf(pv,rfbProtocolVersionFormat,rfbScreen->protocolMajorVersion, 
               rfbScreen->protocolMinorVersion);
@@ -1817,6 +1839,16 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     char encBuf[64];
     char encBuf2[64];
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+    if (cl->webSockets && cl->webSocketsBase64) {
+        /* With Base64 encoding we need at least 4 bytes */
+        n = recv(cl->sock, encBuf, 4, MSG_PEEK);
+        if ((n > 0) && (n < 4)) {
+            return;
+        }
+    }
+#endif
+
     if ((n = rfbReadExact(cl, (char *)&msg, 1)) <= 0) {
         if (n != 0)
             rfbLogPerror("rfbProcessClientNormalMessage: read");
@@ -2904,7 +2936,6 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBPNG
 	case rfbEncodingTightPng:
-            /* TODO */
 	    if (!rfbSendRectEncodingTightPng(cl, x, y, w, h))
 	        goto updateFailed;
 	    break;

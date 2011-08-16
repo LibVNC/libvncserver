@@ -25,6 +25,14 @@ AC_ARG_WITH(tightvnc-filetransfer,
 	, [ with_tightvnc_filetransfer=yes ])
 # AC_DEFINE moved to after libpthread check.
 
+# WebSockets support
+AC_CHECK_LIB(resolv, __b64_ntop, HAVE_B64="true", HAVE_B64="false")
+AH_TEMPLATE(WITH_WEBSOCKETS, [Disable WebSockets support])
+AC_ARG_WITH(websockets,
+	[  --without-websockets    disable WebSockets support],
+	, [ with_websockets=yes ])
+# AC_DEFINE moved to after libresolve check.
+
 AH_TEMPLATE(ALLOW24BPP, [Enable 24 bit per pixel in native framebuffer])
 AC_ARG_WITH(24bpp,
 	[  --without-24bpp         disable 24 bpp framebuffers],
@@ -299,6 +307,7 @@ elif test "x$uname_s" = "xOSF1"; then
 elif test "x$uname_s" = "xDarwin"; then
 	ld_minus_R="no"
 fi
+
 
 
 AH_TEMPLATE(HAVE_LIBCRYPT, [libcrypt library present])
@@ -705,6 +714,16 @@ if test "x$with_tightvnc_filetransfer" = "xyes"; then
 	AC_DEFINE(WITH_TIGHTVNC_FILETRANSFER)
 fi
 AM_CONDITIONAL(WITH_TIGHTVNC_FILETRANSFER, test "$with_tightvnc_filetransfer" = "yes")
+
+# websockets implemented using base64 from resolve
+if test "x$HAVE_B64" != "xtrue"; then
+	with_websockets=""
+fi
+if test "x$with_websockets" = "xyes"; then
+	LIBS="$LIBS -lresolv"
+	AC_DEFINE(WITH_WEBSOCKETS)
+fi
+AM_CONDITIONAL(WITH_WEBSOCKETS, test "$with_websockets" = "yes")
 
 AM_CONDITIONAL(HAVE_LIBZ, test ! -z "$HAVE_ZLIB_H")
 AM_CONDITIONAL(HAVE_LIBJPEG, test ! -z "$HAVE_JPEGLIB_H")

@@ -12,6 +12,10 @@ TIGHTVNCFILETRANSFERSRCS = tightvnc-filetransfer/rfbtightserver.c \
 	tightvnc-filetransfer/filelistinfo.c
 endif
 
+if WITH_WEBSOCKETS
+WEBSOCKETSSRCS = websockets.c md5.c
+endif
+
 includedir=$(prefix)/include/rfb
 #include_HEADERS=rfb.h rfbconfig.h rfbint.h rfbproto.h keysym.h rfbregion.h
 
@@ -37,7 +41,7 @@ endif
 endif
 endif
 
-LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c \
+LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c $(WEBSOCKETSSRCS) \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	httpd.c cursor.c font.c \
 	draw.c selbox.c ../common/d3des.c ../common/vncauth.c cargs.c ../common/minilzo.c ultra.c scale.c \
