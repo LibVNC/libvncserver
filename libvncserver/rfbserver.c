@@ -1840,16 +1840,28 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     char encBuf2[64];
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-    if (cl->webSockets && cl->webSocketsBase64) {
-        /* With Base64 encoding we need at least 4 bytes */
+    if (cl->webSockets) {
         n = recv(cl->sock, encBuf, 4, MSG_PEEK);
-        if ((n > 0) && (n < 4)) {
-            if (encBuf[0] == '\xff') {
-                /* Make sure we don't miss a client disconnect on an end frame
-                 * marker */
-                n = read(cl->sock, encBuf, 1);
+        if (cl->webSocketsBase64) {
+            /* With Base64 encoding we need at least 4 bytes */
+            if ((n > 0) && (n < 4)) {
+                if (encBuf[0] == '\xff') {
+                    /* Make sure we don't miss a client disconnect on an end frame
+                    * marker */
+                    n = read(cl->sock, encBuf, 1);
+                }
+                return;
             }
-            return;
+        } else {
+            /* With UTF-8 encoding we need at least 3 bytes (framing + 1) */
+            if ((n == 1) || (n == 2)) {
+                if (encBuf[0] == '\xff') {
+                    /* Make sure we don't miss a client disconnect on an end frame
+                    * marker */
+                    n = read(cl->sock, encBuf, 1);
+                }
+                return;
+            }
         }
     }
 #endif

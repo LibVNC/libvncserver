@@ -330,11 +330,12 @@ webSocketsEncode(rfbClientPtr cl, const char *src, int len)
 int
 webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 {
-    int retlen = 0, n, i, avail, modlen, needlen;
+    int retlen = 0, n, i, avail, modlen, needlen, actual;
     char *buf, *end = NULL;
-    unsigned char chr;
+    unsigned char chr, chr2;
 
     buf = cl->decodeBuf;
+
     n = recv(cl->sock, buf, len*2+2, MSG_PEEK);
 
     if (n <= 0) {
@@ -342,25 +343,35 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
         return n;
     }
 
-    if (buf[0] == '\xff') {
-        i = read(cl->sock, buf, 1); /* Consume marker */
-        buf++;
-        n--;
-    }
-    if (buf[0] == '\x00') {
-        i = read(cl->sock, buf, 1); /* Consume marker */
-        buf++;
-        n--;
-    }
-    /* rfbLog(">> webSocketsDecode, len: %d, n: %d\n", len, n); */
-    end = memchr(buf, '\xff', len*2+2);
-    if (!end) {
-        end = buf + n;
-    }
-    avail = end - buf;
 
     if (cl->webSocketsBase64) {
         /* Base64 encoded WebSockets stream */
+
+        if (buf[0] == '\xff') {
+            i = read(cl->sock, buf, 1); /* Consume marker */
+            buf++;
+            n--;
+        }
+        if (n == 0) {
+            errno = EAGAIN;
+            return -1;
+        }
+        if (buf[0] == '\x00') {
+            i = read(cl->sock, buf, 1); /* Consume marker */
+            buf++;
+            n--;
+        }
+        if (n == 0) {
+            errno = EAGAIN;
+            return -1;
+        }
+
+        /* end = memchr(buf, '\xff', len*2+2); */
+        end = memchr(buf, '\xff', n);
+        if (!end) {
+            end = buf + n;
+        }
+        avail = end - buf;
 
         len -= cl->carrylen;
 
@@ -396,7 +407,6 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
         retlen += n;
 
         /* Consume the data from socket */
-        /* rfbLog("here1, needlen: %d, n: %d, len: %d\n", needlen, n, len); */
         i = read(cl->sock, buf, needlen);
 
         cl->carrylen = n - len;
@@ -407,42 +417,62 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
         }
     } else {
         /* UTF-8 encoded WebSockets stream */
+
+        actual = 0;
+        for (needlen = 0; needlen < n && actual < len; needlen++) {
+            chr = buf[needlen];
+            if ((chr > 0) && (chr < 128)) {
+                actual++;
+            } else if ((chr > 127) && (chr < 255)) {
+                if (needlen + 1 >= n) {
+                    break;
+                }
+                needlen++;
+                actual++;
+            }
+        }
+
+        if (actual < len) {
+            errno = EAGAIN;
+            return -1;
+        }
+
+        /* Consume what we need */
+        if ((n = read(cl->sock, buf, needlen)) < needlen) {
+            return n;
+        }
+
         while (retlen < len) {
-            chr = *buf;
+            chr = buf[0];
             buf += 1;
-            if (chr < 128) {
+            if (chr == 0) {
+                /* Begin frame marker, just skip it */
+            } else if (chr == 255) {
+                /* Begin frame marker, just skip it */
+	    } else if (chr < 128) {
                 dst[retlen++] = chr;
             } else {
-                if (buf >= end) {
-                    rfbErr("Not enough UTF-8 data to decode\n");
-                    errno = EIO;
-                    return -1;
-                }
-                chr = *buf;
+                chr2 = buf[0];
                 buf += 1;
                 switch (chr) {
                 case (unsigned char) '\xc2':
-                    dst[retlen++] = chr;
+                    dst[retlen++] = chr2;
                     break;
                 case (unsigned char) '\xc3':
-                    dst[retlen++] = chr + 64;
+                    dst[retlen++] = chr2 + 64;
                     break;
                 case (unsigned char) '\xc4':
                     dst[retlen++] = 0;
                     break;
+                default:
+                    rfbErr("Invalid UTF-8 encoding\n");
+                    errno = EIO;
+                    return -1;
                 }
             }
         }
     }
 
-#if 0
-    sprintf(debug, "dst:");
-    for (i = 0; i < retlen; i++) {
-        sprintf(debug+strlen(debug), "%d,", dst[i]);
-    }
-    rfbLog("%s\n", debug);
-
-    rfbLog("<< webSocketsDecode, retlen: %d\n", retlen);
-#endif
+    /* rfbLog("<< webSocketsDecode, retlen: %d\n", retlen); */
     return retlen;
 }
