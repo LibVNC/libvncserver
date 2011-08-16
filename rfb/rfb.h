@@ -368,6 +368,10 @@ typedef struct _rfbScreenInfo
     rfbDisplayFinishedHookPtr displayFinishedHook;
     /** xvpHook is called to handle an xvp client message */
     rfbXvpHookPtr xvpHook;
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+    char *sslkeyfile;
+    char *sslcertfile;
+#endif
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -413,6 +417,8 @@ typedef struct _rfbStatList {
     uint32_t bytesRcvdIfRaw;
     struct _rfbStatList *Next;
 } rfbStatList;
+
+typedef struct _rfbSslCtx rfbSslCtx;
 
 typedef struct _rfbClientRec {
 
@@ -637,8 +643,9 @@ typedef struct _rfbClientRec {
     rfbBool webSocketsSSL;
     rfbBool webSocketsBase64;
 
-    char encodeBuf[UPDATE_BUF_SIZE*2 + 2]; /* UTF-8 could double it + framing */
+    rfbSslCtx *sslctx;
 
+    char encodeBuf[UPDATE_BUF_SIZE*2 + 2]; /* UTF-8 could double it + framing */
     char decodeBuf[8192];                  /* TODO: what makes sense? */
     int dblen;
     char carryBuf[3];                      /* For base64 carry-over */

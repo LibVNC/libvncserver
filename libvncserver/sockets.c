@@ -62,6 +62,10 @@
 #include <unistd.h>
 #endif
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+#include "rfbssl.h"
+#endif
+
 #if defined(__linux__) && defined(NEED_TIMEVAL)
 struct timeval 
 {
@@ -392,6 +396,10 @@ rfbCloseClient(rfbClientPtr cl)
 	  while(cl->screen->maxFd>0
 		&& !FD_ISSET(cl->screen->maxFd,&(cl->screen->allFds)))
 	    cl->screen->maxFd--;
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	if (cl->sslctx)
+	    rfbssl_destroy(cl);
+#endif
 #ifndef __MINGW32__
 	shutdown(cl->sock,SHUT_RDWR);
 #endif
@@ -460,7 +468,9 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
         if (cl->webSockets) {
             n = webSocketsDecode(cl, buf, len);
-        } else {
+        } else if (cl->sslctx) {
+	    n = rfbssl_read(cl, buf, len);
+	} else {
             n = read(sock, buf, len);
         }
 #else
@@ -490,6 +500,12 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
                 return n;
             }
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	    if (cl->sslctx) {
+		if (rfbssl_pending(cl))
+		    continue;
+	    }
+#endif
             FD_ZERO(&fds);
             FD_SET(sock, &fds);
             tv.tv_sec = timeout / 1000;
@@ -500,6 +516,7 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
                 return n;
             }
             if (n == 0) {
+                rfbErr("ReadExact: select timeout\n");
                 errno = ETIMEDOUT;
                 return -1;
             }
@@ -540,7 +557,12 @@ rfbPeekExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
     struct timeval tv;
 
     while (len > 0) {
-        n = recv(sock, buf, len, MSG_PEEK);
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	if (cl->sslctx)
+	    n = rfbssl_peek(cl, buf, len);
+	else
+#endif
+	    n = recv(sock, buf, len, MSG_PEEK);
 
         if (n == len) {
 
@@ -564,13 +586,19 @@ rfbPeekExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
                 return n;
             }
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	    if (cl->sslctx) {
+		if (rfbssl_pending(cl))
+		    continue;
+	    }
+#endif
             FD_ZERO(&fds);
             FD_SET(sock, &fds);
             tv.tv_sec = timeout / 1000;
             tv.tv_usec = (timeout % 1000) * 1000;
             n = select(sock+1, &fds, NULL, &fds, &tv);
             if (n < 0) {
-                rfbLogPerror("ReadExact: select");
+                rfbLogPerror("PeekExact: select");
                 return n;
             }
             if (n == 0) {
@@ -581,7 +609,7 @@ rfbPeekExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
     }
 #undef DEBUG_READ_EXACT
 #ifdef DEBUG_READ_EXACT
-    rfbLog("ReadExact %d bytes\n",len);
+    rfbLog("PeekExact %d bytes\n",len);
     for(n=0;n<len;n++)
 	    fprintf(stderr,"%02x ",(unsigned char)buf[n]);
     fprintf(stderr,"\n");
@@ -628,7 +656,12 @@ rfbWriteExact(rfbClientPtr cl,
 
     LOCK(cl->outputMutex);
     while (len > 0) {
-        n = write(sock, buf, len);
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+        if (cl->sslctx)
+	    n = rfbssl_write(cl, buf, len);
+	else
+#endif
+	    n = write(sock, buf, len);
 
         if (n > 0) {
 

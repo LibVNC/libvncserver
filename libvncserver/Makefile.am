@@ -13,7 +13,7 @@ TIGHTVNCFILETRANSFERSRCS = tightvnc-filetransfer/rfbtightserver.c \
 endif
 
 if WITH_WEBSOCKETS
-WEBSOCKETSSRCS = websockets.c md5.c
+WEBSOCKETSSRCS = websockets.c md5.c rfbssl_none.c
 endif
 
 includedir=$(prefix)/include/rfb

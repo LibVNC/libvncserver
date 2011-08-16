@@ -32,6 +32,7 @@
 #include <errno.h>
 
 #include <md5.h>
+#include "rfbssl.h"
 
 #define FLASH_POLICY_RESPONSE "<cross-domain-policy><allow-access-from domain=\"*\" to-ports=\"*\" /></cross-domain-policy>\n"
 #define SZ_FLASH_POLICY_RESPONSE 93
@@ -91,15 +92,15 @@ webSocketsCheck (rfbClientPtr cl)
             rfbErr("webSocketsHandshake: failed sending Flash policy response");
         }
         return FALSE;
-    } else if (strncmp(bbuf, "\x16", 1) == 0) {
-        cl->webSocketsSSL = TRUE;
+    } else if (strncmp(bbuf, "\x16", 1) == 0 || strncmp(bbuf, "\x80", 1) == 0) {
         rfbLog("Got TLS/SSL WebSockets connection\n");
+        if (-1 == rfbssl_init(cl)) {
+	  rfbErr("webSocketsHandshake: rfbssl_init failed\n");
+	  return FALSE;
+	}
+	ret = rfbPeekExactTimeout(cl, bbuf, 4, WEBSOCKETS_CLIENT_CONNECT_WAIT_MS);
         scheme = "wss";
-        /* TODO */
-        /* bbuf = ... */
-        return FALSE;
     } else {
-        cl->webSocketsSSL = FALSE;
         scheme = "ws";
     }
 
@@ -334,6 +335,30 @@ webSocketsEncode(rfbClientPtr cl, const char *src, int len)
     return sz;
 }
 
+static int
+ws_read(rfbClientPtr cl, char *buf, int len)
+{
+    int n;
+    if (cl->sslctx) {
+	n = rfbssl_read(cl, buf, len);
+    } else {
+	n = read(cl->sock, buf, len);
+    }
+    return n;
+}
+
+static int
+ws_peek(rfbClientPtr cl, char *buf, int len)
+{
+    int n;
+    if (cl->sslctx) {
+	n = rfbssl_peek(cl, buf, len);
+    } else {
+	n = recv(cl->sock, buf, len, MSG_PEEK);
+    }
+    return n;
+}
+
 int
 webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 {
@@ -343,10 +368,10 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 
     buf = cl->decodeBuf;
 
-    n = recv(cl->sock, buf, len*2+2, MSG_PEEK);
+    n = ws_peek(cl, buf, len*2+2);
 
     if (n <= 0) {
-        rfbLog("recv of %d\n", n);
+        rfbErr("%s: recv of %d\n", __func__, n);
         return n;
     }
 
@@ -355,7 +380,7 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
         /* Base64 encoded WebSockets stream */
 
         if (buf[0] == '\xff') {
-            i = read(cl->sock, buf, 1); /* Consume marker */
+            i = ws_read(cl, buf, 1); /* Consume marker */
             buf++;
             n--;
         }
@@ -364,7 +389,7 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
             return -1;
         }
         if (buf[0] == '\x00') {
-            i = read(cl->sock, buf, 1); /* Consume marker */
+            i = ws_read(cl, buf, 1); /* Consume marker */
             buf++;
             n--;
         }
@@ -414,7 +439,7 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
         retlen += n;
 
         /* Consume the data from socket */
-        i = read(cl->sock, buf, needlen);
+        i = ws_read(cl, buf, needlen);
 
         cl->carrylen = n - len;
         retlen -= cl->carrylen;
@@ -445,7 +470,7 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
         }
 
         /* Consume what we need */
-        if ((n = read(cl->sock, buf, needlen)) < needlen) {
+        if ((n = ws_read(cl, buf, needlen)) < needlen) {
             return n;
         }
 
