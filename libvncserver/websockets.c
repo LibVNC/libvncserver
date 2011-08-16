@@ -180,6 +180,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                 path = line+4;
                 buf[len-11] = '\0'; /* Trim trailing " HTTP/1.1\r\n" */
                 cl->webSocketsBase64 = TRUE;
+                cl->wspath = strdup(path);
                 /* rfbLog("Got path: %s\n", path); */
             } else if ((strncasecmp("host: ", line, min(llen,6))) == 0) {
                 host = line+6;

@@ -399,6 +399,7 @@ rfbCloseClient(rfbClientPtr cl)
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 	if (cl->sslctx)
 	    rfbssl_destroy(cl);
+	free(cl->wspath);
 #endif
 #ifndef __MINGW32__
 	shutdown(cl->sock,SHUT_RDWR);

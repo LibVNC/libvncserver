@@ -645,6 +645,7 @@ typedef struct _rfbClientRec {
 
     rfbSslCtx *sslctx;
 
+    char *wspath;                          /* Requests path component */
     char encodeBuf[UPDATE_BUF_SIZE*2 + 2]; /* UTF-8 could double it + framing */
     char decodeBuf[8192];                  /* TODO: what makes sense? */
     int dblen;
