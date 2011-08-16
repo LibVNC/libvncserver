@@ -51,6 +51,10 @@
 # define SWAP(n) (n)
 #endif
 
+void
+md5_process_bytes (const void *buffer, size_t len, struct md5_ctx *ctx);
+void
+md5_process_block (const void *buffer, size_t len, struct md5_ctx *ctx);
 
 /* This array contains the bytes used to pad the buffer to the next
    64-byte boundary.  (RFC 1321, 3.1: Step 1)  */
