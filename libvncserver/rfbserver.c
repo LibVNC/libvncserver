@@ -1844,6 +1844,11 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         /* With Base64 encoding we need at least 4 bytes */
         n = recv(cl->sock, encBuf, 4, MSG_PEEK);
         if ((n > 0) && (n < 4)) {
+            if (encBuf[0] == '\xff') {
+                /* Make sure we don't miss a client disconnect on an end frame
+                 * marker */
+                n = read(cl->sock, encBuf, 1);
+            }
             return;
         }
     }
