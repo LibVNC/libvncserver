@@ -59,6 +59,7 @@ LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c $(WEBSOCKETSSRCS) \
 	$(ZLIBSRCS) $(TIGHTSRCS) $(TIGHTVNCFILETRANSFERSRCS)
 
 libvncserver_la_SOURCES=$(LIB_SRCS)
+libvncserver_la_LIBADD=@SSL_LIBS@ @CRYPT_LIBS@
 
 lib_LTLIBRARIES=libvncserver.la
 
