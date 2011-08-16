@@ -41,11 +41,11 @@ Upgrade: WebSocket\r\n\
 Connection: Upgrade\r\n\
 %sWebSocket-Origin: %s\r\n\
 %sWebSocket-Location: %s://%s%s\r\n\
-%sWebSocket-Protocol: sample\r\n\
+%sWebSocket-Protocol: %s\r\n\
 \r\n%s"
 
 #define WEBSOCKETS_CLIENT_CONNECT_WAIT_MS 100
-#define WEBSOCKETS_CLIENT_SEND_WAIT_MS 20
+#define WEBSOCKETS_CLIENT_SEND_WAIT_MS 100
 #define WEBSOCKETS_MAX_HANDSHAKE_LEN 4096
 
 #if defined(__linux__) && defined(NEED_TIMEVAL)
@@ -123,7 +123,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     char *buf, *response, *line;
     int n, linestart = 0, len = 0, llen;
     char prefix[5], trailer[17];
-    char *path, *host, *origin;
+    char *path = NULL, *host = NULL, *origin = NULL, *protocol = NULL;
     char *key1 = NULL, *key2 = NULL, *key3 = NULL;
 
     buf = (char *) malloc(WEBSOCKETS_MAX_HANDSHAKE_LEN);
@@ -155,7 +155,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         llen = len - linestart;
         if (((llen >= 2)) && (buf[len-1] == '\n')) {
             line = buf+linestart;
-            if ((llen == 2) && ((strncmp("\r\n\r\n", buf+len-4, 4)) == 0)) {
+            if ((llen == 2) && (strncmp("\r\n", line, 2) == 0)) {
                 if (key1 && key2) {
                     if ((n = rfbReadExact(cl, buf+len, 8)) <= 0) {
                         if ((n < 0) && (errno == ETIMEDOUT)) {
@@ -176,32 +176,30 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                 break;
             } else if ((llen >= 16) && ((strncmp("GET ", line, min(llen,4))) == 0)) {
                 /* 16 = 4 ("GET ") + 1 ("/.*") + 11 (" HTTP/1.1\r\n") */
-                /* rfbLog("Got path\n"); */
                 path = line+4;
                 buf[len-11] = '\0'; /* Trim trailing " HTTP/1.1\r\n" */
-                if (strstr(path, "b64encode")) {
-                    rfbLog("  - using base64 encoding\n");
-                    cl->webSocketsBase64 = TRUE;
-                } else {
-                    rfbLog("  - using UTF-8 encoding\n");
-                    cl->webSocketsBase64 = FALSE;
-                }
-            } else if ((strncmp("Host: ", line, min(llen,6))) == 0) {
-                /* rfbLog("Got host\n"); */
+                cl->webSocketsBase64 = TRUE;
+                /* rfbLog("Got path: %s\n", path); */
+            } else if ((strncasecmp("host: ", line, min(llen,6))) == 0) {
                 host = line+6;
                 buf[len-2] = '\0';
-            } else if ((strncmp("Origin: ", line, min(llen,8))) == 0) {
-                /* rfbLog("Got origin\n"); */
+                /* rfbLog("Got host: %s\n", host); */
+            } else if ((strncasecmp("origin: ", line, min(llen,8))) == 0) {
                 origin = line+8;
                 buf[len-2] = '\0';
-            } else if ((strncmp("Sec-Websocket-Key1: ", line, min(llen,20))) == 0) {
-                /* rfbLog("Got key1\n"); */
+                /* rfbLog("Got origin: %s\n", origin); */
+            } else if ((strncasecmp("sec-websocket-key1: ", line, min(llen,20))) == 0) {
                 key1 = line+20;
                 buf[len-2] = '\0';
-            } else if ((strncmp("Sec-Websocket-Key2: ", line, min(llen,20))) == 0) {
-                /* rfbLog("Got key2\n"); */
+                /* rfbLog("Got key1: %s\n", key1); */
+            } else if ((strncasecmp("sec-websocket-key2: ", line, min(llen,20))) == 0) {
                 key2 = line+20;
                 buf[len-2] = '\0';
+                /* rfbLog("Got key2: %s\n", key2); */
+            } else if ((strncasecmp("sec-websocket-protocol: ", line, min(llen,24))) == 0) {
+                protocol = line+24;
+                buf[len-2] = '\0';
+                /* rfbLog("Got protocol: %s\n", protocol); */
             }
             linestart = len;
         }
@@ -213,6 +211,15 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         free(buf);
         return FALSE;
     }
+
+    /*
+    if ((!protocol) || (!strcasestr(protocol, "base64"))) {
+        rfbErr("webSocketsHandshake: base64 subprotocol not supported by client\n");
+        free(response);
+        free(buf);
+        return FALSE;
+    }
+    */
 
     /*
      * Generate the WebSockets server response based on the the headers sent
@@ -231,7 +238,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
 
     snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
              WEBSOCKETS_HANDSHAKE_RESPONSE, prefix, origin, prefix, scheme,
-             host, path, prefix, trailer);
+             host, path, prefix, protocol, trailer);
 
     if (rfbWriteExact(cl, response, strlen(response)) < 0) {
         rfbErr("webSocketsHandshake: failed sending WebSockets response\n");
