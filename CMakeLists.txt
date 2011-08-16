@@ -206,14 +206,12 @@ target_link_libraries(vncclient
                       ${ADDITIONAL_LIBS}
                       ${ZLIB_LIBRARIES}
                       ${JPEG_LIBRARIES}
-                      ${SDL_LIBRARY}
 )
 target_link_libraries(vncserver
                       ${ADDITIONAL_LIBS}
                       ${ZLIB_LIBRARIES}
                       ${JPEG_LIBRARIES}
 		      ${PNG_LIBRARIES}
-                      ${SDL_LIBRARY}
 		      ${WEBSOCKET_LIBRARIES}
 )
 
