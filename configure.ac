@@ -54,6 +54,99 @@ AM_CONDITIONAL(HAVE_MP3LAME, test "$HAVE_MP3LAME" = "true")
 # before it seemed to be inside the with_jpeg conditional. 
 AC_CHECK_HEADER(thenonexistentheader.h, HAVE_THENONEXISTENTHEADER_H="true")
 
+# set some ld -R nonsense
+#
+uname_s=`(uname -s) 2>/dev/null`
+ld_minus_R="yes"
+if test "x$uname_s" = "xHP-UX"; then
+	ld_minus_R="no"
+elif test "x$uname_s" = "xOSF1"; then
+	ld_minus_R="no"
+elif test "x$uname_s" = "xDarwin"; then
+	ld_minus_R="no"
+fi
+
+# Check for OpenSSL
+
+AH_TEMPLATE(HAVE_LIBCRYPT, [libcrypt library present])
+AC_ARG_WITH(crypt,
+[  --without-crypt         disable support for libcrypt],,)
+if test "x$with_crypt" != "xno"; then
+	AC_CHECK_FUNCS([crypt], HAVE_LIBC_CRYPT="true")
+	if test -z "$HAVE_LIBC_CRYPT"; then
+		AC_CHECK_LIB(crypt, crypt,
+			CRYPT_LIBS="-lcrypt"
+			[AC_DEFINE(HAVE_LIBCRYPT)], ,)
+	fi
+fi
+AC_SUBST(CRYPT_LIBS)
+
+# some OS's need both -lssl and -lcrypto on link line:
+AH_TEMPLATE(HAVE_LIBCRYPTO, [openssl libcrypto library present])
+AC_ARG_WITH(crypto,
+[  --without-crypto        disable support for openssl libcrypto],,)
+
+AH_TEMPLATE(HAVE_LIBSSL, [openssl libssl library present])
+AC_ARG_WITH(ssl,
+[  --without-ssl           disable support for openssl libssl]
+[  --with-ssl=DIR          use openssl include/library files in DIR],,)
+
+if test "x$with_crypto" != "xno" -a "x$with_ssl" != "xno"; then
+	if test ! -z "$with_ssl" -a "x$with_ssl" != "xyes"; then
+		saved_CPPFLAGS="$CPPFLAGS"
+		saved_LDFLAGS="$LDFLAGS"
+		CPPFLAGS="$CPPFLAGS -I$with_ssl/include"
+		LDFLAGS="$LDFLAGS -L$with_ssl/lib"
+		if test "x$ld_minus_R" = "xno"; then
+			:
+		elif test "x$GCC" = "xyes"; then
+			LDFLAGS="$LDFLAGS -Xlinker -R$with_ssl/lib"
+		else
+			LDFLAGS="$LDFLAGS -R$with_ssl/lib"
+		fi
+	fi
+	AC_CHECK_LIB(crypto, RAND_file_name,
+		[AC_DEFINE(HAVE_LIBCRYPTO) HAVE_LIBCRYPTO="true"], ,)
+	if test ! -z "$with_ssl" -a "x$with_ssl" != "xyes"; then
+		if test "x$HAVE_LIBCRYPTO" != "xtrue"; then
+			CPPFLAGS="$saved_CPPFLAGS"
+			LDFLAGS="$saved_LDFLAGS"
+		fi
+	fi
+fi
+
+AH_TEMPLATE(HAVE_X509_PRINT_EX_FP, [open ssl X509_print_ex_fp available])
+if test "x$with_ssl" != "xno"; then
+	if test "x$HAVE_LIBCRYPTO" = "xtrue"; then
+		AC_CHECK_LIB(ssl, SSL_library_init,
+			SSL_LIBS="-lssl -lcrypto"
+			[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,
+			-lcrypto)
+	else
+		AC_CHECK_LIB(ssl, SSL_library_init,
+			SSL_LIBS="-lssl"
+			[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,)
+	fi
+fi
+AC_SUBST(SSL_LIBS)
+
+	if test "x$HAVE_LIBSSL" != "xtrue" -a "x$with_ssl" != "xno"; then
+		AC_MSG_WARN([
+==========================================================================
+*** The openssl encryption library libssl.so was not found. ***
+An x11vnc built this way will not support SSL encryption.  To enable
+SSL install the necessary development packages (perhaps it is named
+something like libssl-dev) and run configure again.
+==========================================================================
+])
+		sleep 5
+	elif test "x$with_ssl" != "xno"; then
+		AC_CHECK_LIB(ssl, X509_print_ex_fp,
+			[AC_DEFINE(HAVE_X509_PRINT_EX_FP) HAVE_X509_PRINT_EX_FP="true"], , $SSL_LIBS
+			)
+	fi
+AM_CONDITIONAL(HAVE_LIBSSL, test "x$with_crypto" != "xno" -a "x$with_ssl" != "xno")
+
 # Checks for X libraries
 HAVE_X11="false"
 AC_PATH_XTRA
@@ -295,98 +388,6 @@ configure again.
 ])
 	sleep 5
 fi
-
-# set some ld -R nonsense
-#
-uname_s=`(uname -s) 2>/dev/null`
-ld_minus_R="yes"
-if test "x$uname_s" = "xHP-UX"; then
-	ld_minus_R="no"
-elif test "x$uname_s" = "xOSF1"; then
-	ld_minus_R="no"
-elif test "x$uname_s" = "xDarwin"; then
-	ld_minus_R="no"
-fi
-
-
-
-AH_TEMPLATE(HAVE_LIBCRYPT, [libcrypt library present])
-AC_ARG_WITH(crypt,
-[  --without-crypt         disable support for libcrypt],,)
-if test "x$with_crypt" != "xno"; then
-	AC_CHECK_FUNCS([crypt], HAVE_LIBC_CRYPT="true")
-	if test -z "$HAVE_LIBC_CRYPT"; then
-		AC_CHECK_LIB(crypt, crypt,
-			CRYPT_LIBS="-lcrypt"
-			[AC_DEFINE(HAVE_LIBCRYPT)], ,)
-	fi
-fi
-AC_SUBST(CRYPT_LIBS)
-
-# some OS's need both -lssl and -lcrypto on link line:
-AH_TEMPLATE(HAVE_LIBCRYPTO, [openssl libcrypto library present])
-AC_ARG_WITH(crypto,
-[  --without-crypto        disable support for openssl libcrypto],,)
-
-AH_TEMPLATE(HAVE_LIBSSL, [openssl libssl library present])
-AC_ARG_WITH(ssl,
-[  --without-ssl           disable support for openssl libssl]
-[  --with-ssl=DIR          use openssl include/library files in DIR],,)
-
-if test "x$with_crypto" != "xno" -a "x$with_ssl" != "xno"; then
-	if test ! -z "$with_ssl" -a "x$with_ssl" != "xyes"; then
-		saved_CPPFLAGS="$CPPFLAGS"
-		saved_LDFLAGS="$LDFLAGS"
-		CPPFLAGS="$CPPFLAGS -I$with_ssl/include"
-		LDFLAGS="$LDFLAGS -L$with_ssl/lib"
-		if test "x$ld_minus_R" = "xno"; then
-			:
-		elif test "x$GCC" = "xyes"; then
-			LDFLAGS="$LDFLAGS -Xlinker -R$with_ssl/lib"
-		else
-			LDFLAGS="$LDFLAGS -R$with_ssl/lib"
-		fi
-	fi
-	AC_CHECK_LIB(crypto, RAND_file_name,
-		[AC_DEFINE(HAVE_LIBCRYPTO) HAVE_LIBCRYPTO="true"], ,)
-	if test ! -z "$with_ssl" -a "x$with_ssl" != "xyes"; then
-		if test "x$HAVE_LIBCRYPTO" != "xtrue"; then
-			CPPFLAGS="$saved_CPPFLAGS"
-			LDFLAGS="$saved_LDFLAGS"
-		fi
-	fi
-fi
-
-AH_TEMPLATE(HAVE_X509_PRINT_EX_FP, [open ssl X509_print_ex_fp available])
-if test "x$with_ssl" != "xno"; then
-	if test "x$HAVE_LIBCRYPTO" = "xtrue"; then
-		AC_CHECK_LIB(ssl, SSL_library_init,
-			SSL_LIBS="-lssl -lcrypto"
-			[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,
-			-lcrypto)
-	else
-		AC_CHECK_LIB(ssl, SSL_library_init,
-			SSL_LIBS="-lssl"
-			[AC_DEFINE(HAVE_LIBSSL) HAVE_LIBSSL="true"], ,)
-	fi
-fi
-AC_SUBST(SSL_LIBS)
-
-	if test "x$HAVE_LIBSSL" != "xtrue" -a "x$with_ssl" != "xno"; then
-		AC_MSG_WARN([
-==========================================================================
-*** The openssl encryption library libssl.so was not found. ***
-An x11vnc built this way will not support SSL encryption.  To enable
-SSL install the necessary development packages (perhaps it is named
-something like libssl-dev) and run configure again.
-==========================================================================
-])
-		sleep 5
-	elif test "x$with_ssl" != "xno"; then
-		AC_CHECK_LIB(ssl, X509_print_ex_fp, 
-			[AC_DEFINE(HAVE_X509_PRINT_EX_FP) HAVE_X509_PRINT_EX_FP="true"], , $SSL_LIBS
-			)
-	fi
 
 if test "x$with_v4l" != "xno"; then
 	AC_CHECK_HEADER(linux/videodev.h,
@@ -720,7 +721,7 @@ if test "x$HAVE_B64" != "xtrue"; then
 	with_websockets=""
 fi
 if test "x$with_websockets" = "xyes"; then
-	LIBS="$LIBS -lresolv"
+	LIBS="$LIBS -lresolv $SSL_LIBS"
 	AC_DEFINE(WITH_WEBSOCKETS)
 fi
 AM_CONDITIONAL(WITH_WEBSOCKETS, test "$with_websockets" = "yes")
