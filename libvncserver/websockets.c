@@ -773,13 +773,14 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
       rfbErr("%s: read; %m", __func__);
       return ret;
     } else if (ret < total) {
-      /* TODO: hmm? */
+      /* GT TODO: hmm? */
       rfbLog("%s: read; got partial data\n", __func__);
     } else {
       buf[ret] = '\0';
     }
 
     /* process 1 frame */
+    /* GT TODO: improve it with 32 bit operations */
     for (i = 0; i < flength; i++) {
 	j = i % 4;
 	payload[i] ^= mask.c[j];
@@ -808,7 +809,7 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
 	result = flength;
 	break;
       default:
-	rfbErr("unhandled opcode %d, b0: %02x, b1: %02x\n", (int)opcode, header->b0, header->b1);
+	rfbErr("%s: unhandled opcode %d, b0: %02x, b1: %02x\n", __func__, (int)opcode, header->b0, header->b1);
     }
 
     /* single point of return, if someone has questions :-) */
@@ -893,8 +894,8 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 }
 
 
-/* returns TRUE if client sent an close frame or a single end of marker
- * was received, FALSE otherwise
+/* returns TRUE if client sent a close frame or a single 'end of frame'
+ * marker was received, FALSE otherwise
  *
  * Note: This is a Hixie-only hack!
  **/
