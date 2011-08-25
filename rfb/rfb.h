@@ -419,6 +419,7 @@ typedef struct _rfbStatList {
 } rfbStatList;
 
 typedef struct _rfbSslCtx rfbSslCtx;
+typedef struct _wsCtx wsCtx;
 
 typedef struct _rfbClientRec {
 
@@ -640,17 +641,10 @@ typedef struct _rfbClientRec {
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
     rfbBool webSockets;
-    rfbBool webSocketsSSL;
     rfbBool webSocketsBase64;
-
     rfbSslCtx *sslctx;
-
+    wsCtx     *wsctx;
     char *wspath;                          /* Requests path component */
-    char encodeBuf[UPDATE_BUF_SIZE*2 + 2]; /* UTF-8 could double it + framing */
-    char decodeBuf[8192];                  /* TODO: what makes sense? */
-    int dblen;
-    char carryBuf[3];                      /* For base64 carry-over */
-    int carrylen;
 #endif
 } rfbClientRec, *rfbClientPtr;
 
@@ -718,7 +712,7 @@ extern rfbBool rfbSetNonBlocking(int sock);
 /* websockets.c */
 
 extern rfbBool webSocketsCheck(rfbClientPtr cl);
-extern int webSocketsEncode(rfbClientPtr cl, const char *src, int len);
+extern int webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst);
 extern int webSocketsDecode(rfbClientPtr cl, char *dst, int len);
 #endif
 

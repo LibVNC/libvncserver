@@ -647,11 +647,12 @@ rfbWriteExact(rfbClientPtr cl,
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
     if (cl->webSockets) {
-        if ((len = webSocketsEncode(cl, buf, len)) < 0) {
+        char *tmp = NULL;
+        if ((len = webSocketsEncode(cl, buf, len, &tmp)) < 0) {
             rfbErr("WriteExact: WebSockets encode error\n");
             return -1;
         }
-        buf = cl->encodeBuf;
+        buf = tmp;
     }
 #endif
 

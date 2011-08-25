@@ -365,8 +365,6 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
       cl->webSockets       = FALSE;
       cl->webSocketsBase64 = FALSE;
-      cl->dblen= 0;
-      cl->carrylen = 0;
 #endif
 
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
