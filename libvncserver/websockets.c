@@ -163,6 +163,21 @@ min (int a, int b) {
 }
 
 #ifdef LIBVNCSERVER_WITH_CLIENT_GCRYPT
+#include <gcrypt.h>
+#ifndef SHA_DIGEST_LENGTH
+#define SHA_DIGEST_LENGTH 20
+#endif
+static void webSocketsGenSha1Key(char *target, int size, char *key)
+{
+    gcry_md_hd_t c;
+    unsigned char tmp[SHA_DIGEST_LENGTH];
+    gcry_md_open(&c, GCRY_MD_SHA1, 0);
+    gcry_md_write(c, key, strlen(key));
+    gcry_md_write(c, GUID, sizeof(GUID) - 1);
+    gcry_md_final(c);
+    if (-1 == __b64_ntop(gcry_md_read(c, 0), SHA_DIGEST_LENGTH, target, size))
+	rfbErr("b64_ntop failed\n");
+}
 #else
 #include <openssl/sha.h>
 
