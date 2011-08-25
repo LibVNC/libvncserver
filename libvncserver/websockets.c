@@ -388,7 +388,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         free(buf);
         return FALSE;
     }
-    rfbLog("webSocketsHandshake: %s\n", response);
+    /* rfbLog("webSocketsHandshake: %s\n", response); */
     free(response);
     free(buf);
 
