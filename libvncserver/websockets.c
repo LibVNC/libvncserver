@@ -63,6 +63,9 @@ static int gettid() {
     return (int)syscall(SYS_gettid);
 }
 
+typedef int (*wsEncodeFunc)(rfbClientPtr cl, const char *src, int len, char **dst);
+typedef int (*wsDecodeFunc)(rfbClientPtr cl, char *dst, int len);
+
 typedef struct ws_ctx_s {
     char encodeBuf[B64LEN(UPDATE_BUF_SIZE) + WSHLENMAX]; /* base64 + maximum frame header length */
     char decodeBuf[8192];                  /* TODO: what makes sense? */
@@ -74,6 +77,8 @@ typedef struct ws_ctx_s {
     int carrylen;
     int version;
     int base64;
+    wsEncodeFunc encode;
+    wsDecodeFunc decode;
 } ws_ctx_t;
 
 typedef union ws_mask_s {
@@ -146,6 +151,11 @@ struct timeval
 
 static rfbBool webSocketsHandshake(rfbClientPtr cl, char *scheme);
 void webSocketsGenMd5(char * target, char *key1, char *key2, char *key3);
+
+static int webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst);
+static int webSocketsEncodeHixie(rfbClientPtr cl, const char *src, int len, char **dst);
+static int webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len);
+static int webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len);
 
 static int
 min (int a, int b) {
@@ -234,6 +244,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     char *sec_ws_origin = NULL;
     char *sec_ws_key = NULL;
     char sec_ws_version = 0;
+    ws_ctx_t *wsctx = NULL;
 
     buf = (char *) malloc(WEBSOCKETS_MAX_HANDSHAKE_LEN);
     if (!buf) {
@@ -380,9 +391,20 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     rfbLog("webSocketsHandshake: %s\n", response);
     free(response);
     free(buf);
-    cl->wsctx = (wsCtx *)calloc(1, sizeof(ws_ctx_t));
-    ((ws_ctx_t *)cl->wsctx)->version = sec_ws_version ? WEBSOCKETS_VERSION_HYBI : WEBSOCKETS_VERSION_HIXIE;
-    ((ws_ctx_t *)cl->wsctx)->base64 = base64;
+
+
+    wsctx = calloc(1, sizeof(ws_ctx_t));
+    if (sec_ws_version) {
+	wsctx->version = WEBSOCKETS_VERSION_HYBI;
+	wsctx->encode = webSocketsEncodeHybi;
+	wsctx->decode = webSocketsDecodeHybi;
+    } else {
+	wsctx->version = WEBSOCKETS_VERSION_HIXIE;
+	wsctx->encode = webSocketsEncodeHixie;
+	wsctx->decode = webSocketsDecodeHixie;
+    }
+    wsctx->base64 = base64;
+    cl->wsctx = (wsCtx *)wsctx;
     return TRUE;
 }
 
@@ -432,7 +454,7 @@ webSocketsGenMd5(char * target, char *key1, char *key2, char *key3)
     return;
 }
 
-int
+static int
 webSocketsEncodeHixie(rfbClientPtr cl, const char *src, int len, char **dst)
 {
     int i, sz = 0;
@@ -499,7 +521,7 @@ ws_peek(rfbClientPtr cl, char *buf, int len)
     return n;
 }
 
-int
+static int
 webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len)
 {
     int retlen = 0, n, i, avail, modlen, needlen, actual;
@@ -650,7 +672,7 @@ webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len)
     return retlen;
 }
 
-int
+static int
 webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
 {
     char *buf, *payload, *rbuf;
@@ -780,7 +802,7 @@ spor:
     return result;
 }
 
-int
+static int
 webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
 {
     int blen, ret = -1, sz = 0;
@@ -846,22 +868,15 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
 int
 webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst)
 {
-    ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
-    if (wsctx->version == WEBSOCKETS_VERSION_HIXIE)
-	return webSocketsEncodeHixie(cl, src, len, dst);
-    else
-	return webSocketsEncodeHybi(cl, src, len, dst);
+    return ((ws_ctx_t *)cl->wsctx)->encode(cl, src, len, dst);
 }
 
 int
 webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 {
-    ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
-    if (wsctx->version == WEBSOCKETS_VERSION_HIXIE)
-	return webSocketsDecodeHixie(cl, dst, len);
-    else
-	return webSocketsDecodeHybi(cl, dst, len);
+    return ((ws_ctx_t *)cl->wsctx)->decode(cl, dst, len);
 }
+
 
 /* returns TRUE if client sent an close frame or a single end of marker
  * was received, FALSE otherwise
