@@ -467,7 +467,7 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 
     while (len > 0) {
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-        if (cl->webSockets) {
+        if (cl->wsctx) {
             n = webSocketsDecode(cl, buf, len);
         } else if (cl->sslctx) {
 	    n = rfbssl_read(cl, buf, len);
@@ -646,7 +646,7 @@ rfbWriteExact(rfbClientPtr cl,
 #endif
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-    if (cl->webSockets) {
+    if (cl->wsctx) {
         char *tmp = NULL;
         if ((len = webSocketsEncode(cl, buf, len, &tmp)) < 0) {
             rfbErr("WriteExact: WebSockets encode error\n");

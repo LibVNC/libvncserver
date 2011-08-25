@@ -362,11 +362,6 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       rfbScreen->clientHead = cl;
       UNLOCK(rfbClientListMutex);
 
-#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-      cl->webSockets       = FALSE;
-      cl->webSocketsBase64 = FALSE;
-#endif
-
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
       cl->tightQualityLevel = -1;
 #if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
@@ -1841,66 +1836,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     char encBuf2[64];
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-    if (cl->webSockets) {
-	if (cl->sslctx)
-	    n = rfbssl_peek(cl, encBuf, 4);
-	else
-	    n = recv(cl->sock, encBuf, 4, MSG_PEEK);
-
-	if (n <= 0) {
-	    if (n != 0)
-		rfbLogPerror("rfbProcessClientNormalMessage: peek");
-	    rfbCloseClient(cl);
-	    return;
-	}
-
-	if (cl->webSocketsBase64) {
-            /* With Base64 encoding we need at least 4 bytes */
-            if ((n > 0) && (n < 4)) {
-                if (encBuf[0] == '\xff') {
-		    int doclose = 0;
-                    /* Make sure we don't miss a client disconnect on an end frame
-                     * marker. Because we use a peek buffer in some cases it is not
-		     * applicable to wait for more data per select(). */
-		    switch (n) {
-			case 3:
-			    if (encBuf[1] == '\xff' && encBuf[2] == '\x00')
-				doclose = 1;
-			    break;
-			case 2:
-			    if (encBuf[1] == '\x00')
-				doclose = 1;
-			    break;
-			default:
-			    ;
-		    }
-
-		    if (cl->sslctx)
-			n = rfbssl_read(cl, encBuf, n);
-		    else
-			n = read(cl->sock, encBuf, n);
-
-		    if (doclose) {
-			rfbErr("rfbProcessClientNormalMessage: websocket close frame received\n");
-			rfbCloseClient(cl);
-		    }
-		    return;
-                }
-            }
-        } else {
-            /* With UTF-8 encoding we need at least 3 bytes (framing + 1) */
-            if ((n == 1) || (n == 2)) {
-                if (encBuf[0] == '\xff') {
-                    /* Make sure we don't miss a client disconnect on an end frame
-                    * marker */
-		    if (cl->sslctx)
-			    n = rfbssl_read(cl, encBuf, 1);
-		    else
-			    n = read(cl->sock, encBuf, 1);
-                }
-            }
-        }
-    }
+    if (cl->wsctx && webSocketCheckDisconnect(cl))
+      return;
 #endif
 
     if ((n = rfbReadExact(cl, (char *)&msg, 1)) <= 0) {

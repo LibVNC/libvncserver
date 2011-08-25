@@ -640,8 +640,6 @@ typedef struct _rfbClientRec {
 #endif
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-    rfbBool webSockets;
-    rfbBool webSocketsBase64;
     rfbSslCtx *sslctx;
     wsCtx     *wsctx;
     char *wspath;                          /* Requests path component */
@@ -712,6 +710,7 @@ extern rfbBool rfbSetNonBlocking(int sock);
 /* websockets.c */
 
 extern rfbBool webSocketsCheck(rfbClientPtr cl);
+extern rfbBool webSocketCheckDisconnect(rfbClientPtr cl);
 extern int webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst);
 extern int webSocketsDecode(rfbClientPtr cl, char *dst, int len);
 #endif

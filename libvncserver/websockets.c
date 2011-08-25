@@ -73,6 +73,7 @@ typedef struct ws_ctx_s {
     char carryBuf[3];                      /* For base64 carry-over */
     int carrylen;
     int version;
+    int base64;
 } ws_ctx_t;
 
 typedef union ws_mask_s {
@@ -218,7 +219,7 @@ webSocketsCheck (rfbClientPtr cl)
     if (!webSocketsHandshake(cl, scheme)) {
         return FALSE;
     }
-    cl->webSockets    = TRUE;   /* Start WebSockets framing */
+    /* Start WebSockets framing */
     return TRUE;
 }
 
@@ -226,7 +227,7 @@ static rfbBool
 webSocketsHandshake(rfbClientPtr cl, char *scheme)
 {
     char *buf, *response, *line;
-    int n, linestart = 0, len = 0, llen;
+    int n, linestart = 0, len = 0, llen, base64 = 0;
     char prefix[5], trailer[17];
     char *path = NULL, *host = NULL, *origin = NULL, *protocol = NULL;
     char *key1 = NULL, *key2 = NULL, *key3 = NULL;
@@ -286,7 +287,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                 /* 16 = 4 ("GET ") + 1 ("/.*") + 11 (" HTTP/1.1\r\n") */
                 path = line+4;
                 buf[len-11] = '\0'; /* Trim trailing " HTTP/1.1\r\n" */
-                cl->webSocketsBase64 = TRUE;
+                base64 = TRUE;
                 cl->wspath = strdup(path);
                 /* rfbLog("Got path: %s\n", path); */
             } else if ((strncasecmp("host: ", line, min(llen,6))) == 0) {
@@ -381,6 +382,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     free(buf);
     cl->wsctx = (wsCtx *)calloc(1, sizeof(ws_ctx_t));
     ((ws_ctx_t *)cl->wsctx)->version = sec_ws_version ? WEBSOCKETS_VERSION_HYBI : WEBSOCKETS_VERSION_HIXIE;
+    ((ws_ctx_t *)cl->wsctx)->base64 = base64;
     return TRUE;
 }
 
@@ -438,7 +440,7 @@ webSocketsEncodeHixie(rfbClientPtr cl, const char *src, int len, char **dst)
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
 
     wsctx->encodeBuf[sz++] = '\x00';
-    if (cl->webSocketsBase64) {
+    if (wsctx->base64) {
         len = __b64_ntop((unsigned char *)src, len, wsctx->encodeBuf+sz, sizeof(wsctx->encodeBuf) - (sz + 1));
         if (len < 0) {
             return len;
@@ -489,7 +491,10 @@ ws_peek(rfbClientPtr cl, char *buf, int len)
     if (cl->sslctx) {
 	n = rfbssl_peek(cl, buf, len);
     } else {
-	n = recv(cl->sock, buf, len, MSG_PEEK);
+	while (-1 == (n = recv(cl->sock, buf, len, MSG_PEEK))) {
+	    if (errno != EAGAIN)
+		break;
+	}
     }
     return n;
 }
@@ -507,12 +512,12 @@ webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len)
     n = ws_peek(cl, buf, len*2+2);
 
     if (n <= 0) {
-        rfbErr("%s: peek of %d\n", __func__, n);
+        rfbErr("%s: peek (%d) %m\n", __func__, errno);
         return n;
     }
 
 
-    if (cl->webSocketsBase64) {
+    if (wsctx->base64) {
         /* Base64 encoded WebSockets stream */
 
         if (buf[0] == '\xff') {
@@ -799,7 +804,7 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
 
     header = (ws_header_t *)wsctx->encodeBuf;
 
-    if (cl->webSocketsBase64) {
+    if (wsctx->base64) {
 	opcode = WS_OPCODE_TEXT_FRAME;
 	/* calculate the resulting size */
 	blen = B64LEN(len);
@@ -821,7 +826,7 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
       sz = 10;
     }
 
-    if (cl->webSocketsBase64) {
+    if (wsctx->base64) {
         if (-1 == (ret = __b64_ntop((unsigned char *)src, len, wsctx->encodeBuf + sz, sizeof(wsctx->encodeBuf) - sz))) {
 	  rfbErr("%s: Base 64 encode failed\n", __func__);
 	} else {
@@ -857,3 +862,64 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
     else
 	return webSocketsDecodeHybi(cl, dst, len);
 }
+
+/* returns TRUE if client sent an close frame or a single end of marker
+ * was received, FALSE otherwise
+ *
+ * Note: This is a Hixie-only hack!
+ **/
+rfbBool
+webSocketCheckDisconnect(rfbClientPtr cl)
+{
+    ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
+    /* With Base64 encoding we need at least 4 bytes */
+    char peekbuf[4];
+    int n;
+
+    if (wsctx->version == WEBSOCKETS_VERSION_HYBI)
+	return FALSE;
+
+    if (cl->sslctx)
+	n = rfbssl_peek(cl, peekbuf, 4);
+    else
+	n = recv(cl->sock, peekbuf, 4, MSG_PEEK);
+
+    if (n <= 0) {
+	if (n != 0)
+	    rfbErr("%s: peek; %m", __func__);
+	rfbCloseClient(cl);
+	return TRUE;
+    }
+
+    if (peekbuf[0] == '\xff') {
+	int doclose = 0;
+	/* Make sure we don't miss a client disconnect on an end frame
+	 * marker. Because we use a peek buffer in some cases it is not
+	 * applicable to wait for more data per select(). */
+	switch (n) {
+	    case 3:
+		if (peekbuf[1] == '\xff' && peekbuf[2] == '\x00')
+		    doclose = 1;
+		break;
+	    case 2:
+		if (peekbuf[1] == '\x00')
+		    doclose = 1;
+		break;
+	    default:
+		;
+	}
+
+	if (cl->sslctx)
+	    n = rfbssl_read(cl, peekbuf, n);
+	else
+	    n = read(cl->sock, peekbuf, n);
+
+	if (doclose) {
+	    rfbErr("%s: websocket close frame received\n", __func__);
+	    rfbCloseClient(cl);
+	}
+	return TRUE;
+    }
+    return FALSE;
+}
+
