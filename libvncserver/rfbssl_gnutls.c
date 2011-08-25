@@ -60,7 +60,7 @@ static int rfbssl_init_session(struct rfbssl_ctx *ctx, int fd)
       /* */
     } else {
       gnutls_session_enable_compatibility_mode(session);
-      gnutls_transport_set_ptr(session, (gnutls_transport_ptr_t)fd);
+      gnutls_transport_set_ptr(session, (gnutls_transport_ptr_t)(uintptr_t)fd);
       ctx->session = session;
     }
     return ret;
