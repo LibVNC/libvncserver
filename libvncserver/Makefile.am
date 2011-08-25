@@ -24,7 +24,7 @@ WEBSOCKETSSSLSRCS = rfbssl_none.c
 #endif
 endif
 
-WEBSOCKETSSRCS = websockets.c ../common/md5.c $(WEBSOCKETSSSLSRCS)
+WEBSOCKETSSRCS = websockets.c ../common/md5.c ../common/sha1.c $(WEBSOCKETSSSLSRCS)
 endif
 
 includedir=$(prefix)/include/rfb
