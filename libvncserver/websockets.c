@@ -626,11 +626,12 @@ static int
 webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
 {
     char *buf, *payload;
+    uint32_t *payload32;
     int ret = -1, result = -1;
     int total = 0;
     ws_mask_t mask;
     ws_header_t *header;
-    int i, j;
+    int i;
     unsigned char opcode;
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
     int flength, fin, fhlen;
@@ -714,10 +715,14 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
       buf[ret] = '\0';
     }
 
-    /* process 1 frame */
-    for (i = 0; i < flength; i++) {
-	j = i % 4;
-	payload[i] ^= mask.c[j];
+    /* process 1 frame (32 bit op) */
+    payload32 = (uint32_t *)payload;
+    for (i = 0; i < flength / 4; i++) {
+	payload32[i] ^= mask.u;
+    }
+    /* process the remaining bytes (if any) */
+    for (i*=4; i < flength; i++) {
+	payload[i] ^= mask.c[i % 4];
     }
 
     switch (opcode) {
