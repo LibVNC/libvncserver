@@ -31,8 +31,10 @@
 /* errno */
 #include <errno.h>
 
-#include <md5.h>
 #include <byteswap.h>
+#include <string.h>
+#include "md5.h"
+#include "sha1.h"
 #include "rfbconfig.h"
 #include "rfbssl.h"
 
@@ -58,10 +60,12 @@ enum {
   WEBSOCKETS_VERSION_HYBI
 };
 
+#if 0
 #include <sys/syscall.h>
 static int gettid() {
     return (int)syscall(SYS_gettid);
 }
+#endif
 
 typedef int (*wsEncodeFunc)(rfbClientPtr cl, const char *src, int len, char **dst);
 typedef int (*wsDecodeFunc)(rfbClientPtr cl, char *dst, int len);
@@ -162,38 +166,35 @@ min (int a, int b) {
     return a < b ? a : b;
 }
 
-#ifdef LIBVNCSERVER_WITH_CLIENT_GCRYPT
-#include <gcrypt.h>
-#ifndef SHA_DIGEST_LENGTH
-#define SHA_DIGEST_LENGTH 20
-#endif
-static void webSocketsGenSha1Key(char *target, int size, char *key)
+void
+webSocketsGenSha1Key(char * target, int size, char *key)
 {
-    gcry_md_hd_t c;
-    unsigned char tmp[SHA_DIGEST_LENGTH];
-    gcry_md_open(&c, GCRY_MD_SHA1, 0);
-    gcry_md_write(c, key, strlen(key));
-    gcry_md_write(c, GUID, sizeof(GUID) - 1);
-    gcry_md_final(c);
-    if (-1 == __b64_ntop(gcry_md_read(c, 0), SHA_DIGEST_LENGTH, target, size))
-	rfbErr("b64_ntop failed\n");
-}
-#else
-#include <openssl/sha.h>
+    int len;
+    SHA1Context sha;
+    uint8_t digest[SHA1HashSize];
+    
+    if (size < B64LEN(SHA1HashSize) + 1) {
+        rfbErr("webSocketsGenSha1Key: not enough space in target\n");
+        target[0] = '\0';
+        return;
+    }
 
-static void webSocketsGenSha1Key(char *target, int size, char *key)
-{
-    SHA_CTX c;
-    unsigned char tmp[SHA_DIGEST_LENGTH];
+    SHA1Reset(&sha);
+    SHA1Input(&sha, (unsigned char *)key, strlen(key));
+    SHA1Input(&sha, (unsigned char *)GUID, strlen(GUID));
+    SHA1Result(&sha, digest);
 
-    SHA1_Init(&c);
-    SHA1_Update(&c, key, strlen(key));
-    SHA1_Update(&c, GUID, sizeof(GUID) - 1);
-    SHA1_Final(tmp, &c);
-    if (-1 == __b64_ntop(tmp, SHA_DIGEST_LENGTH, target, size))
-	rfbErr("b64_ntop failed\n");
+    len = __b64_ntop((unsigned char *)digest, SHA1HashSize, target, size);
+    if (len < size - 1) {
+        rfbErr("webSocketsGenSha1Key: b64_ntop failed\n");
+        target[0] = '\0';
+        return;
+    }
+
+    target[len] = '\0';
+    return;
 }
-#endif
+
 
 /*
  * rfbWebSocketsHandshake is called to handle new WebSockets connections
@@ -252,7 +253,7 @@ static rfbBool
 webSocketsHandshake(rfbClientPtr cl, char *scheme)
 {
     char *buf, *response, *line;
-    int n, linestart = 0, len = 0, llen, base64 = 0;
+    int n, linestart = 0, len = 0, llen, base64 = TRUE;
     char prefix[5], trailer[17];
     char *path = NULL, *host = NULL, *origin = NULL, *protocol = NULL;
     char *key1 = NULL, *key2 = NULL, *key3 = NULL;
@@ -283,6 +284,8 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                 rfbLog("webSocketsHandshake: client gone\n");
             else
                 rfbLogPerror("webSocketsHandshake: read");
+            free(response);
+            free(buf);
             return FALSE;
         }
 
@@ -300,6 +303,8 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                             rfbLog("webSocketsHandshake: client gone\n");
                         else
                             rfbLogPerror("webSocketsHandshake: read");
+                        free(response);
+                        free(buf);
                         return FALSE;
                     }
                     rfbLog("Got key3\n");
@@ -313,7 +318,6 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                 /* 16 = 4 ("GET ") + 1 ("/.*") + 11 (" HTTP/1.1\r\n") */
                 path = line+4;
                 buf[len-11] = '\0'; /* Trim trailing " HTTP/1.1\r\n" */
-                base64 = TRUE;
                 cl->wspath = strdup(path);
                 /* rfbLog("Got path: %s\n", path); */
             } else if ((strncasecmp("host: ", line, min(llen,6))) == 0) {
@@ -360,14 +364,25 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         return FALSE;
     }
 
-    /*
-    if ((!protocol) || (!strcasestr(protocol, "base64"))) {
-        rfbErr("webSocketsHandshake: base64 subprotocol not supported by client\n");
-        free(response);
-        free(buf);
-        return FALSE;
+    if ((protocol) && (strstr(protocol, "binary"))) {
+        if (! sec_ws_version) {
+            rfbErr("webSocketsHandshake: 'binary' protocol not supported with Hixie\n");
+            free(response);
+            free(buf);
+            return FALSE;
+        }
+        rfbLog("  - webSocketsHandshake: using binary/raw encoding\n");
+        base64 = FALSE;
+        protocol = "binary";
+    } else {
+        rfbLog("  - webSocketsHandshake: using base64 encoding\n");
+        base64 = TRUE;
+        if ((protocol) && (strstr(protocol, "base64"))) {
+            protocol = "base64";
+        } else {
+            protocol = "";
+        }
     }
-    */
 
     /*
      * Generate the WebSockets server response based on the the headers sent
@@ -375,7 +390,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
      */
 
     if (sec_ws_version) {
-	char accept[SHA_DIGEST_LENGTH * 3];
+	char accept[B64LEN(SHA1HashSize) + 1];
 	rfbLog("  - WebSockets client version hybi-%02d\n", sec_ws_version);
 	webSocketsGenSha1Key(accept, sizeof(accept), sec_ws_key);
 	len = snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
@@ -472,38 +487,16 @@ webSocketsGenMd5(char * target, char *key1, char *key2, char *key3)
 static int
 webSocketsEncodeHixie(rfbClientPtr cl, const char *src, int len, char **dst)
 {
-    int i, sz = 0;
-    unsigned char chr;
+    int sz = 0;
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
 
     wsctx->encodeBuf[sz++] = '\x00';
-    if (wsctx->base64) {
-        len = __b64_ntop((unsigned char *)src, len, wsctx->encodeBuf+sz, sizeof(wsctx->encodeBuf) - (sz + 1));
-        if (len < 0) {
-            return len;
-        }
-        sz += len;
-    } else {
-        for (i=0; i < len; i++) {
-            chr = src[i];
-            if (chr < 128) {
-                if (chr == 0x00) {
-                    wsctx->encodeBuf[sz++] = '\xc4';
-                    wsctx->encodeBuf[sz++] = '\x80';
-                } else {
-                    wsctx->encodeBuf[sz++] = chr;
-                }
-            } else {
-                if (chr < 192) {
-                    wsctx->encodeBuf[sz++] = '\xc2';
-                    wsctx->encodeBuf[sz++] = chr;
-                } else {
-                    wsctx->encodeBuf[sz++] = '\xc3';
-                    wsctx->encodeBuf[sz++] = chr - 64;
-                }
-            }
-        }
+    len = __b64_ntop((unsigned char *)src, len, wsctx->encodeBuf+sz, sizeof(wsctx->encodeBuf) - (sz + 1));
+    if (len < 0) {
+        return len;
     }
+    sz += len;
+
     wsctx->encodeBuf[sz++] = '\xff';
     *dst = wsctx->encodeBuf;
     return sz;
@@ -539,9 +532,8 @@ ws_peek(rfbClientPtr cl, char *buf, int len)
 static int
 webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len)
 {
-    int retlen = 0, n, i, avail, modlen, needlen, actual;
+    int retlen = 0, n, i, avail, modlen, needlen;
     char *buf, *end = NULL;
-    unsigned char chr, chr2;
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
 
     buf = wsctx->decodeBuf;
@@ -554,133 +546,75 @@ webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len)
     }
 
 
-    if (wsctx->base64) {
-        /* Base64 encoded WebSockets stream */
+    /* Base64 encoded WebSockets stream */
 
-        if (buf[0] == '\xff') {
-            i = ws_read(cl, buf, 1); /* Consume marker */
-            buf++;
-            n--;
-        }
-        if (n == 0) {
-            errno = EAGAIN;
-            return -1;
-        }
-        if (buf[0] == '\x00') {
-            i = ws_read(cl, buf, 1); /* Consume marker */
-            buf++;
-            n--;
-        }
-        if (n == 0) {
-            errno = EAGAIN;
-            return -1;
-        }
+    if (buf[0] == '\xff') {
+        i = ws_read(cl, buf, 1); /* Consume marker */
+        buf++;
+        n--;
+    }
+    if (n == 0) {
+        errno = EAGAIN;
+        return -1;
+    }
+    if (buf[0] == '\x00') {
+        i = ws_read(cl, buf, 1); /* Consume marker */
+        buf++;
+        n--;
+    }
+    if (n == 0) {
+        errno = EAGAIN;
+        return -1;
+    }
 
-        /* end = memchr(buf, '\xff', len*2+2); */
-        end = memchr(buf, '\xff', n);
-        if (!end) {
-            end = buf + n;
-        }
-        avail = end - buf;
+    /* end = memchr(buf, '\xff', len*2+2); */
+    end = memchr(buf, '\xff', n);
+    if (!end) {
+        end = buf + n;
+    }
+    avail = end - buf;
 
-        len -= wsctx->carrylen;
+    len -= wsctx->carrylen;
 
-        /* Determine how much base64 data we need */
-        modlen = len + (len+2)/3;
-        needlen = modlen;
-        if (needlen % 4) {
-            needlen += 4 - (needlen % 4);
-        }
+    /* Determine how much base64 data we need */
+    modlen = len + (len+2)/3;
+    needlen = modlen;
+    if (needlen % 4) {
+        needlen += 4 - (needlen % 4);
+    }
 
-        if (needlen > avail) {
-            /* rfbLog("Waiting for more base64 data\n"); */
-            errno = EAGAIN;
-            return -1;
-        }
+    if (needlen > avail) {
+        /* rfbLog("Waiting for more base64 data\n"); */
+        errno = EAGAIN;
+        return -1;
+    }
 
-        /* Any carryover from previous decode */
-        for (i=0; i < wsctx->carrylen; i++) {
-	    /* rfbLog("Adding carryover %d\n", wsctx->carryBuf[i]); */
-            dst[i] = wsctx->carryBuf[i];
-            retlen += 1;
-        }
+    /* Any carryover from previous decode */
+    for (i=0; i < wsctx->carrylen; i++) {
+        /* rfbLog("Adding carryover %d\n", wsctx->carryBuf[i]); */
+        dst[i] = wsctx->carryBuf[i];
+        retlen += 1;
+    }
 
-        /* Decode the rest of what we need */
-        buf[needlen] = '\x00';  /* Replace end marker with end of string */
-        /* rfbLog("buf: %s\n", buf); */
-        n = __b64_pton(buf, (unsigned char *)dst+retlen, 2+len);
-        if (n < len) {
-            rfbErr("Base64 decode error\n");
-            errno = EIO;
-            return -1;
-        }
-        retlen += n;
+    /* Decode the rest of what we need */
+    buf[needlen] = '\x00';  /* Replace end marker with end of string */
+    /* rfbLog("buf: %s\n", buf); */
+    n = __b64_pton(buf, (unsigned char *)dst+retlen, 2+len);
+    if (n < len) {
+        rfbErr("Base64 decode error\n");
+        errno = EIO;
+        return -1;
+    }
+    retlen += n;
 
-        /* Consume the data from socket */
-        i = ws_read(cl, buf, needlen);
+    /* Consume the data from socket */
+    i = ws_read(cl, buf, needlen);
 
-        wsctx->carrylen = n - len;
-        retlen -= wsctx->carrylen;
-        for (i=0; i < wsctx->carrylen; i++) {
-            /* rfbLog("Saving carryover %d\n", dst[retlen + i]); */
-            wsctx->carryBuf[i] = dst[retlen + i];
-        }
-    } else {
-        /* UTF-8 encoded WebSockets stream */
-
-        actual = 0;
-        for (needlen = 0; needlen < n && actual < len; needlen++) {
-            chr = buf[needlen];
-            if ((chr > 0) && (chr < 128)) {
-                actual++;
-            } else if ((chr > 127) && (chr < 255)) {
-                if (needlen + 1 >= n) {
-                    break;
-                }
-                needlen++;
-                actual++;
-            }
-        }
-
-        if (actual < len) {
-            errno = EAGAIN;
-            return -1;
-        }
-
-        /* Consume what we need */
-        if ((n = ws_read(cl, buf, needlen)) < needlen) {
-            return n;
-        }
-
-        while (retlen < len) {
-            chr = buf[0];
-            buf += 1;
-            if (chr == 0) {
-                /* Begin frame marker, just skip it */
-            } else if (chr == 255) {
-                /* Begin frame marker, just skip it */
-	    } else if (chr < 128) {
-                dst[retlen++] = chr;
-            } else {
-                chr2 = buf[0];
-                buf += 1;
-                switch (chr) {
-                case (unsigned char) '\xc2':
-                    dst[retlen++] = chr2;
-                    break;
-                case (unsigned char) '\xc3':
-                    dst[retlen++] = chr2 + 64;
-                    break;
-                case (unsigned char) '\xc4':
-                    dst[retlen++] = 0;
-                    break;
-                default:
-                    rfbErr("Invalid UTF-8 encoding\n");
-                    errno = EIO;
-                    return -1;
-                }
-            }
-        }
+    wsctx->carrylen = n - len;
+    retlen -= wsctx->carrylen;
+    for (i=0; i < wsctx->carrylen; i++) {
+        /* rfbLog("Saving carryover %d\n", dst[retlen + i]); */
+        wsctx->carryBuf[i] = dst[retlen + i];
     }
 
     /* rfbLog("<< webSocketsDecode, retlen: %d\n", retlen); */
@@ -690,15 +624,16 @@ webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len)
 static int
 webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
 {
-    char *buf, *payload, *rbuf;
+    char *buf, *payload;
+    uint32_t *payload32;
     int ret = -1, result = -1;
     int total = 0;
     ws_mask_t mask;
     ws_header_t *header;
-    int i, j;
+    int i;
     unsigned char opcode;
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
-    int flength, fin, fhlen, blen;
+    int flength, fin, fhlen;
 
     // rfbLog(" <== %s[%d]: %d cl: %p, wsctx: %p-%p (%d)\n", __func__, gettid(), len, cl, wsctx, (char *)wsctx + sizeof(ws_ctx_t), sizeof(ws_ctx_t));
 
@@ -779,11 +714,14 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
       buf[ret] = '\0';
     }
 
-    /* process 1 frame */
-    /* GT TODO: improve it with 32 bit operations */
-    for (i = 0; i < flength; i++) {
-	j = i % 4;
-	payload[i] ^= mask.c[j];
+    /* process 1 frame (32 bit op) */
+    payload32 = (uint32_t *)payload;
+    for (i = 0; i < flength / 4; i++) {
+	payload32[i] ^= mask.u;
+    }
+    /* process the remaining bytes (if any) */
+    for (i*=4; i < flength; i++) {
+	payload[i] ^= mask.c[i % 4];
     }
 
     switch (opcode) {
@@ -937,7 +875,7 @@ webSocketCheckDisconnect(rfbClientPtr cl)
 		    doclose = 1;
 		break;
 	    default:
-		;
+		return FALSE;
 	}
 
 	if (cl->sslctx)

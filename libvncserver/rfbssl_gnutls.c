@@ -190,11 +190,8 @@ int rfbssl_write(rfbClientPtr cl, const char *buf, int bufsize)
     return ret;
 }
 
-int rfbssl_peek(rfbClientPtr cl, char *buf, int bufsize)
+static void rfbssl_gc_peekbuf(struct rfbssl_ctx *ctx, int bufsize)
 {
-    int ret = -1;
-    struct rfbssl_ctx *ctx = (struct rfbssl_ctx *)cl->sslctx;
-
     if (ctx->peekstart) {
 	int spaceleft = sizeof(ctx->peekbuf) - ctx->peeklen - ctx->peekstart;
 	if (spaceleft < bufsize) {
@@ -202,44 +199,40 @@ int rfbssl_peek(rfbClientPtr cl, char *buf, int bufsize)
 	    ctx->peekstart = 0;
 	}
     }
+}
 
-    /* If we have any peek data, simply return that. */
+static int __rfbssl_read(rfbClientPtr cl, char *buf, int bufsize, int peek)
+{
+    int ret = 0;
+    struct rfbssl_ctx *ctx = (struct rfbssl_ctx *)cl->sslctx;
+
+    rfbssl_gc_peekbuf(ctx, bufsize);
+
     if (ctx->peeklen) {
-	if (bufsize > ctx->peeklen) {
-	    /* more than we have, so we are trying to read the remaining
-	     * bytes
-	    **/
-	    int required = bufsize - ctx->peeklen;
-	    int total = ctx->peekstart + ctx->peeklen;
-	    int n, avail = sizeof(ctx->peekbuf) - total;
-
-	    if (required > avail)
-		required = avail;
-
-	    if (!required) {
-	      rfbErr("%s: no space left\n", __func__);
-	    } else if ((n = rfbssl_do_read(cl, ctx->peekbuf + total, required)) < 0) {
-	      rfbErr("%s: read error\n", __func__);
-	      return n;
-	    } else {
-		ctx->peeklen += n;
-	    }
-	    ret = ctx->peeklen;
-	} else {
-	    /* simply return what we have */
-	    ret = bufsize;
+	/* If we have any peek data, simply return that. */
+	ret = bufsize < ctx->peeklen ? bufsize : ctx->peeklen;
+	memcpy (buf, ctx->peekbuf + ctx->peekstart, ret);
+	if (!peek) {
+	    ctx->peeklen -= ret;
+	    if (ctx->peeklen != 0)
+		ctx->peekstart += ret;
+	    else
+		ctx->peekstart = 0;
 	}
-    } else {
-	ret = bufsize;
-	if (ret > sizeof(ctx->peekbuf))
-	    ret = sizeof(ctx->peekbuf);
-
-	if ((ret = rfbssl_do_read(cl, ctx->peekbuf, ret)) > 0)
-	    ctx->peeklen = ret;
     }
 
-    if (ret >= 0) {
-	memcpy(buf, ctx->peekbuf + ctx->peekstart, ret);
+    if (ret < bufsize) {
+	int n;
+	/* read the remaining data */
+	if ((n = rfbssl_do_read(cl, buf + ret, bufsize - ret)) <= 0) {
+	    rfbErr("rfbssl_%s: %s error\n", __func__, peek ? "peek" : "read");
+	    return n;
+	}
+	if (peek) {
+	    memcpy(ctx->peekbuf + ctx->peekstart + ctx->peeklen, buf + ret, n);
+	    ctx->peeklen += n;
+	}
+	ret += n;
     }
 
     return ret;
@@ -247,23 +240,12 @@ int rfbssl_peek(rfbClientPtr cl, char *buf, int bufsize)
 
 int rfbssl_read(rfbClientPtr cl, char *buf, int bufsize)
 {
-    int ret;
-    struct rfbssl_ctx *ctx = (struct rfbssl_ctx *)cl->sslctx;
+    return __rfbssl_read(cl, buf, bufsize, 0);
+}
 
-    if (ctx->peeklen) {
-	/* If we have any peek data, simply return that. */
-	ret = bufsize < ctx->peeklen ? bufsize : ctx->peeklen;
-	memcpy (buf, ctx->peekbuf + ctx->peekstart, ret);
-	ctx->peeklen -= ret;
-	if (ctx->peeklen != 0)
-	    ctx->peekstart += ret;
-	else
-	    ctx->peekstart = 0;
-    } else {
-	ret = rfbssl_do_read(cl, buf, bufsize);
-    }
-
-    return ret;
+int rfbssl_peek(rfbClientPtr cl, char *buf, int bufsize)
+{
+    return __rfbssl_read(cl, buf, bufsize, 1);
 }
 
 int rfbssl_pending(rfbClientPtr cl)
