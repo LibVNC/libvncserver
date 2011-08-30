@@ -876,7 +876,7 @@ webSocketCheckDisconnect(rfbClientPtr cl)
 		    doclose = 1;
 		break;
 	    default:
-		;
+		return FALSE;
 	}
 
 	if (cl->sslctx)
