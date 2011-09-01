@@ -71,8 +71,7 @@ typedef int (*wsEncodeFunc)(rfbClientPtr cl, const char *src, int len, char **ds
 typedef int (*wsDecodeFunc)(rfbClientPtr cl, char *dst, int len);
 
 typedef struct ws_ctx_s {
-    char encodeBuf[B64LEN(UPDATE_BUF_SIZE) + WSHLENMAX]; /* base64 + maximum frame header length */
-    char decodeBuf[8192];                  /* TODO: what makes sense? */
+    char codeBuf[B64LEN(UPDATE_BUF_SIZE) + WSHLENMAX]; /* base64 + maximum frame header length */
     char readbuf[8192];
     int readbufstart;
     int readbuflen;
@@ -172,7 +171,7 @@ webSocketsGenSha1Key(char * target, int size, char *key)
     int len;
     SHA1Context sha;
     uint8_t digest[SHA1HashSize];
-    
+
     if (size < B64LEN(SHA1HashSize) + 1) {
         rfbErr("webSocketsGenSha1Key: not enough space in target\n");
         target[0] = '\0';
@@ -490,15 +489,15 @@ webSocketsEncodeHixie(rfbClientPtr cl, const char *src, int len, char **dst)
     int sz = 0;
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
 
-    wsctx->encodeBuf[sz++] = '\x00';
-    len = __b64_ntop((unsigned char *)src, len, wsctx->encodeBuf+sz, sizeof(wsctx->encodeBuf) - (sz + 1));
+    wsctx->codeBuf[sz++] = '\x00';
+    len = __b64_ntop((unsigned char *)src, len, wsctx->codeBuf+sz, sizeof(wsctx->codeBuf) - (sz + 1));
     if (len < 0) {
         return len;
     }
     sz += len;
 
-    wsctx->encodeBuf[sz++] = '\xff';
-    *dst = wsctx->encodeBuf;
+    wsctx->codeBuf[sz++] = '\xff';
+    *dst = wsctx->codeBuf;
     return sz;
 }
 
@@ -536,7 +535,7 @@ webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len)
     char *buf, *end = NULL;
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
 
-    buf = wsctx->decodeBuf;
+    buf = wsctx->codeBuf;
 
     n = ws_peek(cl, buf, len*2+2);
 
@@ -653,8 +652,8 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
       goto spor;
     }
 
-    buf = wsctx->decodeBuf;
-    header = (ws_header_t *)wsctx->decodeBuf;
+    buf = wsctx->codeBuf;
+    header = (ws_header_t *)wsctx->codeBuf;
 
     if (-1 == (ret = ws_peek(cl, buf, B64LEN(len) + WSHLENMAX))) {
       rfbErr("%s: peek; %m\n", __func__);
@@ -730,11 +729,11 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
 	errno = ECONNRESET;
 	break;
       case WS_OPCODE_TEXT_FRAME:
-	if (-1 == (flength = __b64_pton(payload, (unsigned char *)wsctx->decodeBuf, sizeof(wsctx->decodeBuf)))) {
+	if (-1 == (flength = __b64_pton(payload, (unsigned char *)wsctx->codeBuf, sizeof(wsctx->codeBuf)))) {
 	  rfbErr("%s: Base64 decode error; %m\n", __func__);
 	  break;
 	}
-	payload = wsctx->decodeBuf;
+	payload = wsctx->codeBuf;
 	/* fall through */
       case WS_OPCODE_BINARY_FRAME:
 	if (flength > len) {
@@ -778,7 +777,7 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
 	  return 0;
     }
 
-    header = (ws_header_t *)wsctx->encodeBuf;
+    header = (ws_header_t *)wsctx->codeBuf;
 
     if (wsctx->base64) {
 	opcode = WS_OPCODE_TEXT_FRAME;
@@ -803,7 +802,7 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
     }
 
     if (wsctx->base64) {
-        if (-1 == (ret = __b64_ntop((unsigned char *)src, len, wsctx->encodeBuf + sz, sizeof(wsctx->encodeBuf) - sz))) {
+        if (-1 == (ret = __b64_ntop((unsigned char *)src, len, wsctx->codeBuf + sz, sizeof(wsctx->codeBuf) - sz))) {
 	  rfbErr("%s: Base 64 encode failed\n", __func__);
 	} else {
 	  if (ret != blen)
@@ -811,11 +810,11 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
 	  ret += sz;
 	}
     } else {
-      memcpy(wsctx->encodeBuf + sz, src, len);
+      memcpy(wsctx->codeBuf + sz, src, len);
       ret =  sz + len;
     }
 
-    *dst = wsctx->encodeBuf;
+    *dst = wsctx->codeBuf;
     return ret;
 }
 
