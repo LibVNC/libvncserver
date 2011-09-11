@@ -17,11 +17,11 @@ if WITH_WEBSOCKETS
 if HAVE_LIBSSL
 WEBSOCKETSSSLSRCS = rfbssl_openssl.c
 else
-#if HAVE_GNUTLS
-#WEBSOCKETSSSLSRCS = rfbssl_gnutls.c
-#else
+if HAVE_GNUTLS
+WEBSOCKETSSSLSRCS = rfbssl_gnutls.c
+else
 WEBSOCKETSSSLSRCS = rfbssl_none.c
-#endif
+endif
 endif
 
 WEBSOCKETSSRCS = websockets.c ../common/md5.c ../common/sha1.c $(WEBSOCKETSSSLSRCS)
