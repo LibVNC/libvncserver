@@ -32,7 +32,8 @@ Alberto Lusiani, Malvina Mazin, Dave Stuart, Rohit Kumar, Donald Dugger,
 Steven Carr, Uwe Völker, Charles Coffing, Guillaume Rousse,
 Alessandro Praduroux, Brad Hards, Timo Ketola, Christian Ehrlicher,
 Noriaki Yamazaki, Ben Klopfenstein, Vic Lee, Christian Beier,
-Alexander Dorokhine, Corentin Chary, Wouter Van Meir and George Kiagiadakis.
+Alexander Dorokhine, Corentin Chary, Wouter Van Meir, George Kiagiadakis,
+Joel Martin and Gernot Tenchio.
 
 Probably I forgot quite a few people sending a patch here and there, which
 really made a difference. Without those, some obscure bugs still would
