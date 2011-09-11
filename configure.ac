@@ -146,7 +146,7 @@ something like libssl-dev) and run configure again.
 			[AC_DEFINE(HAVE_X509_PRINT_EX_FP) HAVE_X509_PRINT_EX_FP="true"], , $SSL_LIBS
 			)
 	fi
-AM_CONDITIONAL(HAVE_LIBSSL, test "x$with_crypto" != "xno" -a "x$with_ssl" != "xno")
+AM_CONDITIONAL(HAVE_LIBSSL, test ! -z "$SSL_LIBS")
 
 # Checks for X libraries
 HAVE_X11="false"
@@ -796,6 +796,7 @@ if test "x$with_gnutls" != "xno"; then
 		AC_DEFINE(WITH_CLIENT_TLS)
 	fi
 fi
+AM_CONDITIONAL(HAVE_GNUTLS, test ! -z "$GNUTLS_LIBS")
 
 # IPv6
 AH_TEMPLATE(IPv6, [Enable IPv6 support])
