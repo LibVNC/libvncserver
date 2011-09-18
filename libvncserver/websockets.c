@@ -33,10 +33,9 @@
 
 #include <byteswap.h>
 #include <string.h>
-#include "md5.h"
-#include "sha1.h"
 #include "rfbconfig.h"
 #include "rfbssl.h"
+#include "rfbcrypto.h"
 
 #if defined(__BYTE_ORDER) && defined(__BIG_ENDIAN) && __BYTE_ORDER == __BIG_ENDIAN
 #define WS_NTOH64(n) (n)
@@ -165,35 +164,19 @@ min (int a, int b) {
     return a < b ? a : b;
 }
 
-void
-webSocketsGenSha1Key(char * target, int size, char *key)
+static void webSocketsGenSha1Key(char *target, int size, char *key)
 {
-    int len;
-    SHA1Context sha;
-    uint8_t digest[SHA1HashSize];
+    struct iovec iov[2];
+    unsigned char hash[20];
 
-    if (size < B64LEN(SHA1HashSize) + 1) {
-        rfbErr("webSocketsGenSha1Key: not enough space in target\n");
-        target[0] = '\0';
-        return;
-    }
-
-    SHA1Reset(&sha);
-    SHA1Input(&sha, (unsigned char *)key, strlen(key));
-    SHA1Input(&sha, (unsigned char *)GUID, strlen(GUID));
-    SHA1Result(&sha, digest);
-
-    len = __b64_ntop((unsigned char *)digest, SHA1HashSize, target, size);
-    if (len < size - 1) {
-        rfbErr("webSocketsGenSha1Key: b64_ntop failed\n");
-        target[0] = '\0';
-        return;
-    }
-
-    target[len] = '\0';
-    return;
+    iov[0].iov_base = key;
+    iov[0].iov_len = strlen(key);
+    iov[1].iov_base = GUID;
+    iov[1].iov_len = sizeof(GUID) - 1;
+    digestsha1(iov, 2, hash);
+    if (-1 == __b64_ntop(hash, sizeof(hash), target, size))
+	rfbErr("b64_ntop failed\n");
 }
-
 
 /*
  * rfbWebSocketsHandshake is called to handle new WebSockets connections
@@ -389,7 +372,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
      */
 
     if (sec_ws_version) {
-	char accept[B64LEN(SHA1HashSize) + 1];
+	char accept[B64LEN(SHA1_HASH_SIZE) + 1];
 	rfbLog("  - WebSockets client version hybi-%02d\n", sec_ws_version);
 	webSocketsGenSha1Key(accept, sizeof(accept), sec_ws_key);
 	len = snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
@@ -436,13 +419,15 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     cl->wsctx = (wsCtx *)wsctx;
     return TRUE;
 }
-
+ 
 void
 webSocketsGenMd5(char * target, char *key1, char *key2, char *key3)
 {
     unsigned int i, spaces1 = 0, spaces2 = 0;
     unsigned long num1 = 0, num2 = 0;
     unsigned char buf[17];
+    struct iovec iov[1];
+
     for (i=0; i < strlen(key1); i++) {
         if (key1[i] == ' ') {
             spaces1 += 1;
@@ -477,7 +462,9 @@ webSocketsGenMd5(char * target, char *key1, char *key2, char *key3)
     strncpy((char *)buf+8, key3, 8);
     buf[16] = '\0';
 
-    md5_buffer((char *)buf, 16, target);
+    iov[0].iov_base = buf;
+    iov[0].iov_len = 16;
+    digestmd5(iov, 1, target);
     target[16] = '\0';
 
     return;
