@@ -11,7 +11,7 @@ void digestmd5(const struct iovec *iov, int iovcnt, void *dest)
     md5_starts(&c);
     for (i = 0; i < iovcnt; i++)
 	md5_update(&c, iov[i].iov_base, iov[i].iov_len);
-    md5_finish(dest, &c);
+    md5_finish(&c, dest);
 }
 
 void digestsha1(const struct iovec *iov, int iovcnt, void *dest)
@@ -22,5 +22,5 @@ void digestsha1(const struct iovec *iov, int iovcnt, void *dest)
     sha1_starts(&c);
     for (i = 0; i < iovcnt; i++)
 	sha1_update(&c, iov[i].iov_base, iov[i].iov_len);
-    sha1_finish(dest, &c);
+    sha1_finish(&c, dest);
 }
