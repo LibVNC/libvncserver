@@ -15,16 +15,18 @@ endif
 if WITH_WEBSOCKETS
 
 if HAVE_LIBSSL
-WEBSOCKETSSSLSRCS = rfbssl_openssl.c
+WEBSOCKETSSSLSRCS = rfbssl_openssl.c rfbcrypto_openssl.c
+WEBSOCKETSSSLLIBS = @SSL_LIBS@ @CRYPT_LIBS@
 else
 if HAVE_GNUTLS
-WEBSOCKETSSSLSRCS = rfbssl_gnutls.c
+WEBSOCKETSSSLSRCS = rfbssl_gnutls.c rfbcrypto_gnutls.c
+WEBSOCKETSSSLLIBS = @GNUTLS_LIBS@
 else
-WEBSOCKETSSSLSRCS = rfbssl_none.c
+WEBSOCKETSSSLSRCS = rfbssl_none.c rfbcrypto_included.c ../common/md5.c ../common/sha1.c
 endif
 endif
 
-WEBSOCKETSSRCS = websockets.c ../common/md5.c ../common/sha1.c $(WEBSOCKETSSSLSRCS)
+WEBSOCKETSSRCS = websockets.c $(WEBSOCKETSSSLSRCS)
 endif
 
 includedir=$(prefix)/include/rfb
@@ -59,7 +61,7 @@ LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c $(WEBSOCKETSSRCS) \
 	$(ZLIBSRCS) $(TIGHTSRCS) $(TIGHTVNCFILETRANSFERSRCS)
 
 libvncserver_la_SOURCES=$(LIB_SRCS)
-libvncserver_la_LIBADD=@SSL_LIBS@ @CRYPT_LIBS@
+libvncserver_la_LIBADD=$(WEBSOCKETSSSLLIBS)
 
 lib_LTLIBRARIES=libvncserver.la
 

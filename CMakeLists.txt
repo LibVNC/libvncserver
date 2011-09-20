@@ -217,6 +217,10 @@ target_link_libraries(vncserver
 		      ${WEBSOCKET_LIBRARIES}
 )
 
+SET_TARGET_PROPERTIES(vncclient vncserver
+    PROPERTIES SOVERSION "0.0.0"
+)
+
 # tests
 set(LIBVNCSERVER_TESTS
     backchannel
