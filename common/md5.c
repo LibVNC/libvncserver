@@ -28,7 +28,7 @@
 
 #include "md5.h"
 
-#ifdef _LIBC
+/* #ifdef _LIBC */
 # include <endian.h>
 # if __BYTE_ORDER == __BIG_ENDIAN
 #  define WORDS_BIGENDIAN 1
@@ -42,7 +42,7 @@
 # define md5_read_ctx __md5_read_ctx
 # define md5_stream __md5_stream
 # define md5_buffer __md5_buffer
-#endif
+/* #endif */
 
 #ifdef WORDS_BIGENDIAN
 # define SWAP(n)                                                        \
