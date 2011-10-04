@@ -346,12 +346,6 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	return;
     }
 
-    if (strchr(fname+1, '/') != NULL) {
-	rfbErr("httpd: asking for file in other directory\n");
-	rfbWriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
-	httpCloseSock(rfbScreen);
-	return;
-    }
 
     getpeername(rfbScreen->httpSock, (struct sockaddr *)&addr, &addrlen);
     rfbLog("httpd: get '%s' for %s\n", fname+1,
@@ -446,6 +440,10 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
 		    sprintf(str, "%d", rfbScreen->port);
 		    rfbWriteExact(&cl, str, strlen(str));
+
+		} else if (compareAndSkip(&ptr, "$HOST")) {
+
+		    rfbWriteExact(&cl, rfbScreen->thisHost, strlen(rfbScreen->thisHost));
 
 		} else if (compareAndSkip(&ptr, "$DESKTOP")) {
 

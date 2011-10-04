@@ -13,6 +13,12 @@ $USER's $DESKTOP desktop ($DISPLAY)
 <param name=PORT value=$PORT>
 <param name="Open New Window" value=yes>
 </APPLET>
-<BR>
-<A href="http://www.tightvnc.com/">www.TightVNC.com</A>
+<br/>
+<br/>
+If the above Java applet does not work, you can also try the new JavaScript-only <a href="http://novnc.com"<noVNC</a> viewer. You will need a HTML5-capable browser though.
+<a href="novnc/vnc_auto.html?host=$HOST&port=$PORT&true_color=1">Click here to connect using noVNC.</a>
+<br/>
+<br/>
+<br/>
+<A href="http://libvncserver.sf.net/">LibVNCServer/libVNCClient Homepage</A>
 </HTML>
