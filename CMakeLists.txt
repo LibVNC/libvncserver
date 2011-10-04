@@ -10,30 +10,50 @@ set(PACKAGE_NAME           "LibVNCServer")
 set(FULL_PACKAGE_NAME      "LibVNCServer")
 set(PACKAGE_VERSION        "0.9.8")
 set(PROJECT_BUGREPORT_PATH "http://sourceforge.net/projects/libvncserver")
+set(CMAKE_C_FLAGS "-O2 -W -Wall -g")
 
 include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/libvncserver ${CMAKE_SOURCE_DIR}/common)
 
 find_package(ZLIB)
 find_package(JPEG)
+find_package(PNG)
 find_package(SDL)
 find_package(GnuTLS)
 find_package(Threads)
 find_package(X11)
+find_package(OpenSSL)
 find_library(LIBGCRYPT_LIBRARIES gcrypt)
+
+set(CMAKE_REQUIRED_LIBRARIES resolv)
+check_function_exists(__b64_ntop HAVE_B64)
 
 if(Threads_FOUND)
   option(TIGHTVNC_FILETRANSFER "Enable filetransfer" ON)
 endif(Threads_FOUND)
+if (HAVE_B64)
+endif(HAVE_B64)
 if(ZLIB_FOUND)
   set(LIBVNCSERVER_HAVE_LIBZ 1)
 endif(ZLIB_FOUND)
 if(JPEG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBJPEG 1)
 endif(JPEG_FOUND)
+if(PNG_FOUND)
+  set(LIBVNCSERVER_HAVE_LIBPNG 1)
+endif(PNG_FOUND)
 option(LIBVNCSERVER_ALLOW24BPP "Allow 24 bpp" ON)
+
 if(GNUTLS_FOUND)
   set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
-endif(GNUTLS_FOUND)
+  option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (gnutls)" ON)
+  set(WEBSOCKET_LIBRARIES -lresolv ${GNUTLS_LIBRARIES})
+  set(WSSRCS rfbssl_gnutls)
+elseif(OPENSSL_FOUND)
+  option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (openssl)" ON)
+  set(WEBSOCKET_LIBRARIES -lresolv ${OPENSSL_LIBRARIES})
+  set(WSSRCS rfbssl_openssl)
+endif()
+
 if(LIBGCRYPT_LIBRARIES)
   message(STATUS "Found libgcrypt: ${LIBGCRYPT_LIBRARIES}")
   set(LIBVNCSERVER_WITH_CLIENT_GCRYPT 1)
@@ -142,11 +162,19 @@ endif(ZLIB_FOUND)
 if(JPEG_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBJPEG)
   include_directories(${JPEG_INCLUDE_DIR})
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
-    ${LIBVNCSERVER_DIR}/tight.c
-  )
+  set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c)
 endif(JPEG_FOUND)
+
+if(PNG_FOUND)
+  add_definitions(-DLIBVNCSERVER_HAVE_LIBPNG)
+  include_directories(${PNG_INCLUDE_DIR})
+  set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c)
+endif(PNG_FOUND)
+
+set(LIBVNCSERVER_SOURCES
+    ${LIBVNCSERVER_SOURCES}
+    ${TIGHT_C}
+)
 
 if(TIGHTVNC_FILETRANSFER)
   set(LIBVNCSERVER_SOURCES
@@ -158,6 +186,18 @@ if(TIGHTVNC_FILETRANSFER)
   )
 endif(TIGHTVNC_FILETRANSFER)
 
+if(LIBVNCSERVER_WITH_WEBSOCKETS)
+  add_definitions(-DLIBVNCSERVER_WITH_WEBSOCKETS)
+  set(LIBVNCSERVER_SOURCES
+    ${LIBVNCSERVER_SOURCES}
+    ${LIBVNCSERVER_DIR}/websockets.c
+    ${LIBVNCSERVER_DIR}/${WSSRCS}
+    ${COMMON_DIR}/md5.c
+    ${COMMON_DIR}/sha1.c
+  )
+endif(LIBVNCSERVER_WITH_WEBSOCKETS)
+
+
 add_library(vncclient SHARED ${LIBVNCCLIENT_SOURCES})
 add_library(vncserver SHARED ${LIBVNCSERVER_SOURCES})
 if(WIN32)
@@ -168,13 +208,17 @@ target_link_libraries(vncclient
                       ${ADDITIONAL_LIBS}
                       ${ZLIB_LIBRARIES}
                       ${JPEG_LIBRARIES}
-                      ${SDL_LIBRARY}
 )
 target_link_libraries(vncserver
                       ${ADDITIONAL_LIBS}
                       ${ZLIB_LIBRARIES}
                       ${JPEG_LIBRARIES}
-                      ${SDL_LIBRARY}
+		      ${PNG_LIBRARIES}
+		      ${WEBSOCKET_LIBRARIES}
+)
+
+SET_TARGET_PROPERTIES(vncclient vncserver
+    PROPERTIES SOVERSION "0.0.0"
 )
 
 # tests
