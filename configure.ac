@@ -68,7 +68,6 @@ elif test "x$uname_s" = "xDarwin"; then
 fi
 
 # Check for OpenSSL
-
 AH_TEMPLATE(HAVE_LIBCRYPT, [libcrypt library present])
 AC_ARG_WITH(crypt,
 [  --without-crypt         disable support for libcrypt],,)
@@ -130,22 +129,6 @@ if test "x$with_ssl" != "xno"; then
 	fi
 fi
 AC_SUBST(SSL_LIBS)
-
-	if test "x$HAVE_LIBSSL" != "xtrue" -a "x$with_ssl" != "xno"; then
-		AC_MSG_WARN([
-==========================================================================
-*** The openssl encryption library libssl.so was not found. ***
-An x11vnc built this way will not support SSL encryption.  To enable
-SSL install the necessary development packages (perhaps it is named
-something like libssl-dev) and run configure again.
-==========================================================================
-])
-		sleep 5
-	elif test "x$with_ssl" != "xno"; then
-		AC_CHECK_LIB(ssl, X509_print_ex_fp,
-			[AC_DEFINE(HAVE_X509_PRINT_EX_FP) HAVE_X509_PRINT_EX_FP="true"], , $SSL_LIBS
-			)
-	fi
 AM_CONDITIONAL(HAVE_LIBSSL, test ! -z "$SSL_LIBS")
 
 # Checks for X libraries
@@ -797,6 +780,20 @@ if test "x$with_gnutls" != "xno"; then
 	fi
 fi
 AM_CONDITIONAL(HAVE_GNUTLS, test ! -z "$GNUTLS_LIBS")
+
+# warn if neither GnuTLS nor OpenSSL are available
+if test -z "$SSL_LIBS" -a -z "$GNUTLS_LIBS"; then
+		AC_MSG_WARN([
+==========================================================================
+*** No encryption library could be found. ***
+A libvncserver/libvncclient built this way will not support SSL encryption.
+To enable SSL install the necessary development packages (perhaps it is named
+something like libssl-dev or gnutls-dev) and run configure again.
+==========================================================================
+])
+	sleep 5
+fi
+
 
 # IPv6
 AH_TEMPLATE(IPv6, [Enable IPv6 support])
