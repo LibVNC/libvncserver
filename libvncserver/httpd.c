@@ -59,20 +59,6 @@
 #include <tcpd.h>
 #endif
 
-#define connection_close
-#ifndef connection_close
-
-#define NOT_FOUND_STR "HTTP/1.0 404 Not found\r\n\r\n" \
-    "<HEAD><TITLE>File Not Found</TITLE></HEAD>\n" \
-    "<BODY><H1>File Not Found</H1></BODY>\n"
-
-#define INVALID_REQUEST_STR "HTTP/1.0 400 Invalid Request\r\n\r\n" \
-    "<HEAD><TITLE>Invalid Request</TITLE></HEAD>\n" \
-    "<BODY><H1>Invalid request</H1></BODY>\n"
-
-#define OK_STR "HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n"
-
-#else
 
 #define NOT_FOUND_STR "HTTP/1.0 404 Not found\r\nConnection: close\r\n\r\n" \
     "<HEAD><TITLE>File Not Found</TITLE></HEAD>\n" \
@@ -82,9 +68,10 @@
     "<HEAD><TITLE>Invalid Request</TITLE></HEAD>\n" \
     "<BODY><H1>Invalid request</H1></BODY>\n"
 
-#define OK_STR "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n"
+#define OK_STR "HTTP/1.0 200 OK\r\nConnection: close\r\n\r\n"
+#define OK_STR_HTML "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/html\r\n\r\n"
 
-#endif
+
 
 static void httpProcessInput(rfbScreenInfoPtr screen);
 static rfbBool compareAndSkip(char **ptr, const char *str);
@@ -386,7 +373,10 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
         return;
     }
 
-    rfbWriteExact(&cl, OK_STR, strlen(OK_STR));
+    if(performSubstitutions) /* is the 'index.vnc' file */
+      rfbWriteExact(&cl, OK_STR_HTML, strlen(OK_STR_HTML));
+    else
+      rfbWriteExact(&cl, OK_STR, strlen(OK_STR));
 
     while (1) {
 	int n = fread(buf, 1, BUF_SIZE-1, fd);
