@@ -674,14 +674,22 @@ typedef struct _rfbClientRec {
     MUTEX(sendMutex);
 #endif
 
-<<<<<<< HEAD
-    /* buffers to hold pixel data before and after encoding.
-       per-client for thread safety */
+  /* buffers to hold pixel data before and after encoding.
+     per-client for thread safety */
     char *beforeEncBuf;
     int beforeEncBufSize;
     char *afterEncBuf;
     int afterEncBufSize;
     int afterEncBufLen;
+#if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
+    uint32_t tightEncoding;  /* rfbEncodingTight or rfbEncodingTightPng */
+#endif
+
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+    rfbSslCtx *sslctx;
+    wsCtx     *wsctx;
+    char *wspath;                          /* Requests path component */
+#endif
 
     /* multicast stuff */
     rfbBool  enableMulticastVNC;      /* client supports multicast FramebufferUpdates messages */
@@ -701,24 +709,6 @@ typedef struct _rfbClientRec {
     void* multicastPartUpdRgnBuf;      /**< a ringbuffer holding partial update <-> region mappings.
 					this is allocated on the heap and shared by all clients
 					with the same pixelformat and encoding*/
-=======
-  /* buffers to hold pixel data before and after encoding.
-     per-client for thread safety */
-  char *beforeEncBuf;
-  int beforeEncBufSize;
-  char *afterEncBuf;
-  int afterEncBufSize;
-  int afterEncBufLen;
-#if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
-    uint32_t tightEncoding;  /* rfbEncodingTight or rfbEncodingTightPng */
-#endif
-
-#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-    rfbSslCtx *sslctx;
-    wsCtx     *wsctx;
-    char *wspath;                          /* Requests path component */
-#endif
->>>>>>> master
 } rfbClientRec, *rfbClientPtr;
 
 /**
