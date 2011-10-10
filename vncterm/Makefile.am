@@ -8,8 +8,10 @@ LDADD=../libvncserver/libvncserver.la @WSOCKLIB@
 
 if LINUX
 if ! MINGW
+if ! ANDROID
 bin_PROGRAMS=LinuxVNC
 LinuxVNC_SOURCES=LinuxVNC.c $(CONSOLE_SRCS)
+endif
 endif
 endif
 

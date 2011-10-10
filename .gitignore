@@ -39,7 +39,7 @@ client_examples/backchannel
 client_examples/ppmtest
 config.guess
 config.sub
-contrib/zippy
+examples/zippy
 examples/backchannel
 examples/blooptest
 examples/camera

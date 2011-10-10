@@ -18,6 +18,9 @@
 /* Define to 1 if you have the `jpeg' library (-ljpeg). */
 #cmakedefine LIBVNCSERVER_HAVE_LIBJPEG  1 
 
+/* Define if you have the `png' library (-lpng). */
+#cmakedefine LIBVNCSERVER_HAVE_LIBPNG  1
+
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #cmakedefine LIBVNCSERVER_HAVE_LIBPTHREAD  1 
 
@@ -59,6 +62,9 @@
 
 /* Define to 1 if GnuTLS is present */
 #cmakedefine LIBVNCSERVER_WITH_CLIENT_TLS 1
+
+/* Define to 1 to build with websockets */
+#cmakedefine LIBVNCSERVER_WITH_WEBSOCKETS 1
 
 /* Define to 1 if your processor stores words with the most significant byte
    first (like Motorola and SPARC, unlike Intel and VAX). */

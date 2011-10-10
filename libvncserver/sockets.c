@@ -62,6 +62,10 @@
 #include <unistd.h>
 #endif
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+#include "rfbssl.h"
+#endif
+
 #if defined(__linux__) && defined(NEED_TIMEVAL)
 struct timeval 
 {
@@ -339,8 +343,6 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     struct sockaddr_in addr;
     socklen_t addrlen = sizeof(addr);
     char buf[6];
-    const int one = 1;
-    int sock;
     rfbClientIteratorPtr i;
     rfbClientPtr cl;
     int result = 0;
@@ -381,37 +383,8 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
 
 	if (rfbScreen->listenSock != -1 && FD_ISSET(rfbScreen->listenSock, &fds)) {
 
-	    if ((sock = accept(rfbScreen->listenSock,
-			    (struct sockaddr *)&addr, &addrlen)) < 0) {
-		rfbLogPerror("rfbCheckFds: accept");
-		return -1;
-	    }
-
-            if(!rfbSetNonBlocking(sock)) {
-	        closesocket(sock);
-		return -1;
-	    }
-
-	    if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
-			(char *)&one, sizeof(one)) < 0) {
-		rfbLogPerror("rfbCheckFds: setsockopt");
-		closesocket(sock);
-		return -1;
-	    }
-
-#ifdef USE_LIBWRAP
-	    if(!hosts_ctl("vnc",STRING_UNKNOWN,inet_ntoa(addr.sin_addr),
-			STRING_UNKNOWN)) {
-		rfbLog("Rejected connection from client %s\n",
-			inet_ntoa(addr.sin_addr));
-		closesocket(sock);
-		return -1;
-	    }
-#endif
-
-	    rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
-
-	    rfbNewClient(rfbScreen,sock);
+	    if (!rfbProcessNewConnection(rfbScreen))
+                return -1;
 
 	    FD_CLR(rfbScreen->listenSock, &fds);
 	    if (--nfds == 0)
@@ -473,6 +446,49 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
     return result;
 }
 
+rfbBool
+rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
+{
+    const int one = 1;
+    int sock = -1;
+    struct sockaddr_in addr;
+    socklen_t addrlen = sizeof(addr);
+
+    if ((sock = accept(rfbScreen->listenSock,
+		       (struct sockaddr *)&addr, &addrlen)) < 0) {
+      rfbLogPerror("rfbCheckFds: accept");
+      return FALSE;
+    }
+
+    if(!rfbSetNonBlocking(sock)) {
+      closesocket(sock);
+      return FALSE;
+    }
+
+    if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+		   (char *)&one, sizeof(one)) < 0) {
+      rfbLogPerror("rfbCheckFds: setsockopt");
+      closesocket(sock);
+      return FALSE;
+    }
+
+#ifdef USE_LIBWRAP
+    if(!hosts_ctl("vnc",STRING_UNKNOWN,inet_ntoa(addr.sin_addr),
+		  STRING_UNKNOWN)) {
+      rfbLog("Rejected connection from client %s\n",
+	     inet_ntoa(addr.sin_addr));
+      closesocket(sock);
+      return FALSE;
+    }
+#endif
+
+    rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
+
+    rfbNewClient(rfbScreen,sock);
+
+    return TRUE;
+}
+
 
 void
 rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen)
@@ -501,6 +517,11 @@ rfbCloseClient(rfbClientPtr cl)
 	  while(cl->screen->maxFd>0
 		&& !FD_ISSET(cl->screen->maxFd,&(cl->screen->allFds)))
 	    cl->screen->maxFd--;
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	if (cl->sslctx)
+	    rfbssl_destroy(cl);
+	free(cl->wspath);
+#endif
 #ifndef __MINGW32__
 	shutdown(cl->sock,SHUT_RDWR);
 #endif
@@ -566,7 +587,17 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
     struct timeval tv;
 
     while (len > 0) {
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+        if (cl->wsctx) {
+            n = webSocketsDecode(cl, buf, len);
+        } else if (cl->sslctx) {
+	    n = rfbssl_read(cl, buf, len);
+	} else {
+            n = read(sock, buf, len);
+        }
+#else
         n = read(sock, buf, len);
+#endif
 
         if (n > 0) {
 
@@ -591,6 +622,12 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
                 return n;
             }
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	    if (cl->sslctx) {
+		if (rfbssl_pending(cl))
+		    continue;
+	    }
+#endif
             FD_ZERO(&fds);
             FD_SET(sock, &fds);
             tv.tv_sec = timeout / 1000;
@@ -601,6 +638,7 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
                 return n;
             }
             if (n == 0) {
+                rfbErr("ReadExact: select timeout\n");
                 errno = ETIMEDOUT;
                 return -1;
             }
@@ -624,6 +662,82 @@ int rfbReadExact(rfbClientPtr cl,char* buf,int len)
     return(rfbReadExactTimeout(cl,buf,len,cl->screen->maxClientWait));
   else
     return(rfbReadExactTimeout(cl,buf,len,rfbMaxClientWait));
+}
+
+/*
+ * PeekExact peeks at an exact number of bytes from a client.  Returns 1 if
+ * those bytes have been read, 0 if the other end has closed, or -1 if an
+ * error occurred (errno is set to ETIMEDOUT if it timed out).
+ */
+
+int
+rfbPeekExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
+{
+    int sock = cl->sock;
+    int n;
+    fd_set fds;
+    struct timeval tv;
+
+    while (len > 0) {
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	if (cl->sslctx)
+	    n = rfbssl_peek(cl, buf, len);
+	else
+#endif
+	    n = recv(sock, buf, len, MSG_PEEK);
+
+        if (n == len) {
+
+            break;
+
+        } else if (n == 0) {
+
+            return 0;
+
+        } else {
+#ifdef WIN32
+	    errno = WSAGetLastError();
+#endif
+	    if (errno == EINTR)
+		continue;
+
+#ifdef LIBVNCSERVER_ENOENT_WORKAROUND
+	    if (errno != ENOENT)
+#endif
+            if (errno != EWOULDBLOCK && errno != EAGAIN) {
+                return n;
+            }
+
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	    if (cl->sslctx) {
+		if (rfbssl_pending(cl))
+		    continue;
+	    }
+#endif
+            FD_ZERO(&fds);
+            FD_SET(sock, &fds);
+            tv.tv_sec = timeout / 1000;
+            tv.tv_usec = (timeout % 1000) * 1000;
+            n = select(sock+1, &fds, NULL, &fds, &tv);
+            if (n < 0) {
+                rfbLogPerror("PeekExact: select");
+                return n;
+            }
+            if (n == 0) {
+                errno = ETIMEDOUT;
+                return -1;
+            }
+        }
+    }
+#undef DEBUG_READ_EXACT
+#ifdef DEBUG_READ_EXACT
+    rfbLog("PeekExact %d bytes\n",len);
+    for(n=0;n<len;n++)
+	    fprintf(stderr,"%02x ",(unsigned char)buf[n]);
+    fprintf(stderr,"\n");
+#endif
+
+    return 1;
 }
 
 /*
@@ -652,9 +766,25 @@ rfbWriteExact(rfbClientPtr cl,
     fprintf(stderr,"\n");
 #endif
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+    if (cl->wsctx) {
+        char *tmp = NULL;
+        if ((len = webSocketsEncode(cl, buf, len, &tmp)) < 0) {
+            rfbErr("WriteExact: WebSockets encode error\n");
+            return -1;
+        }
+        buf = tmp;
+    }
+#endif
+
     LOCK(cl->outputMutex);
     while (len > 0) {
-        n = write(sock, buf, len);
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+        if (cl->sslctx)
+	    n = rfbssl_write(cl, buf, len);
+	else
+#endif
+	    n = write(sock, buf, len);
 
         if (n > 0) {
 

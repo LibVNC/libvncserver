@@ -6,6 +6,10 @@ MAC=mac
 mac_LDFLAGS=-framework ApplicationServices -framework Carbon -framework IOKit
 endif
 
+if ANDROID
+SUBDIRS=android
+endif
+
 if WITH_TIGHTVNC_FILETRANSFER
 FILETRANSFER=filetransfer
 endif

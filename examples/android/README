@@ -1,0 +1,63 @@
+
+This example VNC server for Android is adopted from
+http://code.google.com/p/android-vnc-server/ with some additional
+fixes applied.
+
+To build, you'll need the Android Native Development Kit from
+http://developer.android.com/sdk/ndk/.
+
+
+Building with autotools
+-----------------------
+
+This has the advantage that the LibVNCServer sources are properly set up
+using the configure script.
+
+1. Read <NDK location>/docs/STANDALONE-TOOLCHAIN.html.
+
+2. Setup your toolchain according to step 3 in the above file.
+
+3. Execute 
+
+    ./configure --host=arm-eabi CC=arm-linux-androideabi-gcc
+
+   in the LibVNCServer root directory.
+
+4. Execute
+
+    make
+
+   in the LibVNCServer root directory. This will build the whole
+   LibVNCServer distribution for Android, including androidvncserver.
+
+
+
+
+Building with the NDK build system
+----------------------------------
+
+This is probably easier than the autotools method, but you'll have to edit
+some files manually.
+
+1. Edit rfb/rfbconfig.h to match your Android target. For instance, comment out
+   LIBVNCSERVER_HAVE_LIBJPEG if you don't have libjpeg for Android.
+
+2. Edit the HAVE_X variables in jni/Android.mk accordingly.
+
+3. Execute
+
+    ndk-build -C .
+
+   in the examples/android directory. The resulting binary will be in libs/.
+
+
+
+Installing && Running
+---------------------
+
+This can be done via
+
+ adb push androidvncserver /data/local/
+ adb shell /data/local/androidvncserver
+
+

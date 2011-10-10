@@ -12,6 +12,23 @@ TIGHTVNCFILETRANSFERSRCS = tightvnc-filetransfer/rfbtightserver.c \
 	tightvnc-filetransfer/filelistinfo.c
 endif
 
+if WITH_WEBSOCKETS
+
+if HAVE_LIBSSL
+WEBSOCKETSSSLSRCS = rfbssl_openssl.c rfbcrypto_openssl.c
+WEBSOCKETSSSLLIBS = @SSL_LIBS@ @CRYPT_LIBS@
+else
+if HAVE_GNUTLS
+WEBSOCKETSSSLSRCS = rfbssl_gnutls.c rfbcrypto_gnutls.c
+WEBSOCKETSSSLLIBS = @GNUTLS_LIBS@
+else
+WEBSOCKETSSSLSRCS = rfbssl_none.c rfbcrypto_included.c ../common/md5.c ../common/sha1.c
+endif
+endif
+
+WEBSOCKETSSRCS = websockets.c $(WEBSOCKETSSSLSRCS)
+endif
+
 includedir=$(prefix)/include/rfb
 #include_HEADERS=rfb.h rfbconfig.h rfbint.h rfbproto.h keysym.h rfbregion.h
 
@@ -30,18 +47,24 @@ EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
 if HAVE_LIBZ
 ZLIBSRCS = zlib.c zrle.c zrleoutstream.c zrlepalettehelper.c ../common/zywrletemplate.c
 if HAVE_LIBJPEG
-JPEGSRCS = tight.c
+TIGHTSRCS = tight.c
+else
+if HAVE_LIBPNG
+TIGHTSRCS = tight.c
+endif
 endif
 endif
 
-LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c \
+LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c $(WEBSOCKETSSRCS) \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	httpd.c cursor.c font.c \
 	draw.c selbox.c ../common/d3des.c ../common/vncauth.c cargs.c ../common/minilzo.c ultra.c scale.c \
 	partialupdateregionbuf.c \
-	$(ZLIBSRCS) $(JPEGSRCS) $(TIGHTVNCFILETRANSFERSRCS)
+	$(ZLIBSRCS) $(TIGHTSRCS) $(TIGHTVNCFILETRANSFERSRCS)
+
 
 libvncserver_la_SOURCES=$(LIB_SRCS)
+libvncserver_la_LIBADD=$(WEBSOCKETSSSLLIBS)
 
 lib_LTLIBRARIES=libvncserver.la
 
