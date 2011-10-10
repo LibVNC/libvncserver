@@ -16,7 +16,7 @@ struct { int sdl; int rfb; } buttonMapping[]={
 	{0,0}
 };
 
-static int enableResizable, viewOnly, listenLoop, buttonMask;
+static int enableResizable = 1, viewOnly, listenLoop, buttonMask;
 #ifdef SDL_ASYNCBLIT
 	int sdlFlags = SDL_HWSURFACE | SDL_ASYNCBLIT | SDL_HWACCEL;
 #else
@@ -487,6 +487,8 @@ int main(int argc,char** argv) {
 			viewOnly = 1;
 		else if (!strcmp(argv[i], "-resizable"))
 			enableResizable = 1;
+		else if (!strcmp(argv[i], "-no-resizable"))
+			enableResizable = 0;
 		else if (!strcmp(argv[i], "-listen")) {
 		        listenLoop = 1;
 			argv[i] = "-listennofork";
