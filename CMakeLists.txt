@@ -8,7 +8,7 @@ include(TestBigEndian)
 
 set(PACKAGE_NAME           "LibVNCServer")
 set(FULL_PACKAGE_NAME      "LibVNCServer")
-set(PACKAGE_VERSION        "0.9.8")
+set(PACKAGE_VERSION        "0.9.8.1")
 set(PROJECT_BUGREPORT_PATH "http://sourceforge.net/projects/libvncserver")
 set(CMAKE_C_FLAGS "-O2 -W -Wall -g")
 
