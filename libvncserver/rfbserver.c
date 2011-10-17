@@ -569,6 +569,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
     TINI_MUTEX(cl->sendMutex);
 
     rfbPrintStats(cl);
+    rfbResetStats(cl);
 
     free(cl);
 }
