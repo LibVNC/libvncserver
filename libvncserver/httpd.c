@@ -431,10 +431,6 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 		    sprintf(str, "%d", rfbScreen->port);
 		    rfbWriteExact(&cl, str, strlen(str));
 
-		} else if (compareAndSkip(&ptr, "$HOST")) {
-
-		    rfbWriteExact(&cl, rfbScreen->thisHost, strlen(rfbScreen->thisHost));
-
 		} else if (compareAndSkip(&ptr, "$DESKTOP")) {
 
 		    rfbWriteExact(&cl, rfbScreen->desktopName, strlen(rfbScreen->desktopName));
