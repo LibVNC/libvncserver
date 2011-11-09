@@ -1,3 +1,21 @@
+2011-11-09  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, configure.ac: Bump version in cmake && autotools.
+
+2011-11-09  Christian Beier <dontmind@freeshell.org>
+
+	* NEWS: Add 0.9.8.2 NEWS entry.
+
+2011-11-09  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/rfbproto.c: When GetCredential() callback is not set,
+	don't use authentications requiring it.  The auth methods that employ Getcredential() will only be used if
+	the client's GetCredential callback is actually set.
+
+2011-10-12  Christian Beier <dontmind@freeshell.org>
+
+	* ChangeLog: Update ChangeLog for 0.9.8.1.
+
 2011-10-12  Christian Beier <dontmind@freeshell.org>
 
 	* CMakeLists.txt, NEWS, configure.ac: Update version number in
