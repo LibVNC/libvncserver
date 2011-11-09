@@ -1,3 +1,6 @@
+0.9.8.2
+   - Fixed a regression that crept in with the Apple Remote Desktop support.
+
 0.9.8.1
    - Fixed an ABI compatibility issue.
 
