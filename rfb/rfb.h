@@ -1097,7 +1097,7 @@ rfbBool rfbUpdateClient(rfbClientPtr cl);
 
  To also start an HTTP server (running on port 5800+display_number), you have
  to set rfbScreenInfo::httpDir to a directory containing vncviewer.jar and
- index.vnc (like the included "classes" directory).
+ index.vnc (like the included "webclients" directory).
 
  @section making_it_interactive Making it interactive
 
