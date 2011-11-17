@@ -59,7 +59,7 @@ make
 %makeinstall includedir="%{buildroot}%{_includedir}/rfb"
 
 %{__install} -d -m0755 %{buildroot}%{_datadir}/x11vnc/classes
-%{__install} classes/VncViewer.jar classes/index.vnc \
+%{__install} webclients/VncViewer.jar webclients/index.vnc \
   %{buildroot}%{_datadir}/x11vnc/classes
 
 %clean

@@ -70,7 +70,7 @@ int main(int argc,char** argv)
   rfbScreen->kbdAddEvent = HandleKey;
 
   /* enable http */
-  rfbScreen->httpDir = "../classes";
+  rfbScreen->httpDir = "../webclients";
 
   /* allocate picture and read it */
   rfbScreen->frameBuffer = (char*)malloc(paddedWidth*3*height);
