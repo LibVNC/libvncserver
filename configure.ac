@@ -1,9 +1,9 @@
 # Process this file with autoconf to produce a configure script.
 AC_INIT(LibVNCServer, 0.9.8.1, http://sourceforge.net/projects/libvncserver)
 AM_INIT_AUTOMAKE(LibVNCServer, 0.9.8.1)
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_CONFIG_HEADER(rfbconfig.h)
 AX_PREFIX_CONFIG_H([rfb/rfbconfig.h])
-AM_SILENT_RULES([yes])
 
 # Checks for programs.
 AC_PROG_CC
