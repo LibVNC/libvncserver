@@ -140,7 +140,25 @@ typedef union _rfbCredential
 
 struct _rfbClient;
 
+/**
+ * Handles a text chat message. If your application should accept text messages
+ * from the server, define a function with this prototype and set
+ * client->HandleTextChat to a pointer to that function subsequent to your
+ * rfbGetClient() call.
+ * @param client The client which called the text chat handler
+ * @param value ????
+ * @param text The text message from the server
+ */
 typedef void (*HandleTextChatProc)(struct _rfbClient* client, int value, char *text);
+/**
+ * Handles XVP server messages. If your application sends XVP messages to the
+ * server, you'll want to handle the server's XVP_FAIL and XVP_INIT responses.
+ * Define a function with this prototype and set client->HandleXvpMsg to a
+ * pointer to that function subsequent to your rfbGetClient() call.
+ * @param client The client which called the XVP message handler
+ * @param version The highest XVP extension version that the server supports
+ * @param opcode The opcode. 0 is XVP_FAIL, 1 is XVP_INIT
+ */
 typedef void (*HandleXvpMsgProc)(struct _rfbClient* client, uint8_t version, uint8_t opcode);
 typedef void (*HandleKeyboardLedStateProc)(struct _rfbClient* client, int value, int pad);
 typedef rfbBool (*HandleCursorPosProc)(struct _rfbClient* client, int x, int y);
@@ -346,19 +364,123 @@ extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int po
 extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
 extern void SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size);
 extern rfbBool InitialiseRFBConnection(rfbClient* client);
+/**
+ * Sends format and encoding parameters to the server. Your application can
+ * modify the 'client' data structure directly. However some changes to this
+ * structure must be communicated back to the server. For instance, if you
+ * change the encoding to hextile, the server needs to know that it should send
+ * framebuffer updates in hextile format. Likewise if you change the dimensions
+ * of the framebuffer, the server must be notified about this as well. Call this
+ * function to propagate your changes to the local 'client' structure over to
+ * the server. These changes to the local 'client' structure must be followed
+ * by a call to SetFormatAndEncodings():
+ * @li Encoding type
+ * @li Framebuffer dimensions
+ * @li Pixel format
+ * @li Remote cursor support
+ * @param client The client in which the format or encodings have been changed
+ * @return true if the format or encodings were sent to the server successfully,
+ * false otherwise
+ */
 extern rfbBool SetFormatAndEncodings(rfbClient* client);
 extern rfbBool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
+/**
+ * Sends a framebuffer update request to the server. A VNC client may request an
+ * update from the server at any time. You can also specify which portions of
+ * the screen you want updated. This can be handy if a pointer is at certain
+ * location and the user pressed a mouse button, for instance. Then you can
+ * immediately request an update of the region around the pointer from the
+ * server.
+ * @note The coordinate system is a left-handed Cartesian coordinate system with
+ * the Z axis (unused) pointing out of the screen. Alternately you can think of
+ * it as a right-handed Cartesian coordinate system with the Z axis pointing
+ * into the screen. The origin is at the upper left corner of the framebuffer.
+ * @param client The client through which to send the request
+ * @param x The horizontal position of the update request rectangle
+ * @param y The vertical position of the update request rectangle
+ * @param w The width of the update request rectangle
+ * @param h The height of the update request rectangle
+ * @param incremental ???
+ * @return true if the update request was sent successfully, false otherwise
+ */
 extern rfbBool SendFramebufferUpdateRequest(rfbClient* client,
 					 int x, int y, int w, int h,
 					 rfbBool incremental);
 extern rfbBool SendScaleSetting(rfbClient* client,int scaleSetting);
+/**
+ * Sends a pointer event to the server. A pointer event includes a cursor
+ * location and a button mask. The button mask indicates which buttons on the
+ * pointing device are pressed. Each button is represented by a bit in the
+ * button mask. A 1 indicates the button is pressed while a 0 indicates that it
+ * is not pressed. You may use these pre-defined button masks by ORing them
+ * together: rfbButton1Mask, rfbButton2Mask, rfbButton3Mask, rfbButton4Mask
+ * rfbButton5Mask
+ * @note  The cursor location is relative to the client's framebuffer, not the
+ * client's screen itself.
+ * @note The coordinate system is a left-handed Cartesian coordinate system with
+ * the Z axis (unused) pointing out of the screen. Alternately you can think of
+ * it as a right-handed Cartesian coordinate system with the Z axis pointing
+ * into the screen. The origin is at the upper left corner of the screen.
+ * @param client The client through which to send the pointer event
+ * @param x the horizontal location of the cursor
+ * @param y the vertical location of the cursor
+ * @param buttonMask the button mask indicating which buttons are pressed
+ * @return true if the pointer event was sent successfully, false otherwise
+ */
 extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
+/**
+ * Sends a key event to the server. If your application is not merely a VNC
+ * viewer (i.e. it controls the server), you'll want to send the keys that the
+ * user presses to the server. Use this function to do that.
+ * @param client The client through which to send the key event
+ * @param key A key which was pressed in UTF-8
+ * @param down true if this was a key down event, false otherwise
+ * @return true if the key event was send successfully, false otherwise
+ */
 extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
+/**
+ * Places a string on the server's clipboard. Use this function if you want to
+ * be able to copy and paste between the server and your application. For
+ * instance, when your application is notified that the user copied some text
+ * onto the clipboard, you would call this function to synchronize the server's
+ * clipboard with your local clipboard.
+ * @param client The client structure through which to send the client cut text
+ * message
+ * @param str The string to send (doesn't need to be NULL terminated)
+ * @param len The length of the string
+ * @return true if the client cut message was sent successfully, false otherwise
+ */
 extern rfbBool SendClientCutText(rfbClient* client,char *str, int len);
+/**
+ * Handles messages from the RFB server. You must call this function
+ * intermittently so libvncclient can parse messages from the server. For
+ * example, if your app has a draw loop, you could place a call to this
+ * function within that draw loop.
+ * @note You must call WaitForMessage() before you call this function.
+ * @param client The client which will handle the RFB server messages
+ * @return true if the client was able to handle the RFB server messages, false
+ * otherwise
+ */
 extern rfbBool HandleRFBServerMessage(rfbClient* client);
 
+/**
+ * Sends a text chat message to the server.
+ * @param client The client through which to send the message
+ * @param text The text to send
+ * @return true if the text was sent successfully, false otherwise
+ */
 extern rfbBool TextChatSend(rfbClient* client, char *text);
+/**
+ * Opens a text chat window on the server.
+ * @param client The client through which to send the message
+ * @return true if the window was opened successfully, false otherwise
+ */
 extern rfbBool TextChatOpen(rfbClient* client);
+/**
+ * Closes the text chat window on the server.
+ * @param client The client through which to send the message
+ * @return true if the window was closed successfully, false otherwise
+ */
 extern rfbBool TextChatClose(rfbClient* client);
 extern rfbBool TextChatFinish(rfbClient* client);
 extern rfbBool PermitServerInput(rfbClient* client, int enabled);
@@ -371,7 +493,28 @@ extern rfbBool SupportsServer2Client(rfbClient* client, int messageType);
 
 /* client data */
 
+/**
+ * Associates a client data tag with the given pointer. libvncclient has
+ * several events to which you can associate your own handlers. These handlers
+ * have the client structure as one of their parameters. Sometimes, you may want
+ * to make data from elsewhere in your application available to these handlers
+ * without using a global variable. To do this, you call
+ * rfbClientSetClientData() and associate the data with a tag. Then, your
+ * handler can call rfbClientGetClientData() and get the a pointer to the data
+ * associated with that tag.
+ * @param client The client in which to set the client data
+ * @param tag A unique tag which identifies the data
+ * @param data A pointer to the data to associate with the tag
+ */
 void rfbClientSetClientData(rfbClient* client, void* tag, void* data);
+/**
+ * Returns a pointer to the client data associated with the given tag. See the
+ * the documentation for rfbClientSetClientData() for a discussion of how you
+ * can use client data.
+ * @param client The client from which to get the client data
+ * @param tag The tag which identifies the client data
+ * @return a pointer to the client data
+ */
 void* rfbClientGetClientData(rfbClient* client, void* tag);
 
 /* protocol extensions */
@@ -406,12 +549,83 @@ extern rfbBool SetDSCP(int sock, int dscp);
 
 extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
 extern rfbBool SameMachine(int sock);
+/**
+ * Waits for an RFB message to arrive from the server. Before handling a message
+ * with HandleRFBServerMessage(), you must wait for your client to receive one.
+ * This function blocks until a message is received. You may specify a timeout
+ * in microseconds. Once this number of microseconds have elapsed, the function
+ * will return.
+ * @param client The client to cause to wait until a message is received
+ * @param usecs The timeout in microseconds
+ * @return the return value of the underlying select() call
+ */
 extern int WaitForMessage(rfbClient* client,unsigned int usecs);
 
 /* vncviewer.c */
+/**
+ * Allocates and returns a pointer to an rfbClient structure. This will probably
+ * be the first libvncclient function your client code calls. Most libvncclient
+ * functions operate on an rfbClient structure, and this function allocates
+ * memory for that structure. When you're done with the rfbClient structure
+ * pointer this function returns, you should free the memory rfbGetClient()
+ * allocated by calling rfbClientCleanup().
+ *
+ * A pixel is one dot on the screen. The number of bytes in a pixel will depend
+ * on the number of samples in that pixel and the number of bits in each sample.
+ * A sample represents one of the primary colors in a color model. The RGB
+ * color model uses red, green, and blue samples respectively. Suppose you
+ * wanted to use 16-bit RGB color: You would have three samples per pixel (one
+ * for each primary color), five bits per sample (the quotient of 16 RGB bits
+ * divided by three samples), and two bytes per pixel (the smallest multiple of
+ * eight bits in which the 16-bit pixel will fit). If you wanted 32-bit RGB
+ * color, you would have three samples per pixel again, eight bits per sample
+ * (since that's how 32-bit color is defined), and four bytes per pixel (the
+ * smallest multiple of eight bits in which the 32-bit pixel will fit.
+ * @param bitsPerSample The number of bits in a sample
+ * @param samplesPerPixel The number of samples in a pixel
+ * @param bytesPerPixel The number of bytes in a pixel
+ * @return a pointer to the allocated rfbClient structure
+ */
 rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
+/**
+ * Initializes the client. The format is {PROGRAM_NAME, [OPTIONS]..., HOST}. This
+ * function does not initialize the program name if the rfbClient's program
+ * name is set already. The options are as follows:
+ * <table>
+ * <tr><th>Option</th><th>Description</th></tr>
+ * <tr><td>-listen</td><td>Listen for incoming connections</td></tr>
+ * <tr><td>-listennofork</td><td>Listen for incoming connections without forking
+ * </td></tr>
+ * <tr><td>-play</td><td>Unknown???</td></tr>
+ * <tr><td>-encodings</td><td>Set the encodings to use. The next item in the
+ * argv array is the encodings. Possible values are:</td></tr>
+ * <tr><td>-compress</td><td>Set the compression level. The next item in the
+ * argv array is the compression level as an integer. Possible values are:
+ * </td></tr>
+ * <tr><td>-scale</td><td>Set the scaling level. The next item in the
+ * argv array is the scaling level as an integer. Example:</td></tr>
+ * <tr><td>-qosdscp</td><td>Set the Quality of Service Differentiated Services
+ * Code Point (QoS DSCP). The next item in the argv array is the code point as
+ * an integer. Example:</td></tr>
+ * <tr><td>-repeaterdest</td><td>Set the ???. The next item in the argv array is
+ * the ???? as a string. Example:</td></tr>
+ * </table>
+ *
+ * The host may include a port number (delimited by a ':').
+ * @param client The client to initialize
+ * @param argc The number of arguments to the initializer
+ * @param argv The arguments to the initializer as an array of NULL terminated
+ * strings
+ * @return true if the client was initialized successfully, false otherwise.
+ */
 rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv);
-/** rfbClientCleanup() does not touch client->frameBuffer */
+/**
+ * Cleans up the client structure and releases the memory allocated for it. You
+ * should call this when you're done with the rfbClient structure that you
+ * allocated with rfbGetClient().
+ * @note rfbClientCleanup() does not touch client->frameBuffer.
+ * @param client The client to clean up
+ */
 void rfbClientCleanup(rfbClient* client);
 
 #if(defined __cplusplus)
