@@ -146,7 +146,8 @@ struct _rfbClient;
  * client->HandleTextChat to a pointer to that function subsequent to your
  * rfbGetClient() call.
  * @param client The client which called the text chat handler
- * @param value ????
+ * @param value  text length if text != NULL, or one of rfbTextChatOpen,
+ * rfbTextChatClose, rfbTextChatFinished if text == NULL
  * @param text The text message from the server
  */
 typedef void (*HandleTextChatProc)(struct _rfbClient* client, int value, char *text);
@@ -369,14 +370,13 @@ extern rfbBool InitialiseRFBConnection(rfbClient* client);
  * modify the 'client' data structure directly. However some changes to this
  * structure must be communicated back to the server. For instance, if you
  * change the encoding to hextile, the server needs to know that it should send
- * framebuffer updates in hextile format. Likewise if you change the dimensions
- * of the framebuffer, the server must be notified about this as well. Call this
- * function to propagate your changes to the local 'client' structure over to
- * the server. These changes to the local 'client' structure must be followed
- * by a call to SetFormatAndEncodings():
+ * framebuffer updates in hextile format. Likewise if you change the pixel
+ * format of the framebuffer, the server must be notified about this as well.
+ * Call this function to propagate your changes of the local 'client' structure
+ * over to the server.
  * @li Encoding type
- * @li Framebuffer dimensions
- * @li Pixel format
+ * @li RFB protocol extensions announced via pseudo-encodings
+ * @li Framebuffer pixel format (like RGB vs ARGB)
  * @li Remote cursor support
  * @param client The client in which the format or encodings have been changed
  * @return true if the format or encodings were sent to the server successfully,
@@ -400,7 +400,8 @@ extern rfbBool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
  * @param y The vertical position of the update request rectangle
  * @param w The width of the update request rectangle
  * @param h The height of the update request rectangle
- * @param incremental ???
+ * @param incremental false: server sends rectangle even if nothing changed.
+ * true: server only sends changed parts of rectangle.
  * @return true if the update request was sent successfully, false otherwise
  */
 extern rfbBool SendFramebufferUpdateRequest(rfbClient* client,
@@ -433,7 +434,7 @@ extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
  * viewer (i.e. it controls the server), you'll want to send the keys that the
  * user presses to the server. Use this function to do that.
  * @param client The client through which to send the key event
- * @param key A key which was pressed in UTF-8
+ * @param key An rfbKeySym defined in rfb/keysym.h
  * @param down true if this was a key down event, false otherwise
  * @return true if the key event was send successfully, false otherwise
  */
@@ -453,7 +454,7 @@ extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
 extern rfbBool SendClientCutText(rfbClient* client,char *str, int len);
 /**
  * Handles messages from the RFB server. You must call this function
- * intermittently so libvncclient can parse messages from the server. For
+ * intermittently so LibVNCClient can parse messages from the server. For
  * example, if your app has a draw loop, you could place a call to this
  * function within that draw loop.
  * @note You must call WaitForMessage() before you call this function.
@@ -494,7 +495,7 @@ extern rfbBool SupportsServer2Client(rfbClient* client, int messageType);
 /* client data */
 
 /**
- * Associates a client data tag with the given pointer. libvncclient has
+ * Associates a client data tag with the given pointer. LibVNCClient has
  * several events to which you can associate your own handlers. These handlers
  * have the client structure as one of their parameters. Sometimes, you may want
  * to make data from elsewhere in your application available to these handlers
@@ -564,7 +565,7 @@ extern int WaitForMessage(rfbClient* client,unsigned int usecs);
 /* vncviewer.c */
 /**
  * Allocates and returns a pointer to an rfbClient structure. This will probably
- * be the first libvncclient function your client code calls. Most libvncclient
+ * be the first LibVNCClient function your client code calls. Most libVNCClient
  * functions operate on an rfbClient structure, and this function allocates
  * memory for that structure. When you're done with the rfbClient structure
  * pointer this function returns, you should free the memory rfbGetClient()
@@ -593,22 +594,22 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,int bytesPerPixel)
  * name is set already. The options are as follows:
  * <table>
  * <tr><th>Option</th><th>Description</th></tr>
- * <tr><td>-listen</td><td>Listen for incoming connections</td></tr>
- * <tr><td>-listennofork</td><td>Listen for incoming connections without forking
+ * <tr><td>-listen</td><td>Listen for incoming connections.</td></tr>
+ * <tr><td>-listennofork</td><td>Listen for incoming connections without forking.
  * </td></tr>
- * <tr><td>-play</td><td>Unknown???</td></tr>
+ * <tr><td>-play</td><td>Set this client to replay a previously recorded session.</td></tr>
  * <tr><td>-encodings</td><td>Set the encodings to use. The next item in the
- * argv array is the encodings. Possible values are:</td></tr>
+ * argv array is the encodings string, consisting of comma separated encodings like 'tight,ultra,raw'.</td></tr>
  * <tr><td>-compress</td><td>Set the compression level. The next item in the
- * argv array is the compression level as an integer. Possible values are:
+ * argv array is the compression level as an integer. Ranges from 0 (lowest) to 9 (highest).
  * </td></tr>
  * <tr><td>-scale</td><td>Set the scaling level. The next item in the
- * argv array is the scaling level as an integer. Example:</td></tr>
+ * argv array is the scaling level as an integer. The screen will be scaled down by this factor.</td></tr>
  * <tr><td>-qosdscp</td><td>Set the Quality of Service Differentiated Services
  * Code Point (QoS DSCP). The next item in the argv array is the code point as
- * an integer. Example:</td></tr>
- * <tr><td>-repeaterdest</td><td>Set the ???. The next item in the argv array is
- * the ???? as a string. Example:</td></tr>
+ * an integer.</td></tr>
+ * <tr><td>-repeaterdest</td><td>Set a VNC repeater address. The next item in the argv array is
+ * the repeater's address as a string.</td></tr>
  * </table>
  *
  * The host may include a port number (delimited by a ':').
