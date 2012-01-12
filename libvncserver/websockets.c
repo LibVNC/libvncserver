@@ -527,7 +527,10 @@ webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len)
     n = ws_peek(cl, buf, len*2+2);
 
     if (n <= 0) {
+        /* save errno because rfbErr() will tamper it */
+        int olderrno = errno;
         rfbErr("%s: peek (%d) %m\n", __func__, errno);
+        errno = olderrno;
         return n;
     }
 
@@ -642,14 +645,20 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
     buf = wsctx->codeBuf;
     header = (ws_header_t *)wsctx->codeBuf;
 
-    if (-1 == (ret = ws_peek(cl, buf, B64LEN(len) + WSHLENMAX))) {
-      rfbErr("%s: peek; %m\n", __func__);
-      goto spor;
-    }
+    ret = ws_peek(cl, buf, B64LEN(len) + WSHLENMAX);
 
     if (ret < 2) {
-	rfbErr("%s: peek; got %d bytes\n", __func__, ret);
-	goto spor; /* Incomplete frame header */
+        /* save errno because rfbErr() will tamper it */
+        if (-1 == ret) {
+            int olderrno = errno;
+            rfbErr("%s: peek; %m\n", __func__);
+            errno = olderrno;
+        } else if (0 == ret) {
+            result = 0;
+        } else {
+            errno = EAGAIN;
+        }
+        goto spor;
     }
 
     opcode = header->b0 & 0x0f;
@@ -691,7 +700,9 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
     payload = buf + fhlen + 4; /* header length + mask */
 
     if (-1 == (ret = ws_read(cl, buf, total))) {
+      int olderrno = errno;
       rfbErr("%s: read; %m", __func__);
+      errno = olderrno;
       return ret;
     } else if (ret < total) {
       /* GT TODO: hmm? */
