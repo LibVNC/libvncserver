@@ -771,7 +771,7 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
      *   0xA - pong
     **/
     if (!len) {
-	  rfbLog("%s: nothing to encode\n", __func__);
+	  /* nothing to encode */
 	  return 0;
     }
 
