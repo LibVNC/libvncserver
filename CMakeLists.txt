@@ -11,6 +11,12 @@ set(FULL_PACKAGE_NAME      "LibVNCServer")
 set(PACKAGE_VERSION        "0.9.8")
 set(PROJECT_BUGREPORT_PATH "http://sourceforge.net/projects/libvncserver")
 set(CMAKE_C_FLAGS "-O2 -W -Wall -g")
+set(LIBVNCSERVER_DIR ${CMAKE_SOURCE_DIR}/libvncserver)
+set(COMMON_DIR ${CMAKE_SOURCE_DIR}/common)
+set(LIBVNCCLIENT_DIR ${CMAKE_SOURCE_DIR}/libvncclient)
+set(LIBVNCSRVTEST_DIR ${CMAKE_SOURCE_DIR}/examples)
+set(LIBVNCCLITEST_DIR ${CMAKE_SOURCE_DIR}/client_examples)
+
 
 include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/libvncserver ${CMAKE_SOURCE_DIR}/common)
 
@@ -47,11 +53,15 @@ if(GNUTLS_FOUND)
   set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
   option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (gnutls)" ON)
   set(WEBSOCKET_LIBRARIES -lresolv ${GNUTLS_LIBRARIES})
-  set(WSSRCS rfbssl_gnutls)
+  set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_gnutls ${LIBVNCSERVER_DIR}/rfbcrypto_gnutls)
 elseif(OPENSSL_FOUND)
   option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (openssl)" ON)
   set(WEBSOCKET_LIBRARIES -lresolv ${OPENSSL_LIBRARIES})
-  set(WSSRCS rfbssl_openssl)
+  set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_openssl ${LIBVNCSERVER_DIR}/rfbcrypto_openssl)
+else()
+  option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (no ssl)" ON)
+  set(WEBSOCKET_LIBRARIES -lresolv)
+  set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_none.c ${LIBVNCSERVER_DIR}/rfbcrypto_included.c ${COMMON_DIR}/md5.c ${COMMON_DIR}/sha1.c)
 endif()
 
 if(LIBGCRYPT_LIBRARIES)
@@ -105,12 +115,6 @@ TEST_BIG_ENDIAN(LIBVNCSERVER_WORDS_BIGENDIAN)
 
 configure_file(${CMAKE_SOURCE_DIR}/rfb/rfbconfig.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbconfig.h)
 configure_file(${CMAKE_SOURCE_DIR}/rfb/rfbint.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbint.h)
-
-set(LIBVNCSERVER_DIR ${CMAKE_SOURCE_DIR}/libvncserver)
-set(COMMON_DIR ${CMAKE_SOURCE_DIR}/common)
-set(LIBVNCCLIENT_DIR ${CMAKE_SOURCE_DIR}/libvncclient)
-set(LIBVNCSRVTEST_DIR ${CMAKE_SOURCE_DIR}/examples)
-set(LIBVNCCLITEST_DIR ${CMAKE_SOURCE_DIR}/client_examples)
 
 set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/main.c
@@ -191,9 +195,7 @@ if(LIBVNCSERVER_WITH_WEBSOCKETS)
   set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_SOURCES}
     ${LIBVNCSERVER_DIR}/websockets.c
-    ${LIBVNCSERVER_DIR}/${WSSRCS}
-    ${COMMON_DIR}/md5.c
-    ${COMMON_DIR}/sha1.c
+    ${WSSRCS}
   )
 endif(LIBVNCSERVER_WITH_WEBSOCKETS)
 
