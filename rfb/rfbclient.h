@@ -345,6 +345,9 @@ typedef struct _rfbClient {
         int listenSock;
 
 	FinishedFrameBufferUpdateProc FinishedFrameBufferUpdate;
+
+	char *listenAddress;
+
 } rfbClient;
 
 /* cursor.c */
@@ -541,6 +544,7 @@ extern rfbBool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
 extern rfbBool WriteToRFBServer(rfbClient* client, char *buf, int n);
 extern int FindFreeTcpPort(void);
 extern int ListenAtTcpPort(int port);
+extern int ListenAtTcpPortAndAddress(int port, const char *address);
 extern int ConnectClientToTcpAddr(unsigned int host, int port);
 extern int ConnectClientToTcpAddr6(const char *hostname, int port);
 extern int ConnectClientToUnixSock(const char *sockFile);

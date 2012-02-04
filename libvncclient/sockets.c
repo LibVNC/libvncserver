@@ -480,13 +480,30 @@ FindFreeTcpPort(void)
 int
 ListenAtTcpPort(int port)
 {
+  return ListenAtTcpPortAndAddress(port, NULL);
+}
+
+
+
+/*
+ * ListenAtTcpPortAndAddress starts listening at the given TCP port on
+ * the given IP address
+ */
+
+int
+ListenAtTcpPortAndAddress(int port, const char *address)
+{
   int sock;
   struct sockaddr_in addr;
   int one = 1;
 
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
-  addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  if (address) {
+    addr.sin_addr.s_addr = inet_addr(address);
+  } else {
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  }
 
   if (!initSockets())
     return -1;

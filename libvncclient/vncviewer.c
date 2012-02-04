@@ -196,6 +196,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 #endif
   client->sock = -1;
   client->listenSock = -1;
+  client->listenAddress = NULL;
   client->clientAuthSchemes = NULL;
   return client;
 }

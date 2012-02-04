@@ -55,7 +55,7 @@ listenForIncomingConnections(rfbClient* client)
 
   client->listenSpecified = TRUE;
 
-  listenSocket = ListenAtTcpPort(client->listenPort);
+  listenSocket = ListenAtTcpPortAndAddress(client->listenPort, client->listenAddress);
 
   if ((listenSocket < 0))
     return;
@@ -133,7 +133,7 @@ listenForIncomingConnectionsNoFork(rfbClient* client, int timeout)
 
   if (client->listenSock < 0)
     {
-      client->listenSock = ListenAtTcpPort(client->listenPort);
+      client->listenSock = ListenAtTcpPortAndAddress(client->listenPort, client->listenAddress);
 
       if (client->listenSock < 0)
 	return -1;
