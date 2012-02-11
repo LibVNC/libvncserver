@@ -740,6 +740,10 @@ AC_SUBST(SDL_CFLAGS)
 AC_SUBST(SDL_LIBS)
 
 
+# Check for GTK+. if present, build the GTK+ vnc viewer example
+PKG_CHECK_MODULES([GTK], [gtk+-2.0])
+AM_CONDITIONAL(HAVE_LIBGTK, test ! -z "$GTK_LIBS")
+
 AC_CANONICAL_HOST
 MINGW=`echo $host_os | grep mingw32  2>/dev/null`
 AM_CONDITIONAL(MINGW, test ! -z "$MINGW" )
