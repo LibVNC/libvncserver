@@ -593,6 +593,7 @@ rfbProcessClientMessage(rfbClientPtr cl)
         rfbAuthProcessClientMessage(cl);
         return;
     case RFB_INITIALISATION:
+    case RFB_INITIALISATION_SHARED:
         rfbProcessClientInitMessage(cl);
         return;
     default:
@@ -720,13 +721,22 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
     rfbClientPtr otherCl;
     rfbExtensionData* extension;
 
-    if ((n = rfbReadExact(cl, (char *)&ci,sz_rfbClientInitMsg)) <= 0) {
-        if (n == 0)
-            rfbLog("rfbProcessClientInitMessage: client gone\n");
-        else
-            rfbLogPerror("rfbProcessClientInitMessage: read");
-        rfbCloseClient(cl);
-        return;
+    if (cl->state == RFB_INITIALISATION_SHARED) {
+        /* In this case behave as though an implicit ClientInit message has
+         * already been received with a shared-flag of true. */
+        ci.shared = 1;
+        /* Avoid the possibility of exposing the RFB_INITIALISATION_SHARED
+         * state to calling software. */
+        cl->state = RFB_INITIALISATION;
+    } else {
+        if ((n = rfbReadExact(cl, (char *)&ci,sz_rfbClientInitMsg)) <= 0) {
+            if (n == 0)
+                rfbLog("rfbProcessClientInitMessage: client gone\n");
+            else
+                rfbLogPerror("rfbProcessClientInitMessage: read");
+            rfbCloseClient(cl);
+            return;
+        }
     }
 
     memset(u.buf,0,sizeof(u.buf));

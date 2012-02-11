@@ -456,13 +456,44 @@ typedef struct _rfbClientRec {
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_t client_thread;
 #endif
+
+    /* Note that the RFB_INITIALISATION_SHARED state is provided to support
+       clients that under some circumstances do not send a ClientInit message.
+       In particular the Mac OS X built-in VNC client (with protocolMinorVersion
+       == 889) is one of those.  However, it only requires this support under
+       special circumstances that can only be determined during the initial
+       authentication.  If the right conditions are met this state will be
+       set (see the auth.c file) when rfbProcessClientInitMessage is called.
+
+       If the state is RFB_INITIALISATION_SHARED we should not expect to recieve
+       any ClientInit message, but instead should proceed to the next stage
+       of initialisation as though an implicit ClientInit message was received
+       with a shared-flag of true.  (There is currently no corresponding
+       RFB_INITIALISATION_NOTSHARED state to represent an implicit ClientInit
+       message with a shared-flag of false because no known existing client
+       requires such support at this time.)
+
+       Note that software using LibVNCServer to provide a VNC server will only
+       ever have a chance to see the state field set to
+       RFB_INITIALISATION_SHARED if the software is multi-threaded and manages
+       to examine the state field during the extremely brief window after the
+       'None' authentication type selection has been received from the built-in
+       OS X VNC client and before the rfbProcessClientInitMessage function is
+       called -- control cannot return to the caller during this brief window
+       while the state field is set to RFB_INITIALISATION_SHARED. */
+
                                 /** Possible client states: */
     enum {
         RFB_PROTOCOL_VERSION,   /**< establishing protocol version */
 	RFB_SECURITY_TYPE,      /**< negotiating security (RFB v.3.7) */
         RFB_AUTHENTICATION,     /**< authenticating */
         RFB_INITIALISATION,     /**< sending initialisation messages */
-        RFB_NORMAL              /**< normal protocol messages */
+        RFB_NORMAL,             /**< normal protocol messages */
+
+        /* Ephemeral internal-use states that will never be seen by software
+         * using LibVNCServer to provide services: */
+
+        RFB_INITIALISATION_SHARED /**< sending initialisation messages with implicit shared-flag already true */
     } state;
 
     rfbBool reverseConnection;
