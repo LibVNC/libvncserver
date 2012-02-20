@@ -377,6 +377,12 @@ typedef struct _rfbScreenInfo
     char *sslkeyfile;
     char *sslcertfile;
 #endif
+    int ipv6port; /**< The port to listen on when using IPv6.  */
+    char* listen6Interface;
+    /* We have an additional IPv6 listen socket since there are systems that
+       don't support dual binding sockets under *any* circumstances, for
+       instance OpenBSD */
+    SOCKET listen6Sock;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -738,6 +744,7 @@ extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern int rfbConnectToTcpAddr(char* host, int port);
 extern int rfbListenOnTCPPort(int port, in_addr_t iface);
+extern int rfbListenOnTCP6Port(int port, const char* iface);
 extern int rfbListenOnUDPPort(int port, in_addr_t iface);
 extern int rfbStringToAddr(char* string,in_addr_t* addr);
 extern rfbBool rfbSetNonBlocking(int sock);

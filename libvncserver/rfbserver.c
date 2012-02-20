@@ -50,6 +50,7 @@
 #ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 #endif
 #endif
@@ -270,8 +271,8 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     rfbProtocolVersionMsg pv;
     rfbClientIteratorPtr iterator;
     rfbClientPtr cl,cl_;
-    struct sockaddr_in addr;
-    socklen_t addrlen = sizeof(struct sockaddr_in);
+    struct sockaddr_storage addr;
+    socklen_t addrlen = sizeof(addr);
     rfbProtocolExtension* extension;
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
@@ -294,7 +295,17 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       int one=1;
 
       getpeername(sock, (struct sockaddr *)&addr, &addrlen);
+#ifdef LIBVNCSERVER_IPv6
+      char host[1024];
+      if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
+	rfbLogPerror("rfbNewClient: error in getnameinfo");
+	cl->host = strdup("");
+      }
+      else
+	cl->host = strdup(host);
+#else
       cl->host = strdup(inet_ntoa(addr.sin_addr));
+#endif
 
       rfbLog("  other clients:\n");
       iterator = rfbGetClientIterator(rfbScreen);
