@@ -271,7 +271,11 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     rfbProtocolVersionMsg pv;
     rfbClientIteratorPtr iterator;
     rfbClientPtr cl,cl_;
+#ifdef LIBVNCSERVER_IPv6
     struct sockaddr_storage addr;
+#else
+    struct sockaddr_in addr;
+#endif
     socklen_t addrlen = sizeof(addr);
     rfbProtocolExtension* extension;
 

@@ -380,7 +380,11 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
 {
     const int one = 1;
     int sock = -1;
+#ifdef LIBVNCSERVER_IPv6
     struct sockaddr_storage addr;
+#else
+    struct sockaddr_in addr;
+#endif
     socklen_t addrlen = sizeof(addr);
     fd_set listen_fds; 
     int chosen_listen_sock = -1;
