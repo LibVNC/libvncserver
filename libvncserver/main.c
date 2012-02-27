@@ -593,7 +593,7 @@ listenerRun(void *data)
 	len = sizeof (peer);
 	if (FD_ISSET(screen->listenSock, &listen_fds)) 
 	    client_fd = accept(screen->listenSock, (struct sockaddr*)&peer, &len);
-	if (FD_ISSET(screen->listen6Sock, &listen_fds)) 
+	else if (FD_ISSET(screen->listen6Sock, &listen_fds))
 	    client_fd = accept(screen->listen6Sock, (struct sockaddr*)&peer, &len);
 
 	if(client_fd >= 0)
