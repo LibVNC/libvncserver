@@ -843,8 +843,10 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->httpInitDone=FALSE;
    screen->httpEnableProxyConnect=FALSE;
    screen->httpPort=0;
+   screen->http6Port=0;
    screen->httpDir=NULL;
    screen->httpListenSock=-1;
+   screen->httpListen6Sock=-1;
    screen->httpSock=-1;
 
    screen->desktopName = "LibVNCServer";

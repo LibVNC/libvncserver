@@ -45,6 +45,9 @@ rfbUsage(void)
                                                                 "instead)\n");
     fprintf(stderr, "-httpdir dir-path      enable http server using dir-path home\n");
     fprintf(stderr, "-httpport portnum      use portnum for http connection\n");
+#ifdef LIBVNCSERVER_IPv6
+    fprintf(stderr, "-httpportv6 portnum    use portnum for IPv6 http connection\n");
+#endif
     fprintf(stderr, "-enablehttpproxy       enable http proxy support\n");
     fprintf(stderr, "-progressive height    enable progressive updating for slow links\n");
     fprintf(stderr, "-listen ipaddr         listen for connections only on network interface with\n");
@@ -162,6 +165,14 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		return FALSE;
 	    }
             rfbScreen->httpPort = atoi(argv[++i]);
+#ifdef LIBVNCSERVER_IPv6
+	} else if (strcmp(argv[i], "-httpportv6") == 0) {  /* -httpportv6 portnum */
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
+            rfbScreen->http6Port = atoi(argv[++i]);
+#endif
         } else if (strcmp(argv[i], "-enablehttpproxy") == 0) {
             rfbScreen->httpEnableProxyConnect = TRUE;
         } else if (strcmp(argv[i], "-progressive") == 0) {  /* -httpport portnum */

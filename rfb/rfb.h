@@ -383,6 +383,8 @@ typedef struct _rfbScreenInfo
        don't support dual binding sockets under *any* circumstances, for
        instance OpenBSD */
     SOCKET listen6Sock;
+    int http6Port;
+    SOCKET httpListen6Sock;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
