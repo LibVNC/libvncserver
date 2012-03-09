@@ -22,7 +22,15 @@ If the above Java applet does not work, you can also try the new JavaScript-only
 <script language="JavaScript">
     <!--
     function start_novnc(){
-	 open("novnc/vnc_auto.html?host=" + document.location.hostname + "&port=$PORT&true_color=1");
+	var host = document.location.hostname;
+	// If there are at least two colons in there, it is likely an IPv6 address. Check for square brackets and add them if missing.
+	if(host.search(/^.*:.*:.*$/) != -1) {
+	   if(host.charAt(0) != "[")
+	      host = "[" + host;
+	   if(host.charAt(host.length-1) != "]")
+	      host = host + "]";
+	}
+	open("novnc/vnc_auto.html?host=" + host + "&port=$PORT&true_color=1");
     }
     -->
 </script>
