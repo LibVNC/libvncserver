@@ -893,6 +893,7 @@ rfbListenOnTCP6Port(int port,
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof(one)) < 0) {
 	  rfbLogPerror("rfbListenOnTCP6Port error in setsockopt IPV6_V6ONLY");
 	  closesocket(sock);
+	  freeaddrinfo(servinfo);
 	  return -1;
 	}
 #endif
@@ -900,6 +901,7 @@ rfbListenOnTCP6Port(int port,
 	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one)) < 0) {
 	  rfbLogPerror("rfbListenOnTCP6Port: error in setsockopt SO_REUSEADDR");
 	  closesocket(sock);
+	  freeaddrinfo(servinfo);
 	  return -1;
 	}
 
@@ -913,6 +915,7 @@ rfbListenOnTCP6Port(int port,
 
     if (p == NULL)  {
         rfbLogPerror("rfbListenOnTCP6Port: error in bind IPv6 socket");
+        freeaddrinfo(servinfo);
         return -1;
     }
 
