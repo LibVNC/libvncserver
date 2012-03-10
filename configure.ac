@@ -528,7 +528,11 @@ AC_ARG_WITH(jpeg,
 #	-without-jpeg             with_jpeg="no"
 #	-with-jpeg=/foo/dir       with_jpeg="/foo/dir"
 
+HAVE_LIBJPEG_TURBO="false"
+
 if test "x$with_jpeg" != "xno"; then
+	AC_ARG_VAR(JPEG_LDFLAGS,
+		[Linker flags to use when linking with libjpeg, e.g. -L/foo/dir/lib -Wl,-static -ljpeg -Wl,-shared.  This overrides the linker flags set by --with-jpeg.])
 	if test ! -z "$with_jpeg" -a "x$with_jpeg" != "xyes"; then
 		# add user supplied directory to flags:
 		saved_CPPFLAGS="$CPPFLAGS"
@@ -544,9 +548,19 @@ if test "x$with_jpeg" != "xno"; then
 			LDFLAGS="$LDFLAGS -R$with_jpeg/lib"
 		fi
 	fi
+	if test "x$JPEG_LDFLAGS" != "x"; then
+		LDFLAGS="$saved_LDFLAGS"
+		LIBS="$LIBS $JPEG_LDFLAGS"
+	else
+		LIBS="-ljpeg"
+	fi
 	AC_CHECK_HEADER(jpeglib.h, HAVE_JPEGLIB_H="true")
+	AC_MSG_CHECKING(for jpeg_CreateCompress in libjpeg)
 	if test "x$HAVE_JPEGLIB_H" = "xtrue"; then
-		AC_CHECK_LIB(jpeg, jpeg_CreateCompress, , HAVE_JPEGLIB_H="")
+		AC_LINK_IFELSE([AC_LANG_CALL([], [jpeg_CreateCompress])],
+			[AC_MSG_RESULT(yes);
+				AC_DEFINE(HAVE_LIBJPEG, 1, libjpeg support enabled)],
+			[AC_MSG_RESULT(no); HAVE_JPEGLIB_H=""])
 	fi
 	if test ! -z "$with_jpeg" -a "x$with_jpeg" != "xyes"; then
 		if test "x$HAVE_JPEGLIB_H" != "xtrue"; then
@@ -563,14 +577,66 @@ if test "x$with_jpeg" != "xno"; then
 This may lead to reduced performance, especially over slow links.
 If libjpeg is in a non-standard location use --with-jpeg=DIR to
 indicate the header file is in DIR/include/jpeglib.h and the library
-in DIR/lib/libjpeg.a.  A copy of libjpeg may be obtained from:
-ftp://ftp.uu.net/graphics/jpeg/
+in DIR/lib/libjpeg.a.  You can also set the JPEG_LDFLAGS variable to
+specify more detailed linker flags.  A copy of libjpeg-turbo may be
+obtained from:  https://sourceforge.net/projects/libjpeg-turbo/files/
+A copy of libjpeg may be obtained from:  http://ijg.org/files/
 ==========================================================================
 ])
 			sleep 5
 		fi
 	fi
+
+	if test "x$HAVE_JPEGLIB_H" = "xtrue"; then
+		AC_MSG_CHECKING(whether JPEG library is libjpeg-turbo)
+		m4_define([LJT_TEST],
+			[AC_LANG_PROGRAM([#include <stdio.h>
+				#include <jpeglib.h>],
+			[struct jpeg_compress_struct cinfo;
+				struct jpeg_error_mgr jerr;
+				cinfo.err=jpeg_std_error(&jerr);
+				jpeg_create_compress(&cinfo);
+				cinfo.input_components = 3;
+				jpeg_set_defaults(&cinfo);
+				cinfo.in_color_space = JCS_EXT_RGB;
+				jpeg_default_colorspace(&cinfo);
+				return 0;])]
+		)
+		if test "x$cross_compiling" != "xyes"; then
+			AC_RUN_IFELSE([LJT_TEST],
+				[HAVE_LIBJPEG_TURBO="true"; AC_MSG_RESULT(yes)],
+				[AC_MSG_RESULT(no)])
+		else
+			AC_LINK_IFELSE([LJT_TEST],
+				[HAVE_LIBJPEG_TURBO="true"; AC_MSG_RESULT(yes)],
+				[AC_MSG_RESULT(no)])
+		fi
+	fi
 fi
+
+AC_ARG_WITH(turbovnc,
+[  --with-turbovnc         use TurboVNC encoder instead of TightVNC encoder],,)
+
+AC_MSG_CHECKING(whether to enable TurboVNC encoder)
+if test "x$with_turbovnc" = "xyes"; then
+	if test "x$HAVE_LIBJPEG_TURBO" != "xtrue"; then
+		AC_MSG_ERROR([
+==========================================================================
+*** The TurboVNC encoder requires libjpeg-turbo, which was not detected.
+You can obtain libjpeg-turbo from:
+https://sourceforge.net/projects/libjpeg-turbo/files/
+Optionally, you can pass --without-turbovnc to configure to use the
+TightVNC encoder instead. ***
+==========================================================================
+])
+	fi
+	AC_DEFINE(HAVE_TURBOVNC, 1, TurboVNC support enabled)
+	AC_MSG_RESULT(yes)
+else
+	AC_MSG_RESULT(no)
+fi
+
+AM_CONDITIONAL(HAVE_TURBOVNC, test "x$with_turbovnc" = "xyes" )
 
 AC_ARG_WITH(png,
 [  --without-png           disable support for png]
@@ -582,7 +648,7 @@ AC_ARG_WITH(png,
 #	-without-png              with_png="no"
 #	-with-png=/foo/dir        with_png="/foo/dir"
 
-if test "x$with_png" != "xno"; then
+if test "x$with_png" != "xno" -a "x$with_turbovnc" != "xyes"; then
 	if test ! -z "$with_png" -a "x$with_png" != "xyes"; then
 		# add user supplied directory to flags:
 		saved_CPPFLAGS="$CPPFLAGS"

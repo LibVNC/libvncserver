@@ -599,6 +599,10 @@ typedef struct _rfbClientRec {
 #if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
     int tightCompressLevel;
 #endif
+#ifdef LIBVNCSERVER_HAVE_TURBOVNC
+    /* TurboVNC Encoding support (extends TightVNC) */
+    int tightSubsampLevel;
+#endif
 #endif
 
     /* Ultra Encoding support */
@@ -870,6 +874,10 @@ extern rfbBool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 /* tight.c */
 
 #define TIGHT_DEFAULT_COMPRESSION  6
+
+#ifdef LIBVNCSERVER_HAVE_TURBOVNC
+#define TIGHT_DEFAULT_SUBSAMP 0
+#endif
 
 extern rfbBool rfbTightDisableGradient;
 
