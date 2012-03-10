@@ -1967,6 +1967,15 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->enableSupportedMessages  = FALSE;
         cl->enableSupportedEncodings = FALSE;
         cl->enableServerIdentity     = FALSE;
+#if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
+        cl->tightQualityLevel        = -1;
+#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_TURBOVNC) || defined(LIBVNCSERVER_HAVE_LIBPNG)
+        cl->tightCompressLevel       = TIGHT_DEFAULT_COMPRESSION;
+#endif
+#ifdef LIBVNCSERVER_HAVE_TURBOVNC
+        cl->tightSubsampLevel        = TIGHT_DEFAULT_SUBSAMP;
+#endif
+#endif
 
 
         for (i = 0; i < msg.se.nEncodings; i++) {
