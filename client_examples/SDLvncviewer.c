@@ -518,6 +518,7 @@ int main(int argc,char** argv) {
 	  cl->HandleTextChat=text_chat;
 	  cl->GotXCutText = got_selection;
 	  cl->listenPort = LISTEN_PORT_OFFSET;
+	  cl->listen6Port = LISTEN_PORT_OFFSET;
 	  if(!rfbInitClient(cl,&argc,argv))
 	    {
 	      cl = NULL; /* rfbInitClient has already freed the client struct */

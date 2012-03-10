@@ -937,8 +937,46 @@ int
 rfbConnectToTcpAddr(char *host,
                     int port)
 {
-    struct hostent *hp;
     int sock;
+#ifdef LIBVNCSERVER_IPv6
+    struct addrinfo hints, *servinfo, *p;
+    int rv;
+    char port_str[8];
+
+    snprintf(port_str, 8, "%d", port);
+
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    if ((rv = getaddrinfo(host, port_str, &hints, &servinfo)) != 0) {
+        rfbErr("rfbConnectToTcpAddr: error in getaddrinfo: %s\n", gai_strerror(rv));
+        return -1;
+    }
+
+    /* loop through all the results and connect to the first we can */
+    for(p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
+            continue;
+
+        if (connect(sock, p->ai_addr, p->ai_addrlen) < 0) {
+            closesocket(sock);
+            continue;
+        }
+
+        break;
+    }
+
+    /* all failed */
+    if (p == NULL) {
+        rfbLogPerror("rfbConnectToTcoAddr: failed to connect\n");
+        sock = -1; /* set return value */
+    }
+
+    /* all done with this structure now */
+    freeaddrinfo(servinfo);
+#else
+    struct hostent *hp;
     struct sockaddr_in addr;
 
     memset(&addr, 0, sizeof(addr));
@@ -962,7 +1000,7 @@ rfbConnectToTcpAddr(char *host,
 	closesocket(sock);
 	return -1;
     }
-
+#endif
     return sock;
 }
 
