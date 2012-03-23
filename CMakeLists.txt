@@ -5,6 +5,9 @@ include(CheckFunctionExists)
 include(CheckIncludeFile)
 include(CheckTypeSize)
 include(TestBigEndian)
+include(CheckCSourceCompiles)
+include(CheckCXXSourceCompiles)
+include(CheckCSourceRuns)
 
 set(PACKAGE_NAME           "LibVNCServer")
 set(FULL_PACKAGE_NAME      "LibVNCServer")
@@ -29,6 +32,40 @@ find_package(Threads)
 find_package(X11)
 find_package(OpenSSL)
 find_library(LIBGCRYPT_LIBRARIES gcrypt)
+
+# Check whether the version of libjpeg we found was libjpeg-turbo and print a
+# warning if not.
+set(CMAKE_REQUIRED_LIBRARIES ${JPEG_LIBRARIES})
+set(CMAKE_REQUIRED_FLAGS -I${JPEG_INCLUDE_DIR})
+
+set(JPEG_TEST_SOURCE "\n
+  #include <stdio.h>\n
+  #include <jpeglib.h>\n
+  int main(void) {\n
+    struct jpeg_compress_struct cinfo;\n
+    struct jpeg_error_mgr jerr;\n
+    cinfo.err=jpeg_std_error(&jerr);\n
+    jpeg_create_compress(&cinfo);\n
+    cinfo.input_components = 3;\n
+    jpeg_set_defaults(&cinfo);\n
+    cinfo.in_color_space = JCS_EXT_RGB;\n
+    jpeg_default_colorspace(&cinfo);\n
+    return 0;\n
+  }")
+
+if(CMAKE_CROSSCOMPILING)
+  check_c_source_compiles("${JPEG_TEST_SOURCE}" FOUND_LIBJPEG_TURBO)
+else()
+  check_c_source_runs("${JPEG_TEST_SOURCE}" FOUND_LIBJPEG_TURBO)
+endif()
+
+set(CMAKE_REQUIRED_LIBRARIES)
+set(CMAKE_REQUIRED_FLAGS)
+set(CMAKE_REQUIRED_DEFINITIONS)
+
+if(NOT FOUND_LIBJPEG_TURBO)
+  message(WARNING "*** The libjpeg library you are building against is not libjpeg-turbo.  Performance will be reduced.  You can obtain libjpeg-turbo from:  https://sourceforge.net/projects/libjpeg-turbo/files/ ***")
+endif()
 
 set(CMAKE_REQUIRED_LIBRARIES resolv)
 check_function_exists(__b64_ntop HAVE_B64)
@@ -166,13 +203,13 @@ endif(ZLIB_FOUND)
 if(JPEG_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBJPEG)
   include_directories(${JPEG_INCLUDE_DIR})
-  set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c)
+  set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c ${COMMON_DIR}/turbojpeg.c)
 endif(JPEG_FOUND)
 
 if(PNG_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBPNG)
   include_directories(${PNG_INCLUDE_DIR})
-  set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c)
+  set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c ${COMMON_DIR}/turbojpeg.c)
 endif(PNG_FOUND)
 
 set(LIBVNCSERVER_SOURCES
