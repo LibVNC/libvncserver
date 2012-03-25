@@ -469,7 +469,6 @@ typedef struct {
  *   0xFFFFFFF0 .. 0xFFFFFFFF -- cross-encoding compression levels.
  */
 
-#ifdef LIBVNCSERVER_HAVE_TURBOVNC
 #define rfbEncodingFineQualityLevel0   0xFFFFFE00
 #define rfbEncodingFineQualityLevel100 0xFFFFFE64
 #define rfbEncodingSubsamp1X           0xFFFFFD00
@@ -478,7 +477,6 @@ typedef struct {
 #define rfbEncodingSubsampGray         0xFFFFFD03
 #define rfbEncodingSubsamp8X           0xFFFFFD04
 #define rfbEncodingSubsamp16X          0xFFFFFD05
-#endif
 
 #define rfbEncodingCompressLevel0  0xFFFFFF00
 #define rfbEncodingCompressLevel1  0xFFFFFF01
@@ -734,12 +732,13 @@ typedef struct {
  *   bit 3:    if 1, then compression stream 3 should be reset;
  *   bits 7-4: if 1000 (0x08), then the compression type is "fill",
  *             if 1001 (0x09), then the compression type is "jpeg",
- *             (TurboVNC) if 1010 (0x0A), then the compression type is "basic"
- *               and no Zlib compression was used,
- *             (TurboVNC) if 1110 (0x0E), then the compression type is "basic",
- *               no Zlib compression was used, and a "filter id" byte follows
- *               this byte,
- *             (TightVNC) if 1010 (0x0A), then the compression type is "png",
+ *             (Tight only) if 1010 (0x0A), then the compression type is
+ *               "basic" and no Zlib compression was used,
+ *             (Tight only) if 1110 (0x0E), then the compression type is
+ *               "basic", no Zlib compression was used, and a "filter id" byte
+ *               follows this byte,
+ *             (TightPng only) if 1010 (0x0A), then the compression type is
+ *               "png",
  *             if 0xxx, then the compression type is "basic" and Zlib
  *               compression was used,
  *             values greater than 1010 are not valid.
@@ -858,11 +857,8 @@ typedef struct {
 #define rfbTightExplicitFilter         0x04
 #define rfbTightFill                   0x08
 #define rfbTightJpeg                   0x09
-#ifdef LIBVNCSERVER_HAVE_TURBOVNC
 #define rfbTightNoZlib                 0x0A
-#else
 #define rfbTightPng                    0x0A
-#endif
 #define rfbTightMaxSubencoding         0x0A
 
 /* Filters to improve compression efficiency */

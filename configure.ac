@@ -612,31 +612,18 @@ A copy of libjpeg may be obtained from:  http://ijg.org/files/
 				[AC_MSG_RESULT(no)])
 		fi
 	fi
-fi
 
-AC_ARG_WITH(turbovnc,
-[  --with-turbovnc         use TurboVNC encoder instead of TightVNC encoder],,)
-
-AC_MSG_CHECKING(whether to enable TurboVNC encoder)
-if test "x$with_turbovnc" = "xyes"; then
 	if test "x$HAVE_LIBJPEG_TURBO" != "xtrue"; then
-		AC_MSG_ERROR([
+		AC_MSG_WARN([
 ==========================================================================
-*** The TurboVNC encoder requires libjpeg-turbo, which was not detected.
-You can obtain libjpeg-turbo from:
-https://sourceforge.net/projects/libjpeg-turbo/files/
-Optionally, you can pass --without-turbovnc to configure to use the
-TightVNC encoder instead. ***
+*** The libjpeg library you are building against is not libjpeg-turbo.
+Performance will be reduced.  You can obtain libjpeg-turbo from:
+https://sourceforge.net/projects/libjpeg-turbo/files/ ***
 ==========================================================================
 ])
-	fi
-	AC_DEFINE(HAVE_TURBOVNC, 1, TurboVNC support enabled)
-	AC_MSG_RESULT(yes)
-else
-	AC_MSG_RESULT(no)
-fi
+  fi
 
-AM_CONDITIONAL(HAVE_TURBOVNC, test "x$with_turbovnc" = "xyes" )
+fi
 
 AC_ARG_WITH(png,
 [  --without-png           disable support for png]
@@ -648,7 +635,7 @@ AC_ARG_WITH(png,
 #	-without-png              with_png="no"
 #	-with-png=/foo/dir        with_png="/foo/dir"
 
-if test "x$with_png" != "xno" -a "x$with_turbovnc" != "xyes"; then
+if test "x$with_png" != "xno"; then
 	if test ! -z "$with_png" -a "x$with_png" != "xyes"; then
 		# add user supplied directory to flags:
 		saved_CPPFLAGS="$CPPFLAGS"
