@@ -141,10 +141,9 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_LALT: k = XK_Alt_L; break;
 	case SDLK_RMETA: k = XK_Meta_R; break;
 	case SDLK_LMETA: k = XK_Meta_L; break;
+	case SDLK_LSUPER: k = XK_Super_L; break;
+	case SDLK_RSUPER: k = XK_Super_R; break;
 #if 0
-	/* TODO: find out keysyms */
-	case SDLK_LSUPER: k = XK_LSuper; break;		/* left "windows" key */
-	case SDLK_RSUPER: k = XK_RSuper; break;		/* right "windows" key */
 	case SDLK_COMPOSE: k = XK_Compose; break;
 #endif
 	case SDLK_MODE: k = XK_Mode_switch; break;
