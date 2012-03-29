@@ -78,7 +78,9 @@ static rfbBool resize(rfbClient* client) {
 
 static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	rfbKeySym k = 0;
-	switch(e->keysym.sym) {
+	SDLKey sym = e->keysym.sym;
+
+	switch (sym) {
 	case SDLK_BACKSPACE: k = XK_BackSpace; break;
 	case SDLK_TAB: k = XK_Tab; break;
 	case SDLK_CLEAR: k = XK_Clear; break;
@@ -152,16 +154,21 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_BREAK: k = XK_Break; break;
 	default: break;
 	}
-	if (k == 0 && e->keysym.sym >= SDLK_a && e->keysym.sym <= SDLK_z) {
-		k = XK_a + e->keysym.sym - SDLK_a;
-		if (e->keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT))
-			k &= ~0x20;
+	/* both SDL and X11 keysyms match ASCII in the range 0x01-0x7f */
+	if (k == 0 && sym > 0x0 && sym < 0x100) {
+		k = sym;
+		if (e->keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT)) {
+			if (k >= '1' && k <= '9')
+				k &= ~0x10;
+			else if (k >= 'a' && k <= 'f')
+				k &= ~0x20;
+		}
 	}
 	if (k == 0) {
 		if (e->keysym.unicode < 0x100)
 			k = e->keysym.unicode;
 		else
-			rfbClientLog("Unknown keysym: %d\n",e->keysym.sym);
+			rfbClientLog("Unknown keysym: %d\n", sym);
 	}
 
 	return k;
