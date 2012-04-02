@@ -347,7 +347,10 @@ typedef struct _rfbClient {
 	FinishedFrameBufferUpdateProc FinishedFrameBufferUpdate;
 
 	char *listenAddress;
-
+        /* IPv6 listen socket, address and port*/
+        int listen6Sock;
+        char* listen6Address;
+        int listen6Port;
 } rfbClient;
 
 /* cursor.c */
