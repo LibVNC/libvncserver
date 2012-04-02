@@ -19,6 +19,7 @@
  */
 
 /*
+ *  Copyright (C) 2011-2012 Christian Beier <dontmind@freeshell.org>
  *  Copyright (C) 2005 Rohit Kumar, Johannes E. Schindelin
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
  *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.  
