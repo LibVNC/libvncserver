@@ -330,7 +330,7 @@ SendRectEncodingTight(rfbClientPtr cl,
        benefit.  For low-color workloads, it provides typically only 10-20%
        better compression than CL 2 with JPEG and CL 1 without JPEG, and it
        uses, on average, twice as much CPU time. */
-    if (compressLevel == 9) compressLevel = 3;
+    if (cl->tightCompressLevel == 9) compressLevel = 3;
 
     if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
          cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
