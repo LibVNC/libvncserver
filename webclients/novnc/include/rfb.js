@@ -4,6 +4,9 @@
  * Licensed under LGPL-3 (see LICENSE.txt)
  *
  * See README.md for usage and integration instructions.
+ *
+ * TIGHT decoder portion:
+ * (c) 2012 Michael Tinglof, Joe Balaz, Les Piech (Mercuri.ca)
  */
 
 /*jslint white: false, browser: true, bitwise: false, plusplus: false */
@@ -23,7 +26,7 @@ var that           = {},  // Public API methods
     pixelFormat, clientEncodings, fbUpdateRequest, fbUpdateRequests,
     keyEvent, pointerEvent, clientCutText,
 
-    extract_data_uri, scan_tight_imgQ,
+    getTightCLength, extract_data_uri, scan_tight_imgQ,
     keyPress, mouseButton, mouseMove,
 
     checkEvents,  // Overridable for testing
@@ -46,6 +49,7 @@ var that           = {},  // Public API methods
     // In preference order
     encodings      = [
         ['COPYRECT',         0x01 ],
+        ['TIGHT',            0x07 ],
         ['TIGHT_PNG',        -260 ],
         ['HEXTILE',          0x05 ],
         ['RRE',              0x02 ],
@@ -54,10 +58,12 @@ var that           = {},  // Public API methods
         ['Cursor',           -239 ],
 
         // Psuedo-encoding settings
-        ['JPEG_quality_lo',   -32 ],
+        //['JPEG_quality_lo',   -32 ],
+        ['JPEG_quality_med',    -26 ],
         //['JPEG_quality_hi',   -23 ],
-        ['compress_lo',      -255 ]
-        //['compress_hi',      -247 ]
+        //['compress_lo',      -255 ],
+        ['compress_hi',        -247 ],
+        ['last_rect',          -224 ]
         ],
 
     encHandlers    = {},
@@ -87,7 +93,8 @@ var that           = {},  // Public API methods
         encoding       : 0,
         subencoding    : -1,
         background     : null,
-        imgQ           : []   // TIGHT_PNG image queue
+        imgQ           : [],  // TIGHT_PNG image queue
+        zlibs          : []   // TIGHT zlib streams
     },
 
     fb_Bpp         = 4,
@@ -109,7 +116,8 @@ var that           = {},  // Public API methods
 
         fbu_rt_start   : 0,
         fbu_rt_total   : 0,
-        fbu_rt_cnt     : 0
+        fbu_rt_cnt     : 0,
+        pixels         : 0
     },
 
     test_mode        = false,
@@ -131,6 +139,7 @@ Util.conf_defaults(conf, that, defaults, [
     ['true_color',         'rw', 'bool', true,  'Request true color pixel data'],
     ['local_cursor',       'rw', 'bool', false, 'Request locally rendered cursor'],
     ['shared',             'rw', 'bool', true,  'Request shared mode'],
+    ['view_only',          'rw', 'bool', false, 'Disable client mouse/keyboard'],
 
     ['connectTimeout',     'rw', 'int', def_con_timeout, 'Time (s) to wait for connection'],
     ['disconnectTimeout',  'rw', 'int', 3,    'Time (s) to wait for disconnection'],
@@ -224,7 +233,10 @@ function constructor() {
             fail("Got unexpected WebSockets connection");
         }
     });
-    ws.on('close', function() {
+    ws.on('close', function(e) {
+        if (e.code) {
+            Util.Info("Close code: " + e.code + ", reason: " + e.reason + ", wasClean: " + e.wasClean);
+        }
         if (rfb_state === 'disconnect') {
             updateState('disconnected', 'VNC disconnected');
         } else if (rfb_state === 'ProtocolVersion') {
@@ -266,14 +278,18 @@ function constructor() {
 
 function connect() {
     Util.Debug(">> RFB.connect");
-
-    var uri = "";
-    if (conf.encrypt) {
-        uri = "wss://";
+    var uri;
+    
+    if (typeof UsingSocketIO !== "undefined") {
+        uri = "http://" + rfb_host + ":" + rfb_port + "/" + rfb_path;
     } else {
-        uri = "ws://";
+        if (conf.encrypt) {
+            uri = "wss://";
+        } else {
+            uri = "ws://";
+        }
+        uri += rfb_host + ":" + rfb_port + "/" + rfb_path;
     }
-    uri += rfb_host + ":" + rfb_port + "/" + rfb_path;
     Util.Info("connecting to " + uri);
     ws.open(uri);
 
@@ -292,12 +308,19 @@ init_vars = function() {
     FBU.lines        = 0;  // RAW
     FBU.tiles        = 0;  // HEXTILE
     FBU.imgQ         = []; // TIGHT_PNG image queue
+    FBU.zlibs        = []; // TIGHT zlib encoders
     mouse_buttonMask = 0;
     mouse_arr        = [];
 
     // Clear the per connection encoding stats
     for (i=0; i < encodings.length; i+=1) {
         encStats[encodings[i][1]][0] = 0;
+    }
+    
+    for (i=0; i < 4; i++) {
+        //FBU.zlibs[i] = new InflateStream();
+        FBU.zlibs[i] = new TINF();
+        FBU.zlibs[i].init();
     }
 };
 
@@ -565,6 +588,9 @@ checkEvents = function() {
 
 keyPress = function(keysym, down) {
     var arr;
+
+    if (conf.view_only) { return; } // View only, skip keyboard events
+
     arr = keyEvent(keysym, down);
     arr = arr.concat(fbUpdateRequests());
     ws.send(arr);
@@ -586,8 +612,11 @@ mouseButton = function(x, y, down, bmask) {
             return;
         } else {
             viewportDragging = false;
+            ws.send(fbUpdateRequests()); // Force immediate redraw
         }
     }
+
+    if (conf.view_only) { return; } // View only, skip mouse events
 
     mouse_arr = mouse_arr.concat(
             pointerEvent(display.absX(x), display.absY(y)) );
@@ -610,6 +639,8 @@ mouseMove = function(x, y) {
         // Skip sending mouse events
         return;
     }
+
+    if (conf.view_only) { return; } // View only, skip mouse events
 
     mouse_arr = mouse_arr.concat(
             pointerEvent(display.absX(x), display.absY(y)) );
@@ -641,8 +672,10 @@ init_msg = function() {
         switch (sversion) {
             case "003.003": rfb_version = 3.3; break;
             case "003.006": rfb_version = 3.3; break;  // UltraVNC
+            case "003.889": rfb_version = 3.3; break;  // Apple Remote Desktop
             case "003.007": rfb_version = 3.7; break;
             case "003.008": rfb_version = 3.8; break;
+            case "004.000": rfb_version = 3.8; break;  // Intel AMT KVM
             default:
                 return fail("Invalid server version " + sversion);
         }
@@ -806,9 +839,25 @@ init_msg = function() {
                   ", green_shift: " + green_shift +
                   ", blue_shift: " + blue_shift);
 
+        if (big_endian !== 0) {
+            Util.Warn("Server native endian is not little endian");
+        }
+        if (red_shift !== 16) {
+            Util.Warn("Server native red-shift is not 16");
+        }
+        if (blue_shift !== 0) {
+            Util.Warn("Server native blue-shift is not 0");
+        }
+
         /* Connection name/title */
         name_length   = ws.rQshift32();
         fb_name = ws.rQshiftStr(name_length);
+        
+        if (conf.true_color && fb_name === "Intel(r) AMT KVM")
+        {
+            Util.Warn("Intel AMT KVM only support 8/16 bit depths. Disabling true color");
+            conf.true_color = false;
+        }
 
         display.set_true_color(conf.true_color);
         display.resize(fb_width, fb_height);
@@ -865,6 +914,8 @@ normal_msg = function() {
         ws.rQshift8();  // Padding
         first_colour = ws.rQshift16(); // First colour
         num_colours = ws.rQshift16();
+        if (ws.rQwait("SetColourMapEntries", num_colours*6, 6)) { return false; }
+        
         for (c=0; c < num_colours; c+=1) { 
             red = ws.rQshift16();
             //Util.Debug("red before: " + red);
@@ -872,7 +923,7 @@ normal_msg = function() {
             //Util.Debug("red after: " + red);
             green = parseInt(ws.rQshift16() / 256, 10);
             blue = parseInt(ws.rQshift16() / 256, 10);
-            display.set_colourMap([red, green, blue], first_colour + c);
+            display.set_colourMap([blue, green, red], first_colour + c);
         }
         Util.Debug("colourMap: " + display.get_colourMap());
         Util.Info("Registered " + num_colours + " colourMap entries");
@@ -973,9 +1024,10 @@ framebufferUpdate = function() {
         if (ret) {
             encStats[FBU.encoding][0] += 1;
             encStats[FBU.encoding][1] += 1;
+            timing.pixels += FBU.width * FBU.height;
         }
 
-        if (FBU.rects === 0) {
+        if (FBU.rects === 0 || (timing.pixels >= (fb_width * fb_height))) {
             if (((FBU.width === fb_width) &&
                         (FBU.height === fb_height)) ||
                     (timing.fbu_rt_start > 0)) {
@@ -1226,42 +1278,197 @@ encHandlers.HEXTILE = function display_hextile() {
 };
 
 
-encHandlers.TIGHT_PNG = function display_tight_png() {
-    //Util.Debug(">> display_tight_png");
-    var ctl, cmode, clength, getCLength, color, img;
-    //Util.Debug("   FBU.rects: " + FBU.rects);
-    //Util.Debug("   starting ws.rQslice(0,20): " + ws.rQslice(0,20) + " (" + ws.rQlen() + ")");
+// Get 'compact length' header and data size
+getTightCLength = function (arr) {
+    var header = 1, data = 0;
+    data += arr[0] & 0x7f;
+    if (arr[0] & 0x80) {
+        header += 1;
+        data += (arr[1] & 0x7f) << 7;
+        if (arr[1] & 0x80) {
+            header += 1;
+            data += arr[2] << 14;
+        }
+    }
+    return [header, data];
+};
+
+function display_tight(isTightPNG) {
+    //Util.Debug(">> display_tight");
+
+    if (fb_depth === 1) {
+        fail("Tight protocol handler only implements true color mode");
+    }
+
+    var ctl, cmode, clength, color, img, data;
+    var filterId = -1, resetStreams = 0, streamId = -1;
+    var rQ = ws.get_rQ(), rQi = ws.get_rQi(); 
 
     FBU.bytes = 1; // compression-control byte
     if (ws.rQwait("TIGHT compression-control", FBU.bytes)) { return false; }
 
-    // Get 'compact length' header and data size
-    getCLength = function (arr) {
-        var header = 1, data = 0;
-        data += arr[0] & 0x7f;
-        if (arr[0] & 0x80) {
-            header += 1;
-            data += (arr[1] & 0x7f) << 7;
-            if (arr[1] & 0x80) {
-                header += 1;
-                data += arr[2] << 14;
+    var checksum = function(data) {
+        var sum=0, i;
+        for (i=0; i<data.length;i++) {
+            sum += data[i];
+            if (sum > 65536) sum -= 65536;
+        }
+        return sum;
+    }
+
+    var decompress = function(data) {
+        for (var i=0; i<4; i++) {
+            if ((resetStreams >> i) & 1) {
+                FBU.zlibs[i].reset();
+                Util.Info("Reset zlib stream " + i);
             }
         }
-        return [header, data];
-    };
+        var uncompressed = FBU.zlibs[streamId].uncompress(data, 0);
+        if (uncompressed.status !== 0) {
+            Util.Error("Invalid data in zlib stream");
+        }
+        //Util.Warn("Decompressed " + data.length + " to " +
+        //    uncompressed.data.length + " checksums " +
+        //    checksum(data) + ":" + checksum(uncompressed.data));
+
+        return uncompressed.data;
+    }
+
+    var handlePalette = function() {
+        var numColors = rQ[rQi + 2] + 1;
+        var paletteSize = numColors * fb_depth; 
+        FBU.bytes += paletteSize;
+        if (ws.rQwait("TIGHT palette " + cmode, FBU.bytes)) { return false; }
+
+        var bpp = (numColors <= 2) ? 1 : 8;
+        var rowSize = Math.floor((FBU.width * bpp + 7) / 8);
+        var raw = false;
+        if (rowSize * FBU.height < 12) {
+            raw = true;
+            clength = [0, rowSize * FBU.height];
+        } else {
+            clength = getTightCLength(ws.rQslice(3 + paletteSize,
+                                                 3 + paletteSize + 3));
+        }
+        FBU.bytes += clength[0] + clength[1];
+        if (ws.rQwait("TIGHT " + cmode, FBU.bytes)) { return false; }
+
+        // Shift ctl, filter id, num colors, palette entries, and clength off
+        ws.rQshiftBytes(3); 
+        var palette = ws.rQshiftBytes(paletteSize);
+        ws.rQshiftBytes(clength[0]);
+
+        if (raw) {
+            data = ws.rQshiftBytes(clength[1]);
+        } else {
+            data = decompress(ws.rQshiftBytes(clength[1]));
+        }
+
+        // Convert indexed (palette based) image data to RGB
+        // TODO: reduce number of calculations inside loop
+        var dest = [];
+        var x, y, b, w, w1, dp, sp;
+        if (numColors === 2) {
+            w = Math.floor((FBU.width + 7) / 8);
+            w1 = Math.floor(FBU.width / 8);
+            for (y = 0; y < FBU.height; y++) {
+                for (x = 0; x < w1; x++) {
+                    for (b = 7; b >= 0; b--) {
+                        dp = (y*FBU.width + x*8 + 7-b) * 3;
+                        sp = (data[y*w + x] >> b & 1) * 3;
+                        dest[dp  ] = palette[sp  ];
+                        dest[dp+1] = palette[sp+1];
+                        dest[dp+2] = palette[sp+2];
+                    }
+                }
+                for (b = 7; b >= 8 - FBU.width % 8; b--) {
+                    dp = (y*FBU.width + x*8 + 7-b) * 3;
+                    sp = (data[y*w + x] >> b & 1) * 3;
+                    dest[dp  ] = palette[sp  ];
+                    dest[dp+1] = palette[sp+1];
+                    dest[dp+2] = palette[sp+2];
+                }
+            }
+        } else {
+            for (y = 0; y < FBU.height; y++) {
+                for (x = 0; x < FBU.width; x++) {
+                    dp = (y*FBU.width + x) * 3;
+                    sp = data[y*FBU.width + x] * 3;
+                    dest[dp  ] = palette[sp  ];
+                    dest[dp+1] = palette[sp+1];
+                    dest[dp+2] = palette[sp+2];
+                }
+            }
+        }
+
+        FBU.imgQ.push({
+                'type': 'rgb',
+                'img':  {'complete': true, 'data': dest},
+                'x': FBU.x,
+                'y': FBU.y,
+                'width': FBU.width,
+                'height': FBU.height});
+        return true;
+    }
+
+    var handleCopy = function() {
+        var raw = false;
+        var uncompressedSize = FBU.width * FBU.height * fb_depth;
+        if (uncompressedSize < 12) {
+            raw = true;
+            clength = [0, uncompressedSize];
+        } else {
+            clength = getTightCLength(ws.rQslice(1, 4));
+        }
+        FBU.bytes = 1 + clength[0] + clength[1];
+        if (ws.rQwait("TIGHT " + cmode, FBU.bytes)) { return false; }
+
+        // Shift ctl, clength off
+        ws.rQshiftBytes(1 + clength[0]);
+
+        if (raw) {
+            data = ws.rQshiftBytes(clength[1]);
+        } else {
+            data = decompress(ws.rQshiftBytes(clength[1]));
+        }
+
+        FBU.imgQ.push({
+                'type': 'rgb',
+                'img':  {'complete': true, 'data': data},
+                'x': FBU.x,
+                'y': FBU.y,
+                'width': FBU.width,
+                'height': FBU.height});
+        return true;
+    }
 
     ctl = ws.rQpeek8();
-    switch (ctl >> 4) {
-        case 0x08: cmode = "fill"; break;
-        case 0x09: cmode = "jpeg"; break;
-        case 0x0A: cmode = "png";  break;
-        default:   throw("Illegal basic compression received, ctl: " + ctl);
+
+    // Keep tight reset bits
+    resetStreams = ctl & 0xF;
+
+    // Figure out filter
+    ctl = ctl >> 4; 
+    streamId = ctl & 0x3;
+
+    if (ctl === 0x08)      cmode = "fill";
+    else if (ctl === 0x09) cmode = "jpeg";
+    else if (ctl === 0x0A) cmode = "png";
+    else if (ctl & 0x04)   cmode = "filter";
+    else if (ctl < 0x04)   cmode = "copy";
+    else throw("Illegal tight compression received, ctl: " + ctl);
+
+    if (isTightPNG && (cmode === "filter" || cmode === "copy")) {
+        throw("filter/copy received in tightPNG mode");
     }
+
     switch (cmode) {
         // fill uses fb_depth because TPIXELs drop the padding byte
-        case "fill": FBU.bytes += fb_depth; break; // TPIXEL
-        case "jpeg": FBU.bytes += 3;            break; // max clength
-        case "png":  FBU.bytes += 3;            break; // max clength
+        case "fill":   FBU.bytes += fb_depth; break; // TPIXEL
+        case "jpeg":   FBU.bytes += 3;        break; // max clength
+        case "png":    FBU.bytes += 3;        break; // max clength
+        case "filter": FBU.bytes += 2;        break; // filter id + num colors if palette
+        case "copy":                          break;
     }
 
     if (ws.rQwait("TIGHT " + cmode, FBU.bytes)) { return false; }
@@ -1281,16 +1488,17 @@ encHandlers.TIGHT_PNG = function display_tight_png() {
                 'y': FBU.y,
                 'width': FBU.width,
                 'height': FBU.height,
-                'color': color});
+                'color': [color[2], color[1], color[0]] });
         break;
-    case "jpeg":
     case "png":
-        clength = getCLength(ws.rQslice(1, 4));
+    case "jpeg":
+        clength = getTightCLength(ws.rQslice(1, 4));
         FBU.bytes = 1 + clength[0] + clength[1]; // ctl + clength size + jpeg-data
         if (ws.rQwait("TIGHT " + cmode, FBU.bytes)) { return false; }
 
         // We have everything, render it
-        //Util.Debug("   png, ws.rQlen(): " + ws.rQlen() + ", clength[0]: " + clength[0] + ", clength[1]: " + clength[1]);
+        //Util.Debug("   jpeg, ws.rQlen(): " + ws.rQlen() + ", clength[0]: " +
+        //           clength[0] + ", clength[1]: " + clength[1]);
         ws.rQshiftBytes(1 + clength[0]); // shift off ctl + compact length
         img = new Image();
         //img.onload = scan_tight_imgQ;
@@ -1303,13 +1511,27 @@ encHandlers.TIGHT_PNG = function display_tight_png() {
             extract_data_uri(ws.rQshiftBytes(clength[1]));
         img = null;
         break;
+    case "filter":
+        filterId = rQ[rQi + 1];
+        if (filterId === 1) {
+            if (!handlePalette()) { return false; }
+        } else {
+            // Filter 0, Copy could be valid here, but servers don't send it as an explicit filter
+            // Filter 2, Gradient is valid but not used if jpeg is enabled
+            throw("Unsupported tight subencoding received, filter: " + filterId);
+        }
+        break;
+    case "copy":
+        if (!handleCopy()) { return false; }
+        break;
     }
+
     FBU.bytes = 0;
     FBU.rects -= 1;
     //Util.Debug("   ending ws.rQslice(0,20): " + ws.rQslice(0,20) + " (" + ws.rQlen() + ")");
     //Util.Debug("<< display_tight_png");
     return true;
-};
+}
 
 extract_data_uri = function(arr) {
     //var i, stra = [];
@@ -1327,14 +1549,26 @@ scan_tight_imgQ = function() {
         imgQ = FBU.imgQ;
         while ((imgQ.length > 0) && (imgQ[0].img.complete)) {
             data = imgQ.shift();
-            if (data['type'] === 'fill') {
+            if (data.type === 'fill') {
                 display.fillRect(data.x, data.y, data.width, data.height, data.color);
+            } else if (data.type === 'rgb') {
+                display.blitRgbImage(data.x, data.y, data.width, data.height, data.img.data, 0);
             } else {
                 ctx.drawImage(data.img, data.x, data.y);
             }
         }
         setTimeout(scan_tight_imgQ, scan_imgQ_rate);
     }
+};
+
+encHandlers.TIGHT = function () { return display_tight(false); };
+encHandlers.TIGHT_PNG = function () { return display_tight(true); };
+
+encHandlers.last_rect = function last_rect() {
+    Util.Debug(">> set_desktopsize");
+    FBU.rects = 0;
+    Util.Debug("<< set_desktopsize");
+    return true;
 };
 
 encHandlers.DesktopSize = function set_desktopsize() {
@@ -1408,9 +1642,9 @@ pixelFormat = function() {
     arr.push16(255);  // red-max
     arr.push16(255);  // green-max
     arr.push16(255);  // blue-max
-    arr.push8(0);     // red-shift
+    arr.push8(16);    // red-shift
     arr.push8(8);     // green-shift
-    arr.push8(16);    // blue-shift
+    arr.push8(0);     // blue-shift
 
     arr.push8(0);     // padding
     arr.push8(0);     // padding
@@ -1556,7 +1790,7 @@ that.sendPassword = function(passwd) {
 };
 
 that.sendCtrlAltDel = function() {
-    if (rfb_state !== "normal") { return false; }
+    if (rfb_state !== "normal" || conf.view_only) { return false; }
     Util.Info("Sending Ctrl-Alt-Del");
     var arr = [];
     arr = arr.concat(keyEvent(0xFFE3, 1)); // Control
@@ -1572,7 +1806,7 @@ that.sendCtrlAltDel = function() {
 // Send a key press. If 'down' is not specified then send a down key
 // followed by an up key.
 that.sendKey = function(code, down) {
-    if (rfb_state !== "normal") { return false; }
+    if (rfb_state !== "normal" || conf.view_only) { return false; }
     var arr = [];
     if (typeof down !== 'undefined') {
         Util.Info("Sending key code (" + (down ? "down" : "up") + "): " + code);

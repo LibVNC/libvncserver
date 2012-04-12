@@ -14,7 +14,7 @@ var UI = {
 
 rfb_state : 'loaded',
 settingsOpen : false,
-connSettingsOpen : true,
+connSettingsOpen : false,
 clipboardOpen: false,
 keyboardVisible: false,
 
@@ -45,15 +45,16 @@ load: function() {
     WebUtil.selectStylesheet(UI.getSetting('stylesheet'));
 
     /* Populate the controls if defaults are provided in the URL */
-    UI.initSetting('host', '');
-    UI.initSetting('port', '');
+    UI.initSetting('host', window.location.hostname);
+    UI.initSetting('port', window.location.port);
     UI.initSetting('password', '');
-    UI.initSetting('encrypt', false);
+    UI.initSetting('encrypt', (window.location.protocol === "https:"));
     UI.initSetting('true_color', true);
     UI.initSetting('cursor', false);
     UI.initSetting('shared', true);
+    UI.initSetting('view_only', false);
     UI.initSetting('connectTimeout', 2);
-    UI.initSetting('path', '');
+    UI.initSetting('path', 'websockify');
 
     UI.rfb = RFB({'target': $D('noVNC_canvas'),
                   'onUpdateState': UI.updateState,
@@ -101,6 +102,14 @@ load: function() {
         }
     } );
 
+    // Show description by default when hosted at for kanaka.github.com
+    if (location.host === "kanaka.github.com") {
+        // Open the description dialog
+        $D('noVNC_description').style.display = "block";
+    } else {
+        // Open the connect panel on first load
+        UI.toggleConnectPanel();
+    }
 },
 
 // Read form control compatible setting from cookie
@@ -188,17 +197,19 @@ forceSetting: function(name, val) {
 
 // Show the clipboard panel
 toggleClipboardPanel: function() {
+    // Close the description panel
+    $D('noVNC_description').style.display = "none";
     //Close settings if open
-    if (UI.settingsOpen == true) {
+    if (UI.settingsOpen === true) {
         UI.settingsApply();
         UI.closeSettingsMenu();
     }
     //Close connection settings if open
-    if (UI.connSettingsOpen == true) {
+    if (UI.connSettingsOpen === true) {
         UI.toggleConnectPanel();
     }
     //Toggle Clipboard Panel
-    if (UI.clipboardOpen == true) {
+    if (UI.clipboardOpen === true) {
         $D('noVNC_clipboard').style.display = "none";
         $D('clipboardButton').className = "noVNC_status_button";
         UI.clipboardOpen = false;
@@ -211,18 +222,20 @@ toggleClipboardPanel: function() {
 
 // Show the connection settings panel/menu
 toggleConnectPanel: function() {
+    // Close the description panel
+    $D('noVNC_description').style.display = "none";
     //Close connection settings if open
-    if (UI.settingsOpen == true) {
+    if (UI.settingsOpen === true) {
         UI.settingsApply();
         UI.closeSettingsMenu();
         $D('connectButton').className = "noVNC_status_button";
     }
-    if (UI.clipboardOpen == true) {
+    if (UI.clipboardOpen === true) {
         UI.toggleClipboardPanel();
     }
 
     //Toggle Connection Panel
-    if (UI.connSettingsOpen == true) {
+    if (UI.connSettingsOpen === true) {
         $D('noVNC_controls').style.display = "none";
         $D('connectButton').className = "noVNC_status_button";
         UI.connSettingsOpen = false;
@@ -238,6 +251,8 @@ toggleConnectPanel: function() {
 //   On open, settings are refreshed from saved cookies.
 //   On close, settings are applied
 toggleSettingsPanel: function() {
+    // Close the description panel
+    $D('noVNC_description').style.display = "none";
     if (UI.settingsOpen) {
         UI.settingsApply();
         UI.closeSettingsMenu();
@@ -252,6 +267,7 @@ toggleSettingsPanel: function() {
         }
         UI.updateSetting('clip');
         UI.updateSetting('shared');
+        UI.updateSetting('view_only');
         UI.updateSetting('connectTimeout');
         UI.updateSetting('path');
         UI.updateSetting('stylesheet');
@@ -263,11 +279,13 @@ toggleSettingsPanel: function() {
 
 // Open menu
 openSettingsMenu: function() {
-    if (UI.clipboardOpen == true) {
+    // Close the description panel
+    $D('noVNC_description').style.display = "none";
+    if (UI.clipboardOpen === true) {
         UI.toggleClipboardPanel();
     }
     //Close connection settings if open
-    if (UI.connSettingsOpen == true) {
+    if (UI.connSettingsOpen === true) {
         UI.toggleConnectPanel();
     }
     $D('noVNC_settings').style.display = "block";
@@ -292,6 +310,7 @@ settingsApply: function() {
     }
     UI.saveSetting('clip');
     UI.saveSetting('shared');
+    UI.saveSetting('view_only');
     UI.saveSetting('connectTimeout');
     UI.saveSetting('path');
     UI.saveSetting('stylesheet');
@@ -363,6 +382,7 @@ updateState: function(rfb, state, oldstate, msg) {
             break;
         case 'disconnected':
             $D('noVNC_logo').style.display = "block";
+            // Fall through
         case 'loaded':
             klass = "noVNC_status_normal";
             break;
@@ -404,16 +424,19 @@ updateVisualState: function() {
         $D('noVNC_cursor').disabled = true;
     }
     $D('noVNC_shared').disabled = connected;
+    $D('noVNC_view_only').disabled = connected;
     $D('noVNC_connectTimeout').disabled = connected;
     $D('noVNC_path').disabled = connected;
 
     if (connected) {
         UI.setViewClip();
         UI.setMouseButton(1);
+        $D('clipboardButton').style.display = "inline";
         $D('showKeyboard').style.display = "inline";
         $D('sendCtrlAltDelButton').style.display = "inline";
     } else {
         UI.setMouseButton();
+        $D('clipboardButton').style.display = "none";
         $D('showKeyboard').style.display = "none";
         $D('sendCtrlAltDelButton').style.display = "none";
     }
@@ -464,6 +487,7 @@ connect: function() {
     UI.rfb.set_true_color(UI.getSetting('true_color'));
     UI.rfb.set_local_cursor(UI.getSetting('cursor'));
     UI.rfb.set_shared(UI.getSetting('shared'));
+    UI.rfb.set_view_only(UI.getSetting('view_only'));
     UI.rfb.set_connectTimeout(UI.getSetting('connectTimeout'));
 
     UI.rfb.connect(host, port, password, path);
@@ -569,11 +593,11 @@ setViewDrag: function(drag) {
 
 // On touch devices, show the OS keyboard
 showKeyboard: function() {
-    if(UI.keyboardVisible == false) {
+    if(UI.keyboardVisible === false) {
         $D('keyboardinput').focus();
         UI.keyboardVisible = true;
         $D('showKeyboard').className = "noVNC_status_button_selected";
-    } else if(UI.keyboardVisible == true) {
+    } else if(UI.keyboardVisible === true) {
         $D('keyboardinput').blur();
         $D('showKeyboard').className = "noVNC_status_button";
         UI.keyboardVisible = false;
@@ -585,7 +609,7 @@ keyInputBlur: function() {
     //Weird bug in iOS if you change keyboardVisible
     //here it does not actually occur so next time
     //you click keyboard icon it doesnt work.
-    setTimeout("UI.setKeyboard()",100)
+    setTimeout(function() { UI.setKeyboard(); },100);
 },
 
 setKeyboard: function() {
