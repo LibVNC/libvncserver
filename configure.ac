@@ -769,21 +769,21 @@ if test "x$with_gcrypt" != "xno"; then
 fi
 
 # Checks for GnuTLS
-AH_TEMPLATE(WITH_CLIENT_TLS, [Enable support for gnutls in libvncclient])
+AH_TEMPLATE(HAVE_GNUTLS, [GnuTLS library present])
 AC_ARG_WITH(gnutls,
-[  --without-gnutls        disable support for gnutls],,)
-AC_ARG_WITH(client-tls,
-[  --without-client-tls    disable support for gnutls in libvncclient],,)
+[  --without-gnutls        disable support for gnutls]
+[  --with-gnutls=DIR       use gnutls include/library files in DIR],,)
 
 if test "x$with_gnutls" != "xno"; then
-	PKG_CHECK_MODULES(GNUTLS, gnutls >= 2.4.0, , with_client_tls=no)
+	PKG_CHECK_MODULES(GNUTLS, gnutls >= 2.4.0)
 	CFLAGS="$CFLAGS $GNUTLS_CFLAGS"
 	LIBS="$LIBS $GNUTLS_LIBS"
-	if test "x$with_client_tls" != "xno"; then
-		AC_DEFINE(WITH_CLIENT_TLS)
-	fi
 fi
 AM_CONDITIONAL(HAVE_GNUTLS, test ! -z "$GNUTLS_LIBS")
+if test ! -z "$GNUTLS_LIBS" ; then
+  AC_DEFINE(HAVE_GNUTLS)
+fi
+
 
 # warn if neither GnuTLS nor OpenSSL are available
 if test -z "$SSL_LIBS" -a -z "$GNUTLS_LIBS"; then
@@ -852,7 +852,6 @@ AH_TEMPLATE(NEED_INADDR_T, [Need a typedef for in_addr_t])
 if test $inaddrt = no ; then
   AC_DEFINE(NEED_INADDR_T)
 fi
-
 # Checks for library functions.
 AC_FUNC_MEMCMP
 AC_FUNC_STAT
