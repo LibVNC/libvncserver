@@ -191,9 +191,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->authScheme = 0;
   client->subAuthScheme = 0;
   client->GetCredential = NULL;
-#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
   client->tlsSession = NULL;
-#endif
   client->sock = -1;
   client->listenSock = -1;
   client->listenAddress = NULL;
@@ -365,9 +363,8 @@ void rfbClientCleanup(rfbClient* client) {
 #endif
 #endif
 
-#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
   FreeTLS(client);
-#endif
+
   if (client->sock >= 0)
     close(client->sock);
   if (client->listenSock >= 0)

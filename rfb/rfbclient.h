@@ -38,9 +38,6 @@
 #include <unistd.h>
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
-#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
-#include <gnutls/gnutls.h>
-#endif
 
 #define rfbClientSwap16IfLE(s) \
     (*(char *)&client->endianTest ? ((((s) & 0xff) << 8) | (((s) >> 8) & 0xff)) : (s))
@@ -314,10 +311,8 @@ typedef struct _rfbClient {
 	/** The selected security types */
 	uint32_t authScheme, subAuthScheme;
 
-#ifdef LIBVNCSERVER_WITH_CLIENT_TLS
 	/** The TLS session for Anonymous TLS and VeNCrypt */
-	gnutls_session_t tlsSession;
-#endif
+	void* tlsSession;
 
 	/** To support security types that requires user input (except VNC password
 	 * authentication), for example VeNCrypt and MSLogon, this callback function
