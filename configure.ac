@@ -16,6 +16,7 @@ fi
 test "x$GCC" = "xyes" && CFLAGS="$CFLAGS -Wall"
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
+PKG_PROG_PKG_CONFIG
 AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
                   [$PATH:/usr/ccs/bin])
 
