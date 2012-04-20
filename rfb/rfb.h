@@ -383,6 +383,16 @@ typedef struct _rfbScreenInfo
     char *sslkeyfile;
     char *sslcertfile;
 #endif
+
+    int ipv6port; /**< The port to listen on when using IPv6.  */
+    char* listen6Interface;
+    /* We have an additional IPv6 listen socket since there are systems that
+       don't support dual binding sockets under *any* circumstances, for
+       instance OpenBSD */
+    SOCKET listen6Sock;
+    int http6Port;
+    SOCKET httpListen6Sock;
+
     /*
       multicast stuff 
     */
@@ -422,6 +432,7 @@ typedef struct _rfbScreenInfo
     uint8_t multicastMaxSendRateIncrementCount;
     struct timeval lastMulticastMaxSendRateIncrement; 
     uint32_t multicastMaxSendRateFixed;     /**< Set this to a fixed maximum send rate in bytes/s to disable multicast flow  control */
+
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -497,13 +508,44 @@ typedef struct _rfbClientRec {
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_t client_thread;
 #endif
+
+    /* Note that the RFB_INITIALISATION_SHARED state is provided to support
+       clients that under some circumstances do not send a ClientInit message.
+       In particular the Mac OS X built-in VNC client (with protocolMinorVersion
+       == 889) is one of those.  However, it only requires this support under
+       special circumstances that can only be determined during the initial
+       authentication.  If the right conditions are met this state will be
+       set (see the auth.c file) when rfbProcessClientInitMessage is called.
+
+       If the state is RFB_INITIALISATION_SHARED we should not expect to recieve
+       any ClientInit message, but instead should proceed to the next stage
+       of initialisation as though an implicit ClientInit message was received
+       with a shared-flag of true.  (There is currently no corresponding
+       RFB_INITIALISATION_NOTSHARED state to represent an implicit ClientInit
+       message with a shared-flag of false because no known existing client
+       requires such support at this time.)
+
+       Note that software using LibVNCServer to provide a VNC server will only
+       ever have a chance to see the state field set to
+       RFB_INITIALISATION_SHARED if the software is multi-threaded and manages
+       to examine the state field during the extremely brief window after the
+       'None' authentication type selection has been received from the built-in
+       OS X VNC client and before the rfbProcessClientInitMessage function is
+       called -- control cannot return to the caller during this brief window
+       while the state field is set to RFB_INITIALISATION_SHARED. */
+
                                 /** Possible client states: */
     enum {
         RFB_PROTOCOL_VERSION,   /**< establishing protocol version */
 	RFB_SECURITY_TYPE,      /**< negotiating security (RFB v.3.7) */
         RFB_AUTHENTICATION,     /**< authenticating */
         RFB_INITIALISATION,     /**< sending initialisation messages */
-        RFB_NORMAL              /**< normal protocol messages */
+        RFB_NORMAL,             /**< normal protocol messages */
+
+        /* Ephemeral internal-use states that will never be seen by software
+         * using LibVNCServer to provide services: */
+
+        RFB_INITIALISATION_SHARED /**< sending initialisation messages with implicit shared-flag already true */
     } state;
 
     rfbBool reverseConnection;
@@ -773,6 +815,7 @@ extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern int rfbConnectToTcpAddr(char* host, int port);
 extern int rfbListenOnTCPPort(int port, in_addr_t iface);
+extern int rfbListenOnTCP6Port(int port, const char* iface);
 extern int rfbListenOnUDPPort(int port, in_addr_t iface);
 extern int rfbStringToAddr(char* string,in_addr_t* addr);
 extern rfbBool rfbSetNonBlocking(int sock);
@@ -1168,7 +1211,7 @@ rfbBool rfbUpdateClient(rfbClientPtr cl);
 
  To also start an HTTP server (running on port 5800+display_number), you have
  to set rfbScreenInfo::httpDir to a directory containing vncviewer.jar and
- index.vnc (like the included "classes" directory).
+ index.vnc (like the included "webclients" directory).
 
  @section making_it_interactive Making it interactive
 

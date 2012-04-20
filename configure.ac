@@ -1,9 +1,9 @@
 # Process this file with autoconf to produce a configure script.
-AC_INIT(LibVNCServer, 0.9.8, http://sourceforge.net/projects/libvncserver)
-AM_INIT_AUTOMAKE(LibVNCServer, 0.9.8)
+AC_INIT(LibVNCServer, 0.9.8.1, http://sourceforge.net/projects/libvncserver)
+AM_INIT_AUTOMAKE(LibVNCServer, 0.9.8.1)
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_CONFIG_HEADER(rfbconfig.h)
 AX_PREFIX_CONFIG_H([rfb/rfbconfig.h])
-AM_SILENT_RULES([yes])
 
 # Checks for programs.
 AC_PROG_CC
@@ -784,6 +784,10 @@ AC_SUBST(SDL_CFLAGS)
 AC_SUBST(SDL_LIBS)
 
 
+# Check for GTK+. if present, build the GTK+ vnc viewer example
+PKG_CHECK_MODULES([GTK], [gtk+-2.0])
+AM_CONDITIONAL(HAVE_LIBGTK, test ! -z "$GTK_LIBS")
+
 AC_CANONICAL_HOST
 MINGW=`echo $host_os | grep mingw32  2>/dev/null`
 AM_CONDITIONAL(MINGW, test ! -z "$MINGW" )
@@ -809,21 +813,21 @@ if test "x$with_gcrypt" != "xno"; then
 fi
 
 # Checks for GnuTLS
-AH_TEMPLATE(WITH_CLIENT_TLS, [Enable support for gnutls in libvncclient])
+AH_TEMPLATE(HAVE_GNUTLS, [GnuTLS library present])
 AC_ARG_WITH(gnutls,
-[  --without-gnutls        disable support for gnutls],,)
-AC_ARG_WITH(client-tls,
-[  --without-client-tls    disable support for gnutls in libvncclient],,)
+[  --without-gnutls        disable support for gnutls]
+[  --with-gnutls=DIR       use gnutls include/library files in DIR],,)
 
 if test "x$with_gnutls" != "xno"; then
-	PKG_CHECK_MODULES(GNUTLS, gnutls >= 2.4.0, , with_client_tls=no)
+	PKG_CHECK_MODULES(GNUTLS, gnutls >= 2.4.0)
 	CFLAGS="$CFLAGS $GNUTLS_CFLAGS"
 	LIBS="$LIBS $GNUTLS_LIBS"
-	if test "x$with_client_tls" != "xno"; then
-		AC_DEFINE(WITH_CLIENT_TLS)
-	fi
 fi
 AM_CONDITIONAL(HAVE_GNUTLS, test ! -z "$GNUTLS_LIBS")
+if test ! -z "$GNUTLS_LIBS" ; then
+  AC_DEFINE(HAVE_GNUTLS)
+fi
+
 
 # warn if neither GnuTLS nor OpenSSL are available
 if test -z "$SSL_LIBS" -a -z "$GNUTLS_LIBS"; then
@@ -920,7 +924,6 @@ AH_TEMPLATE(NEED_INADDR_T, [Need a typedef for in_addr_t])
 if test $inaddrt = no ; then
   AC_DEFINE(NEED_INADDR_T)
 fi
-
 # Checks for library functions.
 AC_FUNC_MEMCMP
 AC_FUNC_STAT
@@ -988,8 +991,9 @@ AC_CONFIG_FILES([Makefile
 	examples/Makefile
 	examples/android/Makefile
 	vncterm/Makefile
-	classes/Makefile
-	classes/ssl/Makefile
+	webclients/Makefile
+	webclients/java-applet/Makefile
+	webclients/java-applet/ssl/Makefile
 	libvncclient/Makefile
 	client_examples/Makefile
 	test/Makefile

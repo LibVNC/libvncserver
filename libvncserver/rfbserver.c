@@ -280,8 +280,12 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     rfbProtocolVersionMsg pv;
     rfbClientIteratorPtr iterator;
     rfbClientPtr cl,cl_;
+#ifdef LIBVNCSERVER_IPv6
+    struct sockaddr_storage addr;
+#else
     struct sockaddr_in addr;
-    socklen_t addrlen = sizeof(struct sockaddr_in);
+#endif
+    socklen_t addrlen = sizeof(addr);
     rfbProtocolExtension* extension;
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
@@ -304,7 +308,17 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       int one=1;
 
       getpeername(sock, (struct sockaddr *)&addr, &addrlen);
+#ifdef LIBVNCSERVER_IPv6
+      char host[1024];
+      if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
+	rfbLogPerror("rfbNewClient: error in getnameinfo");
+	cl->host = strdup("");
+      }
+      else
+	cl->host = strdup(host);
+#else
       cl->host = strdup(inet_ntoa(addr.sin_addr));
+#endif
 
       rfbLog("  other clients:\n");
       iterator = rfbGetClientIterator(rfbScreen);
@@ -507,6 +521,21 @@ rfbClientConnectionGone(rfbClientPtr cl)
     if (cl->next)
         cl->next->prev = cl->prev;
 
+    UNLOCK(rfbClientListMutex);
+
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+    if(cl->screen->backgroundLoop != FALSE) {
+      int i;
+      do {
+	LOCK(cl->refCountMutex);
+	i=cl->refCount;
+	if(i>0)
+	  WAIT(cl->deleteCond,cl->refCountMutex);
+	UNLOCK(cl->refCountMutex);
+      } while(i>0);
+    }
+#endif
+
     if(cl->sock>=0)
 	close(cl->sock);
 
@@ -522,21 +551,6 @@ rfbClientConnectionGone(rfbClientPtr cl)
     /* free buffers holding pixel data before and after encoding */
     free(cl->beforeEncBuf);
     free(cl->afterEncBuf);
-
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-    if(cl->screen->backgroundLoop != FALSE) {
-      int i;
-      do {
-	LOCK(cl->refCountMutex);
-	i=cl->refCount;
-	if(i>0)
-	  WAIT(cl->deleteCond,cl->refCountMutex);
-	UNLOCK(cl->refCountMutex);
-      } while(i>0);
-    }
-#endif
-
-    UNLOCK(rfbClientListMutex);
 
     if(cl->sock>=0)
        FD_CLR(cl->sock,&(cl->screen->allFds));
@@ -602,6 +616,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
     TINI_MUTEX(cl->sendMutex);
 
     rfbPrintStats(cl);
+    rfbResetStats(cl);
 
     free(cl);
 }
@@ -625,6 +640,7 @@ rfbProcessClientMessage(rfbClientPtr cl)
         rfbAuthProcessClientMessage(cl);
         return;
     case RFB_INITIALISATION:
+    case RFB_INITIALISATION_SHARED:
         rfbProcessClientInitMessage(cl);
         return;
     default:
@@ -752,13 +768,22 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
     rfbClientPtr otherCl;
     rfbExtensionData* extension;
 
-    if ((n = rfbReadExact(cl, (char *)&ci,sz_rfbClientInitMsg)) <= 0) {
-        if (n == 0)
-            rfbLog("rfbProcessClientInitMessage: client gone\n");
-        else
-            rfbLogPerror("rfbProcessClientInitMessage: read");
-        rfbCloseClient(cl);
-        return;
+    if (cl->state == RFB_INITIALISATION_SHARED) {
+        /* In this case behave as though an implicit ClientInit message has
+         * already been received with a shared-flag of true. */
+        ci.shared = 1;
+        /* Avoid the possibility of exposing the RFB_INITIALISATION_SHARED
+         * state to calling software. */
+        cl->state = RFB_INITIALISATION;
+    } else {
+        if ((n = rfbReadExact(cl, (char *)&ci,sz_rfbClientInitMsg)) <= 0) {
+            if (n == 0)
+                rfbLog("rfbProcessClientInitMessage: client gone\n");
+            else
+                rfbLogPerror("rfbProcessClientInitMessage: read");
+            rfbCloseClient(cl);
+            return;
+        }
     }
 
     memset(u.buf,0,sizeof(u.buf));

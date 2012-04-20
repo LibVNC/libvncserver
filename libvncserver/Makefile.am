@@ -48,10 +48,6 @@ if HAVE_LIBZ
 ZLIBSRCS = zlib.c zrle.c zrleoutstream.c zrlepalettehelper.c ../common/zywrletemplate.c
 if HAVE_LIBJPEG
 TIGHTSRCS = tight.c
-else
-if HAVE_LIBPNG
-TIGHTSRCS = tight.c
-endif
 endif
 endif
 

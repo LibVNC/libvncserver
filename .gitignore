@@ -36,6 +36,7 @@ libvncserver*.deb
 CVS
 client_examples/SDLvncviewer
 client_examples/backchannel
+client_examples/gtkvncviewer
 client_examples/ppmtest
 config.guess
 config.sub

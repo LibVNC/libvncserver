@@ -78,7 +78,9 @@ static rfbBool resize(rfbClient* client) {
 
 static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	rfbKeySym k = 0;
-	switch(e->keysym.sym) {
+	SDLKey sym = e->keysym.sym;
+
+	switch (sym) {
 	case SDLK_BACKSPACE: k = XK_BackSpace; break;
 	case SDLK_TAB: k = XK_Tab; break;
 	case SDLK_CLEAR: k = XK_Clear; break;
@@ -139,10 +141,9 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_LALT: k = XK_Alt_L; break;
 	case SDLK_RMETA: k = XK_Meta_R; break;
 	case SDLK_LMETA: k = XK_Meta_L; break;
+	case SDLK_LSUPER: k = XK_Super_L; break;
+	case SDLK_RSUPER: k = XK_Super_R; break;
 #if 0
-	/* TODO: find out keysyms */
-	case SDLK_LSUPER: k = XK_LSuper; break;		/* left "windows" key */
-	case SDLK_RSUPER: k = XK_RSuper; break;		/* right "windows" key */
 	case SDLK_COMPOSE: k = XK_Compose; break;
 #endif
 	case SDLK_MODE: k = XK_Mode_switch; break;
@@ -152,16 +153,21 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_BREAK: k = XK_Break; break;
 	default: break;
 	}
-	if (k == 0 && e->keysym.sym >= SDLK_a && e->keysym.sym <= SDLK_z) {
-		k = XK_a + e->keysym.sym - SDLK_a;
-		if (e->keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT))
-			k &= ~0x20;
+	/* both SDL and X11 keysyms match ASCII in the range 0x01-0x7f */
+	if (k == 0 && sym > 0x0 && sym < 0x100) {
+		k = sym;
+		if (e->keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT)) {
+			if (k >= '1' && k <= '9')
+				k &= ~0x10;
+			else if (k >= 'a' && k <= 'f')
+				k &= ~0x20;
+		}
 	}
 	if (k == 0) {
 		if (e->keysym.unicode < 0x100)
 			k = e->keysym.unicode;
 		else
-			rfbClientLog("Unknown keysym: %d\n",e->keysym.sym);
+			rfbClientLog("Unknown keysym: %d\n", sym);
 	}
 
 	return k;
@@ -518,6 +524,7 @@ int main(int argc,char** argv) {
 	  cl->HandleTextChat=text_chat;
 	  cl->GotXCutText = got_selection;
 	  cl->listenPort = LISTEN_PORT_OFFSET;
+	  cl->listen6Port = LISTEN_PORT_OFFSET;
 	  if(!rfbInitClient(cl,&argc,argv))
 	    {
 	      cl = NULL; /* rfbInitClient has already freed the client struct */

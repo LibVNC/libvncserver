@@ -28,7 +28,15 @@ endif
 SDLvncviewer_LDADD=$(LDADD) $(SDL_LIBS) $(X11_LIB)
 endif
 
-noinst_PROGRAMS=ppmtest $(SDLVIEWER) $(FFMPEG_CLIENT) backchannel
+if HAVE_LIBGTK
+GTKVIEWER=gtkvncviewer
+gtkvncviewer_SOURCES=gtkvncviewer.c
+gtkvncviewer_CFLAGS=$(GTK_CFLAGS)
+gtkvncviewer_LDADD=$(LDADD) $(GTK_LIBS)
+endif
+
+
+noinst_PROGRAMS=ppmtest $(SDLVIEWER) $(GTKVIEWER) $(FFMPEG_CLIENT) backchannel
 
 
 
