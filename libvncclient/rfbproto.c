@@ -1076,6 +1076,14 @@ InitialiseRFBConnection(rfbClient* client)
       DefaultSupportedMessagesUltraVNC(client);
   }
 
+  /* UltraVNC Single Click uses minor codes 14 and 16 for the server */
+  if (major==3 && (minor==14 || minor==16)) {
+     minor = minor - 10;
+     client->minor = minor;
+     rfbClientLog("UltraVNC Single Click server detected, enabling UltraVNC specific messages\n",pv);
+     DefaultSupportedMessagesUltraVNC(client);
+  }
+
   /* TightVNC uses minor codes 5 for the server */
   if (major==3 && minor==5) {
       rfbClientLog("TightVNC server detected, enabling TightVNC specific messages\n",pv);
