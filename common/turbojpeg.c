@@ -31,12 +31,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef JCS_EXTENSIONS
+#define JPEG_INTERNAL_OPTIONS
+#endif
 #include <jpeglib.h>
 #include <jerror.h>
-#ifndef JCS_EXTENSIONS
-#define JPEG_INTERNALS
-#include <jmorecfg.h>
-#endif
 #include <setjmp.h>
 #include "./turbojpeg.h"
 
