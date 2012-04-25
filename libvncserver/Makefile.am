@@ -46,7 +46,7 @@ EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
 if HAVE_LIBZ
 ZLIBSRCS = zlib.c zrle.c zrleoutstream.c zrlepalettehelper.c ../common/zywrletemplate.c
 if HAVE_LIBJPEG
-TIGHTSRCS = tight.c
+TIGHTSRCS = tight.c ../common/turbojpeg.c
 endif
 endif
 

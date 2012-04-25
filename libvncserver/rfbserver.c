@@ -3,6 +3,7 @@
  */
 
 /*
+ *  Copyright (C) 2011-2012 D. R. Commander
  *  Copyright (C) 2005 Rohit Kumar, Johannes E. Schindelin
  *  Copyright (C) 2002 RealVNC Ltd.
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
@@ -84,6 +85,21 @@ static int compat_mkdir(const char *path, int mode)
 	return mkdir(path);
 }
 #define mkdir compat_mkdir
+#endif
+
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+/*
+ * Map of quality levels to provide compatibility with TightVNC/TigerVNC
+ * clients.  This emulates the behavior of the TigerVNC Server.
+ */
+
+static const int tight2turbo_qual[10] = {
+   15, 29, 41, 42, 62, 77, 79, 86, 92, 100
+};
+
+static const int tight2turbo_subsamp[10] = {
+   1, 1, 1, 2, 2, 2, 0, 0, 0, 0
+};
 #endif
 
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
@@ -383,6 +399,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
+      cl->turboSubsampLevel = TURBO_DEFAULT_SUBSAMP;
       {
 	int i;
 	for (i = 0; i < 4; i++)
@@ -1963,6 +1980,16 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->enableSupportedMessages  = FALSE;
         cl->enableSupportedEncodings = FALSE;
         cl->enableServerIdentity     = FALSE;
+#if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
+        cl->tightQualityLevel        = -1;
+#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
+        cl->tightCompressLevel       = TIGHT_DEFAULT_COMPRESSION;
+#endif
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+        cl->turboSubsampLevel        = TURBO_DEFAULT_SUBSAMP;
+        cl->turboQualityLevel        = -1;
+#endif
+#endif
 
 
         for (i = 0; i < msg.se.nEncodings; i++) {
@@ -2097,6 +2124,22 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		    cl->tightQualityLevel = enc & 0x0F;
 		    rfbLog("Using image quality level %d for client %s\n",
 			   cl->tightQualityLevel, cl->host);
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+		    cl->turboQualityLevel = tight2turbo_qual[enc & 0x0F];
+		    cl->turboSubsampLevel = tight2turbo_subsamp[enc & 0x0F];
+		    rfbLog("Using JPEG subsampling %d, Q%d for client %s\n",
+			   cl->turboSubsampLevel, cl->turboQualityLevel, cl->host);
+		} else if ( enc >= (uint32_t)rfbEncodingFineQualityLevel0 + 1 &&
+			    enc <= (uint32_t)rfbEncodingFineQualityLevel100 ) {
+		    cl->turboQualityLevel = enc & 0xFF;
+		    rfbLog("Using fine quality level %d for client %s\n",
+			   cl->turboQualityLevel, cl->host);
+		} else if ( enc >= (uint32_t)rfbEncodingSubsamp1X &&
+			    enc <= (uint32_t)rfbEncodingSubsampGray ) {
+		    cl->turboSubsampLevel = enc & 0xFF;
+		    rfbLog("Using subsampling level %d for client %s\n",
+			   cl->turboSubsampLevel, cl->host);
+#endif
 		} else
 #endif
 		{
