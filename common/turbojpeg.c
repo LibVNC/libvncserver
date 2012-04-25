@@ -108,6 +108,7 @@ static const tjscalingfactor sf[NUMSF]={
 	retval=-1;  goto bailout;}
 #define getinstance(handle) tjinstance *this=(tjinstance *)handle;  \
 	j_compress_ptr cinfo=NULL;  j_decompress_ptr dinfo=NULL;  \
+	(void) cinfo; (void) dinfo; /* silence warnings */ \
 	if(!this) {snprintf(errStr, JMSG_LENGTH_MAX, "Invalid handle");  \
 		return -1;}  \
 	cinfo=&this->cinfo;  dinfo=&this->dinfo;

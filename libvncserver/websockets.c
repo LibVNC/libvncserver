@@ -622,7 +622,8 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
     int i;
     unsigned char opcode;
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
-    int flength, fin, fhlen;
+    int flength, fhlen;
+    /* int fin; */ /* not used atm */ 
 
     // rfbLog(" <== %s[%d]: %d cl: %p, wsctx: %p-%p (%d)\n", __func__, gettid(), len, cl, wsctx, (char *)wsctx + sizeof(ws_ctx_t), sizeof(ws_ctx_t));
 
@@ -662,7 +663,7 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
     }
 
     opcode = header->b0 & 0x0f;
-    fin = (header->b0 & 0x80) >> 7;
+    /* fin = (header->b0 & 0x80) >> 7; */ /* not used atm */
     flength = header->b1 & 0x7f;
 
     /*

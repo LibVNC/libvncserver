@@ -228,9 +228,7 @@ void
 rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,
                        int sock)
 {
-    rfbClientPtr cl;
-
-    cl = rfbNewClient(rfbScreen,sock);
+    rfbNewClient(rfbScreen,sock);
 }
 
 

@@ -38,7 +38,8 @@
 
 #define _throw(op, err) {  \
 	printf("ERROR in line %d while %s:\n%s\n", __LINE__, op, err);  \
-  retval=-1;  goto bailout;}
+	(void)retval; /* silence warning */				\
+	retval=-1; goto bailout;}
 #define _throwunix(m) _throw(m, strerror(errno))
 #define _throwtj(m) _throw(m, tjGetErrorStr())
 #define _throwbmp(m) _throw(m, bmpgeterr())
