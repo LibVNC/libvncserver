@@ -9,19 +9,19 @@ LDADD=../libvncserver/libvncserver.la @WSOCKLIB@
 if LINUX
 if ! MINGW
 if ! ANDROID
-bin_PROGRAMS=LinuxVNC
-LinuxVNC_SOURCES=LinuxVNC.c $(CONSOLE_SRCS)
+bin_PROGRAMS=linuxvnc
+linuxvnc_SOURCES=LinuxVNC.c $(CONSOLE_SRCS)
 endif
 endif
 endif
 
 if ! MINGW
-VNCOMMAND=VNCommand
+VNCOMMAND=vncommand
 endif
 
 noinst_PROGRAMS=example $(VNCOMMAND)
 example_SOURCES=example.c $(CONSOLE_SRCS)
-VNCommand_SOURCES=VNCommand.c $(CONSOLE_SRCS)
+vncommand_SOURCES=VNCommand.c $(CONSOLE_SRCS)
 
 
 
