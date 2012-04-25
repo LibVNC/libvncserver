@@ -930,8 +930,8 @@ fi
 AC_CHECK_LIB(cygipc,shmget)
 AM_CONDITIONAL(CYGIPC, test "$HAVE_CYGIPC" = "true")
 
-# Check if /dev/vcsa1 exists, if so, define LINUX
-AM_CONDITIONAL(LINUX, test -c /dev/vcsa1)
+# Check if /usr/include/linux exists, if so, define LINUX
+AM_CONDITIONAL(LINUX, test -d /usr/include/linux)
 
 # Check for OS X specific header
 AC_CHECK_HEADER(ApplicationServices/ApplicationServices.h, HAVE_OSX="true")
