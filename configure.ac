@@ -533,10 +533,11 @@ HAVE_LIBJPEG_TURBO="false"
 if test "x$with_jpeg" != "xno"; then
 	AC_ARG_VAR(JPEG_LDFLAGS,
 		[Linker flags to use when linking with libjpeg, e.g. -L/foo/dir/lib -Wl,-static -ljpeg -Wl,-shared.  This overrides the linker flags set by --with-jpeg.])
+	saved_CPPFLAGS="$CPPFLAGS"
+	saved_LDFLAGS="$LDFLAGS"
+	saved_LIBS="$LIBS"
 	if test ! -z "$with_jpeg" -a "x$with_jpeg" != "xyes"; then
 		# add user supplied directory to flags:
-		saved_CPPFLAGS="$CPPFLAGS"
-		saved_LDFLAGS="$LDFLAGS"
 		CPPFLAGS="$CPPFLAGS -I$with_jpeg/include"
 		LDFLAGS="$LDFLAGS -L$with_jpeg/lib"
 		if test "x$ld_minus_R" = "xno"; then
@@ -562,15 +563,11 @@ if test "x$with_jpeg" != "xno"; then
 				AC_DEFINE(HAVE_LIBJPEG, 1, libjpeg support enabled)],
 			[AC_MSG_RESULT(no); HAVE_JPEGLIB_H=""])
 	fi
-	if test ! -z "$with_jpeg" -a "x$with_jpeg" != "xyes"; then
-		if test "x$HAVE_JPEGLIB_H" != "xtrue"; then
+	if test "x$HAVE_JPEGLIB_H" != "xtrue"; then
 			# restore old flags on failure:
 			CPPFLAGS="$saved_CPPFLAGS"
 			LDFLAGS="$saved_LDFLAGS"
-		fi
-	fi
-	if test "$build_x11vnc" = "yes"; then
-		if test "x$HAVE_JPEGLIB_H" != "xtrue"; then
+			LIBS="$saved_LIBS"
 			AC_MSG_WARN([
 ==========================================================================
 *** The libjpeg compression library was not found. ***
@@ -585,7 +582,6 @@ A copy of libjpeg may be obtained from:  http://ijg.org/files/
 ])
 			sleep 5
 		fi
-	fi
 
 	if test "x$HAVE_JPEGLIB_H" = "xtrue"; then
 		AC_MSG_CHECKING(whether JPEG library is libjpeg-turbo)
@@ -613,7 +609,7 @@ A copy of libjpeg may be obtained from:  http://ijg.org/files/
 		fi
 	fi
 
-	if test "x$HAVE_LIBJPEG_TURBO" != "xtrue"; then
+	if test "x$HAVE_JPEGLIB_H" = "xtrue" -a "x$HAVE_LIBJPEG_TURBO" != "xtrue"; then
 		AC_MSG_WARN([
 ==========================================================================
 *** The libjpeg library you are building against is not libjpeg-turbo.
