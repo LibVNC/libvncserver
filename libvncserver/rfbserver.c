@@ -1721,7 +1721,10 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
 #ifdef LIBVNCSERVER_HAVE_LIBZ
                 /* compressed packet */
                 nRet = uncompress(compBuff,&nRawBytes,(const unsigned char*)buffer, length);
-                retval=write(cl->fileTransfer.fd, (char*)compBuff, nRawBytes);
+		if(nRet == Z_OK)
+		  retval=write(cl->fileTransfer.fd, (char*)compBuff, nRawBytes);
+		else
+		  retval = -1;
 #else
                 /* Write the file out as received... */
                 retval=write(cl->fileTransfer.fd, buffer, length);
