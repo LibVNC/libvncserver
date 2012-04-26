@@ -36,8 +36,8 @@ include_HEADERS=../rfb/rfb.h ../rfb/rfbconfig.h ../rfb/rfbint.h \
 	../rfb/rfbproto.h ../rfb/keysym.h ../rfb/rfbregion.h ../rfb/rfbclient.h
 
 noinst_HEADERS=../common/d3des.h ../rfb/default8x16.h zrleoutstream.h \
-	zrlepalettehelper.h zrletypes.h private.h ../common/minilzo.h ../common/lzoconf.h ../common/lzodefs.h scale.h \
-	rfbssl.h rfbcrypto.h \
+	zrlepalettehelper.h zrletypes.h private.h scale.h rfbssl.h rfbcrypto.h \
+	../common/minilzo.h ../common/lzoconf.h ../common/lzodefs.h ../common/md5.h ../common/sha1.h \
 	$(TIGHTVNCFILETRANSFERHDRS)
 
 EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
