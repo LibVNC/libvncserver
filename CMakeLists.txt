@@ -185,8 +185,24 @@ set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
     ${COMMON_DIR}/minilzo.c
-    ${LIBVNCCLIENT_DIR}/tls.c
 )
+
+if(GNUTLS_FOUND)
+  set(LIBVNCCLIENT_SOURCES
+    ${LIBVNCCLIENT_SOURCES}
+    ${LIBVNCCLIENT_DIR}/tls_gnutls.c
+  )
+elseif(OPENSSL_FOUND)
+  set(LIBVNCCLIENT_SOURCES
+    ${LIBVNCCLIENT_SOURCES}
+    ${LIBVNCCLIENT_DIR}/tls_openssl.c
+  )
+else()
+  set(LIBVNCCLIENT_SOURCES
+    ${LIBVNCCLIENT_SOURCES}
+    ${LIBVNCCLIENT_DIR}/tls_none.c
+  )
+endif()
 
 if(ZLIB_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBZ)
