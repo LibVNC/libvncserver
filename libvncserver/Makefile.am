@@ -14,13 +14,13 @@ endif
 
 if WITH_WEBSOCKETS
 
-if HAVE_LIBSSL
-WEBSOCKETSSSLSRCS = rfbssl_openssl.c rfbcrypto_openssl.c
-WEBSOCKETSSSLLIBS = @SSL_LIBS@ @CRYPT_LIBS@
-else
 if HAVE_GNUTLS
 WEBSOCKETSSSLSRCS = rfbssl_gnutls.c rfbcrypto_gnutls.c
 WEBSOCKETSSSLLIBS = @GNUTLS_LIBS@
+else
+if HAVE_LIBSSL
+WEBSOCKETSSSLSRCS = rfbssl_openssl.c rfbcrypto_openssl.c
+WEBSOCKETSSSLLIBS = @SSL_LIBS@ @CRYPT_LIBS@
 else
 WEBSOCKETSSSLSRCS = rfbssl_none.c rfbcrypto_included.c ../common/md5.c ../common/sha1.c
 endif
