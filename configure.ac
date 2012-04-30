@@ -790,7 +790,7 @@ AC_SUBST(SDL_LIBS)
 
 
 # Check for GTK+. if present, build the GTK+ vnc viewer example
-PKG_CHECK_MODULES([GTK], [gtk+-2.0])
+PKG_CHECK_MODULES([GTK], [gtk+-2.0],,:)
 AM_CONDITIONAL(HAVE_LIBGTK, test ! -z "$GTK_LIBS")
 
 AC_CANONICAL_HOST
@@ -824,7 +824,7 @@ AC_ARG_WITH(gnutls,
 [  --with-gnutls=DIR       use gnutls include/library files in DIR],,)
 
 if test "x$with_gnutls" != "xno"; then
-	PKG_CHECK_MODULES(GNUTLS, gnutls >= 2.4.0)
+	PKG_CHECK_MODULES(GNUTLS, gnutls >= 2.4.0,,:)
 	CFLAGS="$CFLAGS $GNUTLS_CFLAGS"
 	LIBS="$LIBS $GNUTLS_LIBS"
 fi
