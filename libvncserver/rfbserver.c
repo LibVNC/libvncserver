@@ -509,7 +509,7 @@ rfbNewUDPClient(rfbScreenInfoPtr rfbScreen)
 void
 rfbClientConnectionGone(rfbClientPtr cl)
 {
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+#if defined(LIBVNCSERVER_HAVE_LIBZ) && defined(LIBVNCSERVER_HAVE_LIBJPEG)
     int i;
 #endif
 
@@ -2990,7 +2990,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	       goto updateFailed;
            break;
 #endif
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+#if defined(LIBVNCSERVER_HAVE_LIBJPEG) && (defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG))
 	case rfbEncodingTight:
 	    if (!rfbSendRectEncodingTight(cl, x, y, w, h))
 	        goto updateFailed;
