@@ -393,10 +393,8 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
       cl->tightQualityLevel = -1;
-#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
-      cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
-#endif
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
+      cl->tightCompressLevel = TIGHT_DEFAULT_COMPRESSION;
       cl->turboSubsampLevel = TURBO_DEFAULT_SUBSAMP;
       {
 	int i;
@@ -1983,10 +1981,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->enableServerIdentity     = FALSE;
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
         cl->tightQualityLevel        = -1;
-#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
-        cl->tightCompressLevel       = TIGHT_DEFAULT_COMPRESSION;
-#endif
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
+        cl->tightCompressLevel       = TIGHT_DEFAULT_COMPRESSION;
         cl->turboSubsampLevel        = TURBO_DEFAULT_SUBSAMP;
         cl->turboQualityLevel        = -1;
 #endif
@@ -2115,7 +2111,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		if ( enc >= (uint32_t)rfbEncodingCompressLevel0 &&
 		     enc <= (uint32_t)rfbEncodingCompressLevel9 ) {
 		    cl->zlibCompressLevel = enc & 0x0F;
-#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 		    cl->tightCompressLevel = enc & 0x0F;
 		    rfbLog("Using compression level %d for client %s\n",
 			   cl->tightCompressLevel, cl->host);
@@ -2856,7 +2852,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	sraRgnReleaseIterator(i); i=NULL;
 #endif
 #endif
-#ifdef LIBVNCSERVER_HAVE_LIBPNG
+#if defined(LIBVNCSERVER_HAVE_LIBJPEG) && defined(LIBVNCSERVER_HAVE_LIBPNG)
     } else if (cl->preferredEncoding == rfbEncodingTightPng) {
 	nUpdateRegionRects = 0;
 
@@ -2988,25 +2984,23 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h))
 	        goto updateFailed;
 	    break;
+       case rfbEncodingZRLE:
+       case rfbEncodingZYWRLE:
+           if (!rfbSendRectEncodingZRLE(cl, x, y, w, h))
+	       goto updateFailed;
+           break;
+#endif
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	case rfbEncodingTight:
 	    if (!rfbSendRectEncodingTight(cl, x, y, w, h))
 	        goto updateFailed;
 	    break;
-#endif
-#endif
 #ifdef LIBVNCSERVER_HAVE_LIBPNG
 	case rfbEncodingTightPng:
 	    if (!rfbSendRectEncodingTightPng(cl, x, y, w, h))
 	        goto updateFailed;
 	    break;
 #endif
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-       case rfbEncodingZRLE:
-       case rfbEncodingZYWRLE:
-           if (!rfbSendRectEncodingZRLE(cl, x, y, w, h))
-	       goto updateFailed;
-           break;
 #endif
         }
     }

@@ -603,8 +603,6 @@ typedef struct _rfbClientRec {
     z_stream zsStruct[4];
     rfbBool zsActive[4];
     int zsLevel[4];
-#endif
-#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
     int tightCompressLevel;
 #endif
 #endif
@@ -880,22 +878,18 @@ extern rfbBool rfbSendRectEncodingUltra(rfbClientPtr cl, int x,int y,int w,int h
 extern rfbBool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 				    int h);
 
-#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 /* tight.c */
 
 #define TIGHT_DEFAULT_COMPRESSION  6
-
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 #define TURBO_DEFAULT_SUBSAMP 0
-#endif
 
 extern rfbBool rfbTightDisableGradient;
 
 extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
 
-#if defined(LIBVNCSERVER_HAVE_LIBJPEG)
 extern rfbBool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
-#endif
+
 #if defined(LIBVNCSERVER_HAVE_LIBPNG)
 extern rfbBool rfbSendRectEncodingTightPng(rfbClientPtr cl, int x,int y,int w,int h);
 #endif
