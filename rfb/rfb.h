@@ -55,6 +55,10 @@ extern "C"
 #ifdef __MINGW32__
 #undef SOCKET
 #include <winsock2.h>
+#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
+#undef socklen_t
+#include <ws2tcpip.h>
+#endif
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
