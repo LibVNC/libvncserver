@@ -35,6 +35,10 @@
 #endif
 #include <errno.h>
 #include <rfb/rfbclient.h>
+#ifdef WIN32
+#undef SOCKET
+#undef socklen_t
+#endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
 #ifdef __CHECKER__
@@ -52,10 +56,6 @@
 #include <time.h>
 
 #ifdef LIBVNCSERVER_WITH_CLIENT_GCRYPT
-#ifdef WIN32
-#undef SOCKET
-#undef socklen_t
-#endif
 #include <gcrypt.h>
 #endif
 
