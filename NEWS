@@ -1,3 +1,36 @@
+0.9.9
+   - Overall changes:
+     * Added noVNC HTML5 VNC viewer (http://kanaka.github.com/noVNC/) connect possibility
+       to our http server. Pure JavaScript, no Java plugin required anymore! (But a
+       recent browser...)
+     * Added a GTK+ VNC viewer example.
+
+   - LibVNCServer/LibVNCClient:
+     * Added support to build for Google Android.
+     * Complete IPv6 support in both LibVNCServer and LibVNCClient.
+
+   - LibVNCServer:
+     * Split two event-loop related functions out of the rfbProcessEvents() mechanism.
+       This is required to be able to do proper event loop integration with Qt. Idea was
+       taken from Vino's libvncserver fork.
+     * Added TightPNG (http://wiki.qemu.org/VNC_Tight_PNG) encoding support. Like the
+       original Tight encoding, this still uses JPEG, but ZLIB encoded rects are encoded
+       with PNG here.
+     * Added suport for serving VNC sessions through WebSockets
+       (http://en.wikipedia.org/wiki/WebSocket), a web technology providing for multiplexing
+       bi-directional, full-duplex communications channels over a single TCP connection.
+     * Support connections from the Mac OS X built-in VNC client to LibVNCServer
+       instances running with no password.
+     * Replaced the Tight encoder with a TurboVNC one which is tremendously faster in most
+       cases, especially with high-color video or 3D workloads.
+       (http://www.virtualgl.org/pmwiki/uploads/About/tighttoturbo.pdf)
+
+   - LibVNCClient:
+     * Added support to only listen for reverse connections on a specific IP address.
+     * Support for using OpenSSL instead of GnuTLS. This could come in handy on embedded
+       devices where only this TLS implementation is available.
+     * Added support to connect to UltraVNC Single Click servers.
+
 0.9.8.2
    - Fixed a regression that crept in with the Apple Remote Desktop support.
 
