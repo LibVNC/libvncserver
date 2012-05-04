@@ -15,6 +15,7 @@ else
 fi
 test "x$GCC" = "xyes" && CFLAGS="$CFLAGS -Wall"
 AC_PROG_MAKE_SET
+AC_LIBTOOL_WIN32_DLL
 AC_PROG_LIBTOOL
 AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
                   [$PATH:/usr/ccs/bin])
@@ -798,6 +799,7 @@ MINGW=`echo $host_os | grep mingw32  2>/dev/null`
 AM_CONDITIONAL(MINGW, test ! -z "$MINGW" )
 if test ! -z "$MINGW"; then
 	WSOCKLIB="-lws2_32"
+	LDFLAGS="$LDFLAGS -no-undefined"
 fi
 AC_SUBST(WSOCKLIB)
 
