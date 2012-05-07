@@ -1,5 +1,7 @@
 immediate:
 ----------
+- Add sources for the java stuff.
+- Implement encryption in libvncserver.
 
 make SDLvncviewer more versatile
 	- test for missing keys (especially "[]{}" with ./examples/mac),
