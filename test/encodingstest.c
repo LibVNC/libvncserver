@@ -256,7 +256,7 @@ rfbTestLog(const char *format, ...)
 
 	time(&log_clock);
 	strftime(buf, 255, "%d/%m/%Y %X (client) ", localtime(&log_clock));
-	fprintf(stderr,buf);
+	fprintf(stderr,"%s",buf);
 
 	vfprintf(stderr, format, args);
 	fflush(stderr);
