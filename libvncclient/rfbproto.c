@@ -387,8 +387,8 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
       return FALSE;
     }
     setbuf(rec->file,NULL);
-    fread(buffer,1,strlen(magic),rec->file);
-    if (strncmp(buffer,magic,strlen(magic))) {
+
+    if (fread(buffer,1,strlen(magic),rec->file) != strlen(magic) || strncmp(buffer,magic,strlen(magic))) {
       rfbClientLog("File %s was not recorded by vncrec.\n",client->serverHost);
       fclose(rec->file);
       return FALSE;

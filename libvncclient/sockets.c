@@ -111,7 +111,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       rec->tv=tv;
     }
     
-    return (fread(out,1,n,rec->file)<0?FALSE:TRUE);
+    return (fread(out,1,n,rec->file) != n ? FALSE : TRUE);
   }
   
   if (n <= client->buffered) {

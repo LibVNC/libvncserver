@@ -152,7 +152,10 @@ int main(int argc,char **argv)
 #ifdef USE_OLD_VCS
       fread(buffer,width,height,tty_file);
 #else
-      fread(buffer,width*height*2+4,1,tty_file);
+      if(fread(buffer,width*height*2+4,1,tty_file) != 1) {
+	rfbErr("Error reading framebuffer\n");
+	exit(1);
+      }
       vcHideCursor(console);
 #endif
       fclose(tty_file);
