@@ -5,6 +5,11 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_CONFIG_HEADER(rfbconfig.h)
 AX_PREFIX_CONFIG_H([rfb/rfbconfig.h])
 
+# set detailed version info
+AC_DEFINE(VERSION_MAJOR, 0, LibVNCServer major version)
+AC_DEFINE(VERSION_MINOR, 9, LibVNCServer minor version)
+AC_DEFINE(VERSION_PATCHLEVEL, 10, LibVNCServer patchlevel)
+
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
