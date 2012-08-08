@@ -176,7 +176,9 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	rfbScreen->maxFd = max((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
 #endif
     }
-    else if(rfbScreen->port>0) {
+    else
+    {
+	    if(rfbScreen->port>0) {
       FD_ZERO(&(rfbScreen->allFds));
 
       if ((rfbScreen->listenSock = rfbListenOnTCPPort(rfbScreen->port, iface)) < 0) {
@@ -187,8 +189,10 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
   
       FD_SET(rfbScreen->listenSock, &(rfbScreen->allFds));
       rfbScreen->maxFd = rfbScreen->listenSock;
+	    }
 
 #ifdef LIBVNCSERVER_IPv6
+	    if (rfbScreen->ipv6port>0) {
       if ((rfbScreen->listen6Sock = rfbListenOnTCP6Port(rfbScreen->ipv6port, rfbScreen->listen6Interface)) < 0) {
 	/* ListenOnTCP6Port has its own detailed error printout */
 	return;
@@ -197,6 +201,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	
       FD_SET(rfbScreen->listen6Sock, &(rfbScreen->allFds));
       rfbScreen->maxFd = max((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
+	    }
 #endif
 
     }
