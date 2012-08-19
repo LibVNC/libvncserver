@@ -1,6 +1,6 @@
 /*
  * noVNC: HTML5 VNC client
- * Copyright (C) 2011 Joel Martin
+ * Copyright (C) 2012 Joel Martin
  * Licensed under LGPL-3 (see LICENSE.txt)
  *
  * See README.md for usage and integration instructions.
@@ -26,7 +26,7 @@ var that           = {},  // Public API methods
     pixelFormat, clientEncodings, fbUpdateRequest, fbUpdateRequests,
     keyEvent, pointerEvent, clientCutText,
 
-    getTightCLength, extract_data_uri, scan_tight_imgQ,
+    getTightCLength, extract_data_uri,
     keyPress, mouseButton, mouseMove,
 
     checkEvents,  // Overridable for testing
@@ -93,7 +93,6 @@ var that           = {},  // Public API methods
         encoding       : 0,
         subencoding    : -1,
         background     : null,
-        imgQ           : [],  // TIGHT_PNG image queue
         zlibs          : []   // TIGHT zlib streams
     },
 
@@ -103,7 +102,6 @@ var that           = {},  // Public API methods
     fb_height      = 0,
     fb_name        = "",
 
-    scan_imgQ_rate = 40, // 25 times per second or so
     last_req_time  = 0,
     rre_chunk_sz   = 100,
 
@@ -143,6 +141,9 @@ Util.conf_defaults(conf, that, defaults, [
 
     ['connectTimeout',     'rw', 'int', def_con_timeout, 'Time (s) to wait for connection'],
     ['disconnectTimeout',  'rw', 'int', 3,    'Time (s) to wait for disconnection'],
+
+    // UltraVNC repeater ID to connect to
+    ['repeaterID',         'rw', 'str',  '',    'RepeaterID to connect to'],
 
     ['viewportDrag',       'rw', 'bool', false, 'Move the viewport on mouse drags'],
 
@@ -234,21 +235,28 @@ function constructor() {
         }
     });
     ws.on('close', function(e) {
+        Util.Warn("WebSocket on-close event");
+        var msg = "";
         if (e.code) {
-            Util.Info("Close code: " + e.code + ", reason: " + e.reason + ", wasClean: " + e.wasClean);
+            msg = " (code: " + e.code;
+            if (e.reason) {
+                msg += ", reason: " + e.reason;
+            }
+            msg += ")";
         }
         if (rfb_state === 'disconnect') {
-            updateState('disconnected', 'VNC disconnected');
+            updateState('disconnected', 'VNC disconnected' + msg);
         } else if (rfb_state === 'ProtocolVersion') {
-            fail('Failed to connect to server');
+            fail('Failed to connect to server' + msg);
         } else if (rfb_state in {'failed':1, 'disconnected':1}) {
-            Util.Error("Received onclose while disconnected");
+            Util.Error("Received onclose while disconnected" + msg);
         } else  {
-            fail('Server disconnected');
+            fail('Server disconnected' + msg);
         }
     });
     ws.on('error', function(e) {
-        fail("WebSock error: " + e);
+        Util.Warn("WebSocket on-error event");
+        //fail("WebSock reported an error");
     });
 
 
@@ -307,7 +315,6 @@ init_vars = function() {
     FBU.subrects     = 0;  // RRE and HEXTILE
     FBU.lines        = 0;  // RAW
     FBU.tiles        = 0;  // HEXTILE
-    FBU.imgQ         = []; // TIGHT_PNG image queue
     FBU.zlibs        = []; // TIGHT zlib encoders
     mouse_buttonMask = 0;
     mouse_arr        = [];
@@ -419,15 +426,15 @@ updateState = function(state, statusMsg) {
         func = Util.Warn;
     }
 
+    cmsg = typeof(statusMsg) !== 'undefined' ? (" Msg: " + statusMsg) : "";
+    func("New state '" + state + "', was '" + oldstate + "'." + cmsg);
+
     if ((oldstate === 'failed') && (state === 'disconnected')) {
-        // Do disconnect action, but stay in failed state.
+        // Do disconnect action, but stay in failed state
         rfb_state = 'failed';
     } else {
         rfb_state = state;
     }
-
-    cmsg = typeof(statusMsg) !== 'undefined' ? (" Msg: " + statusMsg) : "";
-    func("New state '" + rfb_state + "', was '" + oldstate + "'." + cmsg);
 
     if (connTimer && (rfb_state !== 'connect')) {
         Util.Debug("Clearing connect timer");
@@ -655,10 +662,10 @@ mouseMove = function(x, y) {
 init_msg = function() {
     //Util.Debug(">> init_msg [rfb_state '" + rfb_state + "']");
 
-    var strlen, reason, length, sversion, cversion,
+    var strlen, reason, length, sversion, cversion, repeaterID,
         i, types, num_types, challenge, response, bpp, depth,
         big_endian, red_max, green_max, blue_max, red_shift,
-        green_shift, blue_shift, true_color, name_length;
+        green_shift, blue_shift, true_color, name_length, is_repeater;
 
     //Util.Debug("ws.rQ (" + ws.rQlen() + ") " + ws.rQslice(0));
     switch (rfb_state) {
@@ -669,15 +676,26 @@ init_msg = function() {
         }
         sversion = ws.rQshiftStr(12).substr(4,7);
         Util.Info("Server ProtocolVersion: " + sversion);
+        is_repeater = 0;
         switch (sversion) {
+            case "000.000": is_repeater = 1; break; // UltraVNC repeater
             case "003.003": rfb_version = 3.3; break;
             case "003.006": rfb_version = 3.3; break;  // UltraVNC
             case "003.889": rfb_version = 3.3; break;  // Apple Remote Desktop
             case "003.007": rfb_version = 3.7; break;
             case "003.008": rfb_version = 3.8; break;
             case "004.000": rfb_version = 3.8; break;  // Intel AMT KVM
+            case "004.001": rfb_version = 3.8; break;  // RealVNC 4.6
             default:
                 return fail("Invalid server version " + sversion);
+        }
+        if (is_repeater) { 
+            repeaterID = conf.repeaterID;
+            while (repeaterID.length < 250) {
+                repeaterID += "\0";
+            }
+            ws.send_string(repeaterID);
+            break;
         }
         if (rfb_version > rfb_max_version) { 
             rfb_version = rfb_max_version;
@@ -876,11 +894,11 @@ init_msg = function() {
         response = response.concat(clientEncodings());
         response = response.concat(fbUpdateRequests());
         timing.fbu_rt_start = (new Date()).getTime();
+        timing.pixels = 0;
         ws.send(response);
         
         /* Start pushing/polling */
         setTimeout(checkEvents, conf.check_rate);
-        setTimeout(scan_tight_imgQ, scan_imgQ_rate);
 
         if (conf.encrypt) {
             updateState('normal', "Connected (encrypted) to: " + fb_name);
@@ -1027,7 +1045,7 @@ framebufferUpdate = function() {
             timing.pixels += FBU.width * FBU.height;
         }
 
-        if (FBU.rects === 0 || (timing.pixels >= (fb_width * fb_height))) {
+        if (timing.pixels >= (fb_width * fb_height)) {
             if (((FBU.width === fb_width) &&
                         (FBU.height === fb_height)) ||
                     (timing.fbu_rt_start > 0)) {
@@ -1105,9 +1123,14 @@ encHandlers.COPYRECT = function display_copy_rect() {
     var old_x, old_y;
 
     if (ws.rQwait("COPYRECT", 4)) { return false; }
-    old_x = ws.rQshift16();
-    old_y = ws.rQshift16();
-    display.copyImage(old_x, old_y, FBU.x, FBU.y, FBU.width, FBU.height);
+    display.renderQ_push({
+            'type': 'copy',
+            'old_x': ws.rQshift16(),
+            'old_y': ws.rQshift16(),
+            'x': FBU.x,
+            'y': FBU.y,
+            'width': FBU.width,
+            'height': FBU.height});
     FBU.rects -= 1;
     FBU.bytes = 0;
     return true;
@@ -1401,9 +1424,9 @@ function display_tight(isTightPNG) {
             }
         }
 
-        FBU.imgQ.push({
-                'type': 'rgb',
-                'img':  {'complete': true, 'data': dest},
+        display.renderQ_push({
+                'type': 'blitRgb',
+                'data': dest,
                 'x': FBU.x,
                 'y': FBU.y,
                 'width': FBU.width,
@@ -1432,9 +1455,9 @@ function display_tight(isTightPNG) {
             data = decompress(ws.rQshiftBytes(clength[1]));
         }
 
-        FBU.imgQ.push({
-                'type': 'rgb',
-                'img':  {'complete': true, 'data': data},
+        display.renderQ_push({
+                'type': 'blitRgb',
+                'data': data,
                 'x': FBU.x,
                 'y': FBU.y,
                 'width': FBU.width,
@@ -1456,10 +1479,10 @@ function display_tight(isTightPNG) {
     else if (ctl === 0x0A) cmode = "png";
     else if (ctl & 0x04)   cmode = "filter";
     else if (ctl < 0x04)   cmode = "copy";
-    else throw("Illegal tight compression received, ctl: " + ctl);
+    else return fail("Illegal tight compression received, ctl: " + ctl);
 
     if (isTightPNG && (cmode === "filter" || cmode === "copy")) {
-        throw("filter/copy received in tightPNG mode");
+        return fail("filter/copy received in tightPNG mode");
     }
 
     switch (cmode) {
@@ -1481,9 +1504,8 @@ function display_tight(isTightPNG) {
     case "fill":
         ws.rQshift8(); // shift off ctl
         color = ws.rQshiftBytes(fb_depth);
-        FBU.imgQ.push({
+        display.renderQ_push({
                 'type': 'fill',
-                'img': {'complete': true},
                 'x': FBU.x,
                 'y': FBU.y,
                 'width': FBU.width,
@@ -1501,14 +1523,13 @@ function display_tight(isTightPNG) {
         //           clength[0] + ", clength[1]: " + clength[1]);
         ws.rQshiftBytes(1 + clength[0]); // shift off ctl + compact length
         img = new Image();
-        //img.onload = scan_tight_imgQ;
-        FBU.imgQ.push({
+        img.src = "data:image/" + cmode +
+            extract_data_uri(ws.rQshiftBytes(clength[1]));
+        display.renderQ_push({
                 'type': 'img',
                 'img': img,
                 'x': FBU.x,
                 'y': FBU.y});
-        img.src = "data:image/" + cmode +
-            extract_data_uri(ws.rQshiftBytes(clength[1]));
         img = null;
         break;
     case "filter":
@@ -1542,32 +1563,13 @@ extract_data_uri = function(arr) {
     return ";base64," + Base64.encode(arr);
 };
 
-scan_tight_imgQ = function() {
-    var data, imgQ, ctx;
-    ctx = display.get_context();
-    if (rfb_state === 'normal') {
-        imgQ = FBU.imgQ;
-        while ((imgQ.length > 0) && (imgQ[0].img.complete)) {
-            data = imgQ.shift();
-            if (data.type === 'fill') {
-                display.fillRect(data.x, data.y, data.width, data.height, data.color);
-            } else if (data.type === 'rgb') {
-                display.blitRgbImage(data.x, data.y, data.width, data.height, data.img.data, 0);
-            } else {
-                ctx.drawImage(data.img, data.x, data.y);
-            }
-        }
-        setTimeout(scan_tight_imgQ, scan_imgQ_rate);
-    }
-};
-
 encHandlers.TIGHT = function () { return display_tight(false); };
 encHandlers.TIGHT_PNG = function () { return display_tight(true); };
 
 encHandlers.last_rect = function last_rect() {
-    Util.Debug(">> set_desktopsize");
+    //Util.Debug(">> last_rect");
     FBU.rects = 0;
-    Util.Debug("<< set_desktopsize");
+    //Util.Debug("<< last_rect");
     return true;
 };
 
@@ -1589,7 +1591,7 @@ encHandlers.DesktopSize = function set_desktopsize() {
 
 encHandlers.Cursor = function set_cursor() {
     var x, y, w, h, pixelslength, masklength;
-    //Util.Debug(">> set_cursor");
+    Util.Debug(">> set_cursor");
     x = FBU.x;  // hotspot-x
     y = FBU.y;  // hotspot-y
     w = FBU.width;
@@ -1610,7 +1612,7 @@ encHandlers.Cursor = function set_cursor() {
     FBU.bytes = 0;
     FBU.rects -= 1;
 
-    //Util.Debug("<< set_cursor");
+    Util.Debug("<< set_cursor");
     return true;
 };
 

@@ -1,6 +1,6 @@
 /*
  * noVNC: HTML5 VNC client
- * Copyright (C) 2011 Joel Martin
+ * Copyright (C) 2012 Joel Martin
  * Licensed under LGPL-3 (see LICENSE.txt)
  *
  * See README.md for usage and integration instructions.
@@ -55,6 +55,7 @@ load: function() {
     UI.initSetting('view_only', false);
     UI.initSetting('connectTimeout', 2);
     UI.initSetting('path', 'websockify');
+    UI.initSetting('repeaterID', '');
 
     UI.rfb = RFB({'target': $D('noVNC_canvas'),
                   'onUpdateState': UI.updateState,
@@ -270,6 +271,7 @@ toggleSettingsPanel: function() {
         UI.updateSetting('view_only');
         UI.updateSetting('connectTimeout');
         UI.updateSetting('path');
+        UI.updateSetting('repeaterID');
         UI.updateSetting('stylesheet');
         UI.updateSetting('logging');
 
@@ -313,6 +315,7 @@ settingsApply: function() {
     UI.saveSetting('view_only');
     UI.saveSetting('connectTimeout');
     UI.saveSetting('path');
+    UI.saveSetting('repeaterID');
     UI.saveSetting('stylesheet');
     UI.saveSetting('logging');
 
@@ -427,6 +430,7 @@ updateVisualState: function() {
     $D('noVNC_view_only').disabled = connected;
     $D('noVNC_connectTimeout').disabled = connected;
     $D('noVNC_path').disabled = connected;
+    $D('noVNC_repeaterID').disabled = connected;
 
     if (connected) {
         UI.setViewClip();
@@ -489,8 +493,10 @@ connect: function() {
     UI.rfb.set_shared(UI.getSetting('shared'));
     UI.rfb.set_view_only(UI.getSetting('view_only'));
     UI.rfb.set_connectTimeout(UI.getSetting('connectTimeout'));
+    UI.rfb.set_repeaterID(UI.getSetting('repeaterID'));
 
     UI.rfb.connect(host, port, password, path);
+
     //Close dialog.
     setTimeout(UI.setBarPosition, 100);
     $D('noVNC_logo').style.display = "none";
