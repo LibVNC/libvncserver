@@ -94,6 +94,11 @@ typedef union ws_mask_s {
   uint32_t u;
 } ws_mask_t;
 
+/* XXX: The union and the structs do not need to be named.
+ *      We are working around a bug present in GCC < 4.6 which prevented
+ *      it from recognizing anonymous structs and unions.
+ *      See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=4784
+ */
 typedef struct __attribute__ ((__packed__)) ws_header_s {
   unsigned char b0;
   unsigned char b1;
@@ -101,13 +106,13 @@ typedef struct __attribute__ ((__packed__)) ws_header_s {
     struct __attribute__ ((__packed__)) {
       uint16_t l16;
       ws_mask_t m16;
-    };
+    } s16;
     struct __attribute__ ((__packed__)) {
       uint64_t l64;
       ws_mask_t m64;
-    };
+    } s64;
     ws_mask_t m;
-  };
+  } u;
 } ws_header_t;
 
 enum
@@ -686,15 +691,15 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
 
     if (flength < 126) {
 	fhlen = 2;
-	mask = header->m;
+	mask = header->u.m;
     } else if (flength == 126 && 4 <= ret) {
-	flength = WS_NTOH16(header->l16);
+	flength = WS_NTOH16(header->u.s16.l16);
 	fhlen = 4;
-	mask = header->m16;
+	mask = header->u.s16.m16;
     } else if (flength == 127 && 10 <= ret) {
-	flength = WS_NTOH64(header->l64);
+	flength = WS_NTOH64(header->u.s64.l64);
 	fhlen = 10;
-	mask = header->m64;
+	mask = header->u.s64.m64;
     } else {
       /* Incomplete frame header */
       rfbErr("%s: incomplete frame header\n", __func__, ret);
@@ -798,11 +803,11 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
       sz = 2;
     } else if (blen <= 65536) {
       header->b1 = 0x7e;
-      header->l16 = WS_HTON16((uint16_t)blen);
+      header->u.s16.l16 = WS_HTON16((uint16_t)blen);
       sz = 4;
     } else {
       header->b1 = 0x7f;
-      header->l64 = WS_HTON64(blen);
+      header->u.s64.l64 = WS_HTON64(blen);
       sz = 10;
     }
 
