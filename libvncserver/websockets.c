@@ -41,7 +41,12 @@
 #include <sys/endian.h>
 #endif
 
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
 #include <string.h>
+#include <unistd.h>
 #include "rfb/rfbconfig.h"
 #include "rfbssl.h"
 #include "rfbcrypto.h"
