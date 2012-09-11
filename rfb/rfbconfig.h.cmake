@@ -9,6 +9,9 @@
 /* work around when write() returns ENOENT but does not mean it */
 #cmakedefine LIBVNCSERVER_ENOENT_WORKAROUND 1
 
+/* Define to 1 if you have the <endian.h> header file. */
+#cmakedefine LIBVNCSERVER_HAVE_ENDIAN_H 1
+
 /* Define to 1 if you have the <fcntl.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_FCNTL_H  1 
 
@@ -29,6 +32,9 @@
 
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_NETINET_IN_H  1 
+
+/* Define to 1 if you have the <sys/endian.h> header file. */
+#cmakedefine LIBVNCSERVER_HAVE_SYS_ENDIAN_H 1
 
 /* Define to 1 if you have the <sys/socket.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_SYS_SOCKET_H  1 

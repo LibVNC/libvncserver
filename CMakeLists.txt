@@ -122,8 +122,10 @@ if(LIBGCRYPT_LIBRARIES)
 endif(LIBGCRYPT_LIBRARIES)
 
 
+check_include_file("endian.h"      LIBVNCSERVER_HAVE_ENDIAN_H)
 check_include_file("fcntl.h"       LIBVNCSERVER_HAVE_FCNTL_H)
 check_include_file("netinet/in.h"  LIBVNCSERVER_HAVE_NETINET_IN_H)
+check_include_file("sys/endian.h"  LIBVNCSERVER_HAVE_SYS_ENDIAN_H)
 check_include_file("sys/socket.h"  LIBVNCSERVER_HAVE_SYS_SOCKET_H)
 check_include_file("sys/stat.h"    LIBVNCSERVER_HAVE_SYS_STAT_H)
 check_include_file("sys/time.h"    LIBVNCSERVER_HAVE_SYS_TIME_H)

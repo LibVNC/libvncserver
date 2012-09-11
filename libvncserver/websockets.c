@@ -35,25 +35,22 @@
 /* errno */
 #include <errno.h>
 
-#include <byteswap.h>
+#ifdef LIBVNCSERVER_HAVE_ENDIAN_H
+#include <endian.h>
+#elif LIBVNCSERVER_HAVE_SYS_ENDIAN_H
+#include <sys/endian.h>
+#endif
+
 #include <string.h>
 #include "rfb/rfbconfig.h"
 #include "rfbssl.h"
 #include "rfbcrypto.h"
 
-#if defined(__BYTE_ORDER) && defined(__BIG_ENDIAN) && __BYTE_ORDER == __BIG_ENDIAN
-#define WS_NTOH64(n) (n)
-#define WS_NTOH32(n) (n)
-#define WS_NTOH16(n) (n)
-#define WS_HTON64(n) (n)
-#define WS_HTON16(n) (n)
-#else
-#define WS_NTOH64(n) bswap_64(n)
-#define WS_NTOH32(n) bswap_32(n)
-#define WS_NTOH16(n) bswap_16(n)
-#define WS_HTON64(n) bswap_64(n)
-#define WS_HTON16(n) bswap_16(n)
-#endif
+#define WS_NTOH64(n) htobe64(n)
+#define WS_NTOH32(n) htobe32(n)
+#define WS_NTOH16(n) htobe16(n)
+#define WS_HTON64(n) htobe64(n)
+#define WS_HTON16(n) htobe16(n)
 
 #define B64LEN(__x) (((__x + 2) / 3) * 12 / 3)
 #define WSHLENMAX 14  /* 2 + sizeof(uint64_t) + sizeof(uint32_t) */
