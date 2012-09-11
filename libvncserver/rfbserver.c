@@ -31,6 +31,8 @@
 #define _POSIX_SOURCE
 #define _XOPEN_SOURCE 600
 #endif
+
+#include <stdio.h>
 #include <string.h>
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
