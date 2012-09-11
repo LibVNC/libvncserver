@@ -33,7 +33,16 @@ AC_ARG_WITH(tightvnc-filetransfer,
 # AC_DEFINE moved to after libpthread check.
 
 # WebSockets support
-AC_CHECK_LIB(resolv, __b64_ntop, HAVE_B64="true", HAVE_B64="false")
+AC_CHECK_FUNC(__b64_ntop, HAVE_B64_IN_LIBC="true", HAVE_B64_IN_LIBC="false")
+if test "x$HAVE_B64_IN_LIBC" != "xtrue"; then
+	AC_CHECK_LIB(resolv, __b64_ntop, HAVE_B64_IN_LIBRESOLV="true", HAVE_B64_IN_LIBRESOLV="false")
+	if test "x$HAVE_B64_IN_LIBRESOLV" = "xtrue"; then
+		RESOLV_LIB="-lresolv"
+		HAVE_B64="true"
+	fi
+else
+	HAVE_B64="true"
+fi
 AH_TEMPLATE(WITH_WEBSOCKETS, [Disable WebSockets support])
 AC_ARG_WITH(websockets,
 	[  --without-websockets    disable WebSockets support],
@@ -760,7 +769,7 @@ if test "x$HAVE_B64" != "xtrue"; then
 	with_websockets=""
 fi
 if test "x$with_websockets" = "xyes"; then
-	LIBS="$LIBS -lresolv $SSL_LIBS"
+	LIBS="$LIBS $RESOLV_LIB $SSL_LIBS"
 	AC_DEFINE(WITH_WEBSOCKETS)
 fi
 AM_CONDITIONAL(WITH_WEBSOCKETS, test "$with_websockets" = "yes")

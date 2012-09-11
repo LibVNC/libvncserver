@@ -70,14 +70,25 @@ if(NOT FOUND_LIBJPEG_TURBO)
   message(WARNING "*** The libjpeg library you are building against is not libjpeg-turbo.  Performance will be reduced.  You can obtain libjpeg-turbo from:  https://sourceforge.net/projects/libjpeg-turbo/files/ ***")
 endif()
 
-set(CMAKE_REQUIRED_LIBRARIES resolv)
-check_function_exists(__b64_ntop HAVE_B64)
+# On systems such as GNU/Linux with glibc, __b64_ntop is defined in a
+# separate library, libresolv. On some others, such as FreeBSD, it is
+# part of libc itself. We first check if __b64_ntop is found without
+# additional libraries, and then try looking for it with libresolv if
+# the first test fails.
+check_function_exists(__b64_ntop HAVE_B64_IN_LIBC)
+if(NOT HAVE_B64_IN_LIBC)
+    set(CMAKE_REQUIRED_LIBRARIES resolv)
+    check_function_exists(__b64_ntop HAVE_B64_IN_LIBRESOLV)
+    set(CMAKE_REQUIRED_LIBRARIES)
+
+    if(HAVE_B64_IN_LIBRESOLV)
+        set(RESOLV_LIB "resolv")
+    endif(HAVE_B64_IN_LIBRESOLV)
+endif(NOT HAVE_B64_IN_LIBC)
 
 if(Threads_FOUND)
   option(TIGHTVNC_FILETRANSFER "Enable filetransfer" ON)
 endif(Threads_FOUND)
-if (HAVE_B64)
-endif(HAVE_B64)
 if(ZLIB_FOUND)
   set(LIBVNCSERVER_HAVE_LIBZ 1)
 endif(ZLIB_FOUND)
@@ -92,15 +103,15 @@ option(LIBVNCSERVER_ALLOW24BPP "Allow 24 bpp" ON)
 if(GNUTLS_FOUND)
   set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
   option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (gnutls)" ON)
-  set(WEBSOCKET_LIBRARIES -lresolv ${GNUTLS_LIBRARIES})
+  set(WEBSOCKET_LIBRARIES ${RESOLV_LIB} ${GNUTLS_LIBRARIES})
   set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_gnutls ${LIBVNCSERVER_DIR}/rfbcrypto_gnutls)
 elseif(OPENSSL_FOUND)
   option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (openssl)" ON)
-  set(WEBSOCKET_LIBRARIES -lresolv ${OPENSSL_LIBRARIES})
+  set(WEBSOCKET_LIBRARIES ${RESOLV_LIB} ${OPENSSL_LIBRARIES})
   set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_openssl ${LIBVNCSERVER_DIR}/rfbcrypto_openssl)
 else()
   option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (no ssl)" ON)
-  set(WEBSOCKET_LIBRARIES -lresolv)
+  set(WEBSOCKET_LIBRARIES ${RESOLV_LIB})
   set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_none.c ${LIBVNCSERVER_DIR}/rfbcrypto_included.c ${COMMON_DIR}/md5.c ${COMMON_DIR}/sha1.c)
 endif()
 
