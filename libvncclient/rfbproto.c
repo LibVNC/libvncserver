@@ -26,6 +26,7 @@
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #define _POSIX_SOURCE
+#define _XOPEN_SOURCE 600
 #endif
 #ifndef WIN32
 #include <unistd.h>

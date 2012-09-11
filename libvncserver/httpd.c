@@ -23,6 +23,11 @@
  *  USA.
  */
 
+#ifdef __STRICT_ANSI__
+#define _BSD_SOURCE
+#define _POSIX_SOURCE
+#endif
+
 #include <rfb/rfb.h>
 
 #include <ctype.h>

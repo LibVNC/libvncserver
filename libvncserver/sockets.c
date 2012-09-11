@@ -43,7 +43,11 @@
 
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
-#define _POSIX_SOURCE
+#ifdef __linux__
+/* Setting this on other systems hides definitions such as INADDR_LOOPBACK.
+ * The check should be for __GLIBC__ in fact. */
+# define _POSIX_SOURCE
+#endif
 #endif
 
 #include <rfb/rfb.h>
