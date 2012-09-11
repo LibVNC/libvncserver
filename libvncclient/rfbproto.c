@@ -53,6 +53,7 @@
 #endif
 #include <jpeglib.h>
 #endif
+#include <strings.h>
 #include <stdarg.h>
 #include <time.h>
 
