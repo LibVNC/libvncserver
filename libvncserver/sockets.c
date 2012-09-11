@@ -41,6 +41,11 @@
  *  USA.
  */
 
+#ifdef __STRICT_ANSI__
+#define _BSD_SOURCE
+#define _POSIX_SOURCE
+#endif
+
 #include <rfb/rfb.h>
 
 #ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
