@@ -75,13 +75,13 @@
 #cmakedefine LIBVNCSERVER_WORDS_BIGENDIAN 1
 
 /* Define to empty if `const' does not conform to ANSI C. */
-//#cmakedefine const @CMAKE_CONST@
+/* #cmakedefine const @CMAKE_CONST@ */
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */
-//#ifndef __cplusplus
-//#cmakedefine inline @CMAKE_INLINE@
-//#endif
+/* #ifndef __cplusplus */
+/* #cmakedefine inline @CMAKE_INLINE@ */
+/* #endif */
 
 /* Define to `int' if <sys/types.h> does not define. */
 #cmakedefine HAVE_LIBVNCSERVER_PID_T 1

@@ -81,10 +81,10 @@ typedef struct TIGHT_CONF_s {
 } TIGHT_CONF;
 
 static TIGHT_CONF tightConf[4] = {
-    { 65536, 2048,   6, 0, 0, 0,   4, 24 }, // 0  (used only without JPEG)
-    { 65536, 2048,  32, 1, 1, 1,  96, 24 }, // 1
-    { 65536, 2048,  32, 3, 3, 2,  96, 96 }, // 2  (used only with JPEG)
-    { 65536, 2048,  32, 7, 7, 5,  96, 256 } // 9
+    { 65536, 2048,   6, 0, 0, 0,   4, 24 }, /* 0  (used only without JPEG) */
+    { 65536, 2048,  32, 1, 1, 1,  96, 24 }, /* 1 */
+    { 65536, 2048,  32, 3, 3, 2,  96, 96 }, /* 2  (used only with JPEG) */
+    { 65536, 2048,  32, 7, 7, 5,  96, 256 } /* 9 */
 };
 
 #ifdef LIBVNCSERVER_HAVE_LIBPNG

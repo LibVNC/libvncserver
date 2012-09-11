@@ -686,7 +686,7 @@ typedef struct _rfbClientRec {
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
     /* TurboVNC Encoding support (extends TightVNC) */
     int turboSubsampLevel;
-    int turboQualityLevel;  // 1-100 scale
+    int turboQualityLevel;  /* 1-100 scale */
 #endif
 #endif
 

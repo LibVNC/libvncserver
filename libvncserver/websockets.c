@@ -625,7 +625,7 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
     int flength, fhlen;
     /* int fin; */ /* not used atm */ 
 
-    // rfbLog(" <== %s[%d]: %d cl: %p, wsctx: %p-%p (%d)\n", __func__, gettid(), len, cl, wsctx, (char *)wsctx + sizeof(ws_ctx_t), sizeof(ws_ctx_t));
+    /* rfbLog(" <== %s[%d]: %d cl: %p, wsctx: %p-%p (%d)\n", __func__, gettid(), len, cl, wsctx, (char *)wsctx + sizeof(ws_ctx_t), sizeof(ws_ctx_t)); */
 
     if (wsctx->readbuflen) {
       /* simply return what we have */
