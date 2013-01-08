@@ -26,6 +26,8 @@
 static rfbClient *cl;
 static gchar *server_cut_text = NULL;
 static gboolean framebuffer_allocated = FALSE;
+static GtkWidget *window;
+static GtkWidget *dialog_connecting = NULL;
 
 /* Redraw the screen from the backing pixmap */
 static gboolean expose_event (GtkWidget      *widget,
@@ -58,6 +60,11 @@ static gboolean expose_event (GtkWidget      *widget,
 		SetFormatAndEncodings (cl);
 
 		framebuffer_allocated = TRUE;
+
+		/* Also disable local cursor */
+		GdkCursor* cur = gdk_cursor_new( GDK_BLANK_CURSOR );
+		gdk_window_set_cursor (gtk_widget_get_window(GTK_WIDGET(window)), cur);
+		gdk_cursor_unref( cur );
 	}
 
 	gdk_draw_image (GDK_DRAWABLE (widget->window),
@@ -181,8 +188,6 @@ static void send_crtl_alt_del (GtkMenuItem *menuitem,
 	SendKeyEvent(cl, XK_Control_L, FALSE);
 	SendKeyEvent(cl, XK_Delete, FALSE);
 }
-
-GtkWidget *dialog_connecting = NULL;
 
 static void show_connect_window(int argc, char **argv)
 {
@@ -365,7 +370,6 @@ void quit ()
 }
 
 static rfbBool resize (rfbClient *client) {
-	GtkWidget *window;
 	GtkWidget *scrolled_window;
 	GtkWidget *drawing_area=NULL;
 	static char first=TRUE;
@@ -453,6 +457,11 @@ static rfbBool resize (rfbClient *client) {
 }
 
 static void update (rfbClient *cl, int x, int y, int w, int h) {
+	if (dialog_connecting != NULL) {
+		gtk_widget_destroy (dialog_connecting);
+		dialog_connecting = NULL;
+	}
+
 	GtkWidget *drawing_area = rfbClientGetClientData (cl, gtk_init);
 
 	if (drawing_area != NULL)
