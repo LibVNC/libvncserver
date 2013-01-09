@@ -175,6 +175,7 @@ typedef void (*GotCopyRectProc)(struct _rfbClient* client, int src_x, int src_y,
 
 typedef struct _rfbClient {
 	uint8_t* frameBuffer;
+	unsigned long outputWindow; /* Output Window ID. When set, client application enables libvncclient to perform direct rendering in its window */
 	int width, height;
 
 	int endianTest;

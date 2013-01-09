@@ -23,6 +23,10 @@
 #include <gdk/gdkkeysyms.h>
 #include <rfb/rfbclient.h>
 
+#ifdef LIBVNCSERVER_CONFIG_LIBVA
+#include <gdk/gdkx.h>
+#endif
+
 static rfbClient *cl;
 static gchar *server_cut_text = NULL;
 static gboolean framebuffer_allocated = FALSE;
@@ -57,6 +61,14 @@ static gboolean expose_event (GtkWidget      *widget,
 		cl->format.greenMax = (1 << image->visual->green_prec) - 1;
 		cl->format.blueMax  = (1 << image->visual->blue_prec) - 1;
 
+#ifdef LIBVNCSERVER_CONFIG_LIBVA
+		/* Allow libvncclient to use a more efficient way
+		 * of putting the framebuffer on the screen when
+		 * using the H.264 format.
+		 */
+		cl->outputWindow = GDK_WINDOW_XID(widget->window);
+#endif
+
 		SetFormatAndEncodings (cl);
 
 		framebuffer_allocated = TRUE;
@@ -67,12 +79,14 @@ static gboolean expose_event (GtkWidget      *widget,
 		gdk_cursor_unref( cur );
 	}
 
+#ifndef LIBVNCSERVER_CONFIG_LIBVA
 	gdk_draw_image (GDK_DRAWABLE (widget->window),
 	                widget->style->fg_gc[gtk_widget_get_state(widget)],
 	                image,
 	                event->area.x, event->area.y,
 	                event->area.x, event->area.y,
 	                event->area.width, event->area.height);
+#endif
 
 	return FALSE;
 }
@@ -462,10 +476,12 @@ static void update (rfbClient *cl, int x, int y, int w, int h) {
 		dialog_connecting = NULL;
 	}
 
+#ifndef LIBVNCSERVER_CONFIG_LIBVA
 	GtkWidget *drawing_area = rfbClientGetClientData (cl, gtk_init);
 
 	if (drawing_area != NULL)
 		gtk_widget_queue_draw_area (drawing_area, x, y, w, h);
+#endif
 }
 
 static void kbd_leds (rfbClient *cl, int value, int pad) {

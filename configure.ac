@@ -151,6 +151,20 @@ HAVE_X11="false"
 AC_PATH_XTRA
 AH_TEMPLATE(HAVE_X11, [X11 build environment present])
 
+# See if we want libva support
+# TODO: check if library actually exists
+AH_TEMPLATE(CONFIG_LIBVA, [Build libva support])
+AC_ARG_WITH(libva,
+[  --with-libva                   build libva support],,)
+if test "x$with_libva" != "xno"; then
+    AC_CHECK_LIB(va, vaInitialize,
+        VA_LIBS="-lva -lva-x11"
+        [AC_DEFINE(CONFIG_LIBVA) CONFIG_LIBVA="true"], ,)
+fi
+AC_SUBST(VA_LIBS)
+AM_CONDITIONAL(CONFIG_LIBVA, test ! -z "$VA_LIBS")
+
+
 # See if we are to build x11vnc:
 AH_TEMPLATE(HAVE_SYSTEM_LIBVNCSERVER, [Use the system libvncserver build environment for x11vnc.])
 AC_ARG_WITH(system-libvncserver,
