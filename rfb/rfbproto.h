@@ -442,6 +442,8 @@ typedef struct {
 #define rfbEncodingZRLE 16
 #define rfbEncodingZYWRLE 17
 
+#define rfbEncodingH264               0x48323634
+
 /* Cache & XOR-Zlib - rdv@2002 */
 #define rfbEncodingCache                 0xFFFF0000
 #define rfbEncodingCacheEnable           0xFFFF0001
@@ -514,9 +516,6 @@ typedef struct {
 #define rfbEncodingSupportedEncodings 0xFFFE0002
 #define rfbEncodingServerIdentity     0xFFFE0003
 
-#ifdef LIBVNCSERVER_CONFIG_LIBVA
-#define rfbEncodingH264               0x48323634
-#endif
 
 /*****************************************************************************
  *
