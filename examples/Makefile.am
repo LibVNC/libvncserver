@@ -23,5 +23,5 @@ noinst_HEADERS=radon.h rotatetemplate.c
 noinst_PROGRAMS=example pnmshow regiontest pnmshow24 fontsel \
 	vncev storepasswd colourmaptest simple simple15 $(MAC) \
 	$(FILETRANSFER) backchannel $(BLOOPTEST) camera rotate \
-	zippy
+	zippy repeater
 

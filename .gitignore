@@ -51,6 +51,7 @@ examples/fontsel
 examples/pnmshow
 examples/pnmshow24
 examples/regiontest
+examples/repeater
 examples/rotate
 examples/simple
 examples/simple15
