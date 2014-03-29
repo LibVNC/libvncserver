@@ -2,6 +2,11 @@
 
 #include <rfb/rfb.h>
 
+static void clientGone(rfbClientPtr cl)
+{
+  rfbShutdownServer(cl->screen, TRUE);
+}
+
 int main(int argc,char** argv)
 {
   char *repeaterHost;
@@ -53,6 +58,7 @@ int main(int argc,char** argv)
     return 1;
   }
   cl->reverseConnection = 0;
+  cl->clientGoneHook = clientGone;
 
   /* Run the server */
   rfbInitServer(server);
