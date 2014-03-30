@@ -372,6 +372,12 @@ void rfbClientCleanup(rfbClient* client) {
 
   FreeTLS(client);
 
+  while (client->clientData) {
+    rfbClientData* next = client->clientData->next;
+    free(client->clientData);
+    client->clientData = next;
+  }
+
   if (client->sock >= 0)
     close(client->sock);
   if (client->listenSock >= 0)
