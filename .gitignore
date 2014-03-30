@@ -65,11 +65,16 @@ test/cargstest
 test/copyrecttest
 test/cursortest
 test/encodingstest
+/test/tjbench
+/test/tjunittest
 vncterm/LinuxVNC
 vncterm/VNCommand
 vncterm/example
+/vncterm/linuxvnc
+/vncterm/vncommand
 x11vnc.spec
 x11vnc/x11vnc
 CMakeCache.txt
 cmake_install.cmake
 /CMakeFiles
+/rfbproto.pdf
