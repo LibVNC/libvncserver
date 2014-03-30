@@ -172,6 +172,7 @@ static void* clientLoop(void* data) {
 	}
 	free(((clientData*)client->clientData)->display);
 	free(client->clientData);
+	client->clientData = NULL;
 	if(client->frameBuffer)
 		free(client->frameBuffer);
 	rfbClientCleanup(client);
