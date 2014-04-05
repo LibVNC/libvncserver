@@ -48,6 +48,7 @@ examples/colourmaptest
 examples/example
 examples/filetransfer
 examples/fontsel
+examples/mac
 examples/pnmshow
 examples/pnmshow24
 examples/regiontest
