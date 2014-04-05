@@ -48,9 +48,11 @@ examples/colourmaptest
 examples/example
 examples/filetransfer
 examples/fontsel
+examples/mac
 examples/pnmshow
 examples/pnmshow24
 examples/regiontest
+examples/repeater
 examples/rotate
 examples/simple
 examples/simple15
@@ -78,3 +80,5 @@ CMakeCache.txt
 cmake_install.cmake
 /CMakeFiles
 /rfbproto.pdf
+/rfbproto.rst
+/vencrypt.txt
