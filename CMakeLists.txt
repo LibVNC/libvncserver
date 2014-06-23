@@ -17,14 +17,14 @@ set(VERSION_MINOR          "9")
 set(VERSION_PATCHLEVEL     "10")
 set(PROJECT_BUGREPORT_PATH "http://sourceforge.net/projects/libvncserver")
 set(CMAKE_C_FLAGS "-O2 -W -Wall -g")
-set(LIBVNCSERVER_DIR ${CMAKE_SOURCE_DIR}/libvncserver)
-set(COMMON_DIR ${CMAKE_SOURCE_DIR}/common)
-set(LIBVNCCLIENT_DIR ${CMAKE_SOURCE_DIR}/libvncclient)
-set(LIBVNCSRVTEST_DIR ${CMAKE_SOURCE_DIR}/examples)
-set(LIBVNCCLITEST_DIR ${CMAKE_SOURCE_DIR}/client_examples)
+set(LIBVNCSERVER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver)
+set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/common)
+set(LIBVNCCLIENT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncclient)
+set(LIBVNCSRVTEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples)
+set(LIBVNCCLITEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/client_examples)
 
 
-include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/libvncserver ${CMAKE_SOURCE_DIR}/common)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver ${CMAKE_CURRENT_SOURCE_DIR}/common)
 
 find_package(ZLIB)
 find_package(JPEG)
@@ -167,8 +167,8 @@ TEST_BIG_ENDIAN(LIBVNCSERVER_WORDS_BIGENDIAN)
 # LIBVNCSERVER_ENOENT_WORKAROUND
 # inline
 
-configure_file(${CMAKE_SOURCE_DIR}/rfb/rfbconfig.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbconfig.h)
-configure_file(${CMAKE_SOURCE_DIR}/rfb/rfbint.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbint.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rfb/rfbconfig.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbconfig.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rfb/rfbint.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbint.h)
 
 set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/main.c
@@ -280,6 +280,7 @@ target_link_libraries(vncclient
                       ${ADDITIONAL_LIBS}
                       ${ZLIB_LIBRARIES}
                       ${JPEG_LIBRARIES}
+                      ${GNUTLS_LIBRARIES}
 )
 target_link_libraries(vncserver
                       ${ADDITIONAL_LIBS}
@@ -353,16 +354,16 @@ if(HAVE_FFMPEG)
 endif(HAVE_FFMPEG)
 
 
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/examples)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
 foreach(test ${LIBVNCSERVER_TESTS})
   add_executable(examples/${test} ${LIBVNCSRVTEST_DIR}/${test}.c)
   target_link_libraries(examples/${test} vncserver ${CMAKE_THREAD_LIBS_INIT})
 endforeach(test ${LIBVNCSERVER_TESTS})
 
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/client_examples)
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
 foreach(test ${LIBVNCCLIENT_TESTS})
   add_executable(client_examples/${test} ${LIBVNCCLITEST_DIR}/${test}.c ${LIBVNCCLITEST_DIR}/${${test}_EXTRA_SOURCES} )
-  target_link_libraries(client_examples/${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${GNUTLS_LIBRARIES} ${X11_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
+  target_link_libraries(client_examples/${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${X11_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
 endforeach(test ${LIBVNCCLIENT_TESTS})
 
 install_targets(/lib vncserver)
