@@ -1288,6 +1288,8 @@ SetFormatAndEncodings(rfbClient* client)
   if (!SupportsClient2Server(client, rfbSetPixelFormat)) return TRUE;
 
   spf.type = rfbSetPixelFormat;
+  spf.pad1 = 0;
+  spf.pad2 = 0;
   spf.format = client->format;
   spf.format.redMax = rfbClientSwap16IfLE(spf.format.redMax);
   spf.format.greenMax = rfbClientSwap16IfLE(spf.format.greenMax);
