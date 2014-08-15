@@ -250,7 +250,8 @@ static rfbBool rfbInitConnection(rfbClient* client)
 
   client->width=client->si.framebufferWidth;
   client->height=client->si.framebufferHeight;
-  client->MallocFrameBuffer(client);
+  if (!client->MallocFrameBuffer(client))
+    return FALSE;
 
   if (!SetFormatAndEncodings(client))
     return FALSE;
