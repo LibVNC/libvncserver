@@ -7,6 +7,8 @@ Name: LibVNCClient
 Description: A library for easy implementation of a VNC client.
 Version: @VERSION@
 Requires:
-Libs: -L${libdir} -lvncclient @LIBS@ @WSOCKLIB@
+Requires.private: zlib
+Libs: -L${libdir} -lvncclient
+Libs.private: @LIBS@ @WSOCKLIB@
 Cflags: -I${includedir}
 
