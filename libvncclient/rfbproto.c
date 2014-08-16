@@ -1829,7 +1829,8 @@ HandleRFBServerMessage(rfbClient* client)
 	client->updateRect.x = client->updateRect.y = 0;
 	client->updateRect.w = client->width;
 	client->updateRect.h = client->height;
-	client->MallocFrameBuffer(client);
+  if (!client->MallocFrameBuffer(client))
+    return FALSE;
 	SendFramebufferUpdateRequest(client, 0, 0, rect.r.w, rect.r.h, FALSE);
 	rfbClientLog("Got new framebuffer size: %dx%d\n", rect.r.w, rect.r.h);
 	continue;
@@ -2290,7 +2291,9 @@ HandleRFBServerMessage(rfbClient* client)
     client->updateRect.x = client->updateRect.y = 0;
     client->updateRect.w = client->width;
     client->updateRect.h = client->height;
-    client->MallocFrameBuffer(client);
+    if (!client->MallocFrameBuffer(client))
+      return FALSE;
+
     SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
     rfbClientLog("Got new framebuffer size: %dx%d\n", client->width, client->height);
     break;
@@ -2306,7 +2309,8 @@ HandleRFBServerMessage(rfbClient* client)
     client->updateRect.x = client->updateRect.y = 0;
     client->updateRect.w = client->width;
     client->updateRect.h = client->height;
-    client->MallocFrameBuffer(client);
+    if (!client->MallocFrameBuffer(client))
+      return FALSE;
     SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
     rfbClientLog("Got new framebuffer size: %dx%d\n", client->width, client->height);
     break;
