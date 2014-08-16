@@ -82,7 +82,7 @@ static char* ReadPassword(rfbClient* client) {
 #endif
 }
 static rfbBool MallocFrameBuffer(rfbClient* client) {
-uint64_t allocSize;
+  uint64_t allocSize;
 
   if(client->frameBuffer)
     free(client->frameBuffer);
