@@ -2461,6 +2461,11 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	msg.cct.length = Swap32IfLE(msg.cct.length);
 
 	str = (char *)malloc(msg.cct.length);
+	if (str == NULL) {
+		rfbLogPerror("rfbProcessClientNormalMessage: not enough memory");
+		rfbCloseClient(cl);
+		return;
+	}
 
 	if ((n = rfbReadExact(cl, str, msg.cct.length)) <= 0) {
 	    if (n != 0)
