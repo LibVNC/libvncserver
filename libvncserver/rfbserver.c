@@ -2461,6 +2461,11 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	msg.cct.length = Swap32IfLE(msg.cct.length);
 
 	str = (char *)malloc(msg.cct.length);
+	if (str == NULL) {
+		rfbLogPerror("rfbProcessClientNormalMessage: not enough memory");
+		rfbCloseClient(cl);
+		return;
+	}
 
 	if ((n = rfbReadExact(cl, str, msg.cct.length)) <= 0) {
 	    if (n != 0)
@@ -2486,6 +2491,13 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
           rfbCloseClient(cl);
           return;
       }
+
+      if (msg.ssc.scale == 0) {
+          rfbLogPerror("rfbProcessClientNormalMessage: will not accept a scale factor of zero");
+          rfbCloseClient(cl);
+          return;
+      }
+
       rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbSetScaleMsg, sz_rfbSetScaleMsg);
       rfbLog("rfbSetScale(%d)\n", msg.ssc.scale);
       rfbScalingSetup(cl,cl->screen->width/msg.ssc.scale, cl->screen->height/msg.ssc.scale);
@@ -2502,6 +2514,13 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
           rfbCloseClient(cl);
           return;
       }
+
+      if (msg.ssc.scale == 0) {
+          rfbLogPerror("rfbProcessClientNormalMessage: will not accept a scale factor of zero");
+          rfbCloseClient(cl);
+          return;
+      }
+
       rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbSetScaleMsg, sz_rfbSetScaleMsg);
       rfbLog("rfbSetScale(%d)\n", msg.ssc.scale);
       rfbScalingSetup(cl,cl->screen->width/msg.ssc.scale, cl->screen->height/msg.ssc.scale);
