@@ -189,7 +189,7 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 	} /* while ( remaining > 0 ) */
 
 	if ( inflateResult == Z_OK ) {
-		void* buf=client->raw_buffer;
+		char* buf=client->raw_buffer;
 		int i,j;
 
 		remaining = client->raw_buffer_size-client->decompStream.avail_out;
