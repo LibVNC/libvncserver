@@ -45,7 +45,7 @@ static rfbBool DummyPoint(rfbClient* client, int x, int y) {
 static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 }
 
-#ifdef __MINGW32__
+#ifdef WIN32
 static char* NoPassword(rfbClient* client) {
   return strdup("");
 }
@@ -56,9 +56,9 @@ static char* NoPassword(rfbClient* client) {
 #endif
 
 static char* ReadPassword(rfbClient* client) {
-#ifdef __MINGW32__
+#ifdef WIN32
 	/* FIXME */
-	rfbClientErr("ReadPassword on MinGW32 NOT IMPLEMENTED\n");
+	rfbClientErr("ReadPassword on Windows NOT IMPLEMENTED\n");
 	return NoPassword(client);
 #else
 	int i;
