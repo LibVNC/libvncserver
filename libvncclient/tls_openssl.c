@@ -32,6 +32,8 @@
 #include "tls.h"
 
 #ifdef _MSC_VER
+#include <BaseTsd.h> // That's for SSIZE_T
+typedef SSIZE_T ssize_t;
 #define snprintf _snprintf
 #endif
 
@@ -308,7 +310,11 @@ return TRUE;
     if (ret != -1)
     {
       rfbClientLog("TLS handshake blocking.\n");
-      sleep(1);
+#ifdef WIN32
+      Sleep(1000);
+#else
+	  sleep(1);
+#endif
       timeout--;
       continue;
     }
