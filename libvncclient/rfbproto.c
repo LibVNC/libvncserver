@@ -64,6 +64,10 @@
 #include "minilzo.h"
 #include "tls.h"
 
+#ifdef _MSC_VER
+#  define snprintf _snprintf
+#endif
+
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
  */
