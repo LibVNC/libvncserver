@@ -27,7 +27,30 @@
 #include <openssl/rand.h>
 #include <openssl/x509.h>
 
+#ifdef _MSC_VER
+typedef CRITICAL_SECTION MUTEX_TYPE;
+#define MUTEX_INIT(mutex) InitializeCriticalSection(&mutex)
+#define MUTEX_FREE(mutex) DeleteCriticalSection(&mutex)
+#define MUTEX_LOCK(mutex) EnterCriticalSection(&mutex)
+#define MUTEX_UNLOCK(mutex) LeaveCriticalSection(&mutex)
+#define CURRENT_THREAD_ID GetCurrentThreadId()
+#else
+typedef pthread_mutex_t MUTEX_TYPE;
+#define MUTEX_INIT(mutex) {\
+	pthread_mutexattr_t mutexAttr;\
+	pthread_mutexattr_init(&mutexAttr);\
+	pthread_mutexattr_settype(&mutexAttr, PTHREAD_MUTEX_RECURSIVE);\
+	pthread_mutex_init(&mutex, &mutexAttr);\
+}
+#define MUTEX_FREE(mutex) pthread_mutex_destroy(&mutex)
+#define MUTEX_LOCK(mutex) pthread_mutex_lock(&mutex)
+#define MUTEX_UNLOCK(mutex) pthread_mutex_unlock(&mutex)
+#define CURRENT_THREAD_ID pthread_self()
+#endif
+
+#ifndef _MSC_VER
 #include <pthread.h>
+#endif
 
 #include "tls.h"
 
@@ -38,23 +61,23 @@ typedef SSIZE_T ssize_t;
 #endif
 
 static rfbBool rfbTLSInitialized = FALSE;
-static pthread_mutex_t *mutex_buf = NULL;
+static MUTEX_TYPE *mutex_buf = NULL;
 
 struct CRYPTO_dynlock_value {
-	pthread_mutex_t mutex;
+	MUTEX_TYPE mutex;
 };
 
 static void locking_function(int mode, int n, const char *file, int line)
 {
 	if (mode & CRYPTO_LOCK)
-		pthread_mutex_lock(&mutex_buf[n]);
+		MUTEX_LOCK(mutex_buf[n]);
 	else
-		pthread_mutex_unlock(&mutex_buf[n]);
+		MUTEX_UNLOCK(mutex_buf[n]);
 }
 
 static unsigned long id_function(void)
 {
-	return ((unsigned long) pthread_self());
+	return ((unsigned long) CURRENT_THREAD_ID);
 }
 
 static struct CRYPTO_dynlock_value *dyn_create_function(const char *file, int line)
@@ -65,7 +88,7 @@ static struct CRYPTO_dynlock_value *dyn_create_function(const char *file, int li
 		malloc(sizeof(struct CRYPTO_dynlock_value));
 	if (!value)
 		goto err;
-	pthread_mutex_init(&value->mutex, NULL);
+	MUTEX_INIT(value->mutex);
 
 	return value;
 
@@ -76,16 +99,16 @@ err:
 static void dyn_lock_function (int mode, struct CRYPTO_dynlock_value *l, const char *file, int line)
 {
 	if (mode & CRYPTO_LOCK)
-		pthread_mutex_lock(&l->mutex);
+		MUTEX_LOCK(l->mutex);
 	else
-		pthread_mutex_unlock(&l->mutex);
+		MUTEX_UNLOCK(l->mutex);
 }
 
 
 static void
 dyn_destroy_function(struct CRYPTO_dynlock_value *l, const char *file, int line)
 {
-	pthread_mutex_destroy(&l->mutex);
+	MUTEX_FREE(l->mutex);
 	free(l);
 }
 
@@ -123,14 +146,14 @@ InitializeTLS(void)
 
   if (rfbTLSInitialized) return TRUE;
 
-  mutex_buf = malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
+  mutex_buf = malloc(CRYPTO_num_locks() * sizeof(MUTEX_TYPE));
   if (mutex_buf == NULL) {
     rfbClientLog("Failed to initialized OpenSSL: memory.\n");
     return (-1);
   }
 
   for (i = 0; i < CRYPTO_num_locks(); i++)
-    pthread_mutex_init(&mutex_buf[i], NULL);
+    MUTEX_INIT(mutex_buf[i]);
 
   CRYPTO_set_locking_callback(locking_function);
   CRYPTO_set_id_callback(id_function);
@@ -200,7 +223,7 @@ static int sock_read_ready(SSL *ssl, uint32_t ms)
 	FD_SET(SSL_get_fd(ssl), &fds);
 
 	tv.tv_sec = ms / 1000;
-	tv.tv_usec = (ms % 1000) * 1000;
+	tv.tv_usec = (ms % 1000) * ms;
 	
 	r = select (SSL_get_fd(ssl) + 1, &fds, NULL, NULL, &tv); 
 
@@ -587,7 +610,7 @@ void FreeTLS(rfbClient* client)
     CRYPTO_set_id_callback(NULL);
 
     for (i = 0; i < CRYPTO_num_locks(); i++)
-      pthread_mutex_destroy(&mutex_buf[i]);
+      MUTEX_FREE(mutex_buf[i]);
     free(mutex_buf);
     mutex_buf = NULL;
   }
