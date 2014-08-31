@@ -145,7 +145,6 @@ ssl_verify (int ok, X509_STORE_CTX *ctx)
 {
   unsigned char md5sum[16], fingerprint[40], *f;
   rfbClient *client;
-  char *prompt, *cert_str;
   int err, i;
   unsigned int md5len;
   //char buf[257];
@@ -203,8 +202,6 @@ static int sock_read_ready(SSL *ssl, uint32_t ms)
 
 static int wait_for_data(SSL *ssl, int ret, int timeout)
 {
-  struct timeval tv;
-  fd_set fds;
   int err;
   int retval = 1;
 
@@ -237,7 +234,6 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS)
   SSL_CTX *ssl_ctx = NULL;
   SSL *ssl = NULL;
   int n, finished = 0;
-  BIO *sbio;
 
   ssl_ctx = SSL_CTX_new (SSLv23_client_method ());
   SSL_CTX_set_default_verify_paths (ssl_ctx);
@@ -276,8 +272,6 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS)
 static rfbBool
 InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
 {
-  int ret;
-
   if (client->tlsSession) return TRUE;
 
   client->tlsSession = open_ssl_connection (client, client->sock, anonTLS);
@@ -415,7 +409,6 @@ HandleVeNCryptAuth(rfbClient* client)
   uint32_t authScheme;
   rfbBool anonTLS;
 //  gnutls_certificate_credentials_t x509_cred = NULL;
-  int ret;
 
   if (!InitializeTLS()) return FALSE;
 
