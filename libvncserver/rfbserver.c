@@ -1683,15 +1683,16 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         */
         if ((buffer = rfbProcessFileTransferReadBuffer(cl, length))==NULL) return FALSE;
 
-        /* Parse the FileTime */
+        /* Parse the FileTime
+         * TODO: FileTime is actually never used afterwards
+         */
         p = strrchr(buffer, ',');
         if (p!=NULL) {
             *p = '\0';
-            strcpy(szFileTime, p+1);
+            strncpy(szFileTime, p+1, sizeof(szFileTime));
+            szFileTime[sizeof(szFileTime)-1] = '\x00'; /* ensure NULL terminating byte is present, even if copy overflowed */
         } else
             szFileTime[0]=0;
-
-
 
         /* Need to read in sizeHtmp */
         if ((n = rfbReadExact(cl, (char *)&sizeHtmp, 4)) <= 0) {
