@@ -1770,7 +1770,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         p = strrchr(buffer, ',');
         if (p!=NULL) {
             *p = '\0';
-            strcpy(szFileTime, p+1);
+            strncpy(szFileTime, p+1, sizeof(szFileTime));
+            szFileTime[sizeof(szFileTime)-1] = '\x00'; /* ensure NULL terminating byte is present, even if copy overflowed */
         } else
             szFileTime[0]=0;
 
