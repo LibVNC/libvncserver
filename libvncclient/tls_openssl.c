@@ -31,6 +31,10 @@
 
 #include "tls.h"
 
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif
+
 static rfbBool rfbTLSInitialized = FALSE;
 static pthread_mutex_t *mutex_buf = NULL;
 

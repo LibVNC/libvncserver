@@ -57,6 +57,10 @@
 #endif
 #include "tls.h"
 
+#ifdef _MSC_VER
+#  define snprintf _snprintf
+#endif
+
 void PrintInHex(char *buf, int len);
 
 rfbBool errorMessageOnReadFailure = TRUE;
