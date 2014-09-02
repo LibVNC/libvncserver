@@ -222,7 +222,7 @@ static int sock_read_ready(SSL *ssl, uint32_t ms)
 	FD_SET(SSL_get_fd(ssl), &fds);
 
 	tv.tv_sec = ms / 1000;
-	tv.tv_usec = (ms % 1000) * ms;
+	tv.tv_usec = (ms % 1000) * 1000;
 	
 	r = select (SSL_get_fd(ssl) + 1, &fds, NULL, NULL, &tv); 
 
