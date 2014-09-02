@@ -27,11 +27,13 @@
 #endif
 #include <unistd.h>
 #include <sys/types.h>
-#ifdef __MINGW32__
+#ifdef WIN32
 #define close closesocket
 #include <winsock2.h>
+#ifdef _MINGW32
 #undef max
-#else
+#endif // #ifdef _MINGW32
+#else // #ifdef WIN32
 #include <sys/wait.h>
 #include <sys/utsname.h>
 #endif
@@ -46,7 +48,7 @@
 void
 listenForIncomingConnections(rfbClient* client)
 {
-#ifdef __MINGW32__
+#ifdef WIN32
   /* FIXME */
   rfbClientErr("listenForIncomingConnections on MinGW32 NOT IMPLEMENTED\n");
   return;
