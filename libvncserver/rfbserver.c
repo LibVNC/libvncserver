@@ -1258,9 +1258,7 @@ rfbBool rfbFilenameTranslate2UNIX(rfbClientPtr cl, /* in */ char *path, /* out *
 
     /* C: */
     if (path[0]=='C' && path[1]==':')
-    {
       strcpy(unixPath, &path[2]);
-    }
     else
     {
       home = getenv("HOME");
@@ -1683,9 +1681,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         */
         if ((buffer = rfbProcessFileTransferReadBuffer(cl, length))==NULL) return FALSE;
 
-        /* Parse the FileTime
-         * TODO: FileTime is actually never used afterwards
-         */
+        /* Parse the FileTime */
         p = strrchr(buffer, ',');
         if (p!=NULL) {
             *p = '\0';
@@ -1693,6 +1689,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
             szFileTime[sizeof(szFileTime)-1] = '\x00'; /* ensure NULL terminating byte is present, even if copy overflowed */
         } else
             szFileTime[0]=0;
+
+
 
         /* Need to read in sizeHtmp */
         if ((n = rfbReadExact(cl, (char *)&sizeHtmp, 4)) <= 0) {
