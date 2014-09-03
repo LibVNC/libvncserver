@@ -65,7 +65,7 @@
 #define LIBVNCSERVER_WORDS_BIGENDIAN
 #define rfbBool int
 #include <sys/timeb.h>
-#include <winsock.h>
+#include <winsock2.h>
 #undef SOCKET
 #define SOCKET int
 #else
@@ -106,6 +106,10 @@ typedef int8_t rfbBool;
 #define FALSE 0
 #undef TRUE
 #define TRUE -1
+#endif
+
+#ifdef _MSC_VER
+#include <stdint.h>
 #endif
 
 typedef uint32_t rfbKeySym;
