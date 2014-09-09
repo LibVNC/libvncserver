@@ -1,6 +1,6 @@
 
-SUBDIRS=libvncserver examples libvncclient vncterm webclients client_examples test
-DIST_SUBDIRS=libvncserver examples libvncclient vncterm webclients client_examples test
+SUBDIRS=libvncserver examples libvncclient webclients client_examples test
+DIST_SUBDIRS=libvncserver examples libvncclient webclients client_examples test
 EXTRA_DIST = CMakeLists.txt rfb/rfbint.h.cmake rfb/rfbconfig.h.cmake
 
 bin_SCRIPTS = libvncserver-config
