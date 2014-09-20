@@ -1051,7 +1051,7 @@ void rfbInitServer(rfbScreenInfoPtr screen)
 #endif
   rfbInitSockets(screen);
   rfbHttpInitSockets(screen);
-#ifndef __MINGW32__
+#ifndef WIN32
   if(screen->ignoreSIGPIPE)
     signal(SIGPIPE,SIG_IGN);
 #endif
