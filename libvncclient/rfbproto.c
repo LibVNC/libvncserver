@@ -53,7 +53,12 @@
 #endif
 #include <jpeglib.h>
 #endif
+
+#ifndef _MSC_VER
+/* Strings.h is not available in MSVC */
 #include <strings.h>
+#endif
+
 #include <stdarg.h>
 #include <time.h>
 
@@ -65,7 +70,7 @@
 #include "tls.h"
 
 #ifdef _MSC_VER
-#  define snprintf _snprintf
+#  define snprintf _snprintf /* MSVC went straight to the underscored syntax */
 #endif
 
 /*

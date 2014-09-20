@@ -109,6 +109,10 @@ int deny_severity=LOG_WARNING;
 #define closesocket close
 #endif
 
+#ifdef _MSC_VER
+#define snprintf _snprintf /* Missing in MSVC */
+#endif
+
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */
 

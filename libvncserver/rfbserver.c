@@ -83,6 +83,13 @@
 #include "rfbssl.h"
 #endif
 
+#ifdef _MSC_VER
+#define snprintf _snprintf /* Missing in MSVC */
+/* Prevent POSIX deprecation warnings */
+#define close _close
+#define strdup _strdup 
+#endif
+
 #ifdef __MINGW32__
 static int compat_mkdir(const char *path, int mode)
 {
