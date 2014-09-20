@@ -455,11 +455,13 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
 #endif
 
 #ifdef LIBVNCSERVER_IPv6
-    char host[1024];
-    if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
-      rfbLogPerror("rfbProcessNewConnection: error in getnameinfo");
+    {
+        char host[1024];
+        if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
+            rfbLogPerror("rfbProcessNewConnection: error in getnameinfo");
+        }
+        rfbLog("Got connection from client %s\n", host);
     }
-    rfbLog("Got connection from client %s\n", host);
 #else
     rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
 #endif

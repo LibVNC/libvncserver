@@ -320,12 +320,14 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
     if(isUDP) {
       rfbLog(" accepted UDP client\n");
-    } else {
+	} else {
+#ifdef LIBVNCSERVER_IPv6
+		char host[1024];
+#endif
       int one=1;
 
       getpeername(sock, (struct sockaddr *)&addr, &addrlen);
 #ifdef LIBVNCSERVER_IPv6
-      char host[1024];
       if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
 	rfbLogPerror("rfbNewClient: error in getnameinfo");
 	cl->host = strdup("");

@@ -392,11 +392,13 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
     getpeername(rfbScreen->httpSock, (struct sockaddr *)&addr, &addrlen);
 #ifdef LIBVNCSERVER_IPv6
-    char host[1024];
-    if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
-      rfbLogPerror("httpProcessInput: error in getnameinfo");
+    {
+        char host[1024];
+        if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
+            rfbLogPerror("httpProcessInput: error in getnameinfo");
+        }
+        rfbLog("httpd: get '%s' for %s\n", fname+1, host);
     }
-    rfbLog("httpd: get '%s' for %s\n", fname+1, host);
 #else
     rfbLog("httpd: get '%s' for %s\n", fname+1,
 	   inet_ntoa(addr.sin_addr));
