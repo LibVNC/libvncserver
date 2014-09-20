@@ -109,8 +109,12 @@ CreateFileListInfo(FileListInfoPtr pFileListInfo, char* path, int flag)
 {
 	DIR* pDir = NULL;
 	struct dirent* pDirent = NULL;
-	
-	if((path == NULL) || (strlen(path) == 0)) {
+
+	if(path == NULL) {
+		return FAILURE;
+	}
+
+	if(strlen(path) == 0) {
 		/* In this case we will send the list of entries in ftp root*/
 		sprintf(path, "%s%s", GetFtpRoot(), "/");
 	}
