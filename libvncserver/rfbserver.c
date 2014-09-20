@@ -43,6 +43,8 @@
 #endif
 
 #ifdef WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <io.h>
 #define write(sock,buf,len) send(sock,buf,len,0)
 #else
