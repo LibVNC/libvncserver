@@ -1,8 +1,10 @@
 #pragma once
 
 //http://social.msdn.microsoft.com/Forums/en/vcgeneral/thread/430449b3-f6dd-4e18-84de-eebd26a8d668
-#include < time.h >
-#include <windows.h> //I've ommited this line.
+
+#include <time.h>
+#include <winsock2.h>
+
 #if defined(_MSC_VER) || defined(_MSC_EXTENSIONS)
   #define DELTA_EPOCH_IN_MICROSECS  11644473600000000Ui64
 #else
