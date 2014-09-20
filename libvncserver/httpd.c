@@ -43,8 +43,15 @@
 #include <errno.h>
 
 #ifdef WIN32
-#include <winsock.h>
+#include <io.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #define close closesocket
+#if defined(_MSC_VER)
+#include <BaseTsd.h> /* For the missing ssize_t */
+#define ssize_t SSIZE_T
+#define read _read /* Prevent POSIX deprecation warnings */
+#endif
 #else
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>

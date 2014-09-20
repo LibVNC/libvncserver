@@ -98,6 +98,8 @@ int deny_severity=LOG_WARNING;
 #endif
 
 #if defined(WIN32)
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #ifndef __MINGW32__
 #pragma warning (disable: 4018 4761)
 #endif
@@ -110,6 +112,9 @@ int deny_severity=LOG_WARNING;
 #endif
 
 #ifdef _MSC_VER
+#define SHUT_RD   0x00
+#define SHUT_WR   0x01
+#define SHUT_RDWR 0x02
 #define snprintf _snprintf /* Missing in MSVC */
 #endif
 
