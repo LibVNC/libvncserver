@@ -43,6 +43,7 @@
 #endif
 
 #ifdef WIN32
+#include <io.h>
 #define write(sock,buf,len) send(sock,buf,len,0)
 #else
 #ifdef LIBVNCSERVER_HAVE_UNISTD_H
@@ -90,12 +91,12 @@
 #define strdup _strdup 
 #endif
 
+#ifdef WIN32
 #ifdef __MINGW32__
-static int compat_mkdir(const char *path, int mode)
-{
-	return mkdir(path);
-}
-#define mkdir compat_mkdir
+#define mkdir(path, perms) mkdir(path) /* Omit the perms argument to match POSIX signature */
+#else /* MSVC and other windows compilers */
+#define mkdir(path, perms) _mkdir(path) /* Omit the perms argument to match POSIX signature */
+#endif /* __MINGW32__ else... */
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
