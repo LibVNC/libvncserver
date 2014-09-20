@@ -31,9 +31,12 @@
 #endif
 
 #include <rfb/rfb.h>
-#include <resolv.h> /* __b64_ntop */
 /* errno */
 #include <errno.h>
+
+#ifndef _MSC_VER
+#include <resolv.h> /* __b64_ntop */
+#endif
 
 #ifdef LIBVNCSERVER_HAVE_ENDIAN_H
 #include <endian.h>

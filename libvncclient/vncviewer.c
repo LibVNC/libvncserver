@@ -26,6 +26,10 @@
 #include <winsock2.h>
 #endif
 
+#ifdef _MSC_VER
+#define strdup _strdup /* Prevent POSIX deprecation warnings */
+#endif
+
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #define _POSIX_SOURCE
