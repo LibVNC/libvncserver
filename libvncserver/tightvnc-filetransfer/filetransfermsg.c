@@ -27,8 +27,34 @@
 #include <string.h>
 #include <stdlib.h>
 #include <fcntl.h>
+
+#ifdef WIN32
+#include <io.h>
+#include <direct.h>
+#include <sys/utime.h>
+#ifdef _MSC_VER
+#define S_ISREG(m)	(((m) & _S_IFMT) == _S_IFREG)
+#define S_ISDIR(m)	(((m) & S_IFDIR) == S_IFDIR)
+#define S_IWUSR		S_IWRITE
+#define S_IRUSR		S_IREAD
+#define S_IWOTH		0x0000002
+#define S_IROTH		0x0000004
+#define S_IWGRP		0x0000010
+#define S_IRGRP		0x0000020
+#define mkdir(path, perms) _mkdir(path) /* Match POSIX signature */
+/* Prevent POSIX deprecation warnings on MSVC */
+#define creat _creat
+#define open _open
+#define read _read
+#define write _write
+#define close _close
+#define unlink _unlink
+#endif /* _MSC_VER */
+#else
 #include <dirent.h>
 #include <utime.h>
+#endif
+
 #include <errno.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -104,6 +130,125 @@ GetFileListResponseMsg(char* path, char flags)
 #define __FUNCTION__ "unknown"
 #endif
 
+#ifdef WIN32
+
+/* Most of the Windows version here is based on https://github.com/danielgindi/FileDir */
+
+#define FILETIME_TO_TIME_T(FILETIME) (((((__int64)FILETIME.dwLowDateTime) | (((__int64)FILETIME.dwHighDateTime) << 32)) - 116444736000000000L) / 10000000L)
+
+#ifdef FILE_ATTRIBUTE_INTEGRITY_STREAM
+#define IS_REGULAR_FILE_HAS_ATTRIBUTE_INTEGRITY_STREAM(dwFileAttributes) (!!(dwFileAttributes & FILE_ATTRIBUTE_INTEGRITY_STREAM))
+#else
+#define IS_REGULAR_FILE_HAS_ATTRIBUTE_INTEGRITY_STREAM(dwFileAttributes) 0
+#endif
+
+#ifdef FILE_ATTRIBUTE_NO_SCRUB_DATA
+#define IS_REGULAR_FILE_HAS_ATTRIBUTE_NO_SCRUB_DATA(dwFileAttributes) (!!(dwFileAttributes & FILE_ATTRIBUTE_NO_SCRUB_DATA))
+#else
+#define IS_REGULAR_FILE_HAS_ATTRIBUTE_NO_SCRUB_DATA(dwFileAttributes) 0
+#endif
+
+#define IS_REGULAR_FILE(dwFileAttributes) \
+	( \
+	!!(dwFileAttributes & FILE_ATTRIBUTE_NORMAL) || \
+	( \
+	!(dwFileAttributes & FILE_ATTRIBUTE_DEVICE) && \
+	!(dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && \
+	!(dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED) && \
+	!IS_REGULAR_FILE_HAS_ATTRIBUTE_INTEGRITY_STREAM(dwFileAttributes) && \
+	!IS_REGULAR_FILE_HAS_ATTRIBUTE_NO_SCRUB_DATA(dwFileAttributes) && \
+	!(dwFileAttributes & FILE_ATTRIBUTE_OFFLINE) && \
+	!(dwFileAttributes & FILE_ATTRIBUTE_TEMPORARY) \
+	) \
+	)
+
+#define IS_FOLDER(dwFileAttributes) (!!(dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+
+int
+CreateFileListInfo(FileListInfoPtr pFileListInfo, char* path, int flag)
+{
+	int pathLen, basePathLength;
+	char *basePath, *pChar;
+	WIN32_FIND_DATAA winFindData;
+	HANDLE findHandle;
+
+	if(path == NULL) {
+		return FAILURE;
+	}
+
+	if(strlen(path) == 0) {
+		/* In this case we will send the list of entries in ftp root*/
+		sprintf(path, "%s%s", GetFtpRoot(), "/");
+	}
+
+	/* Create a search string, like C:\folder\* */
+
+	pathLen = strlen(path);
+	basePath = malloc(pathLen + 3);
+	memcpy(basePath, path, pathLen);
+	basePathLength = pathLen;
+	basePath[basePathLength] = '\\';
+	basePath[basePathLength + 1] = '*';
+	basePath[basePathLength + 2] = '\0';
+
+	/* Start a search */
+	memset(&winFindData, 0, sizeof(winFindData));
+	findHandle = FindFirstFileA(path, &winFindData);
+
+	basePath[basePathLength] = '\0'; /* Restore to a basePath + \ */
+	/* Convert \ to / */
+	for(pChar = basePath; *pChar; pChar++) {
+		if (*pChar == '\\') {
+			*pChar = '/';
+		}
+	}
+
+	/* While we can find a next file do...
+	   But ignore \. and '.. entries, which are current folder and parent folder respectively */
+	while(findHandle != INVALID_HANDLE_VALUE && winFindData.cFileName[0] == '.' && 
+		(winFindData.cFileName[1] == '\0' || 
+		(winFindData.cFileName[1] == '.' && winFindData.cFileName[2] == '\0'))) {
+		char fullpath[PATH_MAX];
+		fullpath[0] = 0;
+
+		strncpy_s(fullpath, PATH_MAX, basePath, basePathLength);
+		strncpy_s(fullpath + basePathLength, PATH_MAX - basePathLength, winFindData.cFileName, (int)strlen(winFindData.cFileName));
+
+		if(IS_FOLDER(winFindData.dwFileAttributes)) {
+			if (AddFileListItemInfo(pFileListInfo, winFindData.cFileName, -1, 0) == 0) {
+				rfbLog("File [%s]: Method [%s]: Add directory %s in the"
+					" list failed\n", __FILE__, __FUNCTION__, fullpath);
+				continue;
+			}
+		} 
+		else if(IS_REGULAR_FILE(winFindData.dwFileAttributes)) {
+			if(flag) {
+				unsigned int fileSize = (winFindData.nFileSizeHigh * (MAXDWORD+1)) + winFindData.nFileSizeLow;
+				if(AddFileListItemInfo(pFileListInfo, winFindData.cFileName, fileSize, FILETIME_TO_TIME_T(winFindData.ftLastWriteTime)) == 0) {
+					rfbLog("File [%s]: Method [%s]: Add file %s in the "
+						"list failed\n", __FILE__, __FUNCTION__, fullpath);
+					continue;
+				}			
+			}
+		}
+
+		if(FindNextFileA(findHandle, &winFindData) == 0) {
+			FindClose(findHandle);
+			findHandle = INVALID_HANDLE_VALUE;
+		}
+	}
+
+	if(findHandle != INVALID_HANDLE_VALUE) {
+		FindClose(findHandle);
+	}
+
+	free(basePath);
+	
+	return SUCCESS;
+}
+
+#else /* WIN32 */
+
 int
 CreateFileListInfo(FileListInfoPtr pFileListInfo, char* path, int flag)
 {
@@ -173,6 +318,8 @@ CreateFileListInfo(FileListInfoPtr pFileListInfo, char* path, int flag)
 	
 	return SUCCESS;
 }
+
+#endif
 
 
 FileTransferMsg
