@@ -627,6 +627,10 @@ CloseUndoneFileTransfer(rfbClientPtr cl, rfbTightClientPtr rtcp)
  * Method to handle create directory request.
  ******************************************************************************/
 
+#ifdef _MSC_VER
+#undef CreateDirectory /* Prevent macro clashes under Windows */
+#endif /* _MSC_VER */
+
 void
 CreateDirectory(char* dirName)
 {
@@ -637,4 +641,3 @@ CreateDirectory(char* dirName)
 				__FILE__, __FUNCTION__, dirName);
 	}
 }
-
