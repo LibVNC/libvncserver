@@ -100,7 +100,7 @@ GetFileListResponseMsg(char* path, char flags)
 	return fileListMsg;
 }
 
-#ifndef __GNUC__
+#if !defined(__GNUC__) && !defined(_MSC_VER)
 #define __FUNCTION__ "unknown"
 #endif
 
