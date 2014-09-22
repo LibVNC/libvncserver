@@ -285,21 +285,17 @@ rfbScreenInfoPtr rfbScaledScreenAllocate(rfbClientPtr cl, int width, int height)
     ptr = malloc(sizeof(rfbScreenInfo));
     if (ptr!=NULL)
     {
-      uint64_t allocSize;
+	int allocSize;
 
         /* copy *everything* (we don't use most of it, but just in case) */
         memcpy(ptr, cl->screen, sizeof(rfbScreenInfo));
 
-        /* SECURITY: make sure that no integer overflow will occur afterwards
-         * by pre-performing all computations using a 64-bit integer type.
-         *
+        /* SECURITY: make sure that no integer overflow will occur afterwards.
          * Note: this is defensive coding, as the check should have already been
          * performed during initial, non-scaled screen setup.
          */
-        allocSize = (uint64_t)width * (ptr->bitsPerPixel/8);
-        allocSize += (allocSize % 4);
-        allocSize = allocSize * height; /* this is the actual value that will be passed to malloc() */
-        if (allocSize >= SIZE_MAX)
+        allocSize = pad4(width * (ptr->bitsPerPixel/8)); /* per protocol, width<2**16 and bpp<256 */
+        if ((height == 0) || (allocSize >= (SIZE_MAX / height)))
         {
           free(ptr);
           return NULL; /* malloc() will allocate an incorrect buffer size - early abort */
