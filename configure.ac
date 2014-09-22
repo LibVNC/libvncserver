@@ -598,7 +598,6 @@ AC_CONFIG_FILES([Makefile
 	libvncserver/Makefile
 	examples/Makefile
 	examples/android/Makefile
-	vncterm/Makefile
 	webclients/Makefile
 	webclients/java-applet/Makefile
 	webclients/java-applet/ssl/Makefile

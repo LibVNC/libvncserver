@@ -20,12 +20,8 @@ SDLVIEWER=SDLvncviewer
 SDLvncviewer_CFLAGS=$(SDL_CFLAGS)
 SDLvncviewer_SOURCES=SDLvncviewer.c scrap.c scrap.h
 
-if HAVE_X11
-X11_LIB=-lX11
-endif
-
 # thanks to autoconf, this looks ugly
-SDLvncviewer_LDADD=$(LDADD) $(SDL_LIBS) $(X11_LIB)
+SDLvncviewer_LDADD=$(LDADD) $(SDL_LIBS)
 endif
 
 if HAVE_LIBGTK
