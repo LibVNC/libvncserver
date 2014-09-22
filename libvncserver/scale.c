@@ -66,6 +66,10 @@
         (double) ((int) (x)) : (double) ((int) (x) + 1) )
 #define FLOOR(x) ( (double) ((int) (x)) )
 
+static inline int pad4(int value) {
+    int remainder = value & 3;
+    return value + (remainder == 0 ? 0 : 4 - remainder);
+}
 
 int ScaleX(rfbScreenInfoPtr from, rfbScreenInfoPtr to, int x)
 {
@@ -307,7 +311,7 @@ rfbScreenInfoPtr rfbScaledScreenAllocate(rfbClientPtr cl, int width, int height)
         ptr->paddedWidthInBytes = (ptr->bitsPerPixel/8)*ptr->width;
 
         /* Need to by multiples of 4 for Sparc systems */
-        ptr->paddedWidthInBytes += (ptr->paddedWidthInBytes % 4);
+        ptr->paddedWidthInBytes = pad4(ptr->paddedWidthInBytes);
 
         /* Reset the reference count to 0! */
         ptr->scaledScreenRefCount = 0;
