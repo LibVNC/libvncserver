@@ -285,7 +285,7 @@ rfbScreenInfoPtr rfbScaledScreenAllocate(rfbClientPtr cl, int width, int height)
     ptr = malloc(sizeof(rfbScreenInfo));
     if (ptr!=NULL)
     {
-	int allocSize;
+        int allocSize;
 
         /* copy *everything* (we don't use most of it, but just in case) */
         memcpy(ptr, cl->screen, sizeof(rfbScreenInfo));
