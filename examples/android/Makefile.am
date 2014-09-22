@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir)
+AM_CPPFLAGS = -I$(top_srcdir)
 LDADD = $(top_srcdir)/libvncserver/libvncserver.la @WSOCKLIB@
 
 noinst_PROGRAMS=androidvncserver

@@ -1,9 +1,12 @@
 # Process this file with autoconf to produce a configure script.
 AC_INIT(LibVNCServer, 0.9.10, https://github.com/LibVNC/libvncserver)
-AM_INIT_AUTOMAKE(LibVNCServer, 0.9.10)
+AM_INIT_AUTOMAKE([subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_CONFIG_HEADER(rfbconfig.h)
 AX_PREFIX_CONFIG_H([rfb/rfbconfig.h])
+AC_CONFIG_MACRO_DIR([m4])
+
+AM_MAINTAINER_MODE
 
 # set detailed version info
 AC_DEFINE(VERSION_MAJOR, 0, LibVNCServer major version)
@@ -24,6 +27,12 @@ AC_LIBTOOL_WIN32_DLL
 AC_PROG_LIBTOOL
 AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
                   [$PATH:/usr/ccs/bin])
+
+AC_DISABLE_STATIC
+LT_PREREQ([2.4.2])
+LT_INIT([dlopen])
+LT_LANG([C])
+AC_SUBST([LIBTOOL_DEPS])
 
 # Options
 AH_TEMPLATE(WITH_TIGHTVNC_FILETRANSFER, [Disable TightVNCFileTransfer protocol])
@@ -519,12 +528,12 @@ AC_C_BIGENDIAN
 AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
-AC_TYPE_SOCKLEN_T
+AX_TYPE_SOCKLEN_T
 if test ! -d ./rfb; then
 	echo "creating subdir ./rfb for rfbint.h"
 	mkdir ./rfb 
 fi
-AC_CREATE_STDINT_H(rfb/rfbint.h)
+AX_CREATE_STDINT_H(rfb/rfbint.h)
 AC_CACHE_CHECK([for in_addr_t],
         vnc_cv_inaddrt, [
                 AC_TRY_COMPILE([#include <sys/types.h>
