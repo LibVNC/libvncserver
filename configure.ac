@@ -25,6 +25,12 @@ AC_PROG_LIBTOOL
 AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
                   [$PATH:/usr/ccs/bin])
 
+AC_DISABLE_STATIC
+LT_PREREQ([2.4.2])
+LT_INIT([dlopen])
+LT_LANG([C])
+AC_SUBST([LIBTOOL_DEPS])
+
 # Options
 AH_TEMPLATE(WITH_TIGHTVNC_FILETRANSFER, [Disable TightVNCFileTransfer protocol])
 AC_ARG_WITH(tightvnc-filetransfer,
