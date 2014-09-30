@@ -43,8 +43,15 @@
 #include <errno.h>
 
 #ifdef WIN32
-#include <winsock.h>
+#include <io.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #define close closesocket
+#if defined(_MSC_VER)
+#include <BaseTsd.h> /* For the missing ssize_t */
+#define ssize_t SSIZE_T
+#define read _read /* Prevent POSIX deprecation warnings */
+#endif
 #else
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -392,11 +399,13 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
     getpeername(rfbScreen->httpSock, (struct sockaddr *)&addr, &addrlen);
 #ifdef LIBVNCSERVER_IPv6
-    char host[1024];
-    if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
-      rfbLogPerror("httpProcessInput: error in getnameinfo");
+    {
+        char host[1024];
+        if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
+            rfbLogPerror("httpProcessInput: error in getnameinfo");
+        }
+        rfbLog("httpd: get '%s' for %s\n", fname+1, host);
     }
-    rfbLog("httpd: get '%s' for %s\n", fname+1, host);
 #else
     rfbLog("httpd: get '%s' for %s\n", fname+1,
 	   inet_ntoa(addr.sin_addr));

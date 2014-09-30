@@ -26,6 +26,11 @@
 #ifndef FILE_TRANSFER_MSG_H
 #define FILE_TRANSFER_MSG_H
 
+#ifdef _MSC_VER
+#pragma push_macro("CreateDirectory")
+#undef CreateDirectory /* Prevent macro clashes under Windows */
+#endif /* _MSC_VER */
+
 typedef struct _FileTransferMsg {
 	char* data;
 	unsigned int length;
@@ -49,6 +54,10 @@ void FileUpdateComplete(rfbClientPtr cl, rfbTightClientPtr data);
 void CloseUndoneFileTransfer(rfbClientPtr cl, rfbTightClientPtr data);
 
 void FreeFileTransferMsg(FileTransferMsg ftm);
+
+#ifdef _MSC_VER
+#  pragma pop_macro("CreateDirectory") /* Restore original macro */
+#endif /* _MSC_VER */
 
 #endif
 
