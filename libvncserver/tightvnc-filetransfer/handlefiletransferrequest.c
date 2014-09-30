@@ -24,7 +24,7 @@
  
 #ifndef _MSC_VER
 #include <pwd.h>
-#endif /* _MSC_VER
+#endif /* _MSC_VER */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +33,7 @@
 #ifndef _MSC_VER
 #include <dirent.h>
 #include <pthread.h>
-#endif /* _MSC_VER
+#endif /* _MSC_VER */
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <limits.h>
