@@ -1431,11 +1431,13 @@ rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer)
             }
         }
 
+#ifdef WIN32
         if (FindNextFileA(findHandle, &winFindData) == 0)
         {
             FindClose(findHandle);
             findHandle = INVALID_HANDLE_VALUE;
         }
+#endif
     }
 #ifdef WIN32
     if (findHandle != INVALID_HANDLE_VALUE)
