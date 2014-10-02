@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir)
+AM_CPPFLAGS = -I$(top_srcdir)
 LDADD = ../libvncclient/libvncclient.la @WSOCKLIB@
 
 if WITH_FFMPEG
