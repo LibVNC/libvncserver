@@ -1,3 +1,4 @@
+ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS=libvncserver examples libvncclient webclients client_examples test
 DIST_SUBDIRS=libvncserver examples libvncclient webclients client_examples test
