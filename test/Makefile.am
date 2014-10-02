@@ -9,7 +9,7 @@ tjbench_SOURCES=tjbench.c ../common/turbojpeg.c ../common/turbojpeg.h \
 tjbench_LDADD=$(LDADD) -lm
 endif
 
-INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/common
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/common
 LDADD = ../libvncserver/libvncserver.la ../libvncclient/libvncclient.la @WSOCKLIB@
 
 if HAVE_LIBPTHREAD

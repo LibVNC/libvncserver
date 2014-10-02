@@ -82,3 +82,6 @@ cmake_install.cmake
 /rfbproto.pdf
 /rfbproto.rst
 /vencrypt.txt
+/INSTALL
+.dirstamp
+/ltmain.sh
