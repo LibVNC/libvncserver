@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/common
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/common
 
 if WITH_TIGHTVNC_FILETRANSFER
 TIGHTVNCFILETRANSFERHDRS=tightvnc-filetransfer/filelistinfo.h \
