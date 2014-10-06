@@ -20,7 +20,7 @@ noinst_HEADERS=../common/lzodefs.h ../common/lzoconf.h ../common/minilzo.h tls.h
 
 rfbproto.o: rfbproto.c corre.c hextile.c rre.c tight.c zlib.c zrle.c ultra.c
 
-EXTRA_DIST=corre.c hextile.c rre.c tight.c zlib.c zrle.c ultra.c tls_gnutls.c tls_openssl.c tls_none.c
+EXTRA_DIST=corre.c hextile.c rre.c tight.c zlib.c zrle.c ultra.c tls_gnutls.c tls_openssl.c tls_none.c h264.c
 
 $(libvncclient_la_OBJECTS): ../rfb/rfbclient.h
 
