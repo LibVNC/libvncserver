@@ -90,6 +90,13 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	int nn=n;
 	rfbClientLog("ReadFromRFBServer %d bytes\n",n);
 #endif
+
+  /* Handle attempts to write to NULL out buffer that might occur
+     when an outside malloc() fails. For instance, memcpy() to NULL
+     results in undefined behaviour and probably memory corruption.*/
+  if(!out)
+    return FALSE;
+
   if (client->serverPort==-1) {
     /* vncrec playing */
     rfbVNCRec* rec = client->vncRec;
