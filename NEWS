@@ -20,6 +20,7 @@
    - LibVNCServer:
      * Merged patches from KDE/krfb.
      * Can now do IPv6 without IPv4.
+     * Fixed a use-after-free issue in scale.c.
 
 0.9.9
    - Overall changes:
