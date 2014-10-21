@@ -413,7 +413,6 @@ int rfbSendNewScaleSize(rfbClientPtr cl)
         if (rfbWriteExact(cl, (char *)&pmsg, sz_rfbPalmVNCReSizeFrameBufferMsg) < 0) {
             rfbLogPerror("rfbNewClient: write");
             rfbCloseClient(cl);
-            rfbClientConnectionGone(cl);
             return FALSE;
         }
     }
@@ -428,7 +427,6 @@ int rfbSendNewScaleSize(rfbClientPtr cl)
         if (rfbWriteExact(cl, (char *)&rmsg, sz_rfbResizeFrameBufferMsg) < 0) {
             rfbLogPerror("rfbNewClient: write");
             rfbCloseClient(cl);
-            rfbClientConnectionGone(cl);
             return FALSE;
         }
     }
