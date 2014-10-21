@@ -4,8 +4,9 @@
  * This code should be independent of any changes in the RFB protocol.  It just
  * deals with the X server scheduling stuff, calling rfbNewClientConnection and
  * rfbProcessClientMessage to actually deal with the protocol.  If a socket
- * needs to be closed for any reason then rfbCloseClient should be called, and
- * this in turn will call rfbClientConnectionGone.  To make an active
+ * needs to be closed for any reason then rfbCloseClient should be called. In turn,
+ * rfbClientConnectionGone will be called by rfbProcessEvents (non-threaded case)
+ * or clientInput (threaded case) in main.c.  To make an active
  * connection out, call rfbConnect - note that this does _not_ call
  * rfbNewClientConnection.
  *
