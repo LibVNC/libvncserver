@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/common
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/common
 
 if WITH_TIGHTVNC_FILETRANSFER
 TIGHTVNCFILETRANSFERHDRS=tightvnc-filetransfer/filelistinfo.h \
@@ -14,13 +14,13 @@ endif
 
 if WITH_WEBSOCKETS
 
-if HAVE_LIBSSL
-WEBSOCKETSSSLSRCS = rfbssl_openssl.c rfbcrypto_openssl.c
-WEBSOCKETSSSLLIBS = @SSL_LIBS@ @CRYPT_LIBS@
-else
 if HAVE_GNUTLS
 WEBSOCKETSSSLSRCS = rfbssl_gnutls.c rfbcrypto_gnutls.c
 WEBSOCKETSSSLLIBS = @GNUTLS_LIBS@
+else
+if HAVE_LIBSSL
+WEBSOCKETSSSLSRCS = rfbssl_openssl.c rfbcrypto_openssl.c
+WEBSOCKETSSSLLIBS = @SSL_LIBS@ @CRYPT_LIBS@
 else
 WEBSOCKETSSSLSRCS = rfbssl_none.c rfbcrypto_included.c ../common/md5.c ../common/sha1.c
 endif
@@ -36,8 +36,9 @@ include_HEADERS=../rfb/rfb.h ../rfb/rfbconfig.h ../rfb/rfbint.h \
 	../rfb/rfbproto.h ../rfb/keysym.h ../rfb/rfbregion.h ../rfb/rfbclient.h
 
 noinst_HEADERS=../common/d3des.h ../rfb/default8x16.h zrleoutstream.h \
-	zrlepalettehelper.h zrletypes.h private.h ../common/minilzo.h ../common/lzoconf.h ../common/lzodefs.h scale.h \
-	partialupdateregionbuf.h\
+	zrlepalettehelper.h zrletypes.h private.h scale.h rfbssl.h rfbcrypto.h \
+	partialupdateregionbuf.h \
+	../common/minilzo.h ../common/lzoconf.h ../common/lzodefs.h ../common/md5.h ../common/sha1.h \
 	$(TIGHTVNCFILETRANSFERHDRS)
 
 EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
@@ -47,7 +48,7 @@ EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
 if HAVE_LIBZ
 ZLIBSRCS = zlib.c zrle.c zrleoutstream.c zrlepalettehelper.c ../common/zywrletemplate.c
 if HAVE_LIBJPEG
-TIGHTSRCS = tight.c
+TIGHTSRCS = tight.c ../common/turbojpeg.c
 endif
 endif
 

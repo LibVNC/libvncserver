@@ -4,8 +4,9 @@
  * This code should be independent of any changes in the RFB protocol.  It just
  * deals with the X server scheduling stuff, calling rfbNewClientConnection and
  * rfbProcessClientMessage to actually deal with the protocol.  If a socket
- * needs to be closed for any reason then rfbCloseClient should be called, and
- * this in turn will call rfbClientConnectionGone.  To make an active
+ * needs to be closed for any reason then rfbCloseClient should be called. In turn,
+ * rfbClientConnectionGone will be called by rfbProcessEvents (non-threaded case)
+ * or clientInput (threaded case) in main.c.  To make an active
  * connection out, call rfbConnect - note that this does _not_ call
  * rfbNewClientConnection.
  *
@@ -40,6 +41,15 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
  *  USA.
  */
+
+#ifdef __STRICT_ANSI__
+#define _BSD_SOURCE
+#ifdef __linux__
+/* Setting this on other systems hides definitions such as INADDR_LOOPBACK.
+ * The check should be for __GLIBC__ in fact. */
+# define _POSIX_SOURCE
+#endif
+#endif
 
 #include <rfb/rfb.h>
 
@@ -89,6 +99,8 @@ int deny_severity=LOG_WARNING;
 #endif
 
 #if defined(WIN32)
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #ifndef __MINGW32__
 #pragma warning (disable: 4018 4761)
 #endif
@@ -98,6 +110,13 @@ int deny_severity=LOG_WARNING;
 #define write(sock,buf,len) send(sock,buf,len,0)
 #else
 #define closesocket close
+#endif
+
+#ifdef _MSC_VER
+#define SHUT_RD   0x00
+#define SHUT_WR   0x01
+#define SHUT_RDWR 0x02
+#define snprintf _snprintf /* Missing in MSVC */
 #endif
 
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
@@ -210,8 +229,9 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 {
     in_addr_t iface = rfbScreen->listenInterface;
 
-    if (rfbScreen->socketState!=RFB_SOCKET_INIT)
-	return;
+    if (rfbScreen->socketState == RFB_SOCKET_READY) {
+        return;
+    }
 
     rfbScreen->socketState = RFB_SOCKET_READY;
 
@@ -273,7 +293,9 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	rfbScreen->maxFd = max((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
 #endif
     }
-    else if(rfbScreen->port>0) {
+    else
+    {
+	    if(rfbScreen->port>0) {
       FD_ZERO(&(rfbScreen->allFds));
 
       if ((rfbScreen->listenSock = rfbListenOnTCPPort(rfbScreen->port, iface)) < 0) {
@@ -284,8 +306,10 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
   
       FD_SET(rfbScreen->listenSock, &(rfbScreen->allFds));
       rfbScreen->maxFd = rfbScreen->listenSock;
+	    }
 
 #ifdef LIBVNCSERVER_IPv6
+	    if (rfbScreen->ipv6port>0) {
       if ((rfbScreen->listen6Sock = rfbListenOnTCP6Port(rfbScreen->ipv6port, rfbScreen->listen6Interface)) < 0) {
 	/* ListenOnTCP6Port has its own detailed error printout */
 	return;
@@ -294,6 +318,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	
       FD_SET(rfbScreen->listen6Sock, &(rfbScreen->allFds));
       rfbScreen->maxFd = max((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
+	    }
 #endif
 
     }
@@ -523,9 +548,9 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
       rfbLogPerror("rfbProcessNewConnection: error in select");
       return FALSE;
     }
-    if (FD_ISSET(rfbScreen->listenSock, &listen_fds)) 
+    if (rfbScreen->listenSock >= 0 && FD_ISSET(rfbScreen->listenSock, &listen_fds))
       chosen_listen_sock = rfbScreen->listenSock;
-    if (FD_ISSET(rfbScreen->listen6Sock, &listen_fds)) 
+    if (rfbScreen->listen6Sock >= 0 && FD_ISSET(rfbScreen->listen6Sock, &listen_fds))
       chosen_listen_sock = rfbScreen->listen6Sock;
 
     if ((sock = accept(chosen_listen_sock,
@@ -557,11 +582,13 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
 #endif
 
 #ifdef LIBVNCSERVER_IPv6
-    char host[1024];
-    if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
-      rfbLogPerror("rfbProcessNewConnection: error in getnameinfo");
+    {
+        char host[1024];
+        if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
+            rfbLogPerror("rfbProcessNewConnection: error in getnameinfo");
+        }
+        rfbLog("Got connection from client %s\n", host);
     }
-    rfbLog("Got connection from client %s\n", host);
 #else
     rfbLog("Got connection from client %s\n", inet_ntoa(addr.sin_addr));
 #endif

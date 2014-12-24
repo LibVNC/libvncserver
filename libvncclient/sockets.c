@@ -24,6 +24,11 @@
 
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
+#ifdef __linux__
+/* Setting this on other systems hides definitions such as INADDR_LOOPBACK.
+ * The check should be for __GLIBC__ in fact. */
+# define _POSIX_SOURCE
+#endif
 #endif
 #include <unistd.h>
 #include <errno.h>
@@ -33,7 +38,9 @@
 #ifdef WIN32
 #undef SOCKET
 #include <winsock2.h>
+#ifdef MINGW32
 #define EWOULDBLOCK WSAEWOULDBLOCK
+#endif
 #define close closesocket
 #define read(sock,buf,len) recv(sock,buf,len,0)
 #define write(sock,buf,len) send(sock,buf,len,0)
@@ -53,6 +60,10 @@
 #include "tls.h"
 #include "ghpringbuf.h"
 #include "packet.h"
+
+#ifdef _MSC_VER
+#  define snprintf _snprintf
+#endif
 
 void PrintInHex(char *buf, int len);
 
@@ -81,6 +92,13 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	int nn=n;
 	rfbClientLog("ReadFromRFBServer %d bytes\n",n);
 #endif
+
+  /* Handle attempts to write to NULL out buffer that might occur
+     when an outside malloc() fails. For instance, memcpy() to NULL
+     results in undefined behaviour and probably memory corruption.*/
+  if(!out)
+    return FALSE;
+
   if (client->serverPort==-1) {
     /* vncrec playing */
     rfbVNCRec* rec = client->vncRec;
@@ -102,7 +120,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	  diff.tv_sec--;
 	  diff.tv_usec+=1000000;
         }
-#ifndef __MINGW32__
+#ifndef WIN32
         sleep (diff.tv_sec);
         usleep (diff.tv_usec);
 #else
@@ -113,7 +131,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       rec->tv=tv;
     }
     
-    return (fread(out,1,n,rec->file)<0?FALSE:TRUE);
+    return (fread(out,1,n,rec->file) != n ? FALSE : TRUE);
   }
   
   if (n <= client->buffered) {

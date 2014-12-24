@@ -66,6 +66,7 @@ typedef struct ClientData {
 static void clientgone(rfbClientPtr cl)
 {
   free(cl->clientData);
+  cl->clientData = NULL;
 }
 
 static enum rfbNewClientAction newclient(rfbClientPtr cl)

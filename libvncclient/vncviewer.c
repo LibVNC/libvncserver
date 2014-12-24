@@ -21,6 +21,15 @@
  * vncviewer.c - the Xt-based VNC viewer.
  */
 
+#ifdef WIN32
+#undef SOCKET
+#include <winsock2.h>
+#endif
+
+#ifdef _MSC_VER
+#define strdup _strdup /* Prevent POSIX deprecation warnings */
+#endif
+
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #define _POSIX_SOURCE
@@ -41,12 +50,10 @@ static rfbBool DummyPoint(rfbClient* client, int x, int y) {
 static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 }
 
-#ifdef __MINGW32__
+#ifdef WIN32
 static char* NoPassword(rfbClient* client) {
   return strdup("");
 }
-#undef SOCKET
-#include <winsock2.h>
 #define close closesocket
 #else
 #include <stdio.h>
@@ -54,9 +61,9 @@ static char* NoPassword(rfbClient* client) {
 #endif
 
 static char* ReadPassword(rfbClient* client) {
-#ifdef __MINGW32__
+#ifdef WIN32
 	/* FIXME */
-	rfbClientErr("ReadPassword on MinGW32 NOT IMPLEMENTED\n");
+	rfbClientErr("ReadPassword on Windows NOT IMPLEMENTED\n");
 	return NoPassword(client);
 #else
 	int i;
@@ -83,16 +90,38 @@ static char* ReadPassword(rfbClient* client) {
 #endif
 }
 static rfbBool MallocFrameBuffer(rfbClient* client) {
+  uint64_t allocSize;
+
   if(client->frameBuffer)
     free(client->frameBuffer);
-  client->frameBuffer=malloc(client->width*client->height*client->format.bitsPerPixel/8);
+
+  /* SECURITY: promote 'width' into uint64_t so that the multiplication does not overflow
+     'width' and 'height' are 16-bit integers per RFB protocol design
+     SIZE_MAX is the maximum value that can fit into size_t
+  */
+  allocSize = (uint64_t)client->width * client->height * client->format.bitsPerPixel/8;
+
+  if (allocSize >= SIZE_MAX) {
+    rfbClientErr("CRITICAL: cannot allocate frameBuffer, requested size is too large\n");
+    return FALSE;
+  }
+
+  client->frameBuffer=malloc( (size_t)allocSize );
+
+  if (client->frameBuffer == NULL)
+    rfbClientErr("CRITICAL: frameBuffer allocation failed, requested size too large or not enough memory?\n");
+
   return client->frameBuffer?TRUE:FALSE;
 }
 
 static void initAppData(AppData* data) {
 	data->shareDesktop=TRUE;
 	data->viewOnly=FALSE;
+#ifdef LIBVNCSERVER_CONFIG_LIBVA
+	data->encodingsString="h264 tight zrle ultra copyrect hextile zlib corre rre raw";
+#else
 	data->encodingsString="tight zrle ultra copyrect hextile zlib corre rre raw";
+#endif
 	data->useBGR233=FALSE;
 	data->nColours=0;
 	data->forceOwnCmap=FALSE;
@@ -129,6 +158,9 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 
   /* default: use complete frame buffer */ 
   client->updateRect.x = -1;
+ 
+  client->frameBuffer = NULL;
+  client->outputWindow = 0;
  
   client->format.bitsPerPixel = bytesPerPixel*8;
   client->format.depth = bitsPerSample*samplesPerPixel;
@@ -236,7 +268,8 @@ static rfbBool rfbInitConnection(rfbClient* client)
 
   client->width=client->si.framebufferWidth;
   client->height=client->si.framebufferHeight;
-  client->MallocFrameBuffer(client);
+  if (!client->MallocFrameBuffer(client))
+    return FALSE;
 
   if (!SetFormatAndEncodings(client))
     return FALSE;
@@ -378,6 +411,12 @@ void rfbClientCleanup(rfbClient* client) {
 #endif
 
   FreeTLS(client);
+
+  while (client->clientData) {
+    rfbClientData* next = client->clientData->next;
+    free(client->clientData);
+    client->clientData = next;
+  }
 
   if (client->sock >= 0)
     close(client->sock);

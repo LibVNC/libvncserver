@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir)
+AM_CPPFLAGS = -I$(top_srcdir)
 LDADD = ../libvncserver/libvncserver.la @WSOCKLIB@
 
 if OSX
@@ -23,6 +23,5 @@ noinst_HEADERS=radon.h rotatetemplate.c
 noinst_PROGRAMS=example pnmshow regiontest pnmshow24 fontsel \
 	vncev storepasswd colourmaptest simple simple15 $(MAC) \
 	$(FILETRANSFER) backchannel $(BLOOPTEST) camera rotate \
-	zippy multicast
-
+	zippy repeater multicast
 

@@ -26,30 +26,39 @@
  *  USA.
  */
 
+#ifdef __STRICT_ANSI__
+#define _BSD_SOURCE
+#endif
+
 #include <rfb/rfb.h>
-#include <resolv.h> /* __b64_ntop */
 /* errno */
 #include <errno.h>
 
-#include <byteswap.h>
+#ifndef _MSC_VER
+#include <resolv.h> /* __b64_ntop */
+#endif
+
+#ifdef LIBVNCSERVER_HAVE_ENDIAN_H
+#include <endian.h>
+#elif LIBVNCSERVER_HAVE_SYS_ENDIAN_H
+#include <sys/endian.h>
+#endif
+
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
 #include <string.h>
-#include "rfbconfig.h"
+#include <unistd.h>
+#include "rfb/rfbconfig.h"
 #include "rfbssl.h"
 #include "rfbcrypto.h"
 
-#if defined(__BYTE_ORDER) && defined(__BIG_ENDIAN) && __BYTE_ORDER == __BIG_ENDIAN
-#define WS_NTOH64(n) (n)
-#define WS_NTOH32(n) (n)
-#define WS_NTOH16(n) (n)
-#define WS_HTON64(n) (n)
-#define WS_HTON16(n) (n)
-#else
-#define WS_NTOH64(n) bswap_64(n)
-#define WS_NTOH32(n) bswap_32(n)
-#define WS_NTOH16(n) bswap_16(n)
-#define WS_HTON64(n) bswap_64(n)
-#define WS_HTON16(n) bswap_16(n)
-#endif
+#define WS_NTOH64(n) htobe64(n)
+#define WS_NTOH32(n) htobe32(n)
+#define WS_NTOH16(n) htobe16(n)
+#define WS_HTON64(n) htobe64(n)
+#define WS_HTON16(n) htobe16(n)
 
 #define B64LEN(__x) (((__x + 2) / 3) * 12 / 3)
 #define WSHLENMAX 14  /* 2 + sizeof(uint64_t) + sizeof(uint32_t) */
@@ -88,6 +97,11 @@ typedef union ws_mask_s {
   uint32_t u;
 } ws_mask_t;
 
+/* XXX: The union and the structs do not need to be named.
+ *      We are working around a bug present in GCC < 4.6 which prevented
+ *      it from recognizing anonymous structs and unions.
+ *      See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=4784
+ */
 typedef struct __attribute__ ((__packed__)) ws_header_s {
   unsigned char b0;
   unsigned char b1;
@@ -95,13 +109,13 @@ typedef struct __attribute__ ((__packed__)) ws_header_s {
     struct __attribute__ ((__packed__)) {
       uint16_t l16;
       ws_mask_t m16;
-    };
+    } s16;
     struct __attribute__ ((__packed__)) {
       uint64_t l64;
       ws_mask_t m64;
-    };
+    } s64;
     ws_mask_t m;
-  };
+  } u;
 } ws_header_t;
 
 enum
@@ -622,9 +636,10 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
     int i;
     unsigned char opcode;
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
-    int flength, fin, fhlen;
+    int flength, fhlen;
+    /* int fin; */ /* not used atm */ 
 
-    // rfbLog(" <== %s[%d]: %d cl: %p, wsctx: %p-%p (%d)\n", __func__, gettid(), len, cl, wsctx, (char *)wsctx + sizeof(ws_ctx_t), sizeof(ws_ctx_t));
+    /* rfbLog(" <== %s[%d]: %d cl: %p, wsctx: %p-%p (%d)\n", __func__, gettid(), len, cl, wsctx, (char *)wsctx + sizeof(ws_ctx_t), sizeof(ws_ctx_t)); */
 
     if (wsctx->readbuflen) {
       /* simply return what we have */
@@ -662,7 +677,7 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
     }
 
     opcode = header->b0 & 0x0f;
-    fin = (header->b0 & 0x80) >> 7;
+    /* fin = (header->b0 & 0x80) >> 7; */ /* not used atm */
     flength = header->b1 & 0x7f;
 
     /*
@@ -679,15 +694,15 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
 
     if (flength < 126) {
 	fhlen = 2;
-	mask = header->m;
+	mask = header->u.m;
     } else if (flength == 126 && 4 <= ret) {
-	flength = WS_NTOH16(header->l16);
+	flength = WS_NTOH16(header->u.s16.l16);
 	fhlen = 4;
-	mask = header->m16;
+	mask = header->u.s16.m16;
     } else if (flength == 127 && 10 <= ret) {
-	flength = WS_NTOH64(header->l64);
+	flength = WS_NTOH64(header->u.s64.l64);
 	fhlen = 10;
-	mask = header->m64;
+	mask = header->u.s64.m64;
     } else {
       /* Incomplete frame header */
       rfbErr("%s: incomplete frame header\n", __func__, ret);
@@ -782,6 +797,7 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
 	/* calculate the resulting size */
 	blen = B64LEN(len);
     } else {
+	opcode = WS_OPCODE_BINARY_FRAME;
 	blen = len;
     }
 
@@ -791,11 +807,11 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
       sz = 2;
     } else if (blen <= 65536) {
       header->b1 = 0x7e;
-      header->l16 = WS_HTON16((uint16_t)blen);
+      header->u.s16.l16 = WS_HTON16((uint16_t)blen);
       sz = 4;
     } else {
       header->b1 = 0x7f;
-      header->l64 = WS_HTON64(blen);
+      header->u.s64.l64 = WS_HTON64(blen);
       sz = 10;
     }
 

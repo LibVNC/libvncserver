@@ -31,6 +31,10 @@
  * @file rfbclient.h
  */
 
+#ifdef WIN32
+#define WIN32_LEAN_AND_MEAN /* Prevent loading any Winsock 1.x headers from windows.h */
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -352,6 +356,9 @@ typedef struct _rfbClient {
         char* listen6Address;
         int listen6Port;
 
+        /* Output Window ID. When set, client application enables libvncclient to perform direct rendering in its window */
+        unsigned long outputWindow;
+
         /** Counts bytes received by this client. */
         size_t  bytesRcvd;
 
@@ -380,6 +387,7 @@ typedef struct _rfbClient {
         size_t  multicastPktsNACKed;   /* counts NACKed multicast packets */
         size_t  multicastPktsLost;     /* counts lost multicast packets */
         rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
+
 } rfbClient;
 
 /* cursor.c */

@@ -52,10 +52,13 @@ extern "C"
 #include <sys/types.h>
 #endif
 
-#ifdef __MINGW32__
+#ifdef WIN32
 #undef SOCKET
+#include <winsock2.h>
+#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
 #undef socklen_t
 #include <ws2tcpip.h>
+#endif
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
@@ -269,7 +272,7 @@ typedef struct _rfbScreenInfo
     SOCKET listenSock;
     int maxSock;
     int maxFd;
-#ifdef __MINGW32__
+#ifdef WIN32
     struct fd_set allFds;
 #else
     fd_set allFds;
@@ -647,8 +650,6 @@ typedef struct _rfbClientRec {
     z_stream zsStruct[4];
     rfbBool zsActive[4];
     int zsLevel[4];
-#endif
-#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
     int tightCompressLevel;
 #endif
 #endif
@@ -725,6 +726,11 @@ typedef struct _rfbClientRec {
     int afterEncBufLen;
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
     uint32_t tightEncoding;  /* rfbEncodingTight or rfbEncodingTightPng */
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+    /* TurboVNC Encoding support (extends TightVNC) */
+    int turboSubsampLevel;
+    int turboQualityLevel;  /* 1-100 scale */
+#endif
 #endif
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
@@ -949,18 +955,18 @@ extern rfbBool rfbSendRectEncodingUltra(rfbClientPtr cl, int x,int y,int w,int h
 extern rfbBool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 				    int h);
 
-#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
 /* tight.c */
 
 #define TIGHT_DEFAULT_COMPRESSION  6
+#define TURBO_DEFAULT_SUBSAMP 0
 
 extern rfbBool rfbTightDisableGradient;
 
 extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
 
-#if defined(LIBVNCSERVER_HAVE_LIBJPEG)
 extern rfbBool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
-#endif
+
 #if defined(LIBVNCSERVER_HAVE_LIBPNG)
 extern rfbBool rfbSendRectEncodingTightPng(rfbClientPtr cl, int x,int y,int w,int h);
 #endif

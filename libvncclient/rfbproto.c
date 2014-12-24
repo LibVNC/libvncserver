@@ -26,6 +26,7 @@
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #define _POSIX_SOURCE
+#define _XOPEN_SOURCE 600
 #endif
 #ifndef WIN32
 #include <unistd.h>
@@ -37,6 +38,10 @@
 #endif
 #include <errno.h>
 #include <rfb/rfbclient.h>
+#ifdef WIN32
+#undef SOCKET
+#undef socklen_t
+#endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
 #ifdef __CHECKER__
@@ -50,14 +55,16 @@
 #endif
 #include <jpeglib.h>
 #endif
+
+#ifndef _MSC_VER
+/* Strings.h is not available in MSVC */
+#include <strings.h>
+#endif
+
 #include <stdarg.h>
 #include <time.h>
 
 #ifdef LIBVNCSERVER_WITH_CLIENT_GCRYPT
-#ifdef WIN32
-#undef SOCKET
-#undef socklen_t
-#endif
 #include <gcrypt.h>
 #endif
 
@@ -65,6 +72,10 @@
 #include "tls.h"
 #include "ghpringbuf.h"
 #include "packet.h"
+
+#ifdef _MSC_VER
+#  define snprintf _snprintf /* MSVC went straight to the underscored syntax */
+#endif
 
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
@@ -159,6 +170,10 @@ static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_
 
 static void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int h) {
   int j;
+
+  if (client->frameBuffer == NULL) {
+      return;
+  }
 
 #define COPY_RECT(BPP) \
   { \
@@ -261,6 +276,9 @@ static rfbBool HandleZRLE24(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZRLE24Up(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZRLE24Down(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZRLE32(rfbClient* client, int rx, int ry, int rw, int rh);
+#endif
+#ifdef LIBVNCSERVER_CONFIG_LIBVA
+static rfbBool HandleH264 (rfbClient* client, int rx, int ry, int rw, int rh);
 #endif
 
 extern int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recvbuf);
@@ -395,8 +413,8 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
       return FALSE;
     }
     setbuf(rec->file,NULL);
-    fread(buffer,1,strlen(magic),rec->file);
-    if (strncmp(buffer,magic,strlen(magic))) {
+
+    if (fread(buffer,1,strlen(magic),rec->file) != strlen(magic) || strncmp(buffer,magic,strlen(magic))) {
       rfbClientLog("File %s was not recorded by vncrec.\n",client->serverHost);
       fclose(rec->file);
       return FALSE;
@@ -577,6 +595,9 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
         rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
         if (flag) continue;
         if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth ||
+#if defined(LIBVNCSERVER_HAVE_GNUTLS) || defined(LIBVNCSERVER_HAVE_LIBSSL)
+            tAuth[loop]==rfbVeNCrypt ||
+#endif
             (tAuth[loop]==rfbARD && client->GetCredential) ||
             (!subAuth && (tAuth[loop]==rfbTLS || (tAuth[loop]==rfbVeNCrypt && client->GetCredential))))
         {
@@ -1084,6 +1105,14 @@ InitialiseRFBConnection(rfbClient* client)
       DefaultSupportedMessagesUltraVNC(client);
   }
 
+  /* UltraVNC Single Click uses minor codes 14 and 16 for the server */
+  if (major==3 && (minor==14 || minor==16)) {
+     minor = minor - 10;
+     client->minor = minor;
+     rfbClientLog("UltraVNC Single Click server detected, enabling UltraVNC specific messages\n",pv);
+     DefaultSupportedMessagesUltraVNC(client);
+  }
+
   /* TightVNC uses minor codes 5 for the server */
   if (major==3 && minor==5) {
       rfbClientLog("TightVNC server detected, enabling TightVNC specific messages\n",pv);
@@ -1232,7 +1261,8 @@ InitialiseRFBConnection(rfbClient* client)
   client->si.format.blueMax = rfbClientSwap16IfLE(client->si.format.blueMax);
   client->si.nameLength = rfbClientSwap32IfLE(client->si.nameLength);
 
-  client->desktopName = malloc(client->si.nameLength + 1);
+  /* To guard against integer wrap-around, si.nameLength is cast to 64 bit */
+  client->desktopName = malloc((uint64_t)client->si.nameLength + 1);
   if (!client->desktopName) {
     rfbClientLog("Error allocating memory for desktop name, %lu bytes\n",
             (unsigned long)client->si.nameLength);
@@ -1276,6 +1306,8 @@ SetFormatAndEncodings(rfbClient* client)
   if (!SupportsClient2Server(client, rfbSetPixelFormat)) return TRUE;
 
   spf.type = rfbSetPixelFormat;
+  spf.pad1 = 0;
+  spf.pad2 = 0;
   spf.format = client->format;
   spf.format.redMax = rfbClientSwap16IfLE(spf.format.redMax);
   spf.format.greenMax = rfbClientSwap16IfLE(spf.format.greenMax);
@@ -1342,6 +1374,10 @@ SetFormatAndEncodings(rfbClient* client)
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCoRRE);
       } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRRE);
+#ifdef LIBVNCSERVER_CONFIG_LIBVA
+      } else if (strncasecmp(encStr,"h264",encStrLen) == 0) {
+	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingH264);
+#endif
       } else {
 	rfbClientLog("Unknown encoding '%.*s'\n",encStrLen,encStr);
       }
@@ -1410,6 +1446,10 @@ SetFormatAndEncodings(rfbClient* client)
       encs[se->nEncodings++] = rfbClientSwap32IfLE(client->appData.qualityLevel +
 					  rfbEncodingQualityLevel0);
     }
+#ifdef LIBVNCSERVER_CONFIG_LIBVA
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingH264);
+    rfbClientLog("h264 encoding added\n");
+#endif
   }
 
 
@@ -2049,7 +2089,8 @@ HandleRFBServerMessage(rfbClient* client)
 	client->updateRect.x = client->updateRect.y = 0;
 	client->updateRect.w = client->width;
 	client->updateRect.h = client->height;
-	client->MallocFrameBuffer(client);
+	if (!client->MallocFrameBuffer(client))
+	  return FALSE;
 	SendFramebufferUpdateRequest(client, 0, 0, rect.r.w, rect.r.h, FALSE);
 	rfbClientLog("Got new framebuffer size: %dx%d\n", rect.r.w, rect.r.h);
 	continue;
@@ -2439,6 +2480,14 @@ HandleRFBServerMessage(rfbClient* client)
      }
 
 #endif
+#ifdef LIBVNCSERVER_CONFIG_LIBVA
+      case rfbEncodingH264:
+      {
+	if (!HandleH264(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h))
+	  return FALSE;
+	break;
+      }
+#endif
 
       default:
 	 {
@@ -2581,7 +2630,9 @@ HandleRFBServerMessage(rfbClient* client)
     client->updateRect.x = client->updateRect.y = 0;
     client->updateRect.w = client->width;
     client->updateRect.h = client->height;
-    client->MallocFrameBuffer(client);
+    if (!client->MallocFrameBuffer(client))
+      return FALSE;
+
     SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
     rfbClientLog("Got new framebuffer size: %dx%d\n", client->width, client->height);
     break;
@@ -2597,7 +2648,8 @@ HandleRFBServerMessage(rfbClient* client)
     client->updateRect.x = client->updateRect.y = 0;
     client->updateRect.w = client->width;
     client->updateRect.h = client->height;
-    client->MallocFrameBuffer(client);
+    if (!client->MallocFrameBuffer(client))
+      return FALSE;
     SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
     rfbClientLog("Got new framebuffer size: %dx%d\n", client->width, client->height);
     break;
@@ -2680,6 +2732,7 @@ HandleRFBServerMessage(rfbClient* client)
 #define UNCOMP -8
 #include "zrle.c"
 #undef BPP
+#include "h264.c"
 
 
 /*

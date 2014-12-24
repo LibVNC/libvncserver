@@ -1,4 +1,4 @@
-INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/common
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/common
 
 if HAVE_GNUTLS
 TLSSRCS = tls_gnutls.c
@@ -14,13 +14,13 @@ endif
 
 
 libvncclient_la_SOURCES=cursor.c listen.c rfbproto.c sockets.c vncviewer.c ../common/minilzo.c ../common/ghpringbuf.c $(TLSSRCS)
-libvncclient_la_LIBADD=$(TLSLIBS)
+libvncclient_la_LIBADD=$(TLSLIBS) $(VA_LIBS)
 
 noinst_HEADERS=../common/lzodefs.h ../common/lzoconf.h ../common/minilzo.h tls.h ../common/ghpringbuf.h packet.h
 
 rfbproto.o: rfbproto.c corre.c hextile.c rre.c tight.c zlib.c zrle.c ultra.c
 
-EXTRA_DIST=corre.c hextile.c rre.c tight.c zlib.c zrle.c ultra.c tls.c
+EXTRA_DIST=corre.c hextile.c rre.c tight.c zlib.c zrle.c ultra.c tls_gnutls.c tls_openssl.c tls_none.c h264.c
 
 $(libvncclient_la_OBJECTS): ../rfb/rfbclient.h
 

@@ -172,6 +172,7 @@ static void* clientLoop(void* data) {
 	}
 	free(((clientData*)client->clientData)->display);
 	free(client->clientData);
+	client->clientData = NULL;
 	if(client->frameBuffer)
 		free(client->frameBuffer);
 	rfbClientCleanup(client);
@@ -256,7 +257,7 @@ rfbTestLog(const char *format, ...)
 
 	time(&log_clock);
 	strftime(buf, 255, "%d/%m/%Y %X (client) ", localtime(&log_clock));
-	fprintf(stderr,buf);
+	fprintf(stderr,"%s",buf);
 
 	vfprintf(stderr, format, args);
 	fflush(stderr);

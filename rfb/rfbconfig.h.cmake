@@ -9,6 +9,9 @@
 /* work around when write() returns ENOENT but does not mean it */
 #cmakedefine LIBVNCSERVER_ENOENT_WORKAROUND 1
 
+/* Define to 1 if you have the <endian.h> header file. */
+#cmakedefine LIBVNCSERVER_HAVE_ENDIAN_H 1
+
 /* Define to 1 if you have the <fcntl.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_FCNTL_H  1 
 
@@ -29,6 +32,9 @@
 
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_NETINET_IN_H  1 
+
+/* Define to 1 if you have the <sys/endian.h> header file. */
+#cmakedefine LIBVNCSERVER_HAVE_SYS_ENDIAN_H 1
 
 /* Define to 1 if you have the <sys/socket.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_SYS_SOCKET_H  1 
@@ -56,6 +62,10 @@
 
 /* Define to the version of this package. */
 #define LIBVNCSERVER_PACKAGE_VERSION  "@PACKAGE_VERSION@"
+#define LIBVNCSERVER_VERSION "@PACKAGE_VERSION@"
+#define LIBVNCSERVER_VERSION_MAJOR "@VERSION_MAJOR@"
+#define LIBVNCSERVER_VERSION_MINOR "@VERSION_MINOR@"
+#define LIBVNCSERVER_VERSION_PATCHLEVEL "@VERSION_PATCHLEVEL@"
 
 /* Define to 1 if libgcrypt is present */
 #cmakedefine LIBVNCSERVER_WITH_CLIENT_GCRYPT 1
@@ -71,13 +81,13 @@
 #cmakedefine LIBVNCSERVER_WORDS_BIGENDIAN 1
 
 /* Define to empty if `const' does not conform to ANSI C. */
-//#cmakedefine const @CMAKE_CONST@
+/* #cmakedefine const @CMAKE_CONST@ */
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */
-//#ifndef __cplusplus
-//#cmakedefine inline @CMAKE_INLINE@
-//#endif
+/* #ifndef __cplusplus */
+/* #cmakedefine inline @CMAKE_INLINE@ */
+/* #endif */
 
 /* Define to `int' if <sys/types.h> does not define. */
 #cmakedefine HAVE_LIBVNCSERVER_PID_T 1

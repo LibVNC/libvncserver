@@ -23,9 +23,15 @@
 #include <gdk/gdkkeysyms.h>
 #include <rfb/rfbclient.h>
 
+#ifdef LIBVNCSERVER_CONFIG_LIBVA
+#include <gdk/gdkx.h>
+#endif
+
 static rfbClient *cl;
 static gchar *server_cut_text = NULL;
 static gboolean framebuffer_allocated = FALSE;
+static GtkWidget *window;
+static GtkWidget *dialog_connecting = NULL;
 
 /* Redraw the screen from the backing pixmap */
 static gboolean expose_event (GtkWidget      *widget,
@@ -55,17 +61,32 @@ static gboolean expose_event (GtkWidget      *widget,
 		cl->format.greenMax = (1 << image->visual->green_prec) - 1;
 		cl->format.blueMax  = (1 << image->visual->blue_prec) - 1;
 
+#ifdef LIBVNCSERVER_CONFIG_LIBVA
+		/* Allow libvncclient to use a more efficient way
+		 * of putting the framebuffer on the screen when
+		 * using the H.264 format.
+		 */
+		cl->outputWindow = GDK_WINDOW_XID(widget->window);
+#endif
+
 		SetFormatAndEncodings (cl);
 
 		framebuffer_allocated = TRUE;
+
+		/* Also disable local cursor */
+		GdkCursor* cur = gdk_cursor_new( GDK_BLANK_CURSOR );
+		gdk_window_set_cursor (gtk_widget_get_window(GTK_WIDGET(window)), cur);
+		gdk_cursor_unref( cur );
 	}
 
+#ifndef LIBVNCSERVER_CONFIG_LIBVA
 	gdk_draw_image (GDK_DRAWABLE (widget->window),
 	                widget->style->fg_gc[gtk_widget_get_state(widget)],
 	                image,
 	                event->area.x, event->area.y,
 	                event->area.x, event->area.y,
 	                event->area.width, event->area.height);
+#endif
 
 	return FALSE;
 }
@@ -181,8 +202,6 @@ static void send_crtl_alt_del (GtkMenuItem *menuitem,
 	SendKeyEvent(cl, XK_Control_L, FALSE);
 	SendKeyEvent(cl, XK_Delete, FALSE);
 }
-
-GtkWidget *dialog_connecting = NULL;
 
 static void show_connect_window(int argc, char **argv)
 {
@@ -365,7 +384,6 @@ void quit ()
 }
 
 static rfbBool resize (rfbClient *client) {
-	GtkWidget *window;
 	GtkWidget *scrolled_window;
 	GtkWidget *drawing_area=NULL;
 	static char first=TRUE;
@@ -453,10 +471,17 @@ static rfbBool resize (rfbClient *client) {
 }
 
 static void update (rfbClient *cl, int x, int y, int w, int h) {
+	if (dialog_connecting != NULL) {
+		gtk_widget_destroy (dialog_connecting);
+		dialog_connecting = NULL;
+	}
+
+#ifndef LIBVNCSERVER_CONFIG_LIBVA
 	GtkWidget *drawing_area = rfbClientGetClientData (cl, gtk_init);
 
 	if (drawing_area != NULL)
 		gtk_widget_queue_draw_area (drawing_area, x, y, w, h);
+#endif
 }
 
 static void kbd_leds (rfbClient *cl, int value, int pad) {
