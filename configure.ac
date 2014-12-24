@@ -24,7 +24,6 @@ test "x$GCC" = "xyes" && CFLAGS="$CFLAGS -Wall"
 AC_PROG_MAKE_SET
 AC_LIBTOOL_WIN32_DLL
 AC_PROG_LIBTOOL
-PKG_PROG_PKG_CONFIG
 AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
                   [$PATH:/usr/ccs/bin])
 
@@ -491,11 +490,6 @@ something like libssl-dev or gnutls-dev) and run configure again.
 	sleep 5
 fi
 
-
-# XI2 present?
-AM_CONDITIONAL(HAVE_XI2, [ test "$HAVE_XI2" = "yes" ])
-# cairo?
-AM_CONDITIONAL(HAVE_CAIRO, [ test "$with_cairo" = "yes" ])
 
 # IPv6
 AH_TEMPLATE(IPv6, [Enable IPv6 support])
