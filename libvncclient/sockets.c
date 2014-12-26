@@ -314,7 +314,11 @@ ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
 #endif
 
   if (n) {
-    if(ghpringbuf_at(pbuf, 0, &p)
+    Packet *p_ptr = ghpringbuf_at(pbuf, 0);
+    if(p_ptr)
+	memcpy(&p, p_ptr, sizeof(Packet));
+
+    if(p_ptr /* we do have a packet */
        && n <= p.datalen
        && (client->multicastbuffered ? n <= client->multicastbuffered : 1)) {
 
