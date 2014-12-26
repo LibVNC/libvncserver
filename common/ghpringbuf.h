@@ -64,8 +64,8 @@ int ghpringbuf_put(ghpringbuf* b, void* item);
 /** insert item at index, will be copied from src. returns 1 on success, 0 if index out of bounds */
 int ghpringbuf_insert(ghpringbuf* b, size_t index, void* src);
 
-/** access item at index, will be copied to dst. returns 1 on success, 0 if index out of bounds */
-int ghpringbuf_at(ghpringbuf* b, size_t index, void* dst);
+/** access item at index, returns pointer to item on success, NULL if index out of bounds */
+void* ghpringbuf_at(ghpringbuf* b, size_t index);
 
 /** remove first item. returns 1 on success, 0 if buffer empty */
 int ghpringbuf_pop(ghpringbuf* b);

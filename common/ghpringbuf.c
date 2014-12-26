@@ -122,7 +122,7 @@ int ghpringbuf_insert(ghpringbuf* b, size_t index, void* src)
 }
 
 
-int ghpringbuf_at(ghpringbuf* b, size_t index, void* dst)
+void* ghpringbuf_at(ghpringbuf* b, size_t index)
 {
   b->lock = 1;
   if (b->count > 0 && index < b->count) 
@@ -133,9 +133,8 @@ int ghpringbuf_at(ghpringbuf* b, size_t index, void* dst)
 
       char* it = b->items;
       it += b->item_sz * pos;
-      memcpy(dst, it, b->item_sz);
       b->lock = 0;
-      return 1;
+      return it;
     }
   b->lock = 0;
   return 0;
