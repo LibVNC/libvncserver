@@ -248,7 +248,7 @@ rfbPutMulticastRectEncodingUltra(rfbClientPtr cl,
     rfbScreenInfoPtr s = cl->screen;
     char *fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
 	   + (x * (cl->scaledScreen->bitsPerPixel / 8)));
-    int maxCompSize;
+    lzo_uint maxCompSize;
     int maxRawSize = (w * h * (cl->format.bitsPerPixel / 8));
     rfbClientPtr someclient;
     rfbClientIteratorPtr it;
