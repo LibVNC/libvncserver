@@ -54,8 +54,6 @@ BOTH:
 
 - add #ifdef MULTICASTVNC around mcast code
 
-- unify client and server buffer implementation
-
 - Implement other encodings than raw and ultra.
 
 - have an optional server-push mode that's announced by the server

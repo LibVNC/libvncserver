@@ -37,8 +37,8 @@ include_HEADERS=../rfb/rfb.h ../rfb/rfbconfig.h ../rfb/rfbint.h \
 
 noinst_HEADERS=../common/d3des.h ../rfb/default8x16.h zrleoutstream.h \
 	zrlepalettehelper.h zrletypes.h private.h scale.h rfbssl.h rfbcrypto.h \
-	partialupdateregionbuf.h \
-	../common/minilzo.h ../common/lzoconf.h ../common/lzodefs.h ../common/md5.h ../common/sha1.h \
+	../common/minilzo.h ../common/lzoconf.h ../common/lzodefs.h ../common/md5.h ../common/sha1.h ../common/ghpringbuf.h \
+	partialupdateregion.h \
 	$(TIGHTVNCFILETRANSFERHDRS)
 
 EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
@@ -56,7 +56,7 @@ LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c $(WEBSOCKETSSRCS) \
 	stats.c corre.c hextile.c rre.c translate.c cutpaste.c \
 	httpd.c cursor.c font.c \
 	draw.c selbox.c ../common/d3des.c ../common/vncauth.c cargs.c ../common/minilzo.c ultra.c scale.c \
-	partialupdateregionbuf.c \
+	../common/ghpringbuf.c \
 	$(ZLIBSRCS) $(TIGHTSRCS) $(TIGHTVNCFILETRANSFERSRCS)
 
 

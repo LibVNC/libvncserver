@@ -1,7 +1,7 @@
 /*
-  partialupdateregionbuf.h: partial update region ringbuffer header
+  partialupdateregion.h: partial update region for use with generic ring buffer
 
-  Copyright (C) 2010 Christian Beier <dontmind@freeshell.org>
+  Copyright (C) 2014 Christian Beier <dontmind@freeshell.org>
  
   This is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -20,8 +20,8 @@
 */
 
 
-#ifndef PARTIALUPDATEREGIONBUF_H
-#define PARTIALUPDATEREGIONBUF_H
+#ifndef PARTIALUPDATEREGION_H
+#define PARTIALUPDATEREGION_H
 
 #include "rfb/rfb.h"
 
@@ -41,32 +41,15 @@ typedef struct _partialUpdRegion {
 
 
 /*
-  the ringbuffer holding partialUpdRegions  
-*/
-typedef struct _partUpdRgnBuf {
-  partialUpdRegion* partUpdRgns;
-  size_t len;
-  size_t nextInsertAt;
-  rfbBool wraparound;
-  rfbBool dirty;
-} partUpdRgnBuf;
+  cleaner function for the ring buffer
+*/ 
+static void clean_partialUpdRegion(void *p)
+{
+    partialUpdRegion *pur = (partialUpdRegion*)p;
+    if(pur->region)
+	sraRgnDestroy(pur->region);
+}
 
-
-
-/* creates a new empty partUpdRgnBuf ringbuffer of size length */
-partUpdRgnBuf* partUpdRgnBufCreate(size_t length);
-
-/* destroys a partUpdRgnBuf, deallocating all internal data */
-void partUpdRgnBufDestroy(partUpdRgnBuf* b);
-
-/* insert a partialUpdRegion into a ringbuffer */
-void partUpdRgnBufInsert(partUpdRgnBuf* b, partialUpdRegion partUpdRgn);
-
-/* get partialUpdRegion at index */
-partialUpdRegion* partUpdRgnBufAt(partUpdRgnBuf* b, size_t index);
-
-/* get number of buffered elements */
-size_t partUpdRgnBufCount(partUpdRgnBuf* b);
 
 
 #endif

@@ -36,7 +36,8 @@
 #include <string.h>
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
-#include "partialupdateregionbuf.h"
+#include "ghpringbuf.h"
+#include "partialupdateregion.h"
 #include "private.h"
 
 
@@ -124,6 +125,7 @@ static const int tight2turbo_subsamp[10] = {
 };
 #endif
 
+
 static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
@@ -134,6 +136,7 @@ static rfbMulticastFramebufferUpdateMsg* rfbPutMulticastHeader(rfbClientPtr cl,
 							       rfbBool save);
 static int rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h, rfbBool save);
 
+#define MULTICAST_FLAG_BUFFER_DIRTY 11
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 void rfbIncrClientRef(rfbClientPtr cl)
@@ -625,7 +628,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
 
       if(someclient == NULL) { /* no other one has this */
 	free(cl->multicastUpdPendingPtr);
-	partUpdRgnBufDestroy(cl->multicastPartUpdRgnBuf);
+	ghpringbuf_destroy(cl->multicastPartUpdRgnBuf);
 	free(cl->multicastWholeUpdId);
 	free(cl->multicastPartialUpdId);
       }
@@ -2619,7 +2622,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
     case rfbMulticastFramebufferUpdateNACK:
     {
-	partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
+	ghpringbuf* buf = (ghpringbuf*)cl->multicastPartUpdRgnBuf;
 	uint32_t firstInBuf;
 
 	/* maybe this client sent a NACK without having registered for MulticastVNC? */
@@ -2650,14 +2653,16 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 				 sz_rfbMulticastFramebufferUpdateNACKMsg);
 
 	LOCK(cl->screen->multicastSharedMutex);
-	firstInBuf = partUpdRgnBufAt(buf, 0)->idPartial;
+
+	firstInBuf = ((partialUpdRegion*)ghpringbuf_at(buf, 0))->idPartial;
+
 	/* check if this partial update is in the buffer */
-	if(msg.mfun.idPartialUpd >= firstInBuf && msg.mfun.idPartialUpd < firstInBuf + partUpdRgnBufCount(buf)) {
+	if(msg.mfun.idPartialUpd >= firstInBuf && msg.mfun.idPartialUpd < firstInBuf + ghpringbuf_count(buf)) {
 	  uint32_t start = msg.mfun.idPartialUpd - firstInBuf;
 	  uint32_t i;
 	  uint32_t significantNACKsInPast = 0;
 
-	  for(i = start; i < start+msg.mfun.nPartialUpds && i < buf->len; ++i) {
+	  for(i = start; i < start+msg.mfun.nPartialUpds && i < buf->capacity; ++i) {
 #ifdef MULTICAST_DEBUG
 	    rfbLog("MulticastVNC DEBUG: marking buffer position %u, partial id %u as NACKed\n",
 		   i, partUpdRgnBufAt(buf, i)->idPartial);
@@ -2665,7 +2670,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		   partUpdRgnBufAt(buf, i)->sendrate, partUpdRgnBufAt(buf, i)->sendrate_decreased);
 #endif
 	    /* mark the lost partial updates as requested */
-	    partUpdRgnBufAt(buf, i)->pending = TRUE;
+	    ((partialUpdRegion*)ghpringbuf_at(buf, i))->pending = TRUE;
 
 
 	    /* this NACK CANNOT be part of a 'tightly packed' burst of sufficient size,
@@ -2674,7 +2679,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    if(msg.mfun.nPartialUpds < MULTICAST_MAXSENDRATE_NACKS_REQUIRED) {
 	      uint32_t lookback = 2 * MULTICAST_MAXSENDRATE_NACKS_REQUIRED;
 	      while(lookback) {
-		partialUpdRegion* p = partUpdRgnBufAt(buf, i - lookback);
+		  partialUpdRegion* p = ((partialUpdRegion*)ghpringbuf_at(buf, i - lookback));
 		if(p
 		   && p->pending
 		   && !p->sendrate_decreased
@@ -2688,8 +2693,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    if(!cl->screen->multicastMaxSendRateFixed
 	       && ( msg.mfun.nPartialUpds >= MULTICAST_MAXSENDRATE_NACKS_REQUIRED          /* this NACK belongs to a 'packed' burst of required size */
 		    || significantNACKsInPast+1  >= MULTICAST_MAXSENDRATE_NACKS_REQUIRED ) /* this NACK belongs to a 'sparse' burst of required size */
-	       && !partUpdRgnBufAt(buf, i)->sendrate_decreased
-	       && cl->screen->multicastMaxSendRate >= partUpdRgnBufAt(buf, i)->sendrate) {
+	       && ! ((partialUpdRegion*)ghpringbuf_at(buf, i))->sendrate_decreased
+	       && cl->screen->multicastMaxSendRate >= ((partialUpdRegion*)ghpringbuf_at(buf, i))->sendrate) {
 	      uint32_t j;
 #ifdef MULTICAST_DEBUG
 	      uint32_t oldrate = cl->screen->multicastMaxSendRate;
@@ -2710,14 +2715,14 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		     cl->screen->multicastMaxSendRateIncrement);
 #endif
 	      /* mark this sendrate as decreased */
-	      for(j=0; j < partUpdRgnBufCount(buf); ++j)
-		if(partUpdRgnBufAt(buf, j)->sendrate == partUpdRgnBufAt(buf, i)->sendrate)
-		  partUpdRgnBufAt(buf, j)->sendrate_decreased = TRUE;
+	      for(j=0; j < ghpringbuf_count(buf); ++j)
+		  if(((partialUpdRegion*)ghpringbuf_at(buf, j))->sendrate == ((partialUpdRegion*)ghpringbuf_at(buf, i))->sendrate)
+		      ((partialUpdRegion*)ghpringbuf_at(buf, j))->sendrate_decreased = TRUE;
 	    }
 	  }
 
 	  /* mark this pixelformat and encoding as needing repair */
-	  buf->dirty = TRUE;
+	  buf->flags = MULTICAST_FLAG_BUFFER_DIRTY;
 	}
 	else
 	  rfbLog("MulticastVNC: partial update %d NACKed by client %s not in sent buffer! Increasing sent buffer size helps.\n",
@@ -3184,7 +3189,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 
 	if(someclient == NULL) { /* no other one has this */
 	  free(cl->multicastUpdPendingPtr);
-	  partUpdRgnBufDestroy(cl->multicastPartUpdRgnBuf);
+	  ghpringbuf_destroy(cl->multicastPartUpdRgnBuf);
 	  free(cl->multicastWholeUpdId);
 	  free(cl->multicastPartialUpdId);
 	}
@@ -3208,7 +3213,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 
 	if(someclient == NULL) { /* no other client has this, alloc new ones on the heap */
 	  cl->multicastUpdPendingPtr = calloc(sizeof(rfbBool), 1);
-	  cl->multicastPartUpdRgnBuf = partUpdRgnBufCreate(MULTICAST_PART_UPD_RGN_BUF_SIZE/cl->screen->multicastPacketSize);
+	  cl->multicastPartUpdRgnBuf = ghpringbuf_create(MULTICAST_PART_UPD_RGN_BUF_SIZE/cl->screen->multicastPacketSize, 
+							 sizeof(partialUpdRegion),
+							 1, 
+							 clean_partialUpdRegion);
 	  cl->multicastWholeUpdId = calloc(sizeof(uint16_t), 1);
 	  cl->multicastPartialUpdId = calloc(sizeof(uint32_t), 1);
 	  rfbLog("MulticastVNC encountered new pixelformat and/or encoding, allocating new data for client %s\n", cl->host);
@@ -3883,18 +3891,18 @@ rfbSendMulticastFramebufferUpdate(rfbClientPtr cl,
 rfbBool
 rfbSendMulticastRepairUpdate(rfbClientPtr cl)
 {
-  partUpdRgnBuf* buf;
+  ghpringbuf* buf;
   rfbBool repairPending;
 
   LOCK(cl->screen->multicastUpdateMutex);
 
-  buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
+  buf = (ghpringbuf*)cl->multicastPartUpdRgnBuf;
   LOCK(cl->screen->multicastSharedMutex);
-  repairPending = buf->dirty;
+  repairPending = buf->flags == MULTICAST_FLAG_BUFFER_DIRTY;
   UNLOCK(cl->screen->multicastSharedMutex);
 
   if(repairPending) {
-    size_t i, count = partUpdRgnBufCount(buf); /* multicastUpdateMutex above ensures the buffer size isn't modified by other threads */
+    size_t i, count = ghpringbuf_count(buf); /* multicastUpdateMutex above ensures the buffer size isn't modified by other threads */
 
     /* flush buffer just for safety */
     if(!rfbSendMulticastUpdateBuf(cl->screen)) {
@@ -3903,7 +3911,7 @@ rfbSendMulticastRepairUpdate(rfbClientPtr cl)
     }
 
     for(i = 0; i < count; ++i) {
-      partialUpdRegion* pur = partUpdRgnBufAt(buf, i);
+      partialUpdRegion* pur = (partialUpdRegion*)ghpringbuf_at(buf, i);
       if(pur->pending) {
 	sraRectangleIterator* i=NULL;
 	sraRect rect;
@@ -3938,7 +3946,7 @@ rfbSendMulticastRepairUpdate(rfbClientPtr cl)
 
     /* mark this pixelformat and encoding combination as done */
     LOCK(cl->screen->multicastSharedMutex);
-    buf->dirty = FALSE;
+    buf->flags = 0; /* unset dirty flag */
     UNLOCK(cl->screen->multicastSharedMutex);
   }
 
@@ -3957,7 +3965,7 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
 {
   if(save) {
     LOCK(cl->screen->multicastSharedMutex);
-    partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
+    ghpringbuf* buf = (ghpringbuf*)cl->multicastPartUpdRgnBuf;
     partialUpdRegion tmp;
     tmp.idWhole = idWholeUpd;
     tmp.idPartial = idPartialUpd;
@@ -3965,7 +3973,7 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
     tmp.pending = FALSE; 
     tmp.sendrate = cl->screen->multicastMaxSendRate;
     tmp.sendrate_decreased = FALSE;
-    partUpdRgnBufInsert(buf, tmp);
+    ghpringbuf_put(buf, &tmp);
     UNLOCK(cl->screen->multicastSharedMutex);
   }
 
@@ -4000,9 +4008,9 @@ rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, int w, int h
 {
   if(save) {
     LOCK(cl->screen->multicastSharedMutex);
-    partUpdRgnBuf* buf = (partUpdRgnBuf*)cl->multicastPartUpdRgnBuf;
+    ghpringbuf* buf = (ghpringbuf*)cl->multicastPartUpdRgnBuf;
     sraRegionPtr tmp = sraRgnCreateRect(x, y, x+w, y+h);
-    partialUpdRegion* lastone = partUpdRgnBufAt(buf, partUpdRgnBufCount(buf)-1); 
+    partialUpdRegion* lastone = (partialUpdRegion*)ghpringbuf_at(buf, ghpringbuf_count(buf)-1); 
     sraRgnOr(lastone->region, tmp);
     sraRgnDestroy(tmp);
     UNLOCK(cl->screen->multicastSharedMutex);
