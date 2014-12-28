@@ -20,6 +20,10 @@
 #ifdef LIBVNCSERVER_CONFIG_LIBVA
 
 #include <X11/Xlib.h>
+#include <va/va_version.h>
+#if VA_CHECK_VERSION(0,34,0)
+#include <va/va_compat.h>
+#endif
 #include <va/va_x11.h>
 
 enum _slice_types {
