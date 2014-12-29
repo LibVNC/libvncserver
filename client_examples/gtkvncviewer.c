@@ -588,7 +588,7 @@ static void GtkDefaultLog (const char *format, ...)
 
 	time (&log_clock);
 	strftime (buf, 255, "%d/%m/%Y %X ", localtime (&log_clock));
-	fprintf (stdout, buf);
+	fprintf (stdout, "%s", buf);
 
 	vfprintf (stdout, format, args);
 	fflush (stdout);
