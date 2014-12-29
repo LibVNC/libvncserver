@@ -198,7 +198,7 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 			for(i=0; i<rw; i+=rfbZRLETileWidth) {
 				int subWidth=(i+rfbZRLETileWidth>rw)?rw-i:rfbZRLETileWidth;
 				int subHeight=(j+rfbZRLETileHeight>rh)?rh-j:rfbZRLETileHeight;
-				int result=HandleZRLETile(client,buf,remaining,rx+i,ry+j,subWidth,subHeight);
+				int result=HandleZRLETile(client,(uint8_t *)buf,remaining,rx+i,ry+j,subWidth,subHeight);
 
 				if(result<0) {
 					rfbClientLog("ZRLE decoding failed (%d)\n",result);

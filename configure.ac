@@ -150,12 +150,11 @@ AM_CONDITIONAL(HAVE_LIBSSL, test ! -z "$SSL_LIBS")
 
 
 # See if we want libva support
-# TODO: check if library actually exists
 AH_TEMPLATE(CONFIG_LIBVA, [Build libva support])
 AC_ARG_WITH(libva,
-[  --with-libva                   build libva support],,)
+[  --without-libva         disable support for libva],,)
 if test "x$with_libva" != "xno"; then
-    AC_CHECK_LIB(va, vaInitialize,
+    AC_CHECK_LIB(va-x11, vaGetDisplay,
         VA_LIBS="-lva -lva-x11"
         [AC_DEFINE(CONFIG_LIBVA) CONFIG_LIBVA="true"], ,)
 fi
