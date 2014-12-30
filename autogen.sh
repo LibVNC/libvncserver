@@ -1,4 +1,4 @@
 #!/bin/sh
 
 autoreconf -fiv &&
-./configure
+./configure "$@"
