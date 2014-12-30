@@ -38,9 +38,7 @@
 #ifdef WIN32
 #undef SOCKET
 #include <winsock2.h>
-#ifdef MINGW32
 #define EWOULDBLOCK WSAEWOULDBLOCK
-#endif
 #define close closesocket
 #define read(sock,buf,len) recv(sock,buf,len,0)
 #define write(sock,buf,len) send(sock,buf,len,0)
