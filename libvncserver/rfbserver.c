@@ -101,13 +101,15 @@
 #endif
 
 #ifdef WIN32
+#include <direct.h>
 #ifdef __MINGW32__
 #define mkdir(path, perms) mkdir(path) /* Omit the perms argument to match POSIX signature */
 #else /* MSVC and other windows compilers */
 #define mkdir(path, perms) _mkdir(path) /* Omit the perms argument to match POSIX signature */
 #endif /* __MINGW32__ else... */
+#ifndef S_ISDIR
 #define S_ISDIR(m)	(((m) & S_IFDIR) == S_IFDIR)
-#include <direct.h>
+#endif
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
