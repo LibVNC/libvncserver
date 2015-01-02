@@ -857,6 +857,16 @@ HandleARDAuth(rfbClient *client)
   rfbCredential *cred = NULL;
   rfbBool result = FALSE;
 
+  if (!gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P))
+  {
+    /* Application did not initialize gcrypt, so we should */
+    if (!gcry_check_version(GCRYPT_VERSION))
+    {
+      /* Older version of libgcrypt is installed on system than compiled against */
+      rfbClientLog("libgcrypt version mismatch.\n");
+    }
+  }
+
   while (1)
   {
     if (!ReadFromRFBServer(client, (char *)gen, 2))
