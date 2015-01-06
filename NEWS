@@ -1,3 +1,9 @@
+0.9.11
+   - LibVNCClient:
+     * Now initializes libgcrypt before use if the application did not do it.
+       Fixes a crash when connection to Mac hosts
+       (https://github.com/LibVNC/libvncserver/issues/45).
+
 0.9.10
    - Overall changes:
      * Moved the whole project from sourceforge to https://libvnc.github.io/.
