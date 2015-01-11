@@ -118,7 +118,7 @@ drawn the cursor every time an update is sent. LibVNCServer handles
 all the details. Just set the cursor and don't bother any more.
 
 To set the mouse coordinates (or emulate mouse clicks), call
-  defaultPtrAddEvent(buttonMask,x,y,cl);
+  rfbDefaultPtrAddEvent(buttonMask,x,y,cl);
 IMPORTANT: do this at the end of your function, because this actually draws
 the cursor if no cursor encoding is active.
 
@@ -184,7 +184,7 @@ kbdReleaseAllKeys(rfbClientPtr cl)
 ptrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl)
   is called when the mouse moves or a button is pressed.
   WARNING: if you want to have proper cursor handling, call
-	defaultPtrAddEvent(buttonMask,x,y,cl)
+	rfbDefaultPtrAddEvent(buttonMask,x,y,cl)
   in your own function. This sets the coordinates of the cursor.
 setXCutText(char* str,int len,rfbClientPtr cl)
   is called when the selection changes.
