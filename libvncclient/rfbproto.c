@@ -431,6 +431,8 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
 
       /* serverHost is a hostname */
       if (!StringToIPAddr(hostname, &host)) {
+        if (client->NetworkStatus)
+          client->NetworkStatus(client, rfbNetworkNameResolutionFailed);
         rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
         return FALSE;
       }
@@ -439,6 +441,8 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
   }
 
   if (client->sock < 0) {
+    if (client->NetworkStatus)
+      client->NetworkStatus(client, rfbNetworkConnectionFailed);
     rfbClientLog("Unable to connect to VNC server\n");
     return FALSE;
   }
@@ -512,6 +516,9 @@ rfbHandleAuthResult(rfbClient* client)
     if (!ReadFromRFBServer(client, (char *)&authResult, 4)) return FALSE;
 
     authResult = rfbClientSwap32IfLE(authResult);
+
+    if (client->AuthenticationResults)
+      client->AuthenticationResults(client, authResult);
 
     switch (authResult) {
     case rfbVncAuthOK:
@@ -643,13 +650,19 @@ HandleVncAuth(rfbClient *client)
     char *passwd=NULL;
     int i;
 
-    if (!ReadFromRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
+    if (!ReadFromRFBServer(client, (char *)challenge, CHALLENGESIZE)) {
+      if (client->AuthenticationResults)
+        client->AuthenticationResults(client, rfbVncAuthFailed);
+      return FALSE;
+    }
 
     if (client->serverPort!=-1) { /* if not playing a vncrec file */
       if (client->GetPassword)
         passwd = client->GetPassword(client);
 
       if ((!passwd) || (strlen(passwd) == 0)) {
+        if (client->AuthenticationResults)
+          client->AuthenticationResults(client, rfbVncAuthFailed);
         rfbClientLog("Reading password failed\n");
         return FALSE;
       }
@@ -665,7 +678,11 @@ HandleVncAuth(rfbClient *client)
       }
       free(passwd);
 
-      if (!WriteToRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
+      if (!WriteToRFBServer(client, (char *)challenge, CHALLENGESIZE)) {
+        if (client->AuthenticationResults)
+          client->AuthenticationResults(client, rfbVncAuthFailed);
+        return FALSE;
+      }
     }
 
     /* Handle the SecurityResult message */
@@ -1080,7 +1097,11 @@ InitialiseRFBConnection(rfbClient* client)
   if (client->listenSpecified)
     errorMessageOnReadFailure = FALSE;
 
-  if (!ReadFromRFBServer(client, pv, sz_rfbProtocolVersionMsg)) return FALSE;
+  if (!ReadFromRFBServer(client, pv, sz_rfbProtocolVersionMsg)) {
+    if (client->NetworkStatus)
+      client->NetworkStatus(client, rfbNetworkRFBServerNotValid);
+    return FALSE;
+  }
   pv[sz_rfbProtocolVersionMsg]=0;
 
   errorMessageOnReadFailure = TRUE;
@@ -1088,6 +1109,8 @@ InitialiseRFBConnection(rfbClient* client)
   pv[sz_rfbProtocolVersionMsg] = 0;
 
   if (sscanf(pv,rfbProtocolVersionFormat,&major,&minor) != 2) {
+    if (client->NetworkStatus)
+      client->NetworkStatus(client, rfbNetworkRFBServerNotValid);
     rfbClientLog("Not a valid VNC server (%s)\n",pv);
     return FALSE;
   }
@@ -1133,17 +1156,29 @@ InitialiseRFBConnection(rfbClient* client)
 
   sprintf(pv,rfbProtocolVersionFormat,client->major,client->minor);
 
-  if (!WriteToRFBServer(client, pv, sz_rfbProtocolVersionMsg)) return FALSE;
+  if (!WriteToRFBServer(client, pv, sz_rfbProtocolVersionMsg)) {
+    if (client->NetworkStatus)
+      client->NetworkStatus(client, rfbNetworkRFBProtocolFailure);
+    return FALSE;
+  }
 
 
   /* 3.7 and onwards sends a # of security types first */
   if (client->major==3 && client->minor > 6)
   {
-    if (!ReadSupportedSecurityType(client, &authScheme, FALSE)) return FALSE;
+    if (!ReadSupportedSecurityType(client, &authScheme, FALSE)) {
+      if (client->NetworkStatus)
+        client->NetworkStatus(client, rfbNetworkRFBProtocolFailure);
+      return FALSE;
+    }
   }
   else
   {
-    if (!ReadFromRFBServer(client, (char *)&authScheme, 4)) return FALSE;
+    if (!ReadFromRFBServer(client, (char *)&authScheme, 4)) {
+      if (client->NetworkStatus)
+        client->NetworkStatus(client, rfbNetworkRFBProtocolFailure);
+      return FALSE;
+    }
     authScheme = rfbClientSwap32IfLE(authScheme);
   }
   
