@@ -445,7 +445,6 @@ clientOutput(void *data)
     rfbClientPtr cl = (rfbClientPtr)data;
     rfbBool haveUpdate;
     sraRegion* updateRegion;
-    cl->onHold = FALSE;
 
     while (1) {
         haveUpdate = false;
