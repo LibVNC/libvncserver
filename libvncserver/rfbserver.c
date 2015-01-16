@@ -953,7 +953,6 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     /*rfbSetBit(msgs.client2server, rfbSetSW);           */
     /*rfbSetBit(msgs.client2server, rfbTextChat);        */
     rfbSetBit(msgs.client2server, rfbPalmVNCSetScaleFactor);
-    rfbSetBit(msgs.client2server, rfbXvp);
 
     rfbSetBit(msgs.server2client, rfbFramebufferUpdate);
     rfbSetBit(msgs.server2client, rfbSetColourMapEntries);
@@ -961,7 +960,11 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     rfbSetBit(msgs.server2client, rfbServerCutText);
     rfbSetBit(msgs.server2client, rfbResizeFrameBuffer);
     rfbSetBit(msgs.server2client, rfbPalmVNCReSizeFrameBuffer);
-    rfbSetBit(msgs.server2client, rfbXvp);
+
+    if (cl->screen->xvpHook) {
+        rfbSetBit(msgs.client2server, rfbXvp);
+        rfbSetBit(msgs.server2client, rfbXvp);
+    }
 
     memcpy(&cl->updateBuf[cl->ublen], (char *)&msgs, sz_rfbSupportedMessages);
     cl->ublen += sz_rfbSupportedMessages;
@@ -2214,13 +2217,15 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                   cl->enableServerIdentity = TRUE;
                 }
                 break;
-	    case rfbEncodingXvp:
-	        rfbLog("Enabling Xvp protocol extension for client "
-		        "%s\n", cl->host);
-		if (!rfbSendXvp(cl, 1, rfbXvp_Init)) {
-		  rfbCloseClient(cl);
-		  return;
-		}
+            case rfbEncodingXvp:
+                if (cl->screen->xvpHook) {
+                  rfbLog("Enabling Xvp protocol extension for client "
+                          "%s\n", cl->host);
+                  if (!rfbSendXvp(cl, 1, rfbXvp_Init)) {
+                    rfbCloseClient(cl);
+                    return;
+                  }
+                }
                 break;
             default:
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
