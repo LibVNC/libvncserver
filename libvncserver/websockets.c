@@ -905,3 +905,16 @@ webSocketCheckDisconnect(rfbClientPtr cl)
     return FALSE;
 }
 
+/* returns TRUE if there is data waiting to be read in our internal buffer
+ * or if is there any pending data in the buffer of the SSL implementation
+ */
+rfbBool
+webSocketsHasDataInBuffer(rfbClientPtr cl)
+{
+    ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
+
+    if (wsctx && wsctx->readbuflen)
+      return TRUE;
+
+    return (cl->sslctx && rfbssl_pending(cl) > 0);
+}
