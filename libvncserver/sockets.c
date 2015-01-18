@@ -391,7 +391,15 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
             if (FD_ISSET(cl->sock, &(rfbScreen->allFds)))
             {
                 if (FD_ISSET(cl->sock, &fds))
+                {
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+                    do {
+                        rfbProcessClientMessage(cl);
+                    } while (webSocketsHasDataInBuffer(cl));
+#else
                     rfbProcessClientMessage(cl);
+#endif
+                }
                 else
                     rfbSendFileTransferChunk(cl);
             }
