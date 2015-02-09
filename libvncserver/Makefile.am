@@ -61,6 +61,7 @@ libvncserver_la_SOURCES=$(LIB_SRCS)
 libvncserver_la_LIBADD=$(WEBSOCKETSSSLLIBS)
 
 lib_LTLIBRARIES=libvncserver.la
+libvncserver_la_LDFLAGS = -version-info 1:0:0
 
 if HAVE_RPM
 $(PACKAGE)-$(VERSION).tar.gz: dist

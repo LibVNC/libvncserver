@@ -25,5 +25,5 @@ EXTRA_DIST=corre.c hextile.c rre.c tight.c zlib.c zrle.c ultra.c tls_gnutls.c tl
 $(libvncclient_la_OBJECTS): ../rfb/rfbclient.h
 
 lib_LTLIBRARIES=libvncclient.la
-
+libvncclient_la_LDFLAGS = -version-info 1:0:0
 
