@@ -163,7 +163,11 @@ void rfbTightCleanup (rfbScreenInfoPtr screen)
         tightAfterBufSize = 0;
         tightAfterBuf = NULL;
     }
-    if (j) tjDestroy(j);
+	if (j) {
+		tjDestroy(j);
+		//Set freed resource handle to 0!
+		j = 0;
+	}
 }
 
 
