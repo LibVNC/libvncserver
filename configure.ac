@@ -24,7 +24,7 @@ test "x$GCC" = "xyes" && CFLAGS="$CFLAGS -Wall"
 AC_PROG_MAKE_SET
 AC_LIBTOOL_WIN32_DLL
 AC_PROG_LIBTOOL
-AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
+AC_CHECK_TOOL([AR], [ar], [/usr/bin/ar],
                   [$PATH:/usr/ccs/bin])
 
 # Options
