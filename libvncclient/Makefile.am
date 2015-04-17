@@ -14,7 +14,7 @@ endif
 
 
 libvncclient_la_SOURCES=cursor.c listen.c rfbproto.c sockets.c vncviewer.c ../common/minilzo.c $(TLSSRCS)
-libvncclient_la_LIBADD=$(TLSLIBS) $(VA_LIBS)
+libvncclient_la_LIBADD=$(TLSLIBS)
 
 noinst_HEADERS=../common/lzodefs.h ../common/lzoconf.h ../common/minilzo.h tls.h
 

@@ -875,21 +875,6 @@ typedef struct {
 #endif
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
- * h264 - h264 encoding.  We have an rfbH264Header structure
- * giving the number of bytes following.  Finally the data follows is
- * h264 encoded frame.
- */
-
-typedef struct {
-    uint32_t nBytes;
-	uint32_t slice_type;
-	uint32_t width;
-	uint32_t height;
-} rfbH264Header;
-
-#define sz_rfbH264Header 16
-
-/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * XCursor encoding. This is a special encoding used to transmit X-style
  * cursor shapes from server to clients. Note that for this encoding,
  * coordinates in rfbFramebufferUpdateRectHeader structure hold hotspot

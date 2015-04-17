@@ -149,18 +149,6 @@ AC_SUBST(SSL_LIBS)
 AM_CONDITIONAL(HAVE_LIBSSL, test ! -z "$SSL_LIBS")
 
 
-# See if we want libva support
-AH_TEMPLATE(CONFIG_LIBVA, [Build libva support])
-AC_ARG_WITH(libva,
-[  --without-libva         disable support for libva],,)
-if test "x$with_libva" != "xno"; then
-    AC_CHECK_LIB(va-x11, vaGetDisplay,
-        VA_LIBS="-lva -lva-x11"
-        [AC_DEFINE(CONFIG_LIBVA) CONFIG_LIBVA="true"], ,)
-fi
-AC_SUBST(VA_LIBS)
-AM_CONDITIONAL(CONFIG_LIBVA, test ! -z "$VA_LIBS")
-
 
 
 AC_ARG_WITH(jpeg,

@@ -167,10 +167,6 @@ static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_
 static void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int h) {
   int j;
 
-  if (client->frameBuffer == NULL) {
-      return;
-  }
-
 #define COPY_RECT(BPP) \
   { \
     int rs = w * BPP / 8, rs2 = client->width * BPP / 8; \
@@ -272,9 +268,6 @@ static rfbBool HandleZRLE24(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZRLE24Up(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZRLE24Down(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZRLE32(rfbClient* client, int rx, int ry, int rw, int rh);
-#endif
-#ifdef LIBVNCSERVER_CONFIG_LIBVA
-static rfbBool HandleH264 (rfbClient* client, int rx, int ry, int rw, int rh);
 #endif
 
 /*
@@ -1376,10 +1369,6 @@ SetFormatAndEncodings(rfbClient* client)
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCoRRE);
       } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRRE);
-#ifdef LIBVNCSERVER_CONFIG_LIBVA
-      } else if (strncasecmp(encStr,"h264",encStrLen) == 0) {
-	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingH264);
-#endif
       } else {
 	rfbClientLog("Unknown encoding '%.*s'\n",encStrLen,encStr);
       }
@@ -1448,10 +1437,6 @@ SetFormatAndEncodings(rfbClient* client)
       encs[se->nEncodings++] = rfbClientSwap32IfLE(client->appData.qualityLevel +
 					  rfbEncodingQualityLevel0);
     }
-#ifdef LIBVNCSERVER_CONFIG_LIBVA
-    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingH264);
-    rfbClientLog("h264 encoding added\n");
-#endif
   }
 
 
@@ -2172,14 +2157,6 @@ HandleRFBServerMessage(rfbClient* client)
      }
 
 #endif
-#ifdef LIBVNCSERVER_CONFIG_LIBVA
-      case rfbEncodingH264:
-      {
-	if (!HandleH264(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h))
-	  return FALSE;
-	break;
-      }
-#endif
 
       default:
 	 {
@@ -2416,7 +2393,6 @@ HandleRFBServerMessage(rfbClient* client)
 #define UNCOMP -8
 #include "zrle.c"
 #undef BPP
-#include "h264.c"
 
 
 /*
