@@ -423,6 +423,14 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
        }
     }
 
+    /* Basic protection against directory traversal outside webroot */
+
+    if (strstr(fname, "..")) {
+        rfbErr("httpd: URL should not contain '..'\n");
+        rfbWriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
+        httpCloseSock(rfbScreen);
+        return;
+    }
 
     /* If we were asked for '/', actually read the file index.vnc */
 
