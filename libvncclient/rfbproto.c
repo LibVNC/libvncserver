@@ -1946,7 +1946,10 @@ HandleRFBServerMessage(rfbClient* client)
 	int y=rect.r.y, h=rect.r.h;
 
 	bytesPerLine = rect.r.w * client->format.bitsPerPixel / 8;
-	linesToRead = RFB_BUFFER_SIZE / bytesPerLine;
+	/* RealVNC 4.x-5.x on OSX can induce bytesPerLine==0, 
+	   usually during GPU accel. */
+	/* Regardless of cause, do not divide by zero. */
+	linesToRead = bytesPerLine ? (RFB_BUFFER_SIZE / bytesPerLine) : 0;
 
 	while (h > 0) {
 	  if (linesToRead > h)
