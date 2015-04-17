@@ -154,6 +154,9 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   /* default: use complete frame buffer */ 
   client->updateRect.x = -1;
  
+  client->frameBuffer = NULL;
+  client->outputWindow = 0;
+ 
   client->format.bitsPerPixel = bytesPerPixel*8;
   client->format.depth = bitsPerSample*samplesPerPixel;
   client->appData.requestedDepth=client->format.depth;

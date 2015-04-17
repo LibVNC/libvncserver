@@ -167,6 +167,10 @@ static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_
 static void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int h) {
   int j;
 
+  if (client->frameBuffer == NULL) {
+      return;
+  }
+
 #define COPY_RECT(BPP) \
   { \
     int rs = w * BPP / 8, rs2 = client->width * BPP / 8; \
