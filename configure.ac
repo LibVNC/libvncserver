@@ -498,7 +498,7 @@ fi
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([arpa/inet.h endian.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/endian.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h ws2tcpip.h])
+AC_CHECK_HEADERS([arpa/inet.h endian.h fcntl.h netdb.h netinet/in.h stdlib.h stdint.h string.h sys/endian.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h ws2tcpip.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -508,11 +508,6 @@ AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AX_TYPE_SOCKLEN_T
-if test ! -d ./rfb; then
-	echo "creating subdir ./rfb for rfbint.h"
-	mkdir ./rfb 
-fi
-AX_CREATE_STDINT_H(rfb/rfbint.h)
 AC_CACHE_CHECK([for in_addr_t],
         vnc_cv_inaddrt, [
                 AC_TRY_COMPILE([#include <sys/types.h>

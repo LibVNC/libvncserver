@@ -661,7 +661,6 @@ RECURSIVE              = YES
 # subdirectory from a directory tree whose root is specified with the INPUT tag.
 
 EXCLUDE                = rfb/rfbconfig.h \
-                         rfb/rfbint.h \
                          rfb/default8x16.h
 
 # The EXCLUDE_SYMLINKS tag can be used select whether or not files or 

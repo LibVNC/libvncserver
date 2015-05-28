@@ -170,7 +170,6 @@ TEST_BIG_ENDIAN(LIBVNCSERVER_WORDS_BIGENDIAN)
 # inline
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rfb/rfbconfig.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbconfig.h)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rfb/rfbint.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbint.h)
 
 set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/main.c
@@ -375,7 +374,6 @@ install_files(/include/rfb FILES
     rfb/rfb.h
     rfb/rfbclient.h
     rfb/rfbconfig.h
-    rfb/rfbint.h
     rfb/rfbproto.h
     rfb/rfbregion.h
 )

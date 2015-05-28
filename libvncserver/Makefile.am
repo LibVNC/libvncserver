@@ -30,9 +30,8 @@ WEBSOCKETSSRCS = websockets.c $(WEBSOCKETSSSLSRCS)
 endif
 
 includedir=$(prefix)/include/rfb
-#include_HEADERS=rfb.h rfbconfig.h rfbint.h rfbproto.h keysym.h rfbregion.h
 
-include_HEADERS=../rfb/rfb.h ../rfb/rfbconfig.h ../rfb/rfbint.h \
+include_HEADERS=../rfb/rfb.h ../rfb/rfbconfig.h \
 	../rfb/rfbproto.h ../rfb/keysym.h ../rfb/rfbregion.h ../rfb/rfbclient.h
 
 noinst_HEADERS=../common/d3des.h ../rfb/default8x16.h zrleoutstream.h \

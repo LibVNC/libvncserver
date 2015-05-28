@@ -70,7 +70,6 @@
 #define SOCKET int
 #else
 #include <rfb/rfbconfig.h>
-#include <rfb/rfbint.h>
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -108,9 +107,7 @@ typedef int8_t rfbBool;
 #define TRUE -1
 #endif
 
-#ifdef _MSC_VER
 #include <stdint.h>
-#endif
 
 typedef uint32_t rfbKeySym;
 typedef uint32_t rfbPixel;
