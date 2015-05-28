@@ -80,11 +80,11 @@
 #endif
 #endif
 
-/* some autotool versions do not properly prefix
-   WORDS_BIGENDIAN, so do that manually */
-#ifdef WORDS_BIGENDIAN
-#define LIBVNCSERVER_WORDS_BIGENDIAN
-#endif
+# include <endian.h>
+# if __BYTE_ORDER == __BIG_ENDIAN
+#  define LIBVBNCSERVER_WORDS_BIGENDIAN 1
+# endif
+
 
 /* MS compilers don't have strncasecmp */
 #ifdef _MSC_VER
