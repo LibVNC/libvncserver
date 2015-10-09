@@ -500,7 +500,7 @@ rfbHandleSecTypeTight(rfbClientPtr cl) {
 
     if(rtcp == NULL) {
         /* Error condition close socket */
-        rfbLog("Memory error has occured while handling "
+        rfbLog("Memory error has occurred while handling "
 		"Tight security type... closing connection.\n");
 	 rfbCloseClient(cl);
 	 return;

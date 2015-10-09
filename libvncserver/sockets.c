@@ -925,7 +925,7 @@ rfbListenOnTCP6Port(int port,
         }
 
 #ifdef IPV6_V6ONLY
-	/* we have seperate IPv4 and IPv6 sockets since some OS's do not support dual binding */
+	/* we have separate IPv4 and IPv6 sockets since some OS's do not support dual binding */
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof(one)) < 0) {
 	  rfbLogPerror("rfbListenOnTCP6Port error in setsockopt IPV6_V6ONLY");
 	  closesocket(sock);

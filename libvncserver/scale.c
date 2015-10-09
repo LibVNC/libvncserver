@@ -213,7 +213,7 @@ void rfbScaledScreenUpdateRect(rfbScreenInfoPtr screen, rfbScreenInfoPtr ptr, in
              case 2: pixel_value = *((unsigned short *)srcptr2); break;
              case 1: pixel_value = *((unsigned char *)srcptr2);  break;
              default:
-               /* fixme: endianess problem? */
+               /* fixme: endianness problem? */
                for (z = 0; z < bytesPerPixel; z++)
                  pixel_value += (srcptr2[z] << (8 * z));
                 break;
@@ -240,7 +240,7 @@ void rfbScaledScreenUpdateRect(rfbScreenInfoPtr screen, rfbScreenInfoPtr ptr, in
          case 2: *((unsigned short *)dstptr) = (unsigned short) pixel_value; break;
          case 1: *((unsigned char *)dstptr)  = (unsigned char)  pixel_value; break;
          default:
-           /* fixme: endianess problem? */
+           /* fixme: endianness problem? */
            for (z = 0; z < bytesPerPixel; z++)
              dstptr[z]=(pixel_value >> (8 * z)) & 0xff;
             break;

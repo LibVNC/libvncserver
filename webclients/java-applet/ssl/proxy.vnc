@@ -25,7 +25,7 @@ fails in the proxy environment.
 The applet is not allowed to open a socket connection to the proxy (since
 that would let it connect to just about any host, e.g. CONNECT method).
 
-This is indpendent of SSL but of course fails for that socket connection
+This is independent of SSL but of course fails for that socket connection
 as well.  I.e. this is a problem for non-SSL VNC Viewers as well.
 
 Solution?  Sign the applet and have the user click on "Yes" that they

@@ -42,9 +42,9 @@ Send full Java Console output for failures.
 Tips:
 
 When doing single-port proxy connections (e.g. both VNC and HTTPS
-thru port 5900) it helps to move through the 'do you trust this site'
+through port 5900) it helps to move through the 'do you trust this site'
 dialogs quickly.   x11vnc has to wait to see if the traffic is VNC or
-HTTP and this can cause timeouts if you don't move thru them quickly.
+HTTP and this can cause timeouts if you don't move through them quickly.
 
 You may have to restart your browser completely if it gets into a
 weird state.  For one case we saw the JVM requesting VncViewer.class
@@ -172,7 +172,7 @@ Both TightVNC and UltraVNC Java viewers:
 	Set to do a special HTTP GET (/request.https.vnc.connection)
 	to the vnc server that will cause it to switch to VNC instead.
 	This is to speedup/make more robust, the single port HTTPS and VNC
-	mode of x11vnc (e.g. both services thru port 5900, etc) 
+	mode of x11vnc (e.g. both services through port 5900, etc)
 	
   urlPrefix
 	string, default: none
