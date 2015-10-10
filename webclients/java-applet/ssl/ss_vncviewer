@@ -91,7 +91,7 @@
 #
 #             [user1@]host1[:port1],[user2@]host2[:port2]
 #
-#         in which case a ssh to host1 and thru it via a -L redir a 2nd
+#         in which case a ssh to host1 and through it via a -L redir a 2nd
 #         ssh is established to host2.  
 #
 #         Examples:
@@ -109,10 +109,10 @@
 #
 # -sshargs "args"  pass "args" to the ssh process, e.g. -L/-R port redirs.
 #
-# -sshssl Tunnel the SSL connection thru a SSH connection.  The tunnel as
-#         under -ssh is set up and the SSL connection goes thru it.  Use
+# -sshssl Tunnel the SSL connection through a SSH connection.  The tunnel as
+#         under -ssh is set up and the SSL connection goes through it.  Use
 #         this if you want to have and end-to-end SSL connection but must
-#         go thru a SSH gateway host (e.g. not the vnc server).  Or use
+#         go through a SSH gateway host (e.g. not the vnc server).  Or use
 #         this if you need to tunnel additional services via -R and -L 
 #         (see -sshargs above).
 #
@@ -351,7 +351,7 @@ if [ "X$SKIP_STUNNEL_NO_SYSLOG" = "X" ]; then
 	STUNNEL_NO_SYSLOG=1; export STUNNEL_NO_SYSLOG
 fi
 
-# this is the -t ssh option (gives better keyboard response thru SSH tunnel)
+# this is the -t ssh option (gives better keyboard response through SSH tunnel)
 targ="-t"
 if [ "X$SS_VNCVIEWER_NO_T" != "X" ]; then
 	targ=""

@@ -978,7 +978,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +		}
 +		String sFileName = ((String) selected);
  		
- 		// sf@2004 - Directory can't be transfered
+		// sf@2004 - Directory can't be transferred
  		if (sFileName.substring(0, 2).equals(" [") && sFileName.substring((sFileName.length() - 1), sFileName.length()).equals("]"))
  		{
 -			JOptionPane.showMessageDialog(null, (String)"Directory Transfer is not yet available in this version...", "FileTransfer Info", JOptionPane.INFORMATION_MESSAGE);
@@ -1036,7 +1036,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +			return null;
 +		}
 +		
-+		// sf@2004 - Directory can't be transfered
++		// sf@2004 - Directory can't be transferred
 +		if (sFileName.substring(0, 2).equals(" [") && sFileName.substring((sFileName.length() - 1), sFileName.length()).equals("]"))
 +		{
 +			return null;
@@ -1084,7 +1084,7 @@ diff -Naur JavaViewer.orig/FTPFrame.java JavaViewer/FTPFrame.java
 +		}
 +		String sFileName = ((String) selected);
  		
- 		// sf@2004 - Directory can't be transfered
+		// sf@2004 - Directory can't be transferred
  		if (sFileName.substring(0, 2).equals(" [") && sFileName.substring((sFileName.length() - 1), sFileName.length()).equals("]"))
  		{
 -			JOptionPane.showMessageDialog(null, (String)"Directory Transfer is not yet available in this version...", "FileTransfer Info", JOptionPane.INFORMATION_MESSAGE);

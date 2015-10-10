@@ -16,7 +16,7 @@
  * Christian Daschill 
  *
  *
- * Answer: Originally, I thought about using seperate threads and using a
+ * Answer: Originally, I thought about using separate threads and using a
  * mutex to determine when the frame buffer was being accessed by any client
  * so we could determine a safe time to take a picture.  The probem is, we
  * are lock-stepping everything with framebuffer access.  Why not be a
@@ -31,7 +31,7 @@
  * as the libvncserver should not stall on transmitting to any single
  * client.
  *
- * Another solution would be to provide a seperate framebuffer for each
+ * Another solution would be to provide a separate framebuffer for each
  * client and use mutexes to determine if any particular client is ready for
  * a snapshot.  This way, your not updating a framebuffer for a slow client
  * while it is being transferred.

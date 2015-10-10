@@ -208,7 +208,7 @@ void rfbHandleSecTypeTight(rfbClientPtr cl);
  * In the protocol version 3.7t, the server informs the client what message
  * types it supports in addition to ones defined in the protocol version 3.7.
  * Also, the server sends the list of all supported encodings (note that it's
- * not necessary to advertise the "raw" encoding sinse it MUST be supported in
+ * not necessary to advertise the "raw" encoding since it MUST be supported in
  * RFB 3.x protocols).
  *
  * This data immediately follows the server initialisation message.

@@ -141,7 +141,7 @@ listenForIncomingConnections(rfbClient* client)
 /*
  * listenForIncomingConnectionsNoFork() - listen for incoming connections
  * from servers, but DON'T fork, instead just wait timeout microseconds.
- * If timeout is negative, block indefinitly.
+ * If timeout is negative, block indefinitely.
  * Returns 1 on success (there was an incoming connection on the listen socket
  * and we accepted it successfully), -1 on error, 0 on timeout.
  */

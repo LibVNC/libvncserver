@@ -108,8 +108,8 @@ GetFileListResponseMsg(char* path, char flags)
 
 	
 	 /* fileListInfo can have null data if the folder is Empty 
-    	or if some error condition has occured.
-    	The return value is 'failure' only if some error condition has occured.
+	or if some error condition has occurred.
+	The return value is 'failure' only if some error condition has occurred.
 	 */
 	status = CreateFileListInfo(&fileListInfo, path, !(flags  & 0x10));
 

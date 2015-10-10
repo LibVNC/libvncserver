@@ -46,7 +46,7 @@ var RFB;
             ['DesktopSize',      -223 ],
             ['Cursor',           -239 ],
 
-            // Psuedo-encoding settings
+            // Pseudo-encoding settings
             //['JPEG_quality_lo',   -32 ],
             ['JPEG_quality_med',    -26 ],
             //['JPEG_quality_hi',   -23 ],
