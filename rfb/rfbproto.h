@@ -60,6 +60,7 @@
  *      messages have to be explained by comments.
  */
 
+#include <stdint.h>
 
 #if defined(WIN32) && !defined(__MINGW32__)
 #define LIBVNCSERVER_WORDS_BIGENDIAN
@@ -80,11 +81,12 @@
 #endif
 #endif
 
+#if !defined(_WIN32)
 # include <endian.h>
 # if __BYTE_ORDER == __BIG_ENDIAN
-#  define LIBVBNCSERVER_WORDS_BIGENDIAN 1
+#  define LIBVNCSERVER_WORDS_BIGENDIAN 1
 # endif
-
+#endif /* !_WIN32 */
 
 /* MS compilers don't have strncasecmp */
 #ifdef _MSC_VER
@@ -106,8 +108,6 @@ typedef int8_t rfbBool;
 #undef TRUE
 #define TRUE -1
 #endif
-
-#include <stdint.h>
 
 typedef uint32_t rfbKeySym;
 typedef uint32_t rfbPixel;
