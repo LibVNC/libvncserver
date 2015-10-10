@@ -60,6 +60,7 @@
  *      messages have to be explained by comments.
  */
 
+#include <stdint.h>
 
 #if defined(WIN32) && !defined(__MINGW32__)
 #define LIBVNCSERVER_WORDS_BIGENDIAN
@@ -107,8 +108,6 @@ typedef int8_t rfbBool;
 #undef TRUE
 #define TRUE -1
 #endif
-
-#include <stdint.h>
 
 typedef uint32_t rfbKeySym;
 typedef uint32_t rfbPixel;
