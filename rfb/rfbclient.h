@@ -175,7 +175,10 @@ typedef void (*GotXCutTextProc)(struct _rfbClient* client, const char *text, int
 typedef void (*BellProc)(struct _rfbClient* client);
 /**
     Called when a cursor shape update was received from the server. The decoded cursor shape
-    will be in client->rcSource.
+    will be in client->rcSource. It's up to the application to do something with this, e.g. draw
+    into a viewer's window. If you want the server to draw the cursor into the framebuffer, be
+    careful not to announce remote cursor support, i.e. not include rfbEncodingXCursor or
+    rfbEncodingRichCursor in SetFormatAndEncodings().
 */
 typedef void (*GotCursorShapeProc)(struct _rfbClient* client, int xhot, int yhot, int width, int height, int bytesPerPixel);
 typedef void (*GotCopyRectProc)(struct _rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y);
