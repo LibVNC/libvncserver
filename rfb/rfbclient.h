@@ -173,7 +173,10 @@ typedef rfbCredential* (*GetCredentialProc)(struct _rfbClient* client, int crede
 typedef rfbBool (*MallocFrameBufferProc)(struct _rfbClient* client);
 typedef void (*GotXCutTextProc)(struct _rfbClient* client, const char *text, int textlen);
 typedef void (*BellProc)(struct _rfbClient* client);
-
+/**
+    Called when a cursor shape update was received from the server. The decoded cursor shape
+    will be in client->rcSource.
+*/
 typedef void (*GotCursorShapeProc)(struct _rfbClient* client, int xhot, int yhot, int width, int height, int bytesPerPixel);
 typedef void (*GotCopyRectProc)(struct _rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y);
 
@@ -270,6 +273,7 @@ typedef struct _rfbClient {
 
 
 	/* cursor.c */
+	/** Holds cursor shape data when received from server. */
 	uint8_t *rcSource, *rcMask;
 
 	/** private data pointer */
@@ -357,7 +361,12 @@ typedef struct _rfbClient {
 } rfbClient;
 
 /* cursor.c */
-
+/**
+ * Handles XCursor and RichCursor shape updates from the server.
+ * We emulate cursor operating on the frame buffer (that is
+ * why we call it "software cursor"). This decodes the received cursor
+ * shape and hands it over to GotCursorShapeProc, if set.
+ */
 extern rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int height, uint32_t enc);
 
 /* listen.c */
