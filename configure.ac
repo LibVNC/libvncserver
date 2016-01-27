@@ -30,7 +30,7 @@ AC_CHECK_TOOL([AR], [ar], [/usr/bin/ar],
 # Options
 AH_TEMPLATE(WITH_TIGHTVNC_FILETRANSFER, [Disable TightVNCFileTransfer protocol])
 AC_ARG_WITH(tightvnc-filetransfer,
-	[  --without-filetransfer  disable TightVNC file transfer protocol],
+	[  --without-tightvnc-filetransfer  disable TightVNC file transfer protocol],
 	, [ with_tightvnc_filetransfer=yes ])
 # AC_DEFINE moved to after libpthread check.
 
