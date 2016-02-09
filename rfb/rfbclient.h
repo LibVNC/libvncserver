@@ -182,6 +182,8 @@ typedef void (*BellProc)(struct _rfbClient* client);
 */
 typedef void (*GotCursorShapeProc)(struct _rfbClient* client, int xhot, int yhot, int width, int height, int bytesPerPixel);
 typedef void (*GotCopyRectProc)(struct _rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y);
+typedef rfbBool (*LockWriteToTLSProc)(struct _rfbClient* client);
+typedef rfbBool (*UnlockWriteToTLSProc)(struct _rfbClient* client);
 
 typedef struct _rfbClient {
 	uint8_t* frameBuffer;
@@ -332,6 +334,10 @@ typedef struct _rfbClient {
 	 * be bypassed.
 	 */
 	GetCredentialProc GetCredential;
+
+	/** Hooks for optional protection WriteToTLS() by mutex */
+	LockWriteToTLSProc LockWriteToTLS;
+	UnlockWriteToTLSProc UnlockWriteToTLS;
 
 	/** The 0-terminated security types supported by the client.
 	 * Set by function SetClientAuthSchemes() */
