@@ -335,10 +335,6 @@ typedef struct _rfbClient {
 	 */
 	GetCredentialProc GetCredential;
 
-	/** Hooks for optional protection WriteToTLS() by mutex */
-	LockWriteToTLSProc LockWriteToTLS;
-	UnlockWriteToTLSProc UnlockWriteToTLS;
-
 	/** The 0-terminated security types supported by the client.
 	 * Set by function SetClientAuthSchemes() */
 	uint32_t *clientAuthSchemes;
@@ -366,6 +362,10 @@ typedef struct _rfbClient {
 
         /* Output Window ID. When set, client application enables libvncclient to perform direct rendering in its window */
         unsigned long outputWindow;
+
+	/** Hooks for optional protection WriteToTLS() by mutex */
+	LockWriteToTLSProc LockWriteToTLS;
+	UnlockWriteToTLSProc UnlockWriteToTLS;
 
 } rfbClient;
 
