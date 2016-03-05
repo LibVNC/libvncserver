@@ -133,6 +133,8 @@ check_include_file("sys/time.h"    LIBVNCSERVER_HAVE_SYS_TIME_H)
 check_include_file("sys/types.h"   LIBVNCSERVER_HAVE_SYS_TYPES_H)
 check_include_file("sys/wait.h"    LIBVNCSERVER_HAVE_SYS_WAIT_H)
 check_include_file("unistd.h"      LIBVNCSERVER_HAVE_UNISTD_H)
+
+# headers needed for check_type_size()
 check_include_file("vfork.h"       LIBVNCSERVER_HAVE_VFORK_H)
 check_include_file("ws2tcpip.h"    LIBVNCSERVER_HAVE_WS2TCPIP_H)
 check_include_file("arpa/inet.h"   HAVE_ARPA_INET_H)
