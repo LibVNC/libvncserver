@@ -1962,7 +1962,8 @@ HandleRFBServerMessage(rfbClient* client)
 	  y += linesToRead;
 
 	}
-      } break;
+	break;
+      } 
 
       case rfbEncodingCopyRect:
       {
