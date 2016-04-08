@@ -104,7 +104,7 @@ int TakePicture(unsigned char *buffer)
    */
   gettimeofday(&now,NULL);
   line = now.tv_usec / (1000000/HEIGHT);
-  if (line>HEIGHT) line=HEIGHT-1;
+  if (line>=HEIGHT) line=HEIGHT-1;
   memset(&buffer[(WIDTH * BPP) * line], 0, (WIDTH * BPP));
 
   /* frames per second (informational only) */
