@@ -120,7 +120,7 @@ typedef uint32_t in_addr_t;
 #define                INADDR_NONE     ((in_addr_t) 0xffffffff)
 #endif
 
-#define MAX_ENCODINGS 21
+#define MAX_ENCODINGS 64
 
 /*****************************************************************************
  *
