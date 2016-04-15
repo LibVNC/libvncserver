@@ -146,8 +146,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 
 	if (setsockopt(rfbScreen->inetdSock, IPPROTO_TCP, TCP_NODELAY,
 		       (char *)&one, sizeof(one)) < 0) {
-	    rfbLogPerror("setsockopt");
-	    return;
+	    rfbLogPerror("setsockopt failed: can't set TCP_NODELAY flag, non TCP socket?");
 	}
 
     	FD_ZERO(&(rfbScreen->allFds));
@@ -453,9 +452,7 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
 
     if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		   (char *)&one, sizeof(one)) < 0) {
-      rfbLogPerror("rfbCheckFds: setsockopt");
-      closesocket(sock);
-      return FALSE;
+      rfbLogPerror("rfbCheckFds: setsockopt failed: can't set TCP_NODELAY flag, non TCP socket?");
     }
 
 #ifdef USE_LIBWRAP
@@ -556,9 +553,7 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
 
     if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		   (char *)&one, sizeof(one)) < 0) {
-	rfbLogPerror("setsockopt failed");
-	closesocket(sock);
-	return -1;
+	rfbLogPerror("setsockopt failed: can't set TCP_NODELAY flag, non TCP socket?");
     }
 
     /* AddEnabledDevice(sock); */

@@ -363,9 +363,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
       if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		     (char *)&one, sizeof(one)) < 0) {
-	rfbLogPerror("setsockopt failed");
-	close(sock);
-	return NULL;
+	rfbLogPerror("setsockopt failed: can't set TCP_NODELAY flag, non TCP socket?");
       }
 
       FD_SET(sock,&(rfbScreen->allFds));
