@@ -220,6 +220,8 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->subAuthScheme = 0;
   client->GetCredential = NULL;
   client->tlsSession = NULL;
+  client->LockWriteToTLS = NULL;
+  client->UnlockWriteToTLS = NULL;
   client->sock = -1;
   client->listenSock = -1;
   client->listenAddress = NULL;
