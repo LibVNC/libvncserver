@@ -182,6 +182,8 @@ typedef void (*BellProc)(struct _rfbClient* client);
 */
 typedef void (*GotCursorShapeProc)(struct _rfbClient* client, int xhot, int yhot, int width, int height, int bytesPerPixel);
 typedef void (*GotCopyRectProc)(struct _rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y);
+typedef rfbBool (*LockWriteToTLSProc)(struct _rfbClient* client);
+typedef rfbBool (*UnlockWriteToTLSProc)(struct _rfbClient* client);
 
 typedef struct _rfbClient {
 	uint8_t* frameBuffer;
@@ -360,6 +362,10 @@ typedef struct _rfbClient {
 
         /* Output Window ID. When set, client application enables libvncclient to perform direct rendering in its window */
         unsigned long outputWindow;
+
+	/** Hooks for optional protection WriteToTLS() by mutex */
+	LockWriteToTLSProc LockWriteToTLS;
+	UnlockWriteToTLSProc UnlockWriteToTLS;
 
 } rfbClient;
 
