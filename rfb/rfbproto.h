@@ -93,8 +93,8 @@
 #define strncasecmp _strnicmp
 #endif
 
+#define rfbMax(a,b) (((a)>(b))?(a):(b))
 #if !defined(WIN32) || defined(__MINGW32__)
-#define max(a,b) (((a)>(b))?(a):(b))
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif

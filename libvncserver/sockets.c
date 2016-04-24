@@ -192,7 +192,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 
         rfbLog("Autoprobing selected TCP6 port %d\n", rfbScreen->ipv6port);
 	FD_SET(rfbScreen->listen6Sock, &(rfbScreen->allFds));
-	rfbScreen->maxFd = max((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
+	rfbScreen->maxFd = rfbMax((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
 #endif
     }
     else
@@ -219,7 +219,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
       rfbLog("Listening for VNC connections on TCP6 port %d\n", rfbScreen->ipv6port);  
 	
       FD_SET(rfbScreen->listen6Sock, &(rfbScreen->allFds));
-      rfbScreen->maxFd = max((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
+      rfbScreen->maxFd = rfbMax((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
 	    }
 #endif
 
@@ -235,7 +235,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	rfbLog("Listening for VNC connections on TCP port %d\n", rfbScreen->port);  
 
 	FD_SET(rfbScreen->udpSock, &(rfbScreen->allFds));
-	rfbScreen->maxFd = max((int)rfbScreen->udpSock,rfbScreen->maxFd);
+	rfbScreen->maxFd = rfbMax((int)rfbScreen->udpSock,rfbScreen->maxFd);
     }
 }
 
@@ -558,7 +558,7 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
 
     /* AddEnabledDevice(sock); */
     FD_SET(sock, &rfbScreen->allFds);
-    rfbScreen->maxFd = max(sock,rfbScreen->maxFd);
+    rfbScreen->maxFd = rfbMax(sock,rfbScreen->maxFd);
 
     return sock;
 }
