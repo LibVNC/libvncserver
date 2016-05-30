@@ -293,6 +293,7 @@ target_link_libraries(vncclient
                       ${ZLIB_LIBRARIES}
                       ${JPEG_LIBRARIES}
                       ${GNUTLS_LIBRARIES}
+                      ${OPENSSL_LIBRARIES}
 )
 target_link_libraries(vncserver
                       ${ADDITIONAL_LIBS}
