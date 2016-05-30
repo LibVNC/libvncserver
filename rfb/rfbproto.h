@@ -81,12 +81,12 @@
 #endif
 #endif
 
-#if !defined(_WIN32)
+#if LIBVNCSERVER_HAVE_ENDIAN_H
 # include <endian.h>
 # if __BYTE_ORDER == __BIG_ENDIAN
 #  define LIBVNCSERVER_WORDS_BIGENDIAN 1
 # endif
-#endif /* !_WIN32 */
+#endif
 
 /* MS compilers don't have strncasecmp */
 #ifdef _MSC_VER
