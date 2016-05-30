@@ -5,6 +5,7 @@ project(LibVNCServer)
 include(CheckFunctionExists)
 include(CheckIncludeFile)
 include(CheckTypeSize)
+include(TestBigEndian)
 include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
 include(CheckCSourceRuns)
@@ -172,6 +173,8 @@ check_type_size(in_addr_t LIBVNCSERVER_IN_ADDR_T)
 if(NOT HAVE_LIBVNCSERVER_IN_ADDR_T)
   set(LIBVNCSERVER_NEED_INADDR_T 1)
 endif(NOT HAVE_LIBVNCSERVER_IN_ADDR_T)
+
+TEST_BIG_ENDIAN(LIBVNCSERVER_WORDS_BIGENDIAN)
 
 # TODO:
 # LIBVNCSERVER_ENOENT_WORKAROUND
