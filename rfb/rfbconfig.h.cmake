@@ -54,6 +54,27 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_UNISTD_H  1 
 
+/* Define to 1 if you have the `vfork' function. */
+#cmakedefine LIBVNCSERVER_HAVE_VFORK  1 
+
+/* Define to 1 if you have the <vfork.h> header file. */
+#cmakedefine LIBVNCSERVER_HAVE_VFORK_H  1 
+
+/* Define to 1 if you have the `vprintf' function. */
+#cmakedefine LIBVNCSERVER_HAVE_VPRINTF  1 
+
+/* Define to 1 if `fork' works. */
+#cmakedefine LIBVNCSERVER_HAVE_WORKING_FORK  1 
+
+/* Define to 1 if `vfork' works. */
+#cmakedefine LIBVNCSERVER_HAVE_WORKING_VFORK  1 
+
+/* Define to 1 if you have the <ws2tcpip.h> header file. */
+#cmakedefine LIBVNCSERVER_HAVE_WS2TCPIP_H  1 
+
+/* Enable IPv6 support */
+#cmakedefine LIBVNCSERVER_IPv6  1 
+
 /* Need a typedef for in_addr_t */
 #cmakedefine LIBVNCSERVER_NEED_INADDR_T 1
 
