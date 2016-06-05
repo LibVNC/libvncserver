@@ -53,7 +53,7 @@
 			     (((l) & 0x000000ff) << 24))  : (l))
 
 #define rfbClientSwap64IfLE(l) \
-    (*(char *)&client->endianTest ? ((((l) >> 56 ) & 0xff00000000000000ULL) | \
+    (*(char *)&client->endianTest ? ((((l) >> 56 ) & 0x00000000000000ffULL) | \
 			     (((l) & 0x00ff000000000000ULL) >> 40)  | \
 			     (((l) & 0x0000ff0000000000ULL) >> 24)  | \
 			     (((l) & 0x000000ff00000000ULL) >> 8)  | \
