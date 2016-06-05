@@ -4,6 +4,9 @@
        Fixes a crash when connection to Mac hosts
        (https://github.com/LibVNC/libvncserver/issues/45).
 
+   - LibVNCServer:
+     * Stability fixes for the WebSocket implementation.
+
 0.9.10
    - Overall changes:
      * Moved the whole project from sourceforge to https://libvnc.github.io/.
