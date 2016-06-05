@@ -720,10 +720,10 @@ typedef struct _rfbClientRec {
 #define Swap24(l) ((((l) & 0xff) << 16) | (((l) >> 16) & 0xff) | \
                    (((l) & 0x00ff00)))
 
-#define Swap32(l) (((l) >> 24) | \
+#define Swap32(l) ((((l) >> 24) & 0x000000ff)| \
                    (((l) & 0x00ff0000) >> 8)  | \
                    (((l) & 0x0000ff00) << 8)  | \
-                   ((l) << 24))
+                   (((l) & 0x000000ff) << 24))
 
 
 extern char rfbEndianTest;
