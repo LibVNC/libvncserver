@@ -375,13 +375,11 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
       if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		     (char *)&one, sizeof(one)) < 0) {
-	rfbLogPerror("setsockopt failed");
-	close(sock);
-	return NULL;
+	rfbLogPerror("setsockopt failed: can't set TCP_NODELAY flag, non TCP socket?");
       }
 
       FD_SET(sock,&(rfbScreen->allFds));
-		rfbScreen->maxFd = max(sock,rfbScreen->maxFd);
+		rfbScreen->maxFd = rfbMax(sock,rfbScreen->maxFd);
 
       INIT_MUTEX(cl->outputMutex);
       INIT_MUTEX(cl->refCountMutex);
@@ -990,7 +988,6 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     /*rfbSetBit(msgs.client2server, rfbSetSW);           */
     /*rfbSetBit(msgs.client2server, rfbTextChat);        */
     rfbSetBit(msgs.client2server, rfbPalmVNCSetScaleFactor);
-    rfbSetBit(msgs.client2server, rfbXvp);
     rfbSetBit(msgs.client2server, rfbMulticastFramebufferUpdateRequest);
     rfbSetBit(msgs.client2server, rfbMulticastFramebufferUpdateNACK);
 
@@ -1000,8 +997,13 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     rfbSetBit(msgs.server2client, rfbServerCutText);
     rfbSetBit(msgs.server2client, rfbResizeFrameBuffer);
     rfbSetBit(msgs.server2client, rfbPalmVNCReSizeFrameBuffer);
-    rfbSetBit(msgs.server2client, rfbXvp);
+
     rfbSetBit(msgs.server2client, rfbMulticastFramebufferUpdate);
+
+    if (cl->screen->xvpHook) {
+        rfbSetBit(msgs.client2server, rfbXvp);
+        rfbSetBit(msgs.server2client, rfbXvp);
+    }
 
     memcpy(&cl->updateBuf[cl->ublen], (char *)&msgs, sz_rfbSupportedMessages);
     cl->ublen += sz_rfbSupportedMessages;
@@ -2341,14 +2343,16 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                           "%s\n", cl->host);
                   cl->enableServerIdentity = TRUE;
                 }
-		break;
-	    case rfbEncodingXvp:
-	        rfbLog("Enabling Xvp protocol extension for client "
-		        "%s\n", cl->host);
-		if (!rfbSendXvp(cl, 1, rfbXvp_Init)) {
-		  rfbCloseClient(cl);
-		  return;
-		}
+                break;
+            case rfbEncodingXvp:
+                if (cl->screen->xvpHook) {
+                  rfbLog("Enabling Xvp protocol extension for client "
+                          "%s\n", cl->host);
+                  if (!rfbSendXvp(cl, 1, rfbXvp_Init)) {
+                    rfbCloseClient(cl);
+                    return;
+                  }
+                }
                 break;
             case rfbEncodingMulticastVNC:
      	       /* do we have the right type of multicast socket? */

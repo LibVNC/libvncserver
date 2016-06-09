@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.6)
+cmake_policy(SET CMP0037 NEW)
 
 project(LibVNCServer)
 include(CheckFunctionExists)
@@ -11,10 +12,11 @@ include(CheckCSourceRuns)
 
 set(PACKAGE_NAME           "LibVNCServer")
 set(FULL_PACKAGE_NAME      "LibVNCServer")
-set(PACKAGE_VERSION        "0.9.10")
 set(VERSION_MAJOR          "0")
 set(VERSION_MINOR          "9")
 set(VERSION_PATCHLEVEL     "10")
+set(VERSION_SO             "0")
+set(PACKAGE_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCHLEVEL}")
 set(PROJECT_BUGREPORT_PATH "http://sourceforge.net/projects/libvncserver")
 set(CMAKE_C_FLAGS "-O2 -W -Wall -g")
 set(LIBVNCSERVER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver)
@@ -105,10 +107,12 @@ if(GNUTLS_FOUND)
   option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (gnutls)" ON)
   set(WEBSOCKET_LIBRARIES ${RESOLV_LIB} ${GNUTLS_LIBRARIES})
   set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_gnutls ${LIBVNCSERVER_DIR}/rfbcrypto_gnutls)
+  include_directories(${GNUTLS_INCLUDE_DIR})
 elseif(OPENSSL_FOUND)
   option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (openssl)" ON)
   set(WEBSOCKET_LIBRARIES ${RESOLV_LIB} ${OPENSSL_LIBRARIES})
   set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_openssl ${LIBVNCSERVER_DIR}/rfbcrypto_openssl)
+  include_directories(${OPENSSL_INCLUDE_DIR})
 else()
   option(LIBVNCSERVER_WITH_WEBSOCKETS "Build with websockets support (no ssl)" ON)
   set(WEBSOCKET_LIBRARIES ${RESOLV_LIB})
@@ -134,12 +138,21 @@ check_include_file("sys/wait.h"    LIBVNCSERVER_HAVE_SYS_WAIT_H)
 check_include_file("unistd.h"      LIBVNCSERVER_HAVE_UNISTD_H)
 
 # headers needed for check_type_size()
+check_include_file("vfork.h"       LIBVNCSERVER_HAVE_VFORK_H)
+check_include_file("ws2tcpip.h"    LIBVNCSERVER_HAVE_WS2TCPIP_H)
 check_include_file("arpa/inet.h"   HAVE_ARPA_INET_H)
 check_include_file("stdint.h"      HAVE_STDINT_H)
 check_include_file("stddef.h"      HAVE_STDDEF_H)
 check_include_file("sys/types.h"   HAVE_SYS_TYPES_H)
 
 check_function_exists(gettimeofday    LIBVNCSERVER_HAVE_GETTIMEOFDAY)
+check_function_exists(vfork           LIBVNCSERVER_HAVE_VFORK)
+check_function_exists(vprintf         LIBVNCSERVER_HAVE_VPRINTF)
+
+
+if(LIBVNCSERVER_HAVE_WS2TCPIP_H AND LIBVNCSERVER_HAVE_VPRINTF)
+	option(LIBVNCSERVER_IPv6 "Enable IPv6 Support" ON)
+endif()
 
 if(CMAKE_USE_PTHREADS_INIT)
   set(LIBVNCSERVER_HAVE_LIBPTHREAD 1)
@@ -168,7 +181,6 @@ TEST_BIG_ENDIAN(LIBVNCSERVER_WORDS_BIGENDIAN)
 # inline
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rfb/rfbconfig.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbconfig.h)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rfb/rfbint.h.cmake ${CMAKE_BINARY_DIR}/rfb/rfbint.h)
 
 set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/main.c
@@ -281,6 +293,7 @@ target_link_libraries(vncclient
                       ${ZLIB_LIBRARIES}
                       ${JPEG_LIBRARIES}
                       ${GNUTLS_LIBRARIES}
+                      ${OPENSSL_LIBRARIES}
 )
 target_link_libraries(vncserver
                       ${ADDITIONAL_LIBS}
@@ -291,7 +304,7 @@ target_link_libraries(vncserver
 )
 
 SET_TARGET_PROPERTIES(vncclient vncserver
-    PROPERTIES SOVERSION "0.0.0"
+		PROPERTIES SOVERSION "${VERSION_SO}" VERSION "${PACKAGE_VERSION}"
 )
 
 # tests
@@ -356,14 +369,14 @@ endif(HAVE_FFMPEG)
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
 foreach(test ${LIBVNCSERVER_TESTS})
-  add_executable(examples/${test} ${LIBVNCSRVTEST_DIR}/${test}.c)
-  target_link_libraries(examples/${test} vncserver ${CMAKE_THREAD_LIBS_INIT})
+  add_executable(examples_${test} ${LIBVNCSRVTEST_DIR}/${test}.c)
+  target_link_libraries(examples_${test} vncserver ${CMAKE_THREAD_LIBS_INIT})
 endforeach(test ${LIBVNCSERVER_TESTS})
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
 foreach(test ${LIBVNCCLIENT_TESTS})
-  add_executable(client_examples/${test} ${LIBVNCCLITEST_DIR}/${test}.c ${LIBVNCCLITEST_DIR}/${${test}_EXTRA_SOURCES} )
-  target_link_libraries(client_examples/${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${X11_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
+  add_executable(client_examples_${test} ${LIBVNCCLITEST_DIR}/${test}.c ${LIBVNCCLITEST_DIR}/${${test}_EXTRA_SOURCES} )
+  target_link_libraries(client_examples_${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${X11_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
 endforeach(test ${LIBVNCCLIENT_TESTS})
 
 install_targets(/lib vncserver)
@@ -373,7 +386,6 @@ install_files(/include/rfb FILES
     rfb/rfb.h
     rfb/rfbclient.h
     rfb/rfbconfig.h
-    rfb/rfbint.h
     rfb/rfbproto.h
     rfb/rfbregion.h
 )

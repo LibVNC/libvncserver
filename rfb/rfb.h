@@ -520,7 +520,7 @@ typedef struct _rfbClientRec {
        authentication.  If the right conditions are met this state will be
        set (see the auth.c file) when rfbProcessClientInitMessage is called.
 
-       If the state is RFB_INITIALISATION_SHARED we should not expect to recieve
+       If the state is RFB_INITIALISATION_SHARED we should not expect to receive
        any ClientInit message, but instead should proceed to the next stage
        of initialisation as though an implicit ClientInit message was received
        with a shared-flag of true.  (There is currently no corresponding
@@ -782,10 +782,10 @@ typedef struct _rfbClientRec {
 #define Swap24(l) ((((l) & 0xff) << 16) | (((l) >> 16) & 0xff) | \
                    (((l) & 0x00ff00)))
 
-#define Swap32(l) (((l) >> 24) | \
+#define Swap32(l) ((((l) >> 24) & 0x000000ff)| \
                    (((l) & 0x00ff0000) >> 8)  | \
                    (((l) & 0x0000ff00) << 8)  | \
-                   ((l) << 24))
+                   (((l) & 0x000000ff) << 24))
 
 
 extern char rfbEndianTest;
@@ -833,6 +833,7 @@ extern rfbBool webSocketsCheck(rfbClientPtr cl);
 extern rfbBool webSocketCheckDisconnect(rfbClientPtr cl);
 extern int webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst);
 extern int webSocketsDecode(rfbClientPtr cl, char *dst, int len);
+extern rfbBool webSocketsHasDataInBuffer(rfbClientPtr cl);
 #endif
 
 /* rfbserver.c */
@@ -1325,14 +1326,14 @@ rfbBool rfbUpdateClient(rfbClientPtr cl);
  Try example.c: it outputs on which port it listens (default: 5900), so it is
  display 0. To view, call @code	vncviewer :0 @endcode
  You should see a sheet with a gradient and "Hello World!" written on it. Try
- to paint something. Note that everytime you click, there is some bigger blot,
+ to paint something. Note that every time you click, there is some bigger blot,
  whereas when you drag the mouse while clicked you draw a line. The size of the
  blot depends on the mouse button you click. Open a second vncviewer with
  the same parameters and watch it as you paint in the other window. This also
  works over internet. You just have to know either the name or the IP of your
  machine. Then it is @code vncviewer machine.where.example.runs.com:0 @endcode
  or similar for the remote client. Now you are ready to type something. Be sure
- that your mouse sits still, because everytime the mouse moves, the cursor is
+ that your mouse sits still, because every time the mouse moves, the cursor is
  reset to the position of the pointer! If you are done with that demo, press
  the down or up arrows. If your viewer supports it, then the dimensions of the
  sheet change. Just press Escape in the viewer. Note that the server still

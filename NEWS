@@ -1,3 +1,12 @@
+0.9.11
+   - LibVNCClient:
+     * Now initializes libgcrypt before use if the application did not do it.
+       Fixes a crash when connection to Mac hosts
+       (https://github.com/LibVNC/libvncserver/issues/45).
+
+   - LibVNCServer:
+     * Stability fixes for the WebSocket implementation.
+
 0.9.10
    - Overall changes:
      * Moved the whole project from sourceforge to https://libvnc.github.io/.
@@ -74,7 +83,7 @@
      * Implemented xvp VNC extension.
      * Updated minilzo library used for Ultra encoding to ver 2.04.
        According to the minilzo README, this brings a significant
-       speedup on 64-bit architechtures.
+       speedup on 64-bit architectures.
 
    - LibVNCServer:
      * Thread safety for ZRLE, Zlib, Tight, RRE, CoRRE and Ultra encodings.
@@ -125,7 +134,7 @@
       - Print this string out to stdout:  'PORT=XXXX' (usually XXXX = 5900).
         Combining with -bg, easy to write a ssh/rsh wrapper with something like:
         port=`ssh $host "x11vnc -bg .."` then run vncviewer based on $port output.
-        (tunneling the vnc traffic thru ssh a bit more messy, but doable)
+        (tunneling the vnc traffic through ssh a bit more messy, but doable)
 
       - Quite a bit of code to be more careful when doing 8bpp indexed color, e.g.
         not assuming NCOLORS is 256, handling 8bit TrueColor and Direct Color, etc

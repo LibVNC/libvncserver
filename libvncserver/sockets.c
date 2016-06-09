@@ -243,8 +243,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 
 	if (setsockopt(rfbScreen->inetdSock, IPPROTO_TCP, TCP_NODELAY,
 		       (char *)&one, sizeof(one)) < 0) {
-	    rfbLogPerror("setsockopt");
-	    return;
+	    rfbLogPerror("setsockopt failed: can't set TCP_NODELAY flag, non TCP socket?");
 	}
 
     	FD_ZERO(&(rfbScreen->allFds));
@@ -290,7 +289,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 
         rfbLog("Autoprobing selected TCP6 port %d\n", rfbScreen->ipv6port);
 	FD_SET(rfbScreen->listen6Sock, &(rfbScreen->allFds));
-	rfbScreen->maxFd = max((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
+	rfbScreen->maxFd = rfbMax((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
 #endif
     }
     else
@@ -317,7 +316,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
       rfbLog("Listening for VNC connections on TCP6 port %d\n", rfbScreen->ipv6port);  
 	
       FD_SET(rfbScreen->listen6Sock, &(rfbScreen->allFds));
-      rfbScreen->maxFd = max((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
+      rfbScreen->maxFd = rfbMax((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
 	    }
 #endif
 
@@ -333,7 +332,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	rfbLog("Listening for VNC connections on TCP port %d\n", rfbScreen->port);  
 
 	FD_SET(rfbScreen->udpSock, &(rfbScreen->allFds));
-	rfbScreen->maxFd = max((int)rfbScreen->udpSock,rfbScreen->maxFd);
+	rfbScreen->maxFd = rfbMax((int)rfbScreen->udpSock,rfbScreen->maxFd);
     }
 
     if (rfbScreen->multicastVNC) {
@@ -512,7 +511,15 @@ rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec)
             if (FD_ISSET(cl->sock, &(rfbScreen->allFds)))
             {
                 if (FD_ISSET(cl->sock, &fds))
+                {
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+                    do {
+                        rfbProcessClientMessage(cl);
+                    } while (cl->sock > 0 && webSocketsHasDataInBuffer(cl));
+#else
                     rfbProcessClientMessage(cl);
+#endif
+                }
                 else
                     rfbSendFileTransferChunk(cl);
             }
@@ -566,9 +573,7 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
 
     if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		   (char *)&one, sizeof(one)) < 0) {
-      rfbLogPerror("rfbCheckFds: setsockopt");
-      closesocket(sock);
-      return FALSE;
+      rfbLogPerror("rfbCheckFds: setsockopt failed: can't set TCP_NODELAY flag, non TCP socket?");
     }
 
 #ifdef USE_LIBWRAP
@@ -669,14 +674,12 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
 
     if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		   (char *)&one, sizeof(one)) < 0) {
-	rfbLogPerror("setsockopt failed");
-	closesocket(sock);
-	return -1;
+	rfbLogPerror("setsockopt failed: can't set TCP_NODELAY flag, non TCP socket?");
     }
 
     /* AddEnabledDevice(sock); */
     FD_SET(sock, &rfbScreen->allFds);
-    rfbScreen->maxFd = max(sock,rfbScreen->maxFd);
+    rfbScreen->maxFd = rfbMax(sock,rfbScreen->maxFd);
 
     return sock;
 }
@@ -1196,7 +1199,7 @@ rfbListenOnTCP6Port(int port,
         }
 
 #ifdef IPV6_V6ONLY
-	/* we have seperate IPv4 and IPv6 sockets since some OS's do not support dual binding */
+	/* we have separate IPv4 and IPv6 sockets since some OS's do not support dual binding */
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof(one)) < 0) {
 	  rfbLogPerror("rfbListenOnTCP6Port error in setsockopt IPV6_V6ONLY");
 	  closesocket(sock);

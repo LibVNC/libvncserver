@@ -117,11 +117,7 @@ static rfbBool MallocFrameBuffer(rfbClient* client) {
 static void initAppData(AppData* data) {
 	data->shareDesktop=TRUE;
 	data->viewOnly=FALSE;
-#ifdef LIBVNCSERVER_CONFIG_LIBVA
-	data->encodingsString="h264 tight zrle ultra copyrect hextile zlib corre rre raw";
-#else
 	data->encodingsString="tight zrle ultra copyrect hextile zlib corre rre raw";
-#endif
 	data->useBGR233=FALSE;
 	data->nColours=0;
 	data->forceOwnCmap=FALSE;
@@ -225,6 +221,9 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->subAuthScheme = 0;
   client->GetCredential = NULL;
   client->tlsSession = NULL;
+
+  client->LockWriteToTLS = NULL;
+  client->UnlockWriteToTLS = NULL;
 
   client->sock = -1;
   client->listenSock = -1;

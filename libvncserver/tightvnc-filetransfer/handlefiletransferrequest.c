@@ -703,7 +703,7 @@ HandleFileUploadLengthError(rfbClientPtr cl, short fNameSize)
 	    return;
 	}
 
-	rfbLog("File [%s]: Method [%s]: File Upload Length Error occured"
+	rfbLog("File [%s]: Method [%s]: File Upload Length Error occurred"
 			"file path requested is <%s>\n", __FILE__, __FUNCTION__, path);
 
     if(path != NULL) {

@@ -30,9 +30,6 @@
 #ifdef WIN32
 #define close closesocket
 #include <winsock2.h>
-#ifdef _MINGW32
-#undef max
-#endif // #ifdef _MINGW32
 #else // #ifdef WIN32
 #include <sys/wait.h>
 #include <sys/utsname.h>
@@ -99,7 +96,7 @@ listenForIncomingConnections(rfbClient* client)
     if(listen6Socket >= 0)
       FD_SET(listen6Socket, &fds);
 
-    r = select(max(listenSocket, listen6Socket)+1, &fds, NULL, NULL, NULL);
+    r = select(rfbMax(listenSocket, listen6Socket)+1, &fds, NULL, NULL, NULL);
 
     if (r > 0) {
       if (FD_ISSET(listenSocket, &fds))
@@ -141,7 +138,7 @@ listenForIncomingConnections(rfbClient* client)
 /*
  * listenForIncomingConnectionsNoFork() - listen for incoming connections
  * from servers, but DON'T fork, instead just wait timeout microseconds.
- * If timeout is negative, block indefinitly.
+ * If timeout is negative, block indefinitely.
  * Returns 1 on success (there was an incoming connection on the listen socket
  * and we accepted it successfully), -1 on error, 0 on timeout.
  */
@@ -195,9 +192,9 @@ listenForIncomingConnectionsNoFork(rfbClient* client, int timeout)
     FD_SET(client->listen6Sock, &fds);
 
   if (timeout < 0)
-    r = select(max(client->listenSock, client->listen6Sock) +1, &fds, NULL, NULL, NULL);
+    r = select(rfbMax(client->listenSock, client->listen6Sock) +1, &fds, NULL, NULL, NULL);
   else
-    r = select(max(client->listenSock, client->listen6Sock) +1, &fds, NULL, NULL, &to);
+    r = select(rfbMax(client->listenSock, client->listen6Sock) +1, &fds, NULL, NULL, &to);
 
   if (r > 0)
     {

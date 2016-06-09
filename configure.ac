@@ -24,13 +24,13 @@ test "x$GCC" = "xyes" && CFLAGS="$CFLAGS -Wall"
 AC_PROG_MAKE_SET
 AC_LIBTOOL_WIN32_DLL
 AC_PROG_LIBTOOL
-AC_PATH_PROG([AR], [ar], [/usr/bin/ar],
+AC_CHECK_TOOL([AR], [ar], [/usr/bin/ar],
                   [$PATH:/usr/ccs/bin])
 
 # Options
 AH_TEMPLATE(WITH_TIGHTVNC_FILETRANSFER, [Disable TightVNCFileTransfer protocol])
 AC_ARG_WITH(tightvnc-filetransfer,
-	[  --without-filetransfer  disable TightVNC file transfer protocol],
+	[  --without-tightvnc-filetransfer  disable TightVNC file transfer protocol],
 	, [ with_tightvnc_filetransfer=yes ])
 # AC_DEFINE moved to after libpthread check.
 
@@ -148,18 +148,6 @@ fi
 AC_SUBST(SSL_LIBS)
 AM_CONDITIONAL(HAVE_LIBSSL, test ! -z "$SSL_LIBS")
 
-
-# See if we want libva support
-AH_TEMPLATE(CONFIG_LIBVA, [Build libva support])
-AC_ARG_WITH(libva,
-[  --without-libva         disable support for libva],,)
-if test "x$with_libva" != "xno"; then
-    AC_CHECK_LIB(va-x11, vaGetDisplay,
-        VA_LIBS="-lva -lva-x11"
-        [AC_DEFINE(CONFIG_LIBVA) CONFIG_LIBVA="true"], ,)
-fi
-AC_SUBST(VA_LIBS)
-AM_CONDITIONAL(CONFIG_LIBVA, test ! -z "$VA_LIBS")
 
 
 
@@ -532,21 +520,15 @@ fi
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([arpa/inet.h endian.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/endian.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h ws2tcpip.h])
+AC_CHECK_HEADERS([arpa/inet.h endian.h fcntl.h netdb.h netinet/in.h stdlib.h stdint.h string.h sys/endian.h sys/socket.h sys/time.h sys/timeb.h syslog.h unistd.h ws2tcpip.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_C_INLINE
-AC_C_BIGENDIAN
 AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_HEADER_SYS_WAIT
 AX_TYPE_SOCKLEN_T
-if test ! -d ./rfb; then
-	echo "creating subdir ./rfb for rfbint.h"
-	mkdir ./rfb 
-fi
-AX_CREATE_STDINT_H(rfb/rfbint.h)
 AC_CACHE_CHECK([for in_addr_t],
         vnc_cv_inaddrt, [
                 AC_TRY_COMPILE([#include <sys/types.h>

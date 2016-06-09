@@ -30,15 +30,14 @@ WEBSOCKETSSRCS = websockets.c $(WEBSOCKETSSSLSRCS)
 endif
 
 includedir=$(prefix)/include/rfb
-#include_HEADERS=rfb.h rfbconfig.h rfbint.h rfbproto.h keysym.h rfbregion.h
 
-include_HEADERS=../rfb/rfb.h ../rfb/rfbconfig.h ../rfb/rfbint.h \
+include_HEADERS=../rfb/rfb.h ../rfb/rfbconfig.h \
 	../rfb/rfbproto.h ../rfb/keysym.h ../rfb/rfbregion.h ../rfb/rfbclient.h
 
 noinst_HEADERS=../common/d3des.h ../rfb/default8x16.h zrleoutstream.h \
 	zrlepalettehelper.h zrletypes.h private.h scale.h rfbssl.h rfbcrypto.h \
-	../common/minilzo.h ../common/lzoconf.h ../common/lzodefs.h ../common/md5.h ../common/sha1.h ../common/ghpringbuf.h \
-	partialupdateregion.h \
+	../common/minilzo.h ../common/lzoconf.h ../common/lzodefs.h ../common/md5.h ../common/sha.h ../common/sha-private.h \
+	../common/ghpringbuf.h partialupdateregion.h \
 	$(TIGHTVNCFILETRANSFERHDRS)
 
 EXTRA_DIST=tableinit24.c tableinittctemplate.c tabletranstemplate.c \
@@ -64,6 +63,7 @@ libvncserver_la_SOURCES=$(LIB_SRCS)
 libvncserver_la_LIBADD=$(WEBSOCKETSSSLLIBS)
 
 lib_LTLIBRARIES=libvncserver.la
+libvncserver_la_LDFLAGS = -version-info 1:0:0
 
 if HAVE_RPM
 $(PACKAGE)-$(VERSION).tar.gz: dist

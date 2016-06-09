@@ -192,7 +192,7 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
     }
     tv.tv_sec = 0;
     tv.tv_usec = 0;
-    nfds = select(max(rfbScreen->httpListen6Sock, max(rfbScreen->httpSock,rfbScreen->httpListenSock)) + 1, &fds, NULL, NULL, &tv);
+    nfds = select(rfbMax(rfbScreen->httpListen6Sock, rfbMax(rfbScreen->httpSock,rfbScreen->httpListenSock)) + 1, &fds, NULL, NULL, &tv);
     if (nfds == 0) {
 	return;
     }
@@ -423,6 +423,14 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
        }
     }
 
+    /* Basic protection against directory traversal outside webroot */
+
+    if (strstr(fname, "..")) {
+        rfbErr("httpd: URL should not contain '..'\n");
+        rfbWriteExact(&cl, NOT_FOUND_STR, strlen(NOT_FOUND_STR));
+        httpCloseSock(rfbScreen);
+        return;
+    }
 
     /* If we were asked for '/', actually read the file index.vnc */
 

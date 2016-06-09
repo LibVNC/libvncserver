@@ -674,7 +674,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
     }
 
 #ifdef IPV6_V6ONLY
-    /* we have seperate IPv4 and IPv6 sockets since some OS's do not support dual binding */
+    /* we have separate IPv4 and IPv6 sockets since some OS's do not support dual binding */
     if (p->ai_family == AF_INET6 && setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof(one)) < 0) {
       rfbClientErr("ListenAtTcpPortAndAddress: error in setsockopt IPV6_V6ONLY: %s\n", strerror(errno));
       close(sock);

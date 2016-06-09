@@ -1,0 +1,4 @@
+language: c
+
+# before build script, run autoreconf
+before_script: autoreconf -fiv

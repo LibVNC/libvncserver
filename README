@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/LibVNC/libvncserver.svg?branch=master)](https://travis-ci.org/LibVNC/libvncserver)
+
 LibVNCServer: A library for easy implementation of a VNC server.
 Copyright (C) 2001-2003 Johannes E. Schindelin
 
@@ -24,7 +26,7 @@ Try example: it outputs on which port it listens (default: 5900), so it is
 display 0. To view, call
 	vncviewer :0
 You should see a sheet with a gradient and "Hello World!" written on it. Try
-to paint something. Note that everytime you click, there is some bigger blot,
+to paint something. Note that every time you click, there is some bigger blot,
 whereas when you drag the mouse while clicked you draw a line. The size of the
 blot depends on the mouse button you click. Open a second vncviewer with
 the same parameters and watch it as you paint in the other window. This also
@@ -32,7 +34,7 @@ works over internet. You just have to know either the name or the IP of your
 machine. Then it is
 	vncviewer machine.where.example.runs.com:0
 or similar for the remote client. Now you are ready to type something. Be sure
-that your mouse sits still, because everytime the mouse moves, the cursor is
+that your mouse sits still, because every time the mouse moves, the cursor is
 reset to the position of the pointer! If you are done with that demo, press
 the down or up arrows. If your viewer supports it, then the dimensions of the
 sheet change. Just press Escape in the viewer. Note that the server still
@@ -112,7 +114,7 @@ Before you draw something, be sure to call
 This tells LibVNCServer to hide the cursor.
 Remark: There are vncviewers out there, which know a cursor encoding, so
 that network traffic is low, and also the cursor doesn't need to be
-drawn the cursor everytime an update is sent. LibVNCServer handles
+drawn the cursor every time an update is sent. LibVNCServer handles
 all the details. Just set the cursor and don't bother any more.
 
 To set the mouse coordinates (or emulate mouse clicks), call
@@ -323,7 +325,7 @@ If you love products from Redmod, you better skip this paragraph.
 I am always amazed how people react whenever Microsoft(tm) puts in some
 features into their products which were around for a long time. Especially
 reporters seem to not know dick about what they are reporting about! But
-what is everytime annoying again, is that they don't do it right. Every
+what is every time annoying again, is that they don't do it right. Every
 concept has it's new name (remember what enumerators used to be until
 Mickeysoft(tm) claimed that enumerators are what we thought were iterators.
 Yeah right, enumerators are also containers. They are not separated. Muddy.)

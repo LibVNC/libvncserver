@@ -18,6 +18,10 @@
  *  USA.
  */
 
+#ifndef _MSC_VER
+#define _XOPEN_SOURCE 500
+#endif
+
 #include <rfb/rfbclient.h>
 #include <errno.h>
 

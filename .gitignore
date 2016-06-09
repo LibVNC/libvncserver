@@ -61,7 +61,6 @@ examples/vncev
 libtool
 libvncclient/libvncclient.la
 libvncserver/libvncserver.la
-rfb/rfbint.h
 test/blooptest
 test/cargstest
 test/copyrecttest
