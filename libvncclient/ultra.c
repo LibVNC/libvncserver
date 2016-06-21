@@ -98,7 +98,7 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   /* Put the uncompressed contents of the update on the screen. */
   if ( inflateResult == LZO_E_OK ) 
   {
-    CopyRectangle(client, (unsigned char *)client->raw_buffer, rx, ry, rw, rh);
+    client->GotBitmap(client, (unsigned char *)client->raw_buffer, rx, ry, rw, rh);
   }
   else
   {
@@ -199,7 +199,7 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
     if (se == rfbEncodingRaw)
     {
-        CopyRectangle(client, (unsigned char *)ptr, sx, sy, sw, sh);
+        client->GotBitmap(client, (unsigned char *)ptr, sx, sy, sw, sh);
         ptr += ((sw * sh) * (BPP / 8));
     }
   }  

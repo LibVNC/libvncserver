@@ -145,101 +145,6 @@ void* rfbClientGetClientData(rfbClient* client, void* tag)
 	return NULL;
 }
 
-/* messages */
-
-static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_t colour) {
-  int i,j;
-
-  if (client->frameBuffer == NULL) {
-      return;
-  }
-
-#define FILL_RECT(BPP) \
-    for(j=y*client->width;j<(y+h)*client->width;j+=client->width) \
-      for(i=x;i<x+w;i++) \
-	((uint##BPP##_t*)client->frameBuffer)[j+i]=colour;
-
-  switch(client->format.bitsPerPixel) {
-  case  8: FILL_RECT(8);  break;
-  case 16: FILL_RECT(16); break;
-  case 32: FILL_RECT(32); break;
-  default:
-    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
-  }
-}
-
-static void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int h) {
-  int j;
-
-  if (client->frameBuffer == NULL) {
-      return;
-  }
-
-#define COPY_RECT(BPP) \
-  { \
-    int rs = w * BPP / 8, rs2 = client->width * BPP / 8; \
-    for (j = ((x * (BPP / 8)) + (y * rs2)); j < (y + h) * rs2; j += rs2) { \
-      memcpy(client->frameBuffer + j, buffer, rs); \
-      buffer += rs; \
-    } \
-  }
-
-  switch(client->format.bitsPerPixel) {
-  case  8: COPY_RECT(8);  break;
-  case 16: COPY_RECT(16); break;
-  case 32: COPY_RECT(32); break;
-  default:
-    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
-  }
-}
-
-/* TODO: test */
-static void CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y) {
-  int i,j;
-
-  if (client->frameBuffer == NULL) {
-      return;
-  }
-
-#define COPY_RECT_FROM_RECT(BPP) \
-  { \
-    uint##BPP##_t* _buffer=((uint##BPP##_t*)client->frameBuffer)+(src_y-dest_y)*client->width+src_x-dest_x; \
-    if (dest_y < src_y) { \
-      for(j = dest_y*client->width; j < (dest_y+h)*client->width; j += client->width) { \
-        if (dest_x < src_x) { \
-          for(i = dest_x; i < dest_x+w; i++) { \
-            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
-          } \
-        } else { \
-          for(i = dest_x+w-1; i >= dest_x; i--) { \
-            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
-          } \
-        } \
-      } \
-    } else { \
-      for(j = (dest_y+h-1)*client->width; j >= dest_y*client->width; j-=client->width) { \
-        if (dest_x < src_x) { \
-          for(i = dest_x; i < dest_x+w; i++) { \
-            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
-          } \
-        } else { \
-          for(i = dest_x+w-1; i >= dest_x; i--) { \
-            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
-          } \
-        } \
-      } \
-    } \
-  }
-
-  switch(client->format.bitsPerPixel) {
-  case  8: COPY_RECT_FROM_RECT(8);  break;
-  case 16: COPY_RECT_FROM_RECT(16); break;
-  case 32: COPY_RECT_FROM_RECT(32); break;
-  default:
-    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
-  }
-}
-
 static rfbBool HandleRRE8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleRRE16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
@@ -1956,7 +1861,7 @@ HandleRFBServerMessage(rfbClient* client)
 	  if (!ReadFromRFBServer(client, client->buffer,bytesPerLine * linesToRead))
 	    return FALSE;
 
-	  CopyRectangle(client, (uint8_t *)client->buffer,
+	  client->GotBitmap(client, (uint8_t *)client->buffer,
 			   rect.r.x, y, rect.r.w,linesToRead);
 
 	  h -= linesToRead;
@@ -1982,13 +1887,8 @@ HandleRFBServerMessage(rfbClient* client)
 	client->SoftCursorLockArea(client,
 				   cr.srcX, cr.srcY, rect.r.w, rect.r.h);
 
-        if (client->GotCopyRect != NULL) {
-          client->GotCopyRect(client, cr.srcX, cr.srcY, rect.r.w, rect.r.h,
-              rect.r.x, rect.r.y);
-        } else
-		CopyRectangleFromRectangle(client,
-				   cr.srcX, cr.srcY, rect.r.w, rect.r.h,
-				   rect.r.x, rect.r.y);
+        client->GotCopyRect(client, cr.srcX, cr.srcY, rect.r.w, rect.r.h,
+                            rect.r.x, rect.r.y);
 
 	break;
       }
