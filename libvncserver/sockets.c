@@ -155,10 +155,10 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 	return;
     }
 
-    if(rfbScreen->autoPort) {
-        int i;
-        FD_ZERO(&(rfbScreen->allFds));
+    FD_ZERO(&(rfbScreen->allFds));
 
+    if(rfbScreen->autoPort && rfbScreen->port>0) {
+        int i;
         rfbLog("Autoprobing TCP port \n");
         for (i = 5900; i < 6000; i++) {
             if ((rfbScreen->listenSock = rfbListenOnTCPPort(i, iface)) >= 0) {
@@ -175,8 +175,11 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
         rfbLog("Autoprobing selected TCP port %d\n", rfbScreen->port);
         FD_SET(rfbScreen->listenSock, &(rfbScreen->allFds));
         rfbScreen->maxFd = rfbScreen->listenSock;
+    }
 
 #ifdef LIBVNCSERVER_IPv6
+    if(rfbScreen->autoPort && rfbScreen->ipv6port>0) {
+        int i;
         rfbLog("Autoprobing TCP6 port \n");
 	for (i = 5900; i < 6000; i++) {
             if ((rfbScreen->listen6Sock = rfbListenOnTCP6Port(i, rfbScreen->listen6Interface)) >= 0) {
@@ -193,12 +196,11 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
         rfbLog("Autoprobing selected TCP6 port %d\n", rfbScreen->ipv6port);
 	FD_SET(rfbScreen->listen6Sock, &(rfbScreen->allFds));
 	rfbScreen->maxFd = rfbMax((int)rfbScreen->listen6Sock,rfbScreen->maxFd);
-#endif
     }
-    else
-    {
+#endif
+
+    if(!rfbScreen->autoPort) {
 	    if(rfbScreen->port>0) {
-      FD_ZERO(&(rfbScreen->allFds));
 
       if ((rfbScreen->listenSock = rfbListenOnTCPPort(rfbScreen->port, iface)) < 0) {
 	rfbLogPerror("ListenOnTCPPort");
