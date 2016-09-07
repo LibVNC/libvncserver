@@ -36,6 +36,7 @@ find_package(GnuTLS)
 find_package(Threads)
 find_package(X11)
 find_package(OpenSSL)
+find_package(PkgConfig)
 find_library(LIBGCRYPT_LIBRARIES gcrypt)
 
 # Check whether the version of libjpeg we found was libjpeg-turbo and print a
@@ -101,6 +102,17 @@ if(PNG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBPNG 1)
 endif(PNG_FOUND)
 option(LIBVNCSERVER_ALLOW24BPP "Allow 24 bpp" ON)
+
+pkg_check_modules(SYSTEMD "libsystemd")
+if(SYSTEMD_FOUND)
+  option(LIBVNCSERVER_WITH_SYSTEMD "Build with systemd socket activation support" ON)
+endif(SYSTEMD_FOUND)
+
+if(LIBVNCSERVER_WITH_SYSTEMD)
+  add_definitions(-DLIBVNCSERVER_WITH_SYSTEMD)
+  include_directories(${SYSTEMD_INCLUDE_DIRS})
+  set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${SYSTEMD_LIBRARIES})
+endif(LIBVNCSERVER_WITH_SYSTEMD)
 
 if(GNUTLS_FOUND)
   set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
