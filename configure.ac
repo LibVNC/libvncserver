@@ -68,6 +68,9 @@ if test ! -z "$with_ffmpeg"; then
 fi
 AM_CONDITIONAL(HAVE_MP3LAME, test "$HAVE_MP3LAME" = "true")
 
+PKG_CHECK_MODULES([LIBSYSTEMD], [libsystemd], [with_systemd=1], [with_systemd=0])
+AM_CONDITIONAL([WITH_SYSTEMD], [test $with_systemd -eq 1])
+
 # Seem to need this dummy here to induce the 'checking for egrep... grep -E', etc.
 # before it seemed to be inside the with_jpeg conditional. 
 AC_CHECK_HEADER(thenonexistentheader.h, HAVE_THENONEXISTENTHEADER_H="true")

@@ -59,6 +59,12 @@ LIB_SRCS = main.c rfbserver.c rfbregion.c auth.c sockets.c $(WEBSOCKETSSRCS) \
 libvncserver_la_SOURCES=$(LIB_SRCS)
 libvncserver_la_LIBADD=$(WEBSOCKETSSSLLIBS)
 
+if WITH_SYSTEMD
+AM_CPPFLAGS += -DLIBVNCSERVER_WITH_SYSTEMD
+libvncserver_la_CFLAGS = $(LIBSYSTEMD_CFLAGS)
+libvncserver_la_LIBADD += $(LIBSYSTEMD_LIBS)
+endif
+
 lib_LTLIBRARIES=libvncserver.la
 libvncserver_la_LDFLAGS = -version-info 1:0:0
 
