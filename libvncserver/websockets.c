@@ -153,6 +153,11 @@ Sec-WebSocket-Accept: %s\r\n\
 Sec-WebSocket-Protocol: %s\r\n\
 \r\n"
 
+#define SERVER_HANDSHAKE_HYBI_NO_PROTOCOL "HTTP/1.1 101 Switching Protocols\r\n\
+Upgrade: websocket\r\n\
+Connection: Upgrade\r\n\
+Sec-WebSocket-Accept: %s\r\n\
+\r\n"
 
 #define WEBSOCKETS_CLIENT_CONNECT_WAIT_MS 100
 #define WEBSOCKETS_CLIENT_SEND_WAIT_MS 100
@@ -390,8 +395,12 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
 	char accept[B64LEN(SHA1_HASH_SIZE) + 1];
 	rfbLog("  - WebSockets client version hybi-%02d\n", sec_ws_version);
 	webSocketsGenSha1Key(accept, sizeof(accept), sec_ws_key);
-	len = snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
-		 SERVER_HANDSHAKE_HYBI, accept, protocol);
+        if(strlen(protocol) > 0)
+            len = snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
+	                   SERVER_HANDSHAKE_HYBI, accept, protocol);
+        else
+            len = snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
+                           SERVER_HANDSHAKE_HYBI_NO_PROTOCOL, accept);
     } else {
 	/* older hixie handshake, this could be removed if
 	 * a final standard is established */
