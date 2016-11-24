@@ -147,7 +147,7 @@ void* rfbClientGetClientData(rfbClient* client, void* tag)
 
 /* messages */
 
-static boolean CheckRect(rfbClient* client, int x, int y, int w, int h) {
+static rfbBool CheckRect(rfbClient* client, int x, int y, int w, int h) {
   return x + w <= client->width && y + h <= client->height;
 }
 
