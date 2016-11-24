@@ -549,12 +549,6 @@ AM_CONDITIONAL(LINUX, test -d /usr/include/linux)
 # Check for OS X specific header
 AC_CHECK_HEADER(ApplicationServices/ApplicationServices.h, HAVE_OSX="true")
 AM_CONDITIONAL(OSX, test "$HAVE_OSX" = "true")
-if test "$HAVE_OSX" = "true"; then
-	# this is for finding OpenSSL
-	EXTRA_CFLAGS="-I/opt/local/include"
-	EXTRA_LDFLAGS="-L/opt/local/lib"
-fi
-
 
 # Check for Android specific header
 AC_CHECK_HEADER(android/api-level.h, HAVE_ANDROID="true")
