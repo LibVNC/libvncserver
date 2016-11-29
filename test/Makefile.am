@@ -1,7 +1,8 @@
+check_PROGRAMS =
 
 if HAVE_LIBJPEG
 # TurboJPEG wrapper tests
-noinst_PROGRAMS=tjunittest tjbench
+check_PROGRAMS += tjunittest tjbench
 tjunittest_SOURCES=tjunittest.c ../common/turbojpeg.c ../common/turbojpeg.h \
 	tjutil.c tjutil.h
 tjbench_SOURCES=tjbench.c ../common/turbojpeg.c ../common/turbojpeg.h \
@@ -19,7 +20,7 @@ endif
 
 copyrecttest_LDADD=$(LDADD) -lm
 
-check_PROGRAMS=$(ENCODINGS_TEST) cargstest copyrecttest $(BACKGROUND_TEST) \
+check_PROGRAMS += $(ENCODINGS_TEST) cargstest copyrecttest $(BACKGROUND_TEST) \
 	cursortest
 
 test: encodingstest$(EXEEXT) cargstest$(EXEEXT) copyrecttest$(EXEEXT)
