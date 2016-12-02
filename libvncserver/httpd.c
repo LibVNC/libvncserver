@@ -463,7 +463,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	contentType = "Content-Type: image/svg+xml\r\n";
     rfbWriteExact(&cl, contentType, strlen(contentType));
     /* end the header */
-    rfbWriteExact(&cl, "\r\n", 4);
+    rfbWriteExact(&cl, "\r\n", 2);
 
     while (1) {
 	int n = fread(buf, 1, BUF_SIZE-1, fd);
