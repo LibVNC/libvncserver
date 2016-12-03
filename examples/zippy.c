@@ -7,7 +7,7 @@
 static int maxx=400, maxy=400, bpp=4;
 /* odd maxx doesn't work (vncviewer bug) */
 
-/* Here we create a structure so that every client has it's own pointer */
+/* Here we create a structure so that every client has its own pointer */
 
 /* turns the framebuffer black */
 void blank_framebuffer(char* frame_buffer, int x1, int y1, int x2, int y2);

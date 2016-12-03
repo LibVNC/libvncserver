@@ -118,7 +118,7 @@ drawn the cursor every time an update is sent. LibVNCServer handles
 all the details. Just set the cursor and don't bother any more.
 
 To set the mouse coordinates (or emulate mouse clicks), call
-  defaultPtrAddEvent(buttonMask,x,y,cl);
+  rfbDefaultPtrAddEvent(buttonMask,x,y,cl);
 IMPORTANT: do this at the end of your function, because this actually draws
 the cursor if no cursor encoding is active.
 
@@ -184,7 +184,7 @@ kbdReleaseAllKeys(rfbClientPtr cl)
 ptrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl)
   is called when the mouse moves or a button is pressed.
   WARNING: if you want to have proper cursor handling, call
-	defaultPtrAddEvent(buttonMask,x,y,cl)
+	rfbDefaultPtrAddEvent(buttonMask,x,y,cl)
   in your own function. This sets the coordinates of the cursor.
 setXCutText(char* str,int len,rfbClientPtr cl)
   is called when the selection changes.
@@ -248,7 +248,7 @@ the original code from ORL/AT&T.
 
 When I began hacking with computers, my first interest was speed. So, when I
 got around assembler, I programmed the floppy to do much of the work, because
-it's clock rate was higher than that of my C64. This was my first experience
+its clock rate was higher than that of my C64. This was my first experience
 with client/server techniques.
 
 When I came around Xwindows (much later), I was at once intrigued by the
@@ -259,7 +259,7 @@ modem from home, it was no longer that much fun.
 When I started working with ASP (Application Service Provider) programs, I
 tumbled across Tarantella and Citrix. Being a security fanatic, the idea of
 running a server on windows didn't appeal to me, so Citrix went down the
-basket. However, Tarantella has it's own problems (security as well as the
+basket. However, Tarantella has its own problems (security as well as the
 high price). But at the same time somebody told me about this "great little
 administrator's tool" named VNC. Being used to windows programs' sizes, the
 surprise was reciprocal inverse to the size of VNC!
@@ -326,7 +326,7 @@ I am always amazed how people react whenever Microsoft(tm) puts in some
 features into their products which were around for a long time. Especially
 reporters seem to not know dick about what they are reporting about! But
 what is every time annoying again, is that they don't do it right. Every
-concept has it's new name (remember what enumerators used to be until
+concept has its new name (remember what enumerators used to be until
 Mickeysoft(tm) claimed that enumerators are what we thought were iterators.
 Yeah right, enumerators are also containers. They are not separated. Muddy.)
 
@@ -393,7 +393,7 @@ The people at AT&T worked really well to produce something as clean and lean
 as VNC. The managers decided that for their fame, they would release the
 program for free. But not only that! They realized that by releasing also
 the code for free, VNC would become an evolving little child, conquering
-new worlds, making it's parents very proud. As well they can be! To protect
+new worlds, making its parents very proud. As well they can be! To protect
 this innovation, they decided to make it GPL, not BSD. The principal
 difference is: You can make closed source programs deriving from BSD, not
 from GPL. You have to give proper credit with both.

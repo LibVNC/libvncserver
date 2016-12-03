@@ -56,7 +56,7 @@ static void initBuffer(unsigned char* buffer)
   }
 }
 
-/* Here we create a structure so that every client has it's own pointer */
+/* Here we create a structure so that every client has its own pointer */
 
 typedef struct ClientData {
   rfbBool oldButton;

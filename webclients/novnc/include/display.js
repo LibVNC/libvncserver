@@ -76,7 +76,7 @@ var Display;
         }
 
         if (this._prefer_js === null) {
-            Util.Info("Prefering javascript operations");
+            Util.Info("Preferring javascript operations");
             this._prefer_js = true;
         }
 
