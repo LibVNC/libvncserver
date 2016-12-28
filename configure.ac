@@ -1,5 +1,5 @@
 # Process this file with autoconf to produce a configure script.
-AC_INIT(LibVNCServer, 0.9.10, https://github.com/LibVNC/libvncserver)
+AC_INIT(LibVNCServer, 0.9.11, https://github.com/LibVNC/libvncserver)
 AM_INIT_AUTOMAKE([subdir-objects])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 AM_CONFIG_HEADER(rfbconfig.h)
@@ -10,7 +10,7 @@ AC_CONFIG_MACRO_DIR([m4])
 # set detailed version info
 AC_DEFINE(VERSION_MAJOR, 0, LibVNCServer major version)
 AC_DEFINE(VERSION_MINOR, 9, LibVNCServer minor version)
-AC_DEFINE(VERSION_PATCHLEVEL, 10, LibVNCServer patchlevel)
+AC_DEFINE(VERSION_PATCHLEVEL, 11, LibVNCServer patchlevel)
 
 # Checks for programs.
 AC_PROG_CC
