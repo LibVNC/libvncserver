@@ -1,11 +1,27 @@
 0.9.11
+   - Overall changes:
+     * LibVNCServer/LibVNCClient development now uses continous intregration,
+       provided by TravisCI.
+
    - LibVNCClient:
      * Now initializes libgcrypt before use if the application did not do it.
        Fixes a crash when connection to Mac hosts
        (https://github.com/LibVNC/libvncserver/issues/45).
+     * Various fixes that result in more stable handling of malicious or broken
+       servers.
+     * Removed broken and unmaintained H264 decoding.
+     * Some documentation fixes.
+     * Added hooks to WriteToTLS() for optional protection by mutex.
 
    - LibVNCServer:
      * Stability fixes for the WebSocket implementation.
+     * Replaced SHA1 implementation with the one from RFC 6234.
+     * The built-in HTTP server does not allow directory traversals anymore.
+     * The built-in HTTP now sends correct MIME types for CSS and SVG.
+     * Added support for systemd socket activation.
+     * Made it possible to get autoPort behavior with either ipv4 or ipv6
+       disabled.
+     * Fixed starting of an onHold-client in threaded mode.
 
 0.9.10
    - Overall changes:
