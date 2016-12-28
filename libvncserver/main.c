@@ -612,21 +612,18 @@ listenerRun(void *data)
     return(NULL);
 }
 
-void 
-rfbStartOnHoldClient(rfbClientPtr cl)
-{
-    pthread_create(&cl->client_thread, NULL, clientInput, (void *)cl);
-}
-
-#else
-
-void 
-rfbStartOnHoldClient(rfbClientPtr cl)
-{
-	cl->onHold = FALSE;
-}
-
 #endif
+
+void 
+rfbStartOnHoldClient(rfbClientPtr cl)
+{
+    cl->onHold = FALSE;
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+    if(cl->screen->backgroundLoop)
+	pthread_create(&cl->client_thread, NULL, clientInput, (void *)cl);
+#endif
+}
+
 
 void 
 rfbRefuseOnHoldClient(rfbClientPtr cl)
