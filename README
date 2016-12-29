@@ -334,11 +334,13 @@ There are three packages you want to get hold of: zlib, jpeg and pthreads.
 The latter is not strictly necessary, but when you put something like this
 into your source:
 
+```
 #define MUTEX(s)
 	struct {
 		int something;
 		MUTEX(latex);
 	}
+```
 
 Microsoft's C++ compiler doesn't do it. It complains that this is an error.
 This, however, is how I implemented mutexes in case you don't need pthreads,
