@@ -194,7 +194,7 @@ static void webSocketsGenSha1Key(char *target, int size, char *key)
     iov[1].iov_base = GUID;
     iov[1].iov_len = sizeof(GUID) - 1;
     digestsha1(iov, 2, hash);
-    if (-1 == __b64_ntop(hash, sizeof(hash), target, size))
+    if (-1 == b64_ntop(hash, sizeof(hash), target, size))
 	rfbErr("b64_ntop failed\n");
 }
 
@@ -501,7 +501,7 @@ webSocketsEncodeHixie(rfbClientPtr cl, const char *src, int len, char **dst)
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
 
     wsctx->codeBufEncode[sz++] = '\x00';
-    len = __b64_ntop((unsigned char *)src, len, wsctx->codeBufEncode+sz, sizeof(wsctx->codeBufEncode) - (sz + 1));
+    len = b64_ntop((unsigned char *)src, len, wsctx->codeBufEncode+sz, sizeof(wsctx->codeBufEncode) - (sz + 1));
     if (len < 0) {
         return len;
     }
@@ -612,7 +612,7 @@ webSocketsDecodeHixie(rfbClientPtr cl, char *dst, int len)
     /* Decode the rest of what we need */
     buf[needlen] = '\x00';  /* Replace end marker with end of string */
     /* rfbLog("buf: %s\n", buf); */
-    n = __b64_pton(buf, (unsigned char *)dst+retlen, 2+len);
+    n = b64_pton(buf, (unsigned char *)dst+retlen, 2+len);
     if (n < len) {
         rfbErr("Base64 decode error\n");
         errno = EIO;
@@ -752,7 +752,7 @@ webSocketsDecodeHybi(rfbClientPtr cl, char *dst, int len)
 	errno = ECONNRESET;
 	break;
       case WS_OPCODE_TEXT_FRAME:
-	if (-1 == (flength = __b64_pton(payload, (unsigned char *)wsctx->codeBufDecode, sizeof(wsctx->codeBufDecode)))) {
+	if (-1 == (flength = b64_pton(payload, (unsigned char *)wsctx->codeBufDecode, sizeof(wsctx->codeBufDecode)))) {
 	  rfbErr("%s: Base64 decode error; %m\n", __func__);
 	  break;
 	}
@@ -826,7 +826,7 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
     }
 
     if (wsctx->base64) {
-        if (-1 == (ret = __b64_ntop((unsigned char *)src, len, wsctx->codeBufEncode + sz, sizeof(wsctx->codeBufEncode) - sz))) {
+        if (-1 == (ret = b64_ntop((unsigned char *)src, len, wsctx->codeBufEncode + sz, sizeof(wsctx->codeBufEncode) - sz))) {
 	  rfbErr("%s: Base 64 encode failed\n", __func__);
 	} else {
 	  if (ret != blen)
