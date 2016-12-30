@@ -87,6 +87,12 @@ if(NOT HAVE_B64_IN_LIBC)
     if(HAVE_B64_IN_LIBRESOLV)
         set(RESOLV_LIB "resolv")
     endif(HAVE_B64_IN_LIBRESOLV)
+
+    # the function check somehow fails for apple but the function is there
+    if(APPLE)
+        set(RESOLV_LIB "resolv")
+    endif(APPLE)
+
 endif(NOT HAVE_B64_IN_LIBC)
 
 if(Threads_FOUND)
