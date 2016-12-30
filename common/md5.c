@@ -27,12 +27,11 @@
 # include <string.h>
 
 #include "md5.h"
+#include "rfb/rfbconfig.h"
 
-/* #ifdef _LIBC */
-# include <endian.h>
-# if __BYTE_ORDER == __BIG_ENDIAN
+#ifdef LIBVNCSERVER_WORDS_BIGENDIAN
 #  define WORDS_BIGENDIAN 1
-# endif
+#endif
 /* We need to keep the namespace clean so define the MD5 function
    protected using leading __ .  */
 # define md5_init_ctx __md5_init_ctx
