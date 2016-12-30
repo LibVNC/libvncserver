@@ -54,11 +54,24 @@
 #include "rfbssl.h"
 #include "rfbcrypto.h"
 
+#if defined(__APPLE__)
+
+#include <libkern/OSByteOrder.h>
+#define WS_NTOH64(n) OSSwapBigToHostInt64(n)
+#define WS_NTOH32(n) OSSwapBigToHostInt32(n)
+#define WS_NTOH16(n) OSSwapBigToHostInt16(n)
+#define WS_HTON64(n) OSSwapHostToBigInt64(n)
+#define WS_HTON16(n) OSSwapHostToBigInt16(n)
+
+#else
+
 #define WS_NTOH64(n) htobe64(n)
 #define WS_NTOH32(n) htobe32(n)
 #define WS_NTOH16(n) htobe16(n)
 #define WS_HTON64(n) htobe64(n)
 #define WS_HTON16(n) htobe16(n)
+
+#endif
 
 #define B64LEN(__x) (((__x + 2) / 3) * 12 / 3)
 #define WSHLENMAX 14  /* 2 + sizeof(uint64_t) + sizeof(uint32_t) */
