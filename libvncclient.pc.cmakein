@@ -1,14 +1,14 @@
-prefix=@prefix@
-exec_prefix=@exec_prefix@
-libdir=@libdir@
-includedir=@includedir@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=@CMAKE_INSTALL_PREFIX@
+libdir=@CMAKE_INSTALL_PREFIX@/lib
+includedir=@CMAKE_INSTALL_PREFIX@/include
 
 Name: LibVNCClient
 Description: A library for easy implementation of a VNC client.
-Version: @VERSION@
+Version: @PACKAGE_VERSION@
 Requires:
 Requires.private: zlib
 Libs: -L${libdir} -lvncclient
-Libs.private: @LIBS@ @WSOCKLIB@
+Libs.private: @PRIVATE_LIBS@
 Cflags: -I${includedir}
 

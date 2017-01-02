@@ -97,6 +97,7 @@ endif(NOT HAVE_B64_IN_LIBC)
 
 if(Threads_FOUND)
   option(TIGHTVNC_FILETRANSFER "Enable filetransfer" ON)
+  set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 endif(Threads_FOUND)
 if(ZLIB_FOUND)
   set(LIBVNCSERVER_HAVE_LIBZ 1)
@@ -399,6 +400,28 @@ foreach(test ${LIBVNCCLIENT_TESTS})
   target_link_libraries(client_examples_${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${X11_LIBRARIES} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
 endforeach(test ${LIBVNCCLIENT_TESTS})
 
+# this gets the libraries needed by TARGET in "-libx -liby ..." form
+function(get_link_libraries OUT TARGET)
+    set(RESULT "")
+    get_target_property(LIBRARIES ${TARGET} INTERFACE_LINK_LIBRARIES)
+    foreach(LIB ${LIBRARIES})
+	string(REGEX REPLACE "^.*/lib" "" LIB ${LIB}) # remove leading path and "lib" name prefix
+	string(REGEX REPLACE "-l" "" LIB ${LIB}) # remove leading -l
+	string(REGEX REPLACE "\\.so$" "" LIB ${LIB}) # remove trailing .so
+	list(APPEND RESULT "-l${LIB}")
+    endforeach()
+    list(REMOVE_DUPLICATES RESULT)
+    string(CONCAT RESULT ${RESULT}) # back to string
+    string(REPLACE "-l" " -l" RESULT ${RESULT}) # re-add separators
+    set(${OUT} ${RESULT} PARENT_SCOPE)
+endfunction()
+
+get_link_libraries(PRIVATE_LIBS vncserver)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
+get_link_libraries(PRIVATE_LIBS vncclient)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
+
+
 install_targets(/lib vncserver)
 install_targets(/lib vncclient)
 install_files(/include/rfb FILES
@@ -408,4 +431,9 @@ install_files(/include/rfb FILES
     rfb/rfbconfig.h
     rfb/rfbproto.h
     rfb/rfbregion.h
+)
+
+install_files(/lib/pkgconfig FILES
+    libvncserver.pc
+    libvncclient.pc
 )
