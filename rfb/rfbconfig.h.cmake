@@ -51,6 +51,9 @@
 /* Define to 1 if you have <sys/wait.h> that is POSIX.1 compatible. */
 #cmakedefine LIBVNCSERVER_HAVE_SYS_WAIT_H  1 
 
+/* Define to 1 if you have <sys/uio.h> */
+#cmakedefine LIBVNCSERVER_HAVE_SYS_UIO_H  1 
+
 /* Define to 1 if you have the <unistd.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_UNISTD_H  1 
 
