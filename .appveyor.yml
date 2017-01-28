@@ -1,0 +1,33 @@
+
+os:
+  - Visual Studio 2013
+  - Visual Studio 2015
+
+install:
+  - mkdir deps
+  - cd deps
+  # Zlib
+  - appveyor DownloadFile https://github.com/madler/zlib/archive/v1.2.8.tar.gz
+  - 7z x v1.2.8.tar.gz -so | 7z x -si -ttar > nul
+  - move zlib-1.2.8 zlib
+  - cd zlib
+  - cmake .
+  - cmake --build .
+  - cd ..
+  # libPNG
+  - appveyor DownloadFile ftp://ftp.simplesystems.org/pub/libpng/png/src/libpng16/libpng-1.6.26.tar.gz
+  - 7z x libpng-1.6.26.tar.gz -so | 7z x -si -ttar > nul
+  - move libpng-1.6.26 libpng
+  - cd libpng
+  - cmake .
+  - cmake --build .
+  - cd ..
+  # go back to source root
+  - cd ..
+
+
+build_script:
+  - mkdir build
+  - cd build 
+  - cmake .. -DZLIB_INCLUDE_DIR=..\deps\zlib -DZLIB_LIBRARY=..\deps\zlib\release\zlibstatic.lib -DPNG_INCLUDE_DIR=..\deps\libpng -DPNG_LIBRARIES=..\deps\libpng\libpng.lib
+  - cmake --build .
