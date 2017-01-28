@@ -88,7 +88,11 @@ struct md5_ctx
 
   md5_uint32 total[2];
   md5_uint32 buflen;
-  char buffer[128] __attribute__ ((__aligned__ (__alignof__ (md5_uint32))));
+  char buffer[128]
+#if __GNUC__
+   __attribute__ ((__aligned__ (__alignof__ (md5_uint32))))
+#endif
+  ;
 };
 
 /*

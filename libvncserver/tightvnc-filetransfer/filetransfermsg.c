@@ -56,7 +56,9 @@
 #endif
 
 #include <errno.h>
+#if LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <sys/stat.h>
 #include <sys/types.h>
 

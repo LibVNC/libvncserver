@@ -37,6 +37,7 @@
 #include <rfb/rfb.h>
 #include <rfb/rfbregion.h>
 #include "private.h"
+#include "rfb/rfbconfig.h"
 
 #ifdef LIBVNCSERVER_HAVE_FCNTL_H
 #include <fcntl.h>
@@ -74,7 +75,9 @@
 /* stst() */
 #include <sys/types.h>
 #include <sys/stat.h>
+#if LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 
 #ifndef WIN32
 /* readdir() */

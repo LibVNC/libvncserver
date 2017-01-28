@@ -49,7 +49,9 @@
 #endif
 
 #include <string.h>
+#if LIBVNCSERVER_UNISTD_H
 #include <unistd.h>
+#endif
 #include "rfb/rfbconfig.h"
 #include "rfbssl.h"
 #include "rfbcrypto.h"
@@ -116,15 +118,27 @@ typedef union ws_mask_s {
  *      it from recognizing anonymous structs and unions.
  *      See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=4784
  */
-typedef struct __attribute__ ((__packed__)) ws_header_s {
+typedef struct 
+#if __GNUC__
+__attribute__ ((__packed__)) 
+#endif
+ws_header_s {
   unsigned char b0;
   unsigned char b1;
   union {
-    struct __attribute__ ((__packed__)) {
+    struct 
+#if __GNUC__
+    __attribute__ ((__packed__)) 
+#endif
+           {
       uint16_t l16;
       ws_mask_t m16;
     } s16;
-    struct __attribute__ ((__packed__)) {
+    struct
+#if __GNUC__
+__attribute__ ((__packed__)) 
+#endif
+           {
       uint64_t l64;
       ws_mask_t m64;
     } s64;
