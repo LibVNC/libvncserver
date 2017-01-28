@@ -1,6 +1,8 @@
 #ifndef _RFB_CRYPTO_H
 #define _RFB_CRYPTO_H 1
 
+#include "rfb/rfbconfig.h"
+
 #ifdef LIBVNCSERVER_HAVE_UIO_H
 #include <sys/uio.h>
 
