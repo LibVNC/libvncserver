@@ -3,7 +3,7 @@
 
 #include "rfb/rfbconfig.h"
 
-#ifdef LIBVNCSERVER_HAVE_UIO_H
+#ifdef LIBVNCSERVER_HAVE_SYS_UIO_H
 #include <sys/uio.h>
 
 #define SHA1_HASH_SIZE 20
