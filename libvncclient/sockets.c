@@ -30,7 +30,9 @@
 # define _POSIX_SOURCE
 #endif
 #endif
+#if LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <assert.h>

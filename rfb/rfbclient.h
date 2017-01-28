@@ -38,8 +38,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
+#if LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
 
