@@ -465,6 +465,9 @@ function(get_link_libraries OUT TARGET)
     set(RESULT "")
     get_target_property(LIBRARIES ${TARGET} INTERFACE_LINK_LIBRARIES)
     foreach(LIB ${LIBRARIES})
+	if("${LIB}" MATCHES ".*NOTFOUND.*")
+	    continue()
+	endif()
 	string(REGEX REPLACE "^.*/lib" "" LIB ${LIB}) # remove leading path and "lib" name prefix
 	string(REGEX REPLACE "-l" "" LIB ${LIB}) # remove leading -l
 	string(REGEX REPLACE "\\.so$" "" LIB ${LIB}) # remove trailing .so
