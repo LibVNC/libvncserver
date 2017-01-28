@@ -123,6 +123,31 @@ if(WITH_GCRYPT)
 endif(WITH_GCRYPT)
 
 
+check_include_file("endian.h"      LIBVNCSERVER_HAVE_ENDIAN_H)
+check_include_file("fcntl.h"       LIBVNCSERVER_HAVE_FCNTL_H)
+check_include_file("netinet/in.h"  LIBVNCSERVER_HAVE_NETINET_IN_H)
+check_include_file("sys/endian.h"  LIBVNCSERVER_HAVE_SYS_ENDIAN_H)
+check_include_file("sys/socket.h"  LIBVNCSERVER_HAVE_SYS_SOCKET_H)
+check_include_file("sys/stat.h"    LIBVNCSERVER_HAVE_SYS_STAT_H)
+check_include_file("sys/time.h"    LIBVNCSERVER_HAVE_SYS_TIME_H)
+check_include_file("sys/types.h"   LIBVNCSERVER_HAVE_SYS_TYPES_H)
+check_include_file("sys/wait.h"    LIBVNCSERVER_HAVE_SYS_WAIT_H)
+check_include_file("unistd.h"      LIBVNCSERVER_HAVE_UNISTD_H)
+check_include_file("sys/uio.h"     LIBVNCSERVER_HAVE_SYS_UIO_H)
+
+
+# headers needed for check_type_size()
+check_include_file("vfork.h"       LIBVNCSERVER_HAVE_VFORK_H)
+check_include_file("ws2tcpip.h"    LIBVNCSERVER_HAVE_WS2TCPIP_H)
+check_include_file("arpa/inet.h"   HAVE_ARPA_INET_H)
+check_include_file("stdint.h"      HAVE_STDINT_H)
+check_include_file("stddef.h"      HAVE_STDDEF_H)
+check_include_file("sys/types.h"   HAVE_SYS_TYPES_H)
+
+check_function_exists(gettimeofday    LIBVNCSERVER_HAVE_GETTIMEOFDAY)
+check_function_exists(vfork           LIBVNCSERVER_HAVE_VFORK)
+check_function_exists(vprintf         LIBVNCSERVER_HAVE_VPRINTF)
+
 
 # On systems such as GNU/Linux with glibc, __b64_ntop is defined in a
 # separate library, libresolv. On some others, such as FreeBSD, it is
@@ -170,7 +195,7 @@ if(SYSTEMD_FOUND)
 endif(SYSTEMD_FOUND)
 
 
-if(WITH_WEBSOCKETS)
+if(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_SYS_UIO_H)
   set(LIBVNCSERVER_WITH_WEBSOCKETS 1)
   if(GNUTLS_FOUND)
     set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
@@ -188,39 +213,13 @@ if(WITH_WEBSOCKETS)
     set(WEBSOCKET_LIBRARIES ${RESOLV_LIB})
     set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_none.c ${LIBVNCSERVER_DIR}/rfbcrypto_included.c ${COMMON_DIR}/md5.c ${COMMON_DIR}/sha1.c)
   endif()
-endif(WITH_WEBSOCKETS)
+endif(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_SYS_UIO_H)
 
 if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
   message(STATUS "Found libgcrypt: ${LIBGCRYPT_LIBRARIES}")
   set(LIBVNCSERVER_WITH_CLIENT_GCRYPT 1)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${LIBGCRYPT_LIBRARIES})
 endif(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
-
-
-check_include_file("endian.h"      LIBVNCSERVER_HAVE_ENDIAN_H)
-check_include_file("fcntl.h"       LIBVNCSERVER_HAVE_FCNTL_H)
-check_include_file("netinet/in.h"  LIBVNCSERVER_HAVE_NETINET_IN_H)
-check_include_file("sys/endian.h"  LIBVNCSERVER_HAVE_SYS_ENDIAN_H)
-check_include_file("sys/socket.h"  LIBVNCSERVER_HAVE_SYS_SOCKET_H)
-check_include_file("sys/stat.h"    LIBVNCSERVER_HAVE_SYS_STAT_H)
-check_include_file("sys/time.h"    LIBVNCSERVER_HAVE_SYS_TIME_H)
-check_include_file("sys/types.h"   LIBVNCSERVER_HAVE_SYS_TYPES_H)
-check_include_file("sys/wait.h"    LIBVNCSERVER_HAVE_SYS_WAIT_H)
-check_include_file("unistd.h"      LIBVNCSERVER_HAVE_UNISTD_H)
-check_include_file("sys/uio.h"     LIBVNCSERVER_HAVE_SYS_UIO_H)
-
-
-# headers needed for check_type_size()
-check_include_file("vfork.h"       LIBVNCSERVER_HAVE_VFORK_H)
-check_include_file("ws2tcpip.h"    LIBVNCSERVER_HAVE_WS2TCPIP_H)
-check_include_file("arpa/inet.h"   HAVE_ARPA_INET_H)
-check_include_file("stdint.h"      HAVE_STDINT_H)
-check_include_file("stddef.h"      HAVE_STDDEF_H)
-check_include_file("sys/types.h"   HAVE_SYS_TYPES_H)
-
-check_function_exists(gettimeofday    LIBVNCSERVER_HAVE_GETTIMEOFDAY)
-check_function_exists(vfork           LIBVNCSERVER_HAVE_VFORK)
-check_function_exists(vprintf         LIBVNCSERVER_HAVE_VPRINTF)
 
 
 if(WITH_IPv6)
