@@ -37,7 +37,7 @@ option(WITH_GNUTLS "Search for the GnuTLS secure communications library to suppo
 option(WITH_OPENSSL "Search for the OpenSSL cryptography library to support encryption" ON)
 option(WITH_SYSTEMD "Search for libsystemd to build with systemd socket activation support" ON)
 option(WITH_GCRYPT "Search for libgcrypt to support additional authentication methods in LibVNCClient" ON)
-option(WITH_TIGHTVNC_FILETRANSFER "Enable filetransfer if there is multithreading support" ON)
+option(WITH_TIGHTVNC_FILETRANSFER "Enable filetransfer if there is pthreads support" ON)
 option(WITH_24BPP "Allow 24 bpp" ON)
 option(WITH_IPv6 "Enable IPv6 Support" ON)
 option(WITH_WEBSOCKETS "Build with websockets support" ON)
@@ -207,6 +207,8 @@ check_include_file("sys/time.h"    LIBVNCSERVER_HAVE_SYS_TIME_H)
 check_include_file("sys/types.h"   LIBVNCSERVER_HAVE_SYS_TYPES_H)
 check_include_file("sys/wait.h"    LIBVNCSERVER_HAVE_SYS_WAIT_H)
 check_include_file("unistd.h"      LIBVNCSERVER_HAVE_UNISTD_H)
+check_include_file("sys/uio.h"     LIBVNCSERVER_HAVE_SYS_UIO_H)
+
 
 # headers needed for check_type_size()
 check_include_file("vfork.h"       LIBVNCSERVER_HAVE_VFORK_H)
@@ -344,7 +346,7 @@ set(LIBVNCSERVER_SOURCES
     ${TIGHT_C}
 )
 
-if(WITH_TIGHTVNC_FILETRANSFER AND Threads_FOUND)
+if(WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
   set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_SOURCES}
     ${LIBVNCSERVER_DIR}/tightvnc-filetransfer/rfbtightserver.c
@@ -352,7 +354,7 @@ if(WITH_TIGHTVNC_FILETRANSFER AND Threads_FOUND)
     ${LIBVNCSERVER_DIR}/tightvnc-filetransfer/filetransfermsg.c
     ${LIBVNCSERVER_DIR}/tightvnc-filetransfer/filelistinfo.c
   )
-endif(WITH_TIGHTVNC_FILETRANSFER AND Threads_FOUND)
+endif(WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
 
 if(LIBVNCSERVER_WITH_WEBSOCKETS)
   add_definitions(-DLIBVNCSERVER_WITH_WEBSOCKETS)
@@ -413,12 +415,12 @@ if(Threads_FOUND)
   )
 endif(Threads_FOUND)
 
-if(WITH_TIGHTVNC_FILETRANSFER AND Threads_FOUND)
+if(WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
   set(LIBVNCSERVER_TESTS
     ${LIBVNCSERVER_TESTS}
     filetransfer
   )
-endif(WITH_TIGHTVNC_FILETRANSFER AND Threads_FOUND)
+endif(WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
 
 if(MACOS)
   set(LIBVNCSERVER_TESTS
