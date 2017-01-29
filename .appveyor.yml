@@ -6,18 +6,18 @@ os:
 install:
   - mkdir deps
   - cd deps
-  # Zlib
-  - appveyor DownloadFile https://github.com/madler/zlib/archive/v1.2.8.tar.gz
-  - 7z x v1.2.8.tar.gz -so | 7z x -si -ttar > nul
+  # zlib
+  - curl -fsSL -o zlib.tar.gz https://github.com/madler/zlib/archive/v1.2.8.tar.gz
+  - 7z x zlib.tar.gz -so | 7z x -si -ttar > nul
   - move zlib-1.2.8 zlib
   - cd zlib
   - cmake .
   - cmake --build .
   - cd ..
   # libPNG
-  - appveyor DownloadFile ftp://ftp.simplesystems.org/pub/libpng/png/src/libpng16/libpng-1.6.26.tar.gz
-  - 7z x libpng-1.6.26.tar.gz -so | 7z x -si -ttar > nul
-  - move libpng-1.6.26 libpng
+  - curl -fsSL -o libpng.tar.gz ftp://ftp.simplesystems.org/pub/libpng/png/src/libpng16/libpng-1.6.28.tar.gz
+  - 7z x libpng.tar.gz -so | 7z x -si -ttar > nul
+  - move libpng-1.6.28 libpng
   - cd libpng
   - cmake .
   - cmake --build .
