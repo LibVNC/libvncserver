@@ -19,7 +19,7 @@ install:
   - 7z x libpng.tar.gz -so | 7z x -si -ttar > nul
   - move libpng-1.6.28 libpng
   - cd libpng
-  - cmake .
+  - cmake . -DZLIB_INCLUDE_DIR=..\zlib -DZLIB_LIBRARY=..\zlib\debug\zlibd.lib
   - cmake --build .
   - cd ..
   # go back to source root
@@ -29,5 +29,5 @@ install:
 build_script:
   - mkdir build
   - cd build 
-  - cmake .. -DZLIB_INCLUDE_DIR=..\deps\zlib -DZLIB_LIBRARY=..\deps\zlib\release\zlibstatic.lib -DPNG_INCLUDE_DIR=..\deps\libpng -DPNG_LIBRARIES=..\deps\libpng\libpng.lib
+  - cmake .. -DZLIB_INCLUDE_DIR=..\deps\zlib -DZLIB_LIBRARY=..\deps\zlib\debug\zlibd.lib -DPNG_INCLUDE_DIR=..\deps\libpng -DPNG_LIBRARIES=..\deps\libpng\debug\libpng16d.lib
   - cmake --build .
