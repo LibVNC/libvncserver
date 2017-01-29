@@ -337,7 +337,6 @@ endif(JPEG_FOUND)
 if(PNG_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBPNG)
   include_directories(${PNG_INCLUDE_DIR})
-  set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c ${COMMON_DIR}/turbojpeg.c)
 endif(PNG_FOUND)
 
 set(LIBVNCSERVER_SOURCES
