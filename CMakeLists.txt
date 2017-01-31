@@ -208,7 +208,6 @@ if(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_SYS_UIO_H)
     message(STATUS "Building websockets with OpenSSL")
     set(WEBSOCKET_LIBRARIES ${RESOLV_LIB} ${OPENSSL_LIBRARIES})
     set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_openssl ${LIBVNCSERVER_DIR}/rfbcrypto_openssl)
-    include_directories(${OPENSSL_INCLUDE_DIR})
   else()
     message(STATUS "Building websockets without SSL")
     set(WEBSOCKET_LIBRARIES ${RESOLV_LIB})
@@ -310,6 +309,7 @@ elseif(OPENSSL_FOUND)
     ${LIBVNCCLIENT_SOURCES}
     ${LIBVNCCLIENT_DIR}/tls_openssl.c
   )
+  include_directories(${OPENSSL_INCLUDE_DIR})
 else()
   set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_SOURCES}
