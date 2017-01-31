@@ -386,6 +386,7 @@ if test "x$HAVE_B64" != "xtrue"; then
 	with_websockets=""
 fi
 if test "x$with_websockets" = "xyes"; then
+	AC_CHECK_HEADERS([sys/uio.h])
 	LIBS="$LIBS $RESOLV_LIB $SSL_LIBS"
 	AC_DEFINE(WITH_WEBSOCKETS)
 fi
