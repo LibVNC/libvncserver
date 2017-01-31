@@ -189,7 +189,7 @@ ssl_verify (int ok, X509_STORE_CTX *ctx)
 
   ssl = X509_STORE_CTX_get_ex_data (ctx, SSL_get_ex_data_X509_STORE_CTX_idx ());
 
-  client = SSL_CTX_get_app_data (ssl->ctx);
+  client = SSL_CTX_get_app_data (SSL_get_SSL_CTX(ssl));
 
   cert = X509_STORE_CTX_get_current_cert (ctx);
   err = X509_STORE_CTX_get_error (ctx);
@@ -287,11 +287,10 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS)
     {
       if (wait_for_data(ssl, n, 1) != 1) 
       {
-        finished = 1; 
-        if (ssl->ctx)
-          SSL_CTX_free (ssl->ctx);
+        finished = 1;
+        SSL_shutdown(ssl);
         SSL_free(ssl);
-        SSL_shutdown (ssl);
+        SSL_CTX_free(ssl_ctx);
 
         return NULL;
       }
