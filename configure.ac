@@ -430,6 +430,8 @@ MINGW=`echo $host_os | grep mingw32  2>/dev/null`
 AM_CONDITIONAL(MINGW, test ! -z "$MINGW" )
 if test ! -z "$MINGW"; then
 	WSOCKLIB="-lws2_32"
+	LDFLAGS="-no-undefined $LDFLAGS"
+	AC_DEFINE(HAVE_GETTIMEOFDAY)
 fi
 AC_SUBST(WSOCKLIB)
 
