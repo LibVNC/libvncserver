@@ -245,7 +245,10 @@ webSocketsCheck (rfbClientPtr cl)
       return FALSE;
     }
 
-    if (strncmp(bbuf, "<", 1) == 0) {
+    if (strncmp(bbuf, "RFB ", 4) == 0) {
+        rfbLog("Normal socket connection\n");
+        return TRUE;
+    } else if (strncmp(bbuf, "<", 1) == 0) {
         rfbLog("Got Flash policy request, sending response\n");
         if (rfbWriteExact(cl, FLASH_POLICY_RESPONSE,
                           SZ_FLASH_POLICY_RESPONSE) < 0) {
