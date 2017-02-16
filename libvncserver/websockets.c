@@ -70,14 +70,6 @@ static int gettid() {
  */
 #define GUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-#define SERVER_HANDSHAKE_HIXIE "HTTP/1.1 101 Web Socket Protocol Handshake\r\n\
-Upgrade: WebSocket\r\n\
-Connection: Upgrade\r\n\
-%sWebSocket-Origin: %s\r\n\
-%sWebSocket-Location: %s://%s%s\r\n\
-%sWebSocket-Protocol: %s\r\n\
-\r\n%s"
-
 #define SERVER_HANDSHAKE_HYBI "HTTP/1.1 101 Switching Protocols\r\n\
 Upgrade: websocket\r\n\
 Connection: Upgrade\r\n\
@@ -107,8 +99,6 @@ static rfbBool webSocketsHandshake(rfbClientPtr cl, char *scheme);
 void webSocketsGenMd5(char * target, char *key1, char *key2, char *key3);
 
 static int webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst);
-static int webSocketsEncodeHixie(rfbClientPtr cl, const char *src, int len, char **dst);
-static int webSocketsDecodeHixie(ws_ctx_t *wsctx, char *dst, int len);
 
 static int ws_read(void *cl, char *buf, int len);
 static int ws_peek(void *cl, char *buf, int len);
@@ -221,8 +211,8 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                 rfbLog("webSocketsHandshake: client gone\n");
             else
                 rfbLogPerror("webSocketsHandshake: read");
-            free(response);
-            free(buf);
+                free(response);
+                free(buf);
             return FALSE;
         }
 
@@ -275,24 +265,33 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                 /* rfbLog("Got key2: %s\n", key2); */
             /* HyBI */
 
-	    } else if ((strncasecmp("sec-websocket-protocol: ", line, min(llen,24))) == 0) {
+            } else if ((strncasecmp("sec-websocket-protocol: ", line, min(llen,24))) == 0) {
                 protocol = line+24;
                 buf[len-2] = '\0';
                 rfbLog("Got protocol: %s\n", protocol);
             } else if ((strncasecmp("sec-websocket-origin: ", line, min(llen,22))) == 0) {
-		sec_ws_origin = line+22;
+                sec_ws_origin = line+22;
                 buf[len-2] = '\0';
             } else if ((strncasecmp("sec-websocket-key: ", line, min(llen,19))) == 0) {
-		sec_ws_key = line+19;
+                sec_ws_key = line+19;
                 buf[len-2] = '\0';
             } else if ((strncasecmp("sec-websocket-version: ", line, min(llen,23))) == 0) {
-		sec_ws_version = strtol(line+23, NULL, 10);
+                sec_ws_version = strtol(line+23, NULL, 10);
                 buf[len-2] = '\0';
-	    }
+            }
 
             linestart = len;
         }
     }
+    
+    /* older hixie handshake, this could be removed if
+     * a final standard is established -- removed now */
+    if (!sec_ws_version) {
+        rfbErr("Hixie no longer supported\n");
+        free(response);
+        free(buf);
+        return FALSE;
+    } 
 
     if (!(path && host && (origin || sec_ws_origin))) {
         rfbErr("webSocketsHandshake: incomplete client handshake\n");
@@ -302,12 +301,6 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     }
 
     if ((protocol) && (strstr(protocol, "binary"))) {
-        if (! sec_ws_version) {
-            rfbErr("webSocketsHandshake: 'binary' protocol not supported with Hixie\n");
-            free(response);
-            free(buf);
-            return FALSE;
-        }
         rfbLog("  - webSocketsHandshake: using binary/raw encoding\n");
         base64 = FALSE;
         protocol = "binary";
@@ -325,32 +318,16 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
      * Generate the WebSockets server response based on the the headers sent
      * by the client.
      */
+    char accept[B64LEN(SHA1_HASH_SIZE) + 1];
+    rfbLog("  - WebSockets client version hybi-%02d\n", sec_ws_version);
+    webSocketsGenSha1Key(accept, sizeof(accept), sec_ws_key);
 
-    if (sec_ws_version) {
-	char accept[B64LEN(SHA1_HASH_SIZE) + 1];
-	rfbLog("  - WebSockets client version hybi-%02d\n", sec_ws_version);
-	webSocketsGenSha1Key(accept, sizeof(accept), sec_ws_key);
-        if(strlen(protocol) > 0)
-            len = snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
-	                   SERVER_HANDSHAKE_HYBI, accept, protocol);
-        else
-            len = snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
-                           SERVER_HANDSHAKE_HYBI_NO_PROTOCOL, accept);
+    if(strlen(protocol) > 0) {
+        len = snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
+                 SERVER_HANDSHAKE_HYBI, accept, protocol);
     } else {
-	/* older hixie handshake, this could be removed if
-	 * a final standard is established */
-	if (!(key1 && key2 && key3)) {
-	    rfbLog("  - WebSockets client version hixie-75\n");
-	    prefix[0] = '\0';
-	    trailer[0] = '\0';
-	} else {
-	    rfbLog("  - WebSockets client version hixie-76\n");
-	    snprintf(prefix, 5, "Sec-");
-	    webSocketsGenMd5(trailer, key1, key2, key3);
-	}
-	len = snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
-		 SERVER_HANDSHAKE_HIXIE, prefix, origin, prefix, scheme,
-		 host, path, prefix, protocol, trailer);
+        len = snprintf(response, WEBSOCKETS_MAX_HANDSHAKE_LEN,
+                       SERVER_HANDSHAKE_HYBI_NO_PROTOCOL, accept);
     }
 
     if (rfbWriteExact(cl, response, len) < 0) {
@@ -363,17 +340,10 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     free(response);
     free(buf);
 
-
     wsctx = calloc(1, sizeof(ws_ctx_t));
-    if (sec_ws_version) {
-	wsctx->version = WEBSOCKETS_VERSION_HYBI;
-	wsctx->encode = webSocketsEncodeHybi;
-	wsctx->decode = webSocketsDecodeHybi;
-    } else {
-	wsctx->version = WEBSOCKETS_VERSION_HIXIE;
-	wsctx->encode = webSocketsEncodeHixie;
-	wsctx->decode = webSocketsDecodeHixie;
-    }
+    wsctx->version = WEBSOCKETS_VERSION_HYBI;
+    wsctx->encode = webSocketsEncodeHybi;
+    wsctx->decode = webSocketsDecodeHybi;
     wsctx->ctxInfo.readFunc = ws_read;
     wsctx->ctxInfo.peekFunc = ws_peek;
     wsctx->base64 = base64;
@@ -433,32 +403,14 @@ webSocketsGenMd5(char * target, char *key1, char *key2, char *key3)
 }
 
 static int
-webSocketsEncodeHixie(rfbClientPtr cl, const char *src, int len, char **dst)
-{
-    int sz = 0;
-    ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
-
-    wsctx->codeBufEncode[sz++] = '\x00';
-    len = b64_ntop((unsigned char *)src, len, wsctx->codeBufEncode+sz, sizeof(wsctx->codeBufEncode) - (sz + 1));
-    if (len < 0) {
-        return len;
-    }
-    sz += len;
-
-    wsctx->codeBufEncode[sz++] = '\xff';
-    *dst = wsctx->codeBufEncode;
-    return sz;
-}
-
-static int
 ws_read(void *ctxPtr, char *buf, int len)
 {
     int n;
     rfbClientPtr cl = ctxPtr;
     if (cl->sslctx) {
-	n = rfbssl_read(cl, buf, len);
+        n = rfbssl_read(cl, buf, len);
     } else {
-	n = read(cl->sock, buf, len);
+        n = read(cl->sock, buf, len);
     }
     return n;
 }
@@ -469,112 +421,14 @@ ws_peek(void *ctxPtr, char *buf, int len)
     int n;
     rfbClientPtr cl = ctxPtr;
     if (cl->sslctx) {
-	n = rfbssl_peek(cl, buf, len);
+      n = rfbssl_peek(cl, buf, len);
     } else {
-	while (-1 == (n = recv(cl->sock, buf, len, MSG_PEEK))) {
-	    if (errno != EAGAIN)
-		break;
-	}
+      while (-1 == (n = recv(cl->sock, buf, len, MSG_PEEK))) {
+          if (errno != EAGAIN)
+              break;
+      }
     }
     return n;
-}
-
-static int
-webSocketsDecodeHixie(ws_ctx_t *wsctx, char *dst, int len)
-{
-    int retlen = 0, n, i, avail, modlen, needlen;
-    char *buf, *end = NULL;
-
-    buf = wsctx->codeBufDecode;
-
-    //n = ws_peek(cl, buf, len*2+2);
-    n = wsctx->ctxInfo.peekFunc(wsctx->ctxInfo.ctxPtr, buf, len*2+2);
-
-    if (n <= 0) {
-        /* save errno because rfbErr() will tamper it */
-        int olderrno = errno;
-        rfbErr("%s: peek (%d) %m\n", __func__, errno);
-        errno = olderrno;
-        return n;
-    }
-
-
-    /* Base64 encoded WebSockets stream */
-
-    if (buf[0] == '\xff') {
-        //i = ws_read(cl, buf, 1); /* Consume marker */
-        i = wsctx->ctxInfo.readFunc(wsctx->ctxInfo.ctxPtr, buf, 1);
-        buf++;
-        n--;
-    }
-    if (n == 0) {
-        errno = EAGAIN;
-        return -1;
-    }
-    if (buf[0] == '\x00') {
-        //i = ws_read(cl, buf, 1); /* Consume marker */
-        i = wsctx->ctxInfo.readFunc(wsctx->ctxInfo.ctxPtr, buf, 1);
-        buf++;
-        n--;
-    }
-    if (n == 0) {
-        errno = EAGAIN;
-        return -1;
-    }
-
-    /* end = memchr(buf, '\xff', len*2+2); */
-    end = memchr(buf, '\xff', n);
-    if (!end) {
-        end = buf + n;
-    }
-    avail = end - buf;
-
-    len -= wsctx->carrylen;
-
-    /* Determine how much base64 data we need */
-    modlen = len + (len+2)/3;
-    needlen = modlen;
-    if (needlen % 4) {
-        needlen += 4 - (needlen % 4);
-    }
-
-    if (needlen > avail) {
-        /* rfbLog("Waiting for more base64 data\n"); */
-        errno = EAGAIN;
-        return -1;
-    }
-
-    /* Any carryover from previous decode */
-    for (i=0; i < wsctx->carrylen; i++) {
-        /* rfbLog("Adding carryover %d\n", wsctx->carryBuf[i]); */
-        dst[i] = wsctx->carryBuf[i];
-        retlen += 1;
-    }
-
-    /* Decode the rest of what we need */
-    buf[needlen] = '\x00';  /* Replace end marker with end of string */
-    /* rfbLog("buf: %s\n", buf); */
-    n = b64_pton(buf, (unsigned char *)dst+retlen, 2+len);
-    if (n < len) {
-        rfbErr("Base64 decode error\n");
-        errno = EIO;
-        return -1;
-    }
-    retlen += n;
-
-    /* Consume the data from socket */
-    //i = ws_read(cl, buf, needlen);
-    i = wsctx->ctxInfo.readFunc(wsctx->ctxInfo.ctxPtr, buf, needlen);
-
-    wsctx->carrylen = n - len;
-    retlen -= wsctx->carrylen;
-    for (i=0; i < wsctx->carrylen; i++) {
-        /* rfbLog("Saving carryover %d\n", dst[retlen + i]); */
-        wsctx->carryBuf[i] = dst[retlen + i];
-    }
-
-    /* rfbLog("<< webSocketsDecode, retlen: %d\n", retlen); */
-    return retlen;
 }
 
 static int
@@ -602,12 +456,12 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
     header = (ws_header_t *)wsctx->codeBufEncode;
 
     if (wsctx->base64) {
-	opcode = WS_OPCODE_TEXT_FRAME;
-	/* calculate the resulting size */
-	blen = B64LEN(len);
+        opcode = WS_OPCODE_TEXT_FRAME;
+        /* calculate the resulting size */
+        blen = B64LEN(len);
     } else {
-	opcode = WS_OPCODE_BINARY_FRAME;
-	blen = len;
+        opcode = WS_OPCODE_BINARY_FRAME;
+        blen = len;
     }
 
     header->b0 = 0x80 | (opcode & 0x0f);
@@ -626,15 +480,15 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
 
     if (wsctx->base64) {
         if (-1 == (ret = b64_ntop((unsigned char *)src, len, wsctx->codeBufEncode + sz, sizeof(wsctx->codeBufEncode) - sz))) {
-	  rfbErr("%s: Base 64 encode failed\n", __func__);
-	} else {
-	  if (ret != blen)
-	    rfbErr("%s: Base 64 encode; something weird happened\n", __func__);
-	  ret += sz;
-	}
+            rfbErr("%s: Base 64 encode failed\n", __func__);
+        } else {
+          if (ret != blen)
+            rfbErr("%s: Base 64 encode; something weird happened\n", __func__);
+          ret += sz;
+        }
     } else {
-      memcpy(wsctx->codeBufEncode + sz, src, len);
-      ret =  sz + len;
+        memcpy(wsctx->codeBufEncode + sz, src, len);
+        ret =  sz + len;
     }
 
     *dst = wsctx->codeBufEncode;
@@ -645,7 +499,7 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
 int
 webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst)
 {
-    return ((ws_ctx_t *)cl->wsctx)->encode(cl, src, len, dst);
+    return webSocketsEncodeHybi(cl, src, len, dst);
 }
 
 int
@@ -653,67 +507,18 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 {
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx; 
     wsctx->ctxInfo.ctxPtr = cl;
-    return wsctx->decode(wsctx, dst, len);
+    return webSocketsDecodeHybi(wsctx, dst, len);
 }
 
 
 /* returns TRUE if client sent a close frame or a single 'end of frame'
  * marker was received, FALSE otherwise
  *
- * Note: This is a Hixie-only hack!
+ * Note: This was a Hixie-only hack!
  **/
 rfbBool
 webSocketCheckDisconnect(rfbClientPtr cl)
 {
-    ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
-    /* With Base64 encoding we need at least 4 bytes */
-    char peekbuf[4];
-    int n;
-
-    if (wsctx->version == WEBSOCKETS_VERSION_HYBI)
-	return FALSE;
-
-    if (cl->sslctx)
-	n = rfbssl_peek(cl, peekbuf, 4);
-    else
-	n = recv(cl->sock, peekbuf, 4, MSG_PEEK);
-
-    if (n <= 0) {
-	if (n != 0)
-	    rfbErr("%s: peek; %m", __func__);
-	rfbCloseClient(cl);
-	return TRUE;
-    }
-
-    if (peekbuf[0] == '\xff') {
-	int doclose = 0;
-	/* Make sure we don't miss a client disconnect on an end frame
-	 * marker. Because we use a peek buffer in some cases it is not
-	 * applicable to wait for more data per select(). */
-	switch (n) {
-	    case 3:
-		if (peekbuf[1] == '\xff' && peekbuf[2] == '\x00')
-		    doclose = 1;
-		break;
-	    case 2:
-		if (peekbuf[1] == '\x00')
-		    doclose = 1;
-		break;
-	    default:
-		return FALSE;
-	}
-
-	if (cl->sslctx)
-	    n = rfbssl_read(cl, peekbuf, n);
-	else
-	    n = read(cl->sock, peekbuf, n);
-
-	if (doclose) {
-	    rfbErr("%s: websocket close frame received\n", __func__);
-	    rfbCloseClient(cl);
-	}
-	return TRUE;
-    }
     return FALSE;
 }
 
@@ -726,7 +531,7 @@ webSocketsHasDataInBuffer(rfbClientPtr cl)
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
 
     if (wsctx && wsctx->readlen)
-      return TRUE;
+        return TRUE;
 
     return (cl->sslctx && rfbssl_pending(cl) > 0);
 }
