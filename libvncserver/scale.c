@@ -66,7 +66,18 @@
         (double) ((int) (x)) : (double) ((int) (x) + 1) )
 #define FLOOR(x) ( (double) ((int) (x)) )
 
-static inline int pad4(int value)
+#ifdef WIN32
+#define InlineX __inline
+#else
+# ifndef __STRICT_ANSI__
+#  define InlineX inline
+# else
+#  define InlineX
+# endif
+#endif
+
+
+static InlineX int pad4(int value)
 {
     int remainder = value & 3;
     if (!remainder) return value;
