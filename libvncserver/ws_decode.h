@@ -7,13 +7,6 @@
 #include <resolv.h> /* __b64_ntop */
 #endif
 
-
-
-enum {
-  WEBSOCKETS_VERSION_HIXIE,
-  WEBSOCKETS_VERSION_HYBI
-};
-
 #if defined(__APPLE__)
 
 #include <libkern/OSByteOrder.h>

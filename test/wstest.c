@@ -23,6 +23,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _WIN32
+
 #include <ws_decode.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,11 +32,11 @@
 #include <unistd.h>
 #include <errno.h>
 
-#ifndef _WIN32
-
+/* incoming data frames should not be larger than that */
 #define TEST_BUF_SIZE B64LEN(131072) + WSHLENMAX
+
+/* seed is fixed deliberately to get reproducible test cases */
 #define RND_SEED 100
-#define WS_TMP_LOG "ws_tmp.log"
 
 enum {
   OK,
@@ -55,6 +57,7 @@ struct ws_frame_test {
   char frame[TEST_BUF_SIZE];
   char *pos;
   char expectedDecodeBuf[TEST_BUF_SIZE];
+  uint64_t n_compare;
   uint64_t frame_len;
   uint64_t raw_payload_len;
   int expected_errno;
@@ -66,6 +69,8 @@ struct ws_frame_test {
   int errno_val;
   int close_sock_at;
 };
+
+#include "wstestdata.c"
 
 char el_log[1000000];
 char *el_pos;
@@ -160,15 +165,15 @@ static uint64_t run_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
   return OK;
 }
 
-#include "wstestdata.in"
 
 int main()
 { 
   ws_ctx_t ctx;
-  int retall= 0; 
+  int retall= 0;
+  int i;
   srand(RND_SEED); 
   
-  for (int i = 0; i < ARRAYSIZE(tests); i++) {
+  for (i = 0; i < ARRAYSIZE(tests); i++) {
     int ret;
 
     el_pos = el_log;
@@ -190,6 +195,12 @@ int main()
     }
   }
   return retall;
+}
+
+#else 
+
+int main() {
+  return 0;
 }
 
 #endif
