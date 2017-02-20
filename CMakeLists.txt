@@ -29,6 +29,7 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver ${CMAKE_CURRENT_SOURCE_DIR}/common)
 
 # all the build configuration switches
+option(BUILD_SHARED_LIBS "Build shared libraries" ${UNIX})
 option(WITH_ZLIB "Search for the zlib compression library to support additional encodings" ON)
 option(WITH_JPEG "Search for the libjpeg compression library to support additional encodings" ON)
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
@@ -365,8 +366,8 @@ if(LIBVNCSERVER_WITH_WEBSOCKETS)
 endif(LIBVNCSERVER_WITH_WEBSOCKETS)
 
 
-add_library(vncclient SHARED ${LIBVNCCLIENT_SOURCES})
-add_library(vncserver SHARED ${LIBVNCSERVER_SOURCES})
+add_library(vncclient ${LIBVNCCLIENT_SOURCES})
+add_library(vncserver ${LIBVNCSERVER_SOURCES})
 if(WIN32)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ws2_32)
 endif(WIN32)
