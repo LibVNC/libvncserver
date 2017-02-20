@@ -26,6 +26,14 @@ import websockets
 import base64
 import errno
 
+'''
+    Create websocket frames for the wstest websocket decoding unit test.
+
+    Generates c ws_frame_test structure definitions
+    included by wstest.c.
+'''
+
+
 def add_field(s, name, value, first=False):
     deli = ",\n\t\t"
     if first:
@@ -35,10 +43,9 @@ def add_field(s, name, value, first=False):
 
 
 class Testframe():
-    def __init__(self, frame, descr, retbytes=[], modify_bytes={}, experrno=0, mask=True):
+    def __init__(self, frame, descr, modify_bytes={}, experrno=0, mask=True):
         self.frame = frame
         self.descr = descr
-        self.retbytes = retbytes
         self.modify_bytes = modify_bytes
         self.experrno = experrno
         self.b64 = True if frame.opcode == 1 else False
@@ -53,7 +60,7 @@ class Testframe():
             for k in self.modify_bytes:
                 values[k] = "0X{0:02X}".format(self.modify_bytes[k])
 
-        return "{{{0}}}".format(", ".join(values))
+        return "{{{0}}}".format(",".join(values))
 
 
     def set_frame_buf(self, buf):
@@ -61,14 +68,13 @@ class Testframe():
         self.framelen = len(buf)
 
     def __str__(self):
-        #print("processing frame: {0}".format(self.descr))
+        print("processing frame: {0}".format(self.descr))
         the_frame = self.frame
         if self.b64:
             olddata = self.frame.data
             newdata = base64.b64encode(self.frame.data)
             #print("converting\n{0}\nto{1}\n".format(olddata, newdata))
             the_frame = websockets.framing.Frame(self.frame.fin, self.frame.opcode, base64.b64encode(olddata))
-
         websockets.framing.write_frame(the_frame, self.set_frame_buf, self.mask)
         s = "\t{\n"
         s = add_field(s, "frame", "{0}".format(self.frame_carray), True)
@@ -77,8 +83,6 @@ class Testframe():
         s = add_field(s, "raw_payload_len", len(self.frame.data))
         s = add_field(s, "expected_errno", self.experrno)
         s = add_field(s, "descr", "\"{0}\"".format(self.descr))
-        s = add_field(s, "ret_bytes", "{{{0}}}".format(", ".join(self.retbytes)))
-        s = add_field(s, "ret_bytes_len", len(self.retbytes))
         s = add_field(s, "i", "0")
         s = add_field(s, "simulate_sock_malfunction_at", "0")
         s = add_field(s, "errno_val", "0")
@@ -89,25 +93,25 @@ class Testframe():
 ### create test frames
 flist = []
 ### standard text frames with different lengths
-flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("Testit", encoding="utf-8")), "Short valid text frame", {}))
+flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("Testit", encoding="utf-8")), "Short valid text frame"))
 flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("Frame2 does contain much more text and even goes beyond the 126 byte len field. Frame2 does contain much more text and even goes beyond the 126 byte len field.", encoding="utf-8")),
-    "Mid-long valid text frame", {}))
-flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray([(x % 26) + 65 for x in range(100000)])), "100k text frame (ABC..YZABC..)", {}))
+    "Mid-long valid text frame"))
+#flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray([(x % 26) + 65 for x in range(100000)])), "100k text frame (ABC..YZABC..)"))
 
 ### standard binary frames with different lengths
-flist.append(Testframe(websockets.framing.Frame(1, 2, bytearray("Testit", encoding="utf-8")), "Short valid binary frame", {}))
+flist.append(Testframe(websockets.framing.Frame(1, 2, bytearray("Testit", encoding="utf-8")), "Short valid binary frame"))
 flist.append(Testframe(websockets.framing.Frame(1, 2, bytearray("Frame2 does contain much more text and even goes beyond the 126 byte len field. Frame2 does contain much more text and even goes beyond the 126 byte len field.", encoding="utf-8")),
-    "Mid-long valid binary frame", {}))
-flist.append(Testframe(websockets.framing.Frame(1, 2, bytearray([(x % 26) + 65 for x in range(100000)])), "100k binary frame (ABC..YZABC..)", {}))
+    "Mid-long valid binary frame"))
+#flist.append(Testframe(websockets.framing.Frame(1, 2, bytearray([(x % 26) + 65 for x in range(100000)])), "100k binary frame (ABC..YZABC..)"))
 
-### some conn reset frames, one with no close message, one with close message (the latter should cause an error)
-flist.append(Testframe(websockets.framing.Frame(1, 8, bytearray(list([0x03, 0xEB]))), "Close frame (Reason 1003)", {}, experrno=errno.ECONNRESET))
-flist.append(Testframe(websockets.framing.Frame(1, 8, bytearray(list([0x03, 0xEB])) + bytearray("I'm a close reason", encoding="utf-8")), "Close frame (Reason 1003) and msg", {}, experrno=errno.EIO))
+### some conn reset frames, one with no close message, one with close message
+flist.append(Testframe(websockets.framing.Frame(1, 8, bytearray(list([0x03, 0xEB]))), "Close frame (Reason 1003)", experrno=errno.ECONNRESET))
+flist.append(Testframe(websockets.framing.Frame(1, 8, bytearray(list([0x03, 0xEB])) + bytearray("I'm a close reason and much more than that!", encoding="utf-8")), "Close frame (Reason 1003) and msg", experrno=errno.ECONNRESET))
 
 ### invalid header values
-flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("Testit", encoding="utf-8")), "Invalid frame: Wrong masking", {}, experrno=errno.EPROTO, mask=False))
-flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("..Lore Ipsum", encoding="utf-8")), "Invalid frame: Length of < 126 with add. 16 bit len field", {}, experrno=errno.EPROTO, modify_bytes={ 1: 0xFE, 2: 0x00, 3: 0x0F}))
-flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("........Lore Ipsum", encoding="utf-8")), "Invalid frame: Length of < 126 with add. 64 bit len field", {}, experrno=errno.EPROTO, modify_bytes={ 1: 0xFF, 2: 0x00, 3: 0x00, 4: 0x00, 5: 0x00, 6: 0x80, 7: 0x40}))
+flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("Testit", encoding="utf-8")), "Invalid frame: Wrong masking", experrno=errno.EPROTO, mask=False))
+flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("..Lore Ipsum", encoding="utf-8")), "Invalid frame: Length of < 126 with add. 16 bit len field", experrno=errno.EPROTO, modify_bytes={ 1: 0xFE, 2: 0x00, 3: 0x0F}))
+flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("........Lore Ipsum", encoding="utf-8")), "Invalid frame: Length of < 126 with add. 64 bit len field", experrno=errno.EPROTO, modify_bytes={ 1: 0xFF, 2: 0x00, 3: 0x00, 4: 0x00, 5: 0x00, 6: 0x80, 7: 0x40}))
 
 s = "struct ws_frame_test tests[] = {\n"
 for i in range(len(flist)):
@@ -117,5 +121,5 @@ for i in range(len(flist)):
     s += "\n"
 s += "};\n"
 
-with open("wstestdata.in", "w") as cdatafile:
+with open("wstestdata.c", "w") as cdatafile:
     cdatafile.write(s)

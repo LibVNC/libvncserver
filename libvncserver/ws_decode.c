@@ -85,11 +85,12 @@ hybiReturnData(char *dst, int len, ws_ctx_t *wsctx, int *nWritten)
  *
  * @param[in]   cl client ptr with ptr to raw socket and ws_ctx_t ptr
  * @param[out]  sockRet emulated recv return value
+ * @param[out]  nPayload number of payload bytes already read
  * @return next hybi decoding state; WS_HYBI_STATE_HEADER_PENDING indicates
  *         that the header was not received completely.
  */
 static int
-hybiReadHeader(ws_ctx_t *wsctx, int *sockRet)
+hybiReadHeader(ws_ctx_t *wsctx, int *sockRet, int *nPayload)
 {
   int ret;
   char *headerDst = wsctx->codeBufDecode + wsctx->nReadRaw;
@@ -184,7 +185,8 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet)
   /* set payload pointer just after header */
   wsctx->readPos = (unsigned char *)(wsctx->codeBufDecode + wsctx->header.headerLen);
 
-  rfbLog("header complete: state=%d flen=%d writeTo=%p\n", wsctx->hybiDecodeState, wsctx->nToRead, wsctx->writePos);
+  *nPayload = wsctx->nReadRaw - wsctx->header.headerLen;
+  rfbLog("header complete: state=%d flen=%d writeTo=%p nPayload=%d\n", wsctx->hybiDecodeState, wsctx->nToRead, wsctx->writePos, *nPayload);
 
   return WS_HYBI_STATE_DATA_NEEDED;
 }
@@ -217,21 +219,24 @@ hybiPayloadStart(ws_ctx_t *wsctx)
  *  - execute return data routine
  *
  *  Sets errno corresponding to what it gets from the underlying
- *  socket or EIO if some internal sanity check fails.
+ *  socket or EPROTO if some invalid data is in the received frame
+ *  or ECONNRESET if a close reason + message is received. EIO is used if
+ *  an internal sanity check fails.
  *
  *  @param[in]  cl client ptr with raw socket reference
  *  @param[out] dst  destination buffer
  *  @param[in]  len  size of destination buffer
  *  @param[out] sockRet emulated recv return value
+ *  @param[in]  nInBuf number of undecoded bytes before writePos from header read
  *  @return next hybi decode state
  */
 static int
-hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet)
+hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
 {
   int n;
   int i;
-  int toReturn;
-  int toDecode;
+  int toReturn; /* number of data bytes to return */
+  int toDecode; /* number of bytes to decode starting at wsctx->writePos */
   int bufsize;
   int nextRead;
   unsigned char *data;
@@ -253,7 +258,6 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet)
 
   if (wsctx->nReadRaw < wsctx->nToRead) {
     /* decode more data */
-    //if (-1 == (n = ws_read(cl, wsctx->writePos, nextRead))) {
     if (-1 == (n = wsctx->ctxInfo.readFunc(wsctx->ctxInfo.ctxPtr, wsctx->writePos, nextRead))) {
       int olderrno = errno;
       rfbErr("%s: read; %s", __func__, strerror(errno));
@@ -283,7 +287,9 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet)
     }
   }
 
-  toDecode = wsctx->writePos - hybiPayloadStart(wsctx);
+  /* number of not yet unmasked payload bytes: what we read here + what was
+   * carried over + what was read with the header */
+  toDecode = n + wsctx->carrylen + nInBuf;
   rfbLog("toDecode=%d from n=%d carrylen=%d headerLen=%d\n", toDecode, n, wsctx->carrylen, wsctx->header.headerLen);
   if (toDecode < 0) {
     rfbErr("%s: internal error; negative number of bytes to decode: %d", __func__, toDecode);
@@ -294,7 +300,7 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet)
 
   /* for a possible base64 decoding, we decode multiples of 4 bytes until
    * the whole frame is received and carry over any remaining bytes in the carry buf*/
-  data = (unsigned char *)hybiPayloadStart(wsctx);
+  data = (unsigned char *)(wsctx->writePos - toDecode);
   data32= (uint32_t *)data;
 
   for (i = 0; i < (toDecode >> 2); i++) {
@@ -321,24 +327,25 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet)
     }
     rfbLog("carrying over %d bytes from %p to %p\n", wsctx->carrylen, wsctx->writePos + (i * 4), wsctx->carryBuf);
     memcpy(wsctx->carryBuf, data + (i * 4), wsctx->carrylen);
+    wsctx->writePos -= wsctx->carrylen;
   }
 
   toReturn = toDecode - wsctx->carrylen;
 
   switch (wsctx->header.opcode) {
     case WS_OPCODE_CLOSE:
-
       /* this data is not returned as payload data */
       if (hybiWsFrameComplete(wsctx)) {
-        rfbLog("got close cmd, reason %d\n", WS_NTOH16(((uint16_t *)data)[0]));
+        *(wsctx->writePos) = '\0';
+        rfbLog("got close cmd %d, reason %d: %s\n", (int)(wsctx->writePos - hybiPayloadStart(wsctx)), WS_NTOH16(((uint16_t *)hybiPayloadStart(wsctx))[0]), &hybiPayloadStart(wsctx)[2]);
         errno = ECONNRESET;
         *sockRet = -1;
         return WS_HYBI_STATE_FRAME_COMPLETE;
       } else {
-        rfbErr("%s: close reason with long frame not supported", __func__);
-        errno = EIO;
+        rfbLog("got close cmd; waiting for %d more bytes to arrive\n", hybiRemaining(wsctx));
         *sockRet = -1;
-        return WS_HYBI_STATE_ERR;
+        errno = EAGAIN;
+        return WS_HYBI_STATE_CLOSE_REASON_PENDING;
       }
       break;
     case WS_OPCODE_TEXT_FRAME:
@@ -412,25 +419,26 @@ webSocketsDecodeHybi(ws_ctx_t *wsctx, char *dst, int len)
                       wsctx->nReadRaw, wsctx->carrylen, wsctx->carryBuf);
 
     switch (wsctx->hybiDecodeState){
+      int nInBuf;
       case WS_HYBI_STATE_HEADER_PENDING:
-        wsctx->hybiDecodeState = hybiReadHeader(wsctx, &result);
+        wsctx->hybiDecodeState = hybiReadHeader(wsctx, &result, &nInBuf);
         if (wsctx->hybiDecodeState == WS_HYBI_STATE_ERR) {
           goto spor;
         }
         if (wsctx->hybiDecodeState != WS_HYBI_STATE_HEADER_PENDING) {
 
           /* when header is complete, try to read some more data */
-          wsctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result);
+          wsctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result, nInBuf);
         }
         break;
       case WS_HYBI_STATE_DATA_AVAILABLE:
         wsctx->hybiDecodeState = hybiReturnData(dst, len, wsctx, &result);
         break;
       case WS_HYBI_STATE_DATA_NEEDED:
-        wsctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result);
+        wsctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result, 0);
         break;
       case WS_HYBI_STATE_CLOSE_REASON_PENDING:
-        wsctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result);
+        wsctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result, 0);
         break;
       default:
         /* invalid state */

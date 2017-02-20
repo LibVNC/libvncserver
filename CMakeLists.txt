@@ -47,7 +47,6 @@ option(WITH_IPv6 "Enable IPv6 Support" ON)
 option(WITH_WEBSOCKETS "Build with websockets support" ON)
 
 
-
 if(WITH_ZLIB)
   find_package(ZLIB)
 endif(WITH_ZLIB)
@@ -368,6 +367,7 @@ if(LIBVNCSERVER_WITH_WEBSOCKETS)
   set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_SOURCES}
     ${LIBVNCSERVER_DIR}/websockets.c
+    ${LIBVNCSERVER_DIR}/ws_decode.c
     ${WSSRCS}
   )
 endif(LIBVNCSERVER_WITH_WEBSOCKETS)
@@ -481,11 +481,9 @@ foreach(e ${LIBVNCCLIENT_EXAMPLES})
   target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
 endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 
-
 #
 # them tests
 #
-
 if(UNIX)
     set(ADDITIONAL_TEST_LIBS m)
 endif(UNIX)
@@ -493,18 +491,41 @@ endif(UNIX)
 set(SIMPLETESTS
    cargstest
    copyrecttest
+   wstest
 )
 
-if(CMAKE_USE_PTHREADS_INIT)
-  set(SIMPLETESTS
-      ${SIMPLETESTS}
-      encodingstest
+add_test(NAME cargs COMMAND test_cargstest)
+add_test(NAME websockets_decode COMMAND test_wstest)
+
+if(CMAKE_USE_PTHREADS_INI)
+  list(APPEND SIMPLETESTS encodingstest)
+endif(CMAKE_USE_PTHREADS_INI)
+
+if(FOUND_LIBJPEG_TURBO)
+  list(APPEND SIMPLETESTS tjunittest tjbench)
+  set(tjunittest_add_src 
+      ${TESTS_DIR}/tjutil.c
+      ${TESTS_DIR}/tjutil.h
+      ${COMMON_DIR}/turbojpeg.c
+      ${COMMON_DIR}/turbojpeg.h
      )
-endif(CMAKE_USE_PTHREADS_INIT)
+
+ set(tjbench_add_src
+     ${TESTS_DIR}/tjbench.c
+     ${TESTS_DIR}/tjutil.c
+     ${TESTS_DIR}/tjutil.h
+     ${TESTS_DIR}/bmp.c
+     ${TESTS_DIR}/bmp.h
+     ${COMMON_DIR}/turbojpeg.c
+     ${COMMON_DIR}/turbojpeg.h
+    )
+
+  add_test(NAME turbojpeg COMMAND test_tjunittest)
+endif(FOUND_LIBJPEG_TURBO)
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
 foreach(t ${SIMPLETESTS})
-  add_executable(test_${t} ${TESTS_DIR}/${t}.c)
+  add_executable(test_${t} ${TESTS_DIR}/${t}.c ${${t}_add_src})
   set_target_properties(test_${t} PROPERTIES OUTPUT_NAME ${t})
   set_target_properties(test_${t} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
   target_link_libraries(test_${t} vncserver vncclient ${ADDITIONAL_TEST_LIBS})
@@ -541,8 +562,6 @@ add_test(NAME cargs COMMAND test_cargstest)
 if(FOUND_LIBJPEG_TURBO)
     add_test(NAME turbojpeg COMMAND test_tjunittest)
 endif(FOUND_LIBJPEG_TURBO)
-
-
 
 #
 # this gets the libraries needed by TARGET in "-libx -liby ..." form
