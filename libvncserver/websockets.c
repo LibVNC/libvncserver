@@ -100,8 +100,7 @@ void webSocketsGenMd5(char * target, char *key1, char *key2, char *key3);
 
 static int webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst);
 
-static int ws_read(void *cl, char *buf, int len);
-static int ws_peek(void *cl, char *buf, int len);
+static int ws_read(void *cl, char *buf, size_t len);
 
 
 static int
@@ -345,7 +344,6 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     wsctx->encode = webSocketsEncodeHybi;
     wsctx->decode = webSocketsDecodeHybi;
     wsctx->ctxInfo.readFunc = ws_read;
-    wsctx->ctxInfo.peekFunc = ws_peek;
     wsctx->base64 = base64;
     hybiDecodeCleanup(wsctx);
     cl->wsctx = (wsCtx *)wsctx;
@@ -403,7 +401,7 @@ webSocketsGenMd5(char * target, char *key1, char *key2, char *key3)
 }
 
 static int
-ws_read(void *ctxPtr, char *buf, int len)
+ws_read(void *ctxPtr, char *buf, size_t len)
 {
     int n;
     rfbClientPtr cl = ctxPtr;
@@ -411,22 +409,6 @@ ws_read(void *ctxPtr, char *buf, int len)
         n = rfbssl_read(cl, buf, len);
     } else {
         n = read(cl->sock, buf, len);
-    }
-    return n;
-}
-
-static int
-ws_peek(void *ctxPtr, char *buf, int len)
-{
-    int n;
-    rfbClientPtr cl = ctxPtr;
-    if (cl->sslctx) {
-      n = rfbssl_peek(cl, buf, len);
-    } else {
-      while (-1 == (n = recv(cl->sock, buf, len, MSG_PEEK))) {
-          if (errno != EAGAIN)
-              break;
-      }
     }
     return n;
 }

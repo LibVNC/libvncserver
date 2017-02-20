@@ -66,6 +66,9 @@ test/cargstest
 test/copyrecttest
 test/cursortest
 test/encodingstest
+test/wstest
+test/wsmaketestframe.py
+test/wstestdata.in
 /test/tjbench
 /test/tjunittest
 vncterm/LinuxVNC

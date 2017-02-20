@@ -50,13 +50,11 @@ typedef struct ws_ctx_s ws_ctx_t;
 typedef int (*wsEncodeFunc)(rfbClientPtr cl, const char *src, int len, char **dst);
 typedef int (*wsDecodeFunc)(ws_ctx_t *wsctx, char *dst, int len);
 
-typedef int (*wsReadFunc)(void *ctx, char *dst, int len);
-typedef int (*wsPeekFunc)(void *ctx, char *dst, int len);
+typedef int (*wsReadFunc)(void *ctx, char *dst, size_t len);
 
 typedef struct ctxInfo_s{
   void *ctxPtr;
   wsReadFunc readFunc;
-  wsPeekFunc peekFunc;
 } ctxInfo_t;
 
 enum {

@@ -1,11 +1,12 @@
 #include "ws_decode.h"
 
-#include <syslog.h>
 #include <string.h>
 #include <errno.h>
 
 #define WS_HYBI_MASK_LEN 4
-
+#define WS_HYBI_HEADER_LEN_SHORT 2 + WS_HYBI_MASK_LEN
+#define WS_HYBI_HEADER_LEN_EXTENDED 4 + WS_HYBI_MASK_LEN
+#define WS_HYBI_HEADER_LEN_LONG 10 + WS_HYBI_MASK_LEN
 
 static int
 hybiRemaining(ws_ctx_t *wsctx)
@@ -66,8 +67,12 @@ hybiReturnData(char *dst, int len, ws_ctx_t *wsctx, int *nWritten)
       }
     }
     rfbLog("after copy: readPos=%p, readLen=%d\n", wsctx->readPos, wsctx->readlen);
-  } else if (wsctx->hybiDecodeState == WS_HYBI_STATE_CLOSE_REASON_PENDING) {
-    nextState = WS_HYBI_STATE_CLOSE_REASON_PENDING;
+  } else {
+    /* it may happen that we read some bytes but could not decode them,
+     * in that case, set errno to EAGAIN and return -1 */
+    nextState = wsctx->hybiDecodeState;
+    errno = EAGAIN;
+    *nWritten = -1;
   }
   return nextState;
 }
@@ -98,7 +103,7 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet)
     if (-1 == ret) {
       /* save errno because rfbErr() will tamper it */
       int olderrno = errno;
-      rfbErr("%s: peek; %m\n", __func__);
+      rfbErr("%s: read; %s\n", __func__, strerror(errno));
       errno = olderrno;
       *sockRet = -1;
     } else {
@@ -131,22 +136,22 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet)
    * close the connection upon receiving a frame with the MASK bit set to 0.
   **/
   if (!(wsctx->header.data->b1 & 0x80)) {
-    rfbErr("%s: got frame without mask ret=%d\n", __func__, ret);
-    syslog(LOG_ERR, "%s: got frame without mask; ret=%d\n", __func__, ret);
-    errno = EIO;
+    rfbErr("%s: got frame without mask; ret=%d\n", __func__, ret);
+    errno = EPROTO;
     *sockRet = -1;
     return WS_HYBI_STATE_ERR;
   }
 
+
   if (wsctx->header.payloadLen < 126 && wsctx->nReadRaw >= 6) {
-    wsctx->header.headerLen = 2 + WS_HYBI_MASK_LEN;
+    wsctx->header.headerLen = WS_HYBI_HEADER_LEN_SHORT;
     wsctx->header.mask = wsctx->header.data->u.m;
   } else if (wsctx->header.payloadLen == 126 && 8 <= wsctx->nReadRaw) {
-    wsctx->header.headerLen = 4 + WS_HYBI_MASK_LEN;
+    wsctx->header.headerLen = WS_HYBI_HEADER_LEN_EXTENDED;
     wsctx->header.payloadLen = WS_NTOH16(wsctx->header.data->u.s16.l16);
     wsctx->header.mask = wsctx->header.data->u.s16.m16;
   } else if (wsctx->header.payloadLen == 127 && 14 <= wsctx->nReadRaw) {
-    wsctx->header.headerLen = 10 + WS_HYBI_MASK_LEN;
+    wsctx->header.headerLen = WS_HYBI_HEADER_LEN_LONG;
     wsctx->header.payloadLen = WS_NTOH64(wsctx->header.data->u.s64.l64);
     wsctx->header.mask = wsctx->header.data->u.s64.m64;
   } else {
@@ -155,6 +160,19 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet)
     errno = EAGAIN;
     *sockRet = -1;
     return WS_HYBI_STATE_HEADER_PENDING;
+  }
+
+  /* while RFC 6455 mandates that lengths MUST be encoded with the minimum
+   * number of bytes, it does not specify for the server how to react on
+   * 'wrongly' encoded frames --- this implementation rejects them*/
+  if ((wsctx->header.headerLen > WS_HYBI_HEADER_LEN_SHORT
+      && wsctx->header.payloadLen < 126)
+      || (wsctx->header.headerLen > WS_HYBI_HEADER_LEN_EXTENDED
+        && wsctx->header.payloadLen < 65536)) {
+    rfbErr("%s: invalid length field; headerLen=%d payloadLen=%llu\n", __func__, wsctx->header.headerLen, wsctx->header.payloadLen);
+    errno = EPROTO;
+    *sockRet = -1;
+    return WS_HYBI_STATE_ERR;
   }
 
   /* absolute length of frame */
@@ -238,7 +256,7 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet)
     //if (-1 == (n = ws_read(cl, wsctx->writePos, nextRead))) {
     if (-1 == (n = wsctx->ctxInfo.readFunc(wsctx->ctxInfo.ctxPtr, wsctx->writePos, nextRead))) {
       int olderrno = errno;
-      rfbErr("%s: read; %m", __func__);
+      rfbErr("%s: read; %s", __func__, strerror(errno));
       errno = olderrno;
       *sockRet = -1;
       return WS_HYBI_STATE_ERR;
@@ -260,6 +278,8 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet)
       errno=EIO;
       *sockRet = -1;
       return WS_HYBI_STATE_ERR;
+    } else {
+      wsctx->hybiDecodeState = WS_HYBI_STATE_FRAME_COMPLETE;
     }
   }
 
@@ -294,7 +314,7 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet)
     /* carry over remaining, non-multiple-of-four bytes */
     wsctx->carrylen = toDecode - (i * 4);
     if (wsctx->carrylen < 0 || wsctx->carrylen > ARRAYSIZE(wsctx->carryBuf)) {
-      syslog(LOG_ERR, "%s: internal error, invalid carry over size: carrylen=%d, toDecode=%d, i=%d", __func__, wsctx->carrylen, toDecode, i);
+      rfbErr("%s: internal error, invalid carry over size: carrylen=%d, toDecode=%d, i=%d", __func__, wsctx->carrylen, toDecode, i);
       *sockRet = -1;
       errno = EIO;
       return WS_HYBI_STATE_ERR;
@@ -310,7 +330,6 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet)
 
       /* this data is not returned as payload data */
       if (hybiWsFrameComplete(wsctx)) {
-        rfbLog("got closure, reason %d\n", WS_NTOH16(((uint16_t *)data)[0]));
         rfbLog("got close cmd, reason %d\n", WS_NTOH16(((uint16_t *)data)[0]));
         errno = ECONNRESET;
         *sockRet = -1;
@@ -326,8 +345,7 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet)
       data[toReturn] = '\0';
       rfbLog("Initiate Base64 decoding in %p with max size %d and '\\0' at %p\n", data, bufsize, data + toReturn);
       if (-1 == (wsctx->readlen = b64_pton((char *)data, data, bufsize))) {
-        syslog(LOG_ERR, "Base64 decode error in %s; data=%p bufsize=%d", __func__, data, bufsize);
-        rfbErr("%s: Base64 decode error; %m\n", __func__);
+        rfbErr("%s: Base64 decode error; %s\n", __func__, strerror(errno));
       }
       wsctx->writePos = hybiPayloadStart(wsctx);
       break;
@@ -437,12 +455,14 @@ spor:
                       "writePos=%p "
                       "state=%d toRead=%d remaining=%d "
                       "nRead=%d carrylen=%d carryBuf=%p "
-                      "result=%d\n",
+                      "result=%d "
+                      "errno=%d\n",
                       __func__, len,
                       wsctx->readlen, wsctx->readPos,
                       wsctx->writePos,
                       wsctx->hybiDecodeState, wsctx->nToRead, hybiRemaining(wsctx),
                       wsctx->nReadRaw, wsctx->carrylen, wsctx->carryBuf,
-                      result);
+                      result,
+                      errno);
     return result;
 }
