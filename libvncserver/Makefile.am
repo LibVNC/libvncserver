@@ -26,7 +26,14 @@ WEBSOCKETSSSLSRCS = rfbssl_none.c rfbcrypto_included.c ../common/md5.c ../common
 endif
 endif
 
-WEBSOCKETSSRCS = websockets.c $(WEBSOCKETSSSLSRCS)
+if HAVE_B64
+WEBSOCKETSB64SSRCS =
+else
+WEBSOCKETSB64SRCS = ../compat/base64.c
+endif
+
+WEBSOCKETSSRCS = websockets.c $(WEBSOCKETSB64SRCS) $(WEBSOCKETSSSLSRCS)
+
 endif
 
 includedir=$(prefix)/include/rfb
