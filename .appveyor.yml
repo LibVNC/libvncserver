@@ -19,7 +19,7 @@ install:
   - 7z x libpng.tar.gz -so | 7z x -si -ttar > nul
   - move libpng-1.6.28 libpng
   - cd libpng
-  - cmake . -DZLIB_INCLUDE_DIR=..\zlib -DZLIB_LIBRARY=..\zlib\debug\zlibd.lib
+  - cmake . -DZLIB_INCLUDE_DIR=..\zlib -DZLIB_LIBRARY=..\zlib\debug\zlibstaticd.lib
   - cmake --build .
   - cd ..
   # go back to source root
@@ -29,6 +29,6 @@ install:
 build_script:
   - mkdir build
   - cd build 
-  - cmake .. -DZLIB_INCLUDE_DIR=..\deps\zlib -DZLIB_LIBRARY=..\deps\zlib\debug\zlibd.lib -DPNG_PNG_INCLUDE_DIR=..\deps\libpng -DPNG_LIBRARY=..\deps\libpng\debug\libpng16d.lib
+  - cmake .. -DZLIB_INCLUDE_DIR=..\deps\zlib -DZLIB_LIBRARY=..\deps\zlib\debug\zlibstaticd.lib -DPNG_PNG_INCLUDE_DIR=..\deps\libpng -DPNG_LIBRARY=..\deps\libpng\debug\libpng16_staticd.lib
   - cmake --build .
   - ctest -C Debug --output-on-failure
