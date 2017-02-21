@@ -21,8 +21,8 @@ set(PROJECT_BUGREPORT_PATH "https://github.com/LibVNC/libvncserver/issues")
 set(LIBVNCSERVER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver)
 set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/common)
 set(LIBVNCCLIENT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncclient)
-set(LIBVNCSRVTEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples)
-set(LIBVNCCLITEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/client_examples)
+set(LIBVNCSRVEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples)
+set(LIBVNCCLIEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/client_examples)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 
@@ -391,8 +391,8 @@ SET_TARGET_PROPERTIES(vncclient vncserver
 		PROPERTIES SOVERSION "${VERSION_SO}" VERSION "${PACKAGE_VERSION}"
 )
 
-# tests
-set(LIBVNCSERVER_TESTS
+# EXAMPLES
+set(LIBVNCSERVER_EXAMPLES
     backchannel
     camera
     colourmaptest
@@ -409,63 +409,63 @@ set(LIBVNCSERVER_TESTS
   )
 
 if(CMAKE_USE_PTHREADS_INIT)
-  set(LIBVNCSERVER_TESTS
-    ${LIBVNCSERVER_TESTS}
+  set(LIBVNCSERVER_EXAMPLES
+    ${LIBVNCSERVER_EXAMPLES}
     blooptest
   )
 endif(CMAKE_USE_PTHREADS_INIT)
 
 if(WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
-  set(LIBVNCSERVER_TESTS
-    ${LIBVNCSERVER_TESTS}
+  set(LIBVNCSERVER_EXAMPLES
+    ${LIBVNCSERVER_EXAMPLES}
     filetransfer
   )
 endif(WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
 
 if(MACOS)
-  set(LIBVNCSERVER_TESTS
-    ${LIBVNCSERVER_TESTS}
+  set(LIBVNCSERVER_EXAMPLES
+    ${LIBVNCSERVER_EXAMPLES}
     mac
   )
 endif(MACOS)
 
-set(LIBVNCCLIENT_TESTS
+set(LIBVNCCLIENT_EXAMPLES
     backchannel
     ppmtest
 )
 
 if(SDL_FOUND)
   include_directories(${SDL_INCLUDE_DIR})
-  set(LIBVNCCLIENT_TESTS
-    ${LIBVNCCLIENT_TESTS}
+  set(LIBVNCCLIENT_EXAMPLES
+    ${LIBVNCCLIENT_EXAMPLES}
     SDLvncviewer
   )
   set(SDLvncviewer_EXTRA_SOURCES scrap.c)
 endif(SDL_FOUND)
 
 if(HAVE_FFMPEG)
-  set(LIBVNCCLIENT_TESTS
-    ${LIBVNCCLIENT_TESTS}
+  set(LIBVNCCLIENT_EXAMPLES
+    ${LIBVNCCLIENT_EXAMPLES}
     vnc2mpg
   )
 endif(HAVE_FFMPEG)
 
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
-foreach(test ${LIBVNCSERVER_TESTS})
-  add_executable(examples_${test} ${LIBVNCSRVTEST_DIR}/${test}.c)
-  set_target_properties(examples_${test} PROPERTIES OUTPUT_NAME ${test})
-  set_target_properties(examples_${test} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
-  target_link_libraries(examples_${test} vncserver ${CMAKE_THREAD_LIBS_INIT})
-endforeach(test ${LIBVNCSERVER_TESTS})
+foreach(e ${LIBVNCSERVER_EXAMPLES})
+  add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
+  set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
+  set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
+  target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT})
+endforeach(e ${LIBVNCSERVER_EXAMPLES})
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
-foreach(test ${LIBVNCCLIENT_TESTS})
-  add_executable(client_examples_${test} ${LIBVNCCLITEST_DIR}/${test}.c ${LIBVNCCLITEST_DIR}/${${test}_EXTRA_SOURCES} )
-  set_target_properties(client_examples_${test} PROPERTIES OUTPUT_NAME ${test})
-  set_target_properties(client_examples_${test} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
-  target_link_libraries(client_examples_${test} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
-endforeach(test ${LIBVNCCLIENT_TESTS})
+foreach(e ${LIBVNCCLIENT_EXAMPLES})
+  add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
+  set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
+  set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
+  target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
+endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 
 # this gets the libraries needed by TARGET in "-libx -liby ..." form
 function(get_link_libraries OUT TARGET)
