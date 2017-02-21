@@ -174,28 +174,6 @@ check_function_exists(strdup          LIBVNCSERVER_HAVE_STRDUP)
 check_function_exists(strerror        LIBVNCSERVER_HAVE_STRERROR)
 check_function_exists(strstr          LIBVNCSERVER_HAVE_STRSTR)
 
-# On systems such as GNU/Linux with glibc, __b64_ntop is defined in a
-# separate library, libresolv. On some others, such as FreeBSD, it is
-# part of libc itself. We first check if __b64_ntop is found without
-# additional libraries, and then try looking for it with libresolv if
-# the first test fails.
-check_function_exists(__b64_ntop HAVE_B64_IN_LIBC)
-if(NOT HAVE_B64_IN_LIBC)
-    set(CMAKE_REQUIRED_LIBRARIES resolv)
-    check_function_exists(__b64_ntop HAVE_B64_IN_LIBRESOLV)
-    set(CMAKE_REQUIRED_LIBRARIES)
-
-    if(HAVE_B64_IN_LIBRESOLV)
-        set(RESOLV_LIB "resolv")
-    endif(HAVE_B64_IN_LIBRESOLV)
-
-    # the function check somehow fails for apple but the function is there
-    if(APPLE)
-        set(RESOLV_LIB "resolv")
-    endif(APPLE)
-
-endif(NOT HAVE_B64_IN_LIBC)
-
 if(Threads_FOUND)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 endif(Threads_FOUND)
@@ -225,16 +203,16 @@ if(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_SYS_UIO_H)
   if(GNUTLS_FOUND)
     set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
     message(STATUS "Building websockets with GnuTLS")
-    set(WEBSOCKET_LIBRARIES ${RESOLV_LIB} ${GNUTLS_LIBRARIES})
+    set(WEBSOCKET_LIBRARIES ${GNUTLS_LIBRARIES})
     set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_gnutls ${LIBVNCSERVER_DIR}/rfbcrypto_gnutls)
     include_directories(${GNUTLS_INCLUDE_DIR})
   elseif(OPENSSL_FOUND)
     message(STATUS "Building websockets with OpenSSL")
-    set(WEBSOCKET_LIBRARIES ${RESOLV_LIB} ${OPENSSL_LIBRARIES})
+    set(WEBSOCKET_LIBRARIES ${OPENSSL_LIBRARIES})
     set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_openssl ${LIBVNCSERVER_DIR}/rfbcrypto_openssl)
   else()
     message(STATUS "Building websockets without SSL")
-    set(WEBSOCKET_LIBRARIES ${RESOLV_LIB})
+    set(WEBSOCKET_LIBRARIES)
     set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_none.c ${LIBVNCSERVER_DIR}/rfbcrypto_included.c ${COMMON_DIR}/md5.c ${COMMON_DIR}/sha1.c)
   endif()
 endif(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_SYS_UIO_H)
@@ -388,10 +366,10 @@ if(LIBVNCSERVER_WITH_WEBSOCKETS)
     ${LIBVNCSERVER_SOURCES}
     ${LIBVNCSERVER_DIR}/websockets.c
     ${LIBVNCSERVER_DIR}/ws_decode.c
+    ${COMMON_DIR}/base64.c
     ${WSSRCS}
   )
 endif(LIBVNCSERVER_WITH_WEBSOCKETS)
-
 
 add_library(vncclient ${LIBVNCCLIENT_SOURCES})
 add_library(vncserver ${LIBVNCSERVER_SOURCES})

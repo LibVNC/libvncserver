@@ -3,9 +3,6 @@
 
 #include <stdint.h>
 #include <rfb/rfb.h>
-#ifndef _MSC_VER
-#include <resolv.h> /* __b64_ntop */
-#endif
 
 #if defined(__APPLE__)
 
