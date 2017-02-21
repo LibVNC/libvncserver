@@ -31,4 +31,4 @@ build_script:
   - cd build 
   - cmake .. -DZLIB_INCLUDE_DIR=..\deps\zlib -DZLIB_LIBRARY=..\deps\zlib\debug\zlibd.lib -DPNG_PNG_INCLUDE_DIR=..\deps\libpng -DPNG_LIBRARY=..\deps\libpng\debug\libpng16d.lib
   - cmake --build .
-  - ctest -C Debug
+  - ctest -C Debug -V
