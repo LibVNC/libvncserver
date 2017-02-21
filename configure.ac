@@ -77,9 +77,15 @@ AC_CHECK_HEADER(thenonexistentheader.h, HAVE_THENONEXISTENTHEADER_H="true")
 
 # set some ld -R nonsense
 #
+AC_ARG_ENABLE(rpath,
+[  --disable-rpath         do not hardcode runtime library paths],
+:, enable_rpath=yes)
+
 uname_s=`(uname -s) 2>/dev/null`
 ld_minus_R="yes"
-if test "x$uname_s" = "xHP-UX"; then
+if test "x$enable_rpath" != "yes"; then
+        ld_minus_R="no"
+elif test "x$uname_s" = "xHP-UX"; then
 	ld_minus_R="no"
 elif test "x$uname_s" = "xOSF1"; then
 	ld_minus_R="no"
