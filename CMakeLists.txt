@@ -7,7 +7,6 @@ include(CheckIncludeFile)
 include(CheckTypeSize)
 include(TestBigEndian)
 include(CheckCSourceCompiles)
-include(CheckCXXSourceCompiles)
 include(CheckCSourceRuns)
 
 enable_testing()
