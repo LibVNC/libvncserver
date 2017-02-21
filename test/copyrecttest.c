@@ -2,6 +2,7 @@
 #define _BSD_SOURCE
 #endif
 #include <rfb/rfb.h>
+#define _USE_MATH_DEFINES
 #include <math.h>
 
 static void initBackground(rfbScreenInfoPtr server)
