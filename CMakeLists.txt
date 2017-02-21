@@ -10,6 +10,8 @@ include(CheckCSourceCompiles)
 include(CheckCXXSourceCompiles)
 include(CheckCSourceRuns)
 
+enable_testing()
+
 set(PACKAGE_NAME           "LibVNCServer")
 set(FULL_PACKAGE_NAME      "LibVNCServer")
 set(VERSION_MAJOR          "0")
@@ -524,6 +526,8 @@ if(FOUND_LIBJPEG_TURBO)
 
 endif(FOUND_LIBJPEG_TURBO)
 
+add_test(NAME cargs COMMAND test_cargstest)
+add_test(NAME turbojpeg COMMAND test_tjunittest)
 
 
 
