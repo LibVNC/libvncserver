@@ -472,6 +472,11 @@ endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 #
 # them tests
 #
+
+if(UNIX)
+    set(ADDITIONAL_TEST_LIBS m)
+endif(UNIX)
+
 set(SIMPLETESTS
    cargstest
    copyrecttest
@@ -489,7 +494,7 @@ foreach(t ${SIMPLETESTS})
   add_executable(test_${t} ${TESTS_DIR}/${t}.c)
   set_target_properties(test_${t} PROPERTIES OUTPUT_NAME ${t})
   set_target_properties(test_${t} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
-  target_link_libraries(test_${t} vncserver vncclient m)
+  target_link_libraries(test_${t} vncserver vncclient ${ADDITIONAL_TEST_LIBS})
 endforeach(t ${SIMPLETESTS})
 
 if(FOUND_LIBJPEG_TURBO)
@@ -502,7 +507,7 @@ if(FOUND_LIBJPEG_TURBO)
                 )
   set_target_properties(test_tjunittest PROPERTIES OUTPUT_NAME tjunittest)
   set_target_properties(test_tjunittest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
-  target_link_libraries(test_tjunittest vncserver vncclient m)
+  target_link_libraries(test_tjunittest vncserver vncclient ${ADDITIONAL_TEST_LIBS})
 
   add_executable(test_tjbench
                  ${TESTS_DIR}/tjbench.c
@@ -515,7 +520,7 @@ if(FOUND_LIBJPEG_TURBO)
                 )
   set_target_properties(test_tjbench PROPERTIES OUTPUT_NAME tjbench)
   set_target_properties(test_tjbench PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
-  target_link_libraries(test_tjbench vncserver vncclient m)
+  target_link_libraries(test_tjbench vncserver vncclient ${ADDITIONAL_TEST_LIBS})
 
 endif(FOUND_LIBJPEG_TURBO)
 
