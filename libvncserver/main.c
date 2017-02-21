@@ -1061,7 +1061,15 @@ void rfbInitServer(rfbScreenInfoPtr screen)
 {
 #ifdef WIN32
   WSADATA trash;
-  WSAStartup(MAKEWORD(2,2),&trash);
+  static rfbBool WSAinitted=FALSE;
+  if(!WSAinitted) {
+    int i=WSAStartup(MAKEWORD(2,0),&trash);
+    if(i!=0) {
+      rfbErr("Couldn't init Windows Sockets\n");
+      return 0;
+    }
+    WSAinitted=TRUE;
+  }
 #endif
   rfbInitSockets(screen);
   rfbHttpInitSockets(screen);
