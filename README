@@ -68,6 +68,19 @@ https://github.com/ocrespo/VNCpp
 
 Mail me, if your application is missing!
 
+How to build
+------------
+
+LibVNCServer uses CMake, so you can build via:
+
+    mkdir build
+    cd build
+    cmake ..
+    cmake --build .
+
+For some more comprehensive examples that include installation of dependencies, see
+the [Unix CI](.travis.yml) and [Windows CI](.appveyor.yml) build setups.
+
 How to use
 ----------
 
