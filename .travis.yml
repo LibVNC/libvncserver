@@ -25,5 +25,5 @@ script:
   - cd build
   - cmake ..
   - cmake --build .
-  - ctest -C Debug
+  - ctest
 
