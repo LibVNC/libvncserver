@@ -527,7 +527,9 @@ if(FOUND_LIBJPEG_TURBO)
 endif(FOUND_LIBJPEG_TURBO)
 
 add_test(NAME cargs COMMAND test_cargstest)
-add_test(NAME turbojpeg COMMAND test_tjunittest)
+if(FOUND_LIBJPEG_TURBO)
+    add_test(NAME turbojpeg COMMAND test_tjunittest)
+endif(FOUND_LIBJPEG_TURBO)
 
 
 
