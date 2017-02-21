@@ -23,6 +23,7 @@ set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/common)
 set(LIBVNCCLIENT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncclient)
 set(LIBVNCSRVEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples)
 set(LIBVNCCLIEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/client_examples)
+set(TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 
@@ -467,7 +468,63 @@ foreach(e ${LIBVNCCLIENT_EXAMPLES})
   target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
 endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 
+
+#
+# them tests
+#
+set(SIMPLETESTS
+   cargstest
+   copyrecttest
+)
+
+if(CMAKE_USE_PTHREADS_INIT)
+  set(SIMPLETESTS
+      ${SIMPLETESTS}
+      encodingstest
+     )
+endif(CMAKE_USE_PTHREADS_INIT)
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
+foreach(t ${SIMPLETESTS})
+  add_executable(test_${t} ${TESTS_DIR}/${t}.c)
+  set_target_properties(test_${t} PROPERTIES OUTPUT_NAME ${t})
+  set_target_properties(test_${t} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
+  target_link_libraries(test_${t} vncserver vncclient m)
+endforeach(t ${SIMPLETESTS})
+
+if(FOUND_LIBJPEG_TURBO)
+  add_executable(test_tjunittest
+                 ${TESTS_DIR}/tjunittest.c
+                 ${TESTS_DIR}/tjutil.c
+                 ${TESTS_DIR}/tjutil.h
+                 ${COMMON_DIR}/turbojpeg.c
+                 ${COMMON_DIR}/turbojpeg.h
+                )
+  set_target_properties(test_tjunittest PROPERTIES OUTPUT_NAME tjunittest)
+  set_target_properties(test_tjunittest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
+  target_link_libraries(test_tjunittest vncserver vncclient m)
+
+  add_executable(test_tjbench
+                 ${TESTS_DIR}/tjbench.c
+                 ${TESTS_DIR}/tjutil.c
+                 ${TESTS_DIR}/tjutil.h
+                 ${TESTS_DIR}/bmp.c
+                 ${TESTS_DIR}/bmp.h
+                 ${COMMON_DIR}/turbojpeg.c
+                 ${COMMON_DIR}/turbojpeg.h
+                )
+  set_target_properties(test_tjbench PROPERTIES OUTPUT_NAME tjbench)
+  set_target_properties(test_tjbench PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
+  target_link_libraries(test_tjbench vncserver vncclient m)
+
+endif(FOUND_LIBJPEG_TURBO)
+
+
+
+
+#
 # this gets the libraries needed by TARGET in "-libx -liby ..." form
+#
 function(get_link_libraries OUT TARGET)
     set(RESULT "")
     get_target_property(LIBRARIES ${TARGET} INTERFACE_LINK_LIBRARIES)
