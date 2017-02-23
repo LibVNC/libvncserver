@@ -96,7 +96,6 @@ struct timeval
 #endif
 
 static rfbBool webSocketsHandshake(rfbClientPtr cl, char *scheme);
-void webSocketsGenMd5(char * target, char *key1, char *key2, char *key3);
 
 static int webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst);
 
@@ -350,56 +349,6 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     return TRUE;
 }
 
-void
-webSocketsGenMd5(char * target, char *key1, char *key2, char *key3)
-{
-    unsigned int i, spaces1 = 0, spaces2 = 0;
-    unsigned long num1 = 0, num2 = 0;
-    unsigned char buf[17];
-    struct iovec iov[1];
-
-    for (i=0; i < strlen(key1); i++) {
-        if (key1[i] == ' ') {
-            spaces1 += 1;
-        }
-        if ((key1[i] >= 48) && (key1[i] <= 57)) {
-            num1 = num1 * 10 + (key1[i] - 48);
-        }
-    }
-    num1 = num1 / spaces1;
-
-    for (i=0; i < strlen(key2); i++) {
-        if (key2[i] == ' ') {
-            spaces2 += 1;
-        }
-        if ((key2[i] >= 48) && (key2[i] <= 57)) {
-            num2 = num2 * 10 + (key2[i] - 48);
-        }
-    }
-    num2 = num2 / spaces2;
-
-    /* Pack it big-endian */
-    buf[0] = (num1 & 0xff000000) >> 24;
-    buf[1] = (num1 & 0xff0000) >> 16;
-    buf[2] = (num1 & 0xff00) >> 8;
-    buf[3] =  num1 & 0xff;
-
-    buf[4] = (num2 & 0xff000000) >> 24;
-    buf[5] = (num2 & 0xff0000) >> 16;
-    buf[6] = (num2 & 0xff00) >> 8;
-    buf[7] =  num2 & 0xff;
-
-    strncpy((char *)buf+8, key3, 8);
-    buf[16] = '\0';
-
-    iov[0].iov_base = buf;
-    iov[0].iov_len = 16;
-    digestmd5(iov, 1, target);
-    target[16] = '\0';
-
-    return;
-}
-
 static int
 ws_read(void *ctxPtr, char *buf, size_t len)
 {
@@ -490,18 +439,6 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx; 
     wsctx->ctxInfo.ctxPtr = cl;
     return webSocketsDecodeHybi(wsctx, dst, len);
-}
-
-
-/* returns TRUE if client sent a close frame or a single 'end of frame'
- * marker was received, FALSE otherwise
- *
- * Note: This was a Hixie-only hack!
- **/
-rfbBool
-webSocketCheckDisconnect(rfbClientPtr cl)
-{
-    return FALSE;
 }
 
 /* returns TRUE if there is data waiting to be read in our internal buffer
