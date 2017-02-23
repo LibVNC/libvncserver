@@ -1999,11 +1999,6 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     char encBuf[64];
     char encBuf2[64];
 
-#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-    if (cl->wsctx && webSocketCheckDisconnect(cl))
-      return;
-#endif
-
     if ((n = rfbReadExact(cl, (char *)&msg, 1)) <= 0) {
         if (n != 0)
             rfbLogPerror("rfbProcessClientNormalMessage: read");
