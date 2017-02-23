@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <errno.h>
 
@@ -70,7 +71,7 @@ struct ws_frame_test {
   int close_sock_at;
 };
 
-#include "wstestdata.c"
+#include "wstestdata.inc"
 
 char el_log[1000000];
 char *el_pos;
