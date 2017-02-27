@@ -8,17 +8,27 @@
 #define WS_HYBI_HEADER_LEN_EXTENDED 4 + WS_HYBI_MASK_LEN
 #define WS_HYBI_HEADER_LEN_LONG 10 + WS_HYBI_MASK_LEN
 
-static int
+static inline int
+isControlFrame(ws_ctx_t *wsctx)
+{
+  return 0 != (wsctx->header.opcode & 0x08);
+}
+
+static uint64_t 
 hybiRemaining(ws_ctx_t *wsctx)
 {
   return wsctx->nToRead - wsctx->nReadRaw;
 }
 
-void
-hybiDecodeCleanup(ws_ctx_t *wsctx)
+static void
+hybiDecodeCleanupBasics(ws_ctx_t *wsctx)
 {
+  /* keep opcode, cleanup rest */
+  wsctx->header.opcode = WS_OPCODE_INVALID;
   wsctx->header.payloadLen = 0;
   wsctx->header.mask.u = 0;
+  wsctx->header.headerLen = 0;
+  wsctx->header.data = NULL;
   wsctx->nReadRaw = 0;
   wsctx->nToRead= 0;
   wsctx->carrylen = 0;
@@ -26,8 +36,23 @@ hybiDecodeCleanup(ws_ctx_t *wsctx)
   wsctx->readlen = 0;
   wsctx->hybiDecodeState = WS_HYBI_STATE_HEADER_PENDING;
   wsctx->writePos = NULL;
-  rfbLog("cleaned up wsctx\n");
 }
+
+static void
+hybiDecodeCleanupForContinuation(ws_ctx_t *wsctx)
+{
+  hybiDecodeCleanupBasics(wsctx);
+  rfbLog("clean up frame, but expect continuation with opcode %d\n", wsctx->continuation_opcode);
+}
+
+void
+hybiDecodeCleanupComplete(ws_ctx_t *wsctx)
+{
+  hybiDecodeCleanupBasics(wsctx);
+  wsctx->continuation_opcode = WS_OPCODE_INVALID;
+  rfbLog("cleaned up wsctx completely\n");
+}
+
 
 /**
  * Return payload data that has been decoded/unmasked from
@@ -94,10 +119,9 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet, int *nPayload)
 {
   int ret;
   char *headerDst = wsctx->codeBufDecode + wsctx->nReadRaw;
-  int n = WSHLENMAX - wsctx->nReadRaw;
+  int n = ((uint64_t)WSHLENMAX) - wsctx->nReadRaw;
 
   rfbLog("header_read to %p with len=%d\n", headerDst, n);
-  //ret = ws_read(cl, headerDst, n);
   ret = wsctx->ctxInfo.readFunc(wsctx->ctxInfo.ctxPtr, headerDst, n);
   rfbLog("read %d bytes from socket\n", ret);
   if (ret <= 0) {
@@ -106,29 +130,65 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet, int *nPayload)
       int olderrno = errno;
       rfbErr("%s: read; %s\n", __func__, strerror(errno));
       errno = olderrno;
-      *sockRet = -1;
+      goto err_cleanup_state;
     } else {
       *sockRet = 0;
+      goto err_cleanup_state_sock_closed;
     }
-    return WS_HYBI_STATE_ERR;
   }
 
   wsctx->nReadRaw += ret;
   if (wsctx->nReadRaw < 2) {
     /* cannot decode header with less than two bytes */
-    errno = EAGAIN;
-    *sockRet = -1;
-    return WS_HYBI_STATE_HEADER_PENDING;
+    goto ret_header_pending;
   }
 
   /* first two header bytes received; interpret header data and get rest */
   wsctx->header.data = (ws_header_t *)wsctx->codeBufDecode;
 
   wsctx->header.opcode = wsctx->header.data->b0 & 0x0f;
+  wsctx->header.fin = (wsctx->header.data->b0 & 0x80) >> 7;
+  if (isControlFrame(wsctx)) {
+    rfbLog("is control frame\n");
+    /* is a control frame, leave remembered continuation opcode unchanged;
+     * just check if there is a wrong fragmentation */
+    if (wsctx->header.fin == 0) {
 
-  /* fin = (header->b0 & 0x80) >> 7; */ /* not used atm */
-  wsctx->header.payloadLen = wsctx->header.data->b1 & 0x7f;
-  rfbLog("first header bytes received; opcode=%d lenbyte=%d\n", wsctx->header.opcode, wsctx->header.payloadLen);
+      /* we only accept text/binary continuation frames; RFC6455:
+       * Control frames (see Section 5.5) MAY be injected in the middle of
+       * a fragmented message.  Control frames themselves MUST NOT be
+       * fragmented. */
+      rfbErr("control frame with FIN bit cleared received, aborting\n");
+      errno = EPROTO;
+      goto err_cleanup_state;
+    }
+  } else {
+    rfbLog("not a control frame\n");
+    /* not a control frame, check for continuation opcode */
+    if (wsctx->header.opcode == WS_OPCODE_CONTINUATION) {
+      rfbLog("cont_frame\n");
+      /* do we have state (i.e., opcode) for continuation frame? */
+      if (wsctx->continuation_opcode == WS_OPCODE_INVALID) {
+        rfbErr("no continuation state\n");
+        errno = EPROTO;
+        goto err_cleanup_state;
+      }
+
+      /* otherwise, set opcode = continuation_opcode */
+      wsctx->header.opcode = wsctx->continuation_opcode;
+      rfbLog("set opcode to continuation_opcode: %d\n", wsctx->header.opcode);
+    } else {
+      if (wsctx->header.fin == 0) {
+        wsctx->continuation_opcode = wsctx->header.opcode;
+      } else {
+        wsctx->continuation_opcode = WS_OPCODE_INVALID;
+      }
+      rfbLog("set continuation_opcode to %d\n", wsctx->continuation_opcode);
+    }
+  }
+
+  wsctx->header.payloadLen = (uint64_t)(wsctx->header.data->b1 & 0x7f);
+  rfbLog("first header bytes received; opcode=%d lenbyte=%d fin=%d\n", wsctx->header.opcode, wsctx->header.payloadLen, wsctx->header.fin);
 
   /*
    * 4.3. Client-to-Server Masking
@@ -139,8 +199,7 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet, int *nPayload)
   if (!(wsctx->header.data->b1 & 0x80)) {
     rfbErr("%s: got frame without mask; ret=%d\n", __func__, ret);
     errno = EPROTO;
-    *sockRet = -1;
-    return WS_HYBI_STATE_ERR;
+    goto err_cleanup_state;
   }
 
 
@@ -158,22 +217,27 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet, int *nPayload)
   } else {
     /* Incomplete frame header, try again */
     rfbErr("%s: incomplete frame header; ret=%d\n", __func__, ret);
-    errno = EAGAIN;
-    *sockRet = -1;
-    return WS_HYBI_STATE_HEADER_PENDING;
+    goto ret_header_pending;
   }
+
+  char *h = wsctx->codeBufDecode;
+  int i;
+  rfbLog("Header:\n");
+  for (i=0; i <10; i++) {
+    rfbLog("0x%02X\n", (unsigned char)h[i]);
+  }
+  rfbLog("\n");
 
   /* while RFC 6455 mandates that lengths MUST be encoded with the minimum
    * number of bytes, it does not specify for the server how to react on
    * 'wrongly' encoded frames --- this implementation rejects them*/
   if ((wsctx->header.headerLen > WS_HYBI_HEADER_LEN_SHORT
-      && wsctx->header.payloadLen < 126)
+      && wsctx->header.payloadLen < (uint64_t)126)
       || (wsctx->header.headerLen > WS_HYBI_HEADER_LEN_EXTENDED
-        && wsctx->header.payloadLen < 65536)) {
+        && wsctx->header.payloadLen < (uint64_t)65536)) {
     rfbErr("%s: invalid length field; headerLen=%d payloadLen=%llu\n", __func__, wsctx->header.headerLen, wsctx->header.payloadLen);
     errno = EPROTO;
-    *sockRet = -1;
-    return WS_HYBI_STATE_ERR;
+    goto err_cleanup_state;
   }
 
   /* absolute length of frame */
@@ -186,9 +250,20 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet, int *nPayload)
   wsctx->readPos = (unsigned char *)(wsctx->codeBufDecode + wsctx->header.headerLen);
 
   *nPayload = wsctx->nReadRaw - wsctx->header.headerLen;
-  rfbLog("header complete: state=%d flen=%d writeTo=%p nPayload=%d\n", wsctx->hybiDecodeState, wsctx->nToRead, wsctx->writePos, *nPayload);
+  rfbLog("header complete: state=%d flen=%llu writeTo=%p nPayload=%d\n", wsctx->hybiDecodeState, wsctx->nToRead, wsctx->writePos, *nPayload);
 
   return WS_HYBI_STATE_DATA_NEEDED;
+
+ret_header_pending:
+  errno = EAGAIN;
+  *sockRet = -1;
+  return WS_HYBI_STATE_HEADER_PENDING;
+
+err_cleanup_state:
+  *sockRet = -1;
+err_cleanup_state_sock_closed:
+  hybiDecodeCleanupComplete(wsctx);
+  return WS_HYBI_STATE_ERR;
 }
 
 static int
@@ -248,6 +323,7 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
 
   /* -1 accounts for potential '\0' terminator for base64 decoding */
   bufsize = wsctx->codeBufDecode + ARRAYSIZE(wsctx->codeBufDecode) - wsctx->writePos - 1;
+  rfbLog("bufsize=%d\n", bufsize);
   if (hybiRemaining(wsctx) > bufsize) {
     nextRead = bufsize;
   } else {
@@ -453,11 +529,18 @@ spor:
     /* rfbLog("%s: ret: %d/%d\n", __func__, result, len); */
     if (wsctx->hybiDecodeState == WS_HYBI_STATE_FRAME_COMPLETE) {
       rfbLog("frame received successfully, cleaning up: read=%d hlen=%d plen=%d\n", wsctx->header.nRead, wsctx->header.headerLen, wsctx->header.payloadLen);
-      /* frame finished, cleanup state */
-      hybiDecodeCleanup(wsctx);
+      if (wsctx->header.fin && !isControlFrame(wsctx)) {
+        /* frame finished, cleanup state */
+        hybiDecodeCleanupComplete(wsctx);
+      } else {
+        /* always retain continuation opcode for unfinished data frames
+         * or control frames, which may interleave with data frames */
+        hybiDecodeCleanupForContinuation(wsctx);
+      }
     } else if (wsctx->hybiDecodeState == WS_HYBI_STATE_ERR) {
-      hybiDecodeCleanup(wsctx);
+      hybiDecodeCleanupComplete(wsctx);
     }
+
     rfbLog("%s_exit: len=%d; "
                       "CTX: readlen=%d readPos=%p "
                       "writePos=%p "
