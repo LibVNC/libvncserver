@@ -98,10 +98,10 @@ static int emu_read(void *ctx, char *dst, size_t len)
   rfbLog("emu_read called with dst=%p and len=%lu\n", dst, len);
   if (ft->simulate_sock_malfunction_at > 0 && ft->simulate_sock_malfunction_at == ft->i) {
     rfbLog("simulating IO error with errno=%d\n", ft->errno_val);
-    errno = ft->errno_val; 
+    errno = ft->errno_val;
     return -1;
   }
-  
+
   /* return something */
   r = rand();
   modu = (ft->frame + ft->frame_len) - ft->pos;
@@ -130,7 +130,7 @@ static uint64_t run_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
   while (nleft > 0) {
     rfbLog("calling ws_decode with dst=%p, len=%lu\n", dst, nleft);
     n = ctx->decode(ctx, dst, nleft);
-    rfbLog("read n=%ld\n", n); 
+    rfbLog("read n=%ld\n", n);
     if (n == 0) {
       if (ft->close_sock_at > 0) {
         return OK;
@@ -155,7 +155,7 @@ static uint64_t run_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
       rfbLog("read n=%ld from decode; dst=%p, nleft=%lu\n", n, dst, nleft);
     }
   }
- 
+
   if (memcmp(ft->expectedDecodeBuf, dstbuf, ft->raw_payload_len) != 0) {
     ft->expectedDecodeBuf[ft->raw_payload_len] = '\0';
     dstbuf[ft->raw_payload_len] = '\0';
@@ -168,24 +168,23 @@ static uint64_t run_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
 
 
 int main()
-{ 
+{
   ws_ctx_t ctx;
   int retall= 0;
   int i;
-  srand(RND_SEED); 
+  srand(RND_SEED);
   
+  hybiDecodeCleanupComplete(&ctx);
+  ctx.decode = webSocketsDecodeHybi;
+  ctx.ctxInfo.readFunc = emu_read;
+  rfbLog = logtest;
+  rfbErr = logtest;
+
   for (i = 0; i < ARRAYSIZE(tests); i++) {
     int ret;
 
+    /* reset output log buffer to begin */
     el_pos = el_log;
-    rfbLog = logtest;
-    rfbErr = logtest;
-
-    hybiDecodeCleanup(&ctx);
-    ctx.decode = webSocketsDecodeHybi;
-    ctx.version = WEBSOCKETS_VERSION_HYBI;
-
-    ctx.ctxInfo.readFunc = emu_read;
 
     ret = run_test(&tests[i], &ctx);
     printf("%s: \"%s\"\n", ret == 0 ? "PASS" : "FAIL", tests[i].descr);
@@ -198,7 +197,7 @@ int main()
   return retall;
 }
 
-#else 
+#else
 
 int main() {
   return 0;

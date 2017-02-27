@@ -339,12 +339,11 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     free(buf);
 
     wsctx = calloc(1, sizeof(ws_ctx_t));
-    wsctx->version = WEBSOCKETS_VERSION_HYBI;
     wsctx->encode = webSocketsEncodeHybi;
     wsctx->decode = webSocketsDecodeHybi;
     wsctx->ctxInfo.readFunc = ws_read;
     wsctx->base64 = base64;
-    hybiDecodeCleanup(wsctx);
+    hybiDecodeCleanupComplete(wsctx);
     cl->wsctx = (wsCtx *)wsctx;
     return TRUE;
 }

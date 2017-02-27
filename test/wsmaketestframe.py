@@ -42,12 +42,12 @@ def add_field(s, name, value, first=False):
 
 
 class Testframe():
-    def __init__(self, frame, descr, modify_bytes={}, experrno=0, mask=True):
+    def __init__(self, frame, descr, modify_bytes={}, experrno=0, mask=True, opcode_overwrite=False):
         self.frame = frame
         self.descr = descr
         self.modify_bytes = modify_bytes
         self.experrno = experrno
-        self.b64 = True if frame.opcode == 1 else False
+        self.b64 = True if frame.opcode == 1 or opcode_overwrite == 1 else False
         self.mask = mask
 
     def to_carray_initializer(self, buf):
@@ -110,7 +110,14 @@ flist.append(Testframe(websockets.framing.Frame(1, 8, bytearray(list([0x03, 0xEB
 ### invalid header values
 flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("Testit", encoding="utf-8")), "Invalid frame: Wrong masking", experrno="EPROTO", mask=False))
 flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("..Lore Ipsum", encoding="utf-8")), "Invalid frame: Length of < 126 with add. 16 bit len field", experrno="EPROTO", modify_bytes={ 1: 0xFE, 2: 0x00, 3: 0x0F}))
-flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("........Lore Ipsum", encoding="utf-8")), "Invalid frame: Length of < 126 with add. 64 bit len field", experrno="EPROTO", modify_bytes={ 1: 0xFF, 2: 0x00, 3: 0x00, 4: 0x00, 5: 0x00, 6: 0x80, 7: 0x40}))
+flist.append(Testframe(websockets.framing.Frame(1, 1, bytearray("........Lore Ipsum", encoding="utf-8")), "Invalid frame: Length of < 126 with add. 64 bit len field", experrno="EPROTO", modify_bytes={ 1: 0xFF, 2: 0x00, 3: 0x00, 4: 0x00, 5: 0x00, 6: 0x00, 7: 0x00, 8: 0x80, 9: 0x40}))
+
+frag1 = websockets.framing.Frame(0, 1, bytearray("This is a fragmented websocket...", encoding="utf-8"))
+frag2 = websockets.framing.Frame(0, 0, bytearray("... and it goes on...", encoding="utf-8"))
+frag3 = websockets.framing.Frame(1, 0, bytearray("and on and stop", encoding="utf-8"))
+flist.append(Testframe(frag1, "Continuation test frag1"))
+flist.append(Testframe(frag2, "Continuation test frag2", opcode_overwrite=1))
+flist.append(Testframe(frag3, "Continuation test frag3", opcode_overwrite=1))
 
 s = "struct ws_frame_test tests[] = {\n"
 for i in range(len(flist)):
@@ -120,5 +127,5 @@ for i in range(len(flist)):
     s += "\n"
 s += "};\n"
 
-with open("wstestdata.c", "w") as cdatafile:
+with open("wstestdata.inc", "w") as cdatafile:
     cdatafile.write(s)

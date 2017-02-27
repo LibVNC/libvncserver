@@ -27,15 +27,10 @@
 #endif
 
 #define B64LEN(__x) (((__x + 2) / 3) * 12 / 3)
-#define WSHLENMAX 14  /* 2 + sizeof(uint64_t) + sizeof(uint32_t) */
+#define WSHLENMAX 14LL  /* 2 + sizeof(uint64_t) + sizeof(uint32_t) */
 #define WS_HYBI_MASK_LEN 4
 
 #define ARRAYSIZE(a) ((sizeof(a) / sizeof((a[0]))) / (size_t)(!(sizeof(a) % sizeof((a[0])))))
-
-enum {
-  WEBSOCKETS_VERSION_HIXIE,
-  WEBSOCKETS_VERSION_HYBI
-};
 
 struct ws_ctx_s;
 typedef struct ws_ctx_s ws_ctx_t;
@@ -111,9 +106,11 @@ typedef struct ws_header_data_s {
   /** length of frame header including payload len, but without mask */
   int headerLen;
   /** length of the payload data */
-  int payloadLen;
+  uint64_t payloadLen;
   /** opcode */
   unsigned char opcode;
+  /** fin bit */
+  unsigned char fin;
 } ws_header_data_t;
 
 typedef struct ws_ctx_s {
@@ -125,11 +122,11 @@ typedef struct ws_ctx_s {
     int hybiDecodeState;
     char carryBuf[3];                      /* For base64 carry-over */
     int carrylen;
-    int version;
     int base64;
     ws_header_data_t header;
-    int nReadRaw;
-    int nToRead;
+    uint64_t nReadRaw;
+    uint64_t nToRead;
+    unsigned char continuation_opcode;
     wsEncodeFunc encode;
     wsDecodeFunc decode;
     ctxInfo_t ctxInfo;
@@ -137,15 +134,16 @@ typedef struct ws_ctx_s {
 
 enum
 {
-    WS_OPCODE_CONTINUATION = 0x0,
-    WS_OPCODE_TEXT_FRAME,
-    WS_OPCODE_BINARY_FRAME,
-    WS_OPCODE_CLOSE = 0x8,
-    WS_OPCODE_PING,
-    WS_OPCODE_PONG
+    WS_OPCODE_CONTINUATION = 0x00,
+    WS_OPCODE_TEXT_FRAME = 0x01,
+    WS_OPCODE_BINARY_FRAME = 0x02,
+    WS_OPCODE_CLOSE = 0x08,
+    WS_OPCODE_PING = 0x09,
+    WS_OPCODE_PONG = 0x0A,
+    WS_OPCODE_INVALID = 0xFF
 };
 
 int webSocketsDecodeHybi(ws_ctx_t *wsctx, char *dst, int len);
 
-void hybiDecodeCleanup(ws_ctx_t *wsctx);
+void hybiDecodeCleanupComplete(ws_ctx_t *wsctx);
 #endif
