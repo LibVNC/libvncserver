@@ -124,8 +124,7 @@ typedef struct ws_ctx_s {
     int carrylen;
     int base64;
     ws_header_data_t header;
-    uint64_t nReadRaw;
-    uint64_t nToRead;
+    uint64_t nReadPayload;
     unsigned char continuation_opcode;
     wsEncodeFunc encode;
     wsDecodeFunc decode;
