@@ -97,10 +97,11 @@ struct timeval
 
 static rfbBool webSocketsHandshake(rfbClientPtr cl, char *scheme);
 
-static int webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst);
+static int webSocketsEncodeHybi(ws_ctx_t *ctx, const char *src, int len);
 
-static int ws_read(void *cl, char *buf, size_t len);
+static size_t ws_read(void *cl, char *buf, size_t len);
 
+static size_t ws_write(void *cl, char *buf, size_t len);
 
 static int
 min (int a, int b) {
@@ -120,6 +121,16 @@ static void webSocketsGenSha1Key(char *target, int size, char *key)
     if (-1 == b64_ntop(hash, sizeof(hash), target, size))
 	rfbErr("b64_ntop failed\n");
 }
+
+  
+void
+wsEncodeCleanup(ws_encoding_ctx_t *ctx)
+{
+    wsHeaderCleanup(&(ctx->header));
+    ctx->state = WS_STATE_ENCODING_IDLE;
+    ctx->readPos = ctx->codeBufEncode;
+}
+
 
 /*
  * rfbWebSocketsHandshake is called to handle new WebSockets connections
@@ -205,12 +216,13 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
             if ((n < 0) && (errno == ETIMEDOUT)) {
                 break;
             }
-            if (n == 0)
+            if (n == 0) {
                 rfbLog("webSocketsHandshake: client gone\n");
-            else
+            } else {
                 rfbLogPerror("webSocketsHandshake: read");
-                free(response);
-                free(buf);
+            }
+            free(response);
+            free(buf);
             return FALSE;
         }
 
@@ -224,10 +236,11 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                         if ((n < 0) && (errno == ETIMEDOUT)) {
                             break;
                         }
-                        if (n == 0)
+                        if (n == 0) {
                             rfbLog("webSocketsHandshake: client gone\n");
-                        else
+                        } else {
                             rfbLogPerror("webSocketsHandshake: read");
+                        }
                         free(response);
                         free(buf);
                         return FALSE;
@@ -343,12 +356,13 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     wsctx->decode = webSocketsDecodeHybi;
     wsctx->ctxInfo.readFunc = ws_read;
     wsctx->base64 = base64;
-    hybiDecodeCleanupComplete(wsctx);
+    hybiDecodeCleanupComplete(&(wsctx->dec));
+    wsEncodeCleanup(&(wsctx->enc));
     cl->wsctx = (wsCtx *)wsctx;
     return TRUE;
 }
 
-static int
+static size_t
 ws_read(void *ctxPtr, char *buf, size_t len)
 {
     int n;
@@ -361,15 +375,98 @@ ws_read(void *ctxPtr, char *buf, size_t len)
     return n;
 }
 
-static int
-webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
+static size_t
+ws_write(void *ctxPtr, char *buf, size_t len)
 {
-    int blen, ret = -1, sz = 0;
+  int n;
+  rfbClientPtr cl = ctxPtr;
+  if (cl->sslctx) {
+    n = rfbssl_write(cl, buf, len);
+  } else {
+    n = write(cl->sock, buf, len);
+  }
+  return n;
+}
+
+static size_t
+encodeSockTotal(ws_encoding_ctx_t *ctx)
+{
+    return ctx->header.headerLen + ctx->header.payloadLen;
+}
+
+static size_t
+encodeSockRemaining(ws_encoding_ctx_t *ctx)
+{
+    return encodeSockTotal(ctx) - (ctx->readPos - ctx->codeBufEncode);
+}
+
+static size_t
+encodeSockWritten(ws_encoding_ctx_t *ctx)
+{
+  return ctx->readPos - ctx->codeBufEncode;
+}
+
+static size_t
+encodeWritten(ws_encoding_ctx_t *ctx, int base64)
+{   
+    size_t nSockWritten = encodeSockWritten(ctx);
+    if (nSockWritten <= ctx->header.headerLen) {
+      return 0;
+    } else {
+        if (base64) {
+            return B64_ENCODABLE_WITH_BUF_SIZE(nSockWritten - ctx->header.headerLen);
+        } else {
+            return nSockWritten - ctx->header.headerLen;
+        }
+    }
+}
+
+
+static size_t
+encodeRemaining(ws_encoding_ctx_t *ctx, int base64)
+{
+  size_t nSockWritten = encodeSockTotal(ctx) - encodeSockRemaining(ctx);
+  if (nSockWritten <= ctx->header.headerLen) {
+    if (base64) {
+        return B64_ENCODABLE_WITH_BUF_SIZE(ctx->header.payloadLen);
+    } else {
+        return ctx->header.payloadLen;
+    }
+  } else {
+    if (base64) {
+        size_t nWritten = encodeWritten(ctx, base64);
+        size_t additionalBytes = (ctx->readPos - ctx->codeBufEncode - ctx->header.headerLen) - (nWritten / 3 * 4);
+        return B64_ENCODABLE_WITH_BUF_SIZE(encodeSockRemaining(ctx) + additionalBytes);
+    } else {
+        return encodeSockRemaining(ctx);
+    }
+  }
+}
+/**
+ * We encode a write request as a single websocket frame,
+ * as long as our buffer can handle it. When the buffer is too large,
+ * we take as many bytes as we can handle, put them into a websocket frame
+ * and return the length of the raw payload data written to the underlying
+ * socket. 
+ *
+ * If the underlying socket suspends writing in the middle of a b64 encoding,
+ * we return the completely written bytes and remember the position we stopped.
+ * The next call continues writing bytes at this position.
+ */
+static int
+webSocketsEncodeHybi(ws_ctx_t *wsctx, const char *src, int len)
+{
+    int framePayloadLen;
+    int nSock = -1;
+    int nMax = 0;
+    int n = 0;
+    int ret = 0;
+    size_t nWritten = 0;
+    int toEncode = len;
     unsigned char opcode = '\0'; /* TODO: option! */
-    ws_header_t *header;
-    ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
+    ws_encoding_ctx_t *enc_ctx = &(wsctx->enc);
 
-
+    rfbLog("%s: src=%p len=%d\n", __func__, src, len);
     /* Optional opcode:
      *   0x0 - continuation
      *   0x1 - text frame (base64 encode buf)
@@ -379,57 +476,132 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
      *   0xA - pong
     **/
     if (!len) {
-	  /* nothing to encode */
-	  return 0;
+        /* nothing to encode */
+        return 0;
     }
 
-    header = (ws_header_t *)wsctx->codeBufEncode;
+    if (enc_ctx->state == WS_STATE_ENCODING_IDLE) {
+        /* create websocket frame header */
+        enc_ctx->header.data = (ws_header_t *)enc_ctx->codeBufEncode;
+        ws_header_t *header = enc_ctx->header.data;
 
-    if (wsctx->base64) {
-        opcode = WS_OPCODE_TEXT_FRAME;
-        /* calculate the resulting size */
-        blen = B64LEN(len);
-    } else {
-        opcode = WS_OPCODE_BINARY_FRAME;
-        blen = len;
-    }
+        if (wsctx->base64) {
+            opcode = WS_OPCODE_TEXT_FRAME;
 
-    header->b0 = 0x80 | (opcode & 0x0f);
-    if (blen <= 125) {
-      header->b1 = (uint8_t)blen;
-      sz = 2;
-    } else if (blen <= 65536) {
-      header->b1 = 0x7e;
-      header->u.s16.l16 = WS_HTON16((uint16_t)blen);
-      sz = 4;
-    } else {
-      header->b1 = 0x7f;
-      header->u.s64.l64 = WS_HTON64(blen);
-      sz = 10;
-    }
+            /* for simplicity, assume maximum header length here */
+            nMax = B64_ENCODABLE_WITH_BUF_SIZE(ARRAYSIZE(enc_ctx->codeBufEncode) - WS_HYBI_HEADER_LEN_LONG_NOTMASKED);
 
-    if (wsctx->base64) {
-        if (-1 == (ret = b64_ntop((unsigned char *)src, len, wsctx->codeBufEncode + sz, sizeof(wsctx->codeBufEncode) - sz))) {
-            rfbErr("%s: Base 64 encode failed\n", __func__);
+            /* calculate the resulting size, but make sure it fits the buffer */
+            if (B64LEN(len) > nMax) {
+                framePayloadLen = B64LEN(nMax); 
+                toEncode = nMax;
+            } else {
+                framePayloadLen = B64LEN(len);
+                toEncode = len;
+            } 
         } else {
-          if (ret != blen)
-            rfbErr("%s: Base 64 encode; something weird happened\n", __func__);
-          ret += sz;
+            opcode = WS_OPCODE_BINARY_FRAME;
+            nMax = ARRAYSIZE(enc_ctx->codeBufEncode) - WS_HYBI_HEADER_LEN_LONG_NOTMASKED;
+            toEncode = len > nMax ? nMax : len;
+            framePayloadLen = toEncode;
         }
+       
+        enc_ctx->header.payloadLen = framePayloadLen;
+        header->b0 = 0x80 | (opcode & 0x0f);
+        if (framePayloadLen <= 125) {
+          header->b1 = (uint8_t)framePayloadLen;
+          enc_ctx->header.headerLen = WS_HYBI_HEADER_LEN_SHORT_NOTMASKED;
+        } else if (framePayloadLen < 65536) {
+          header->b1 = 0x7e;
+          header->u.s16.l16 = WS_HTON16((uint16_t)framePayloadLen);
+          enc_ctx->header.headerLen = WS_HYBI_HEADER_LEN_EXTENDED_NOTMASKED;
+        } else {
+          header->b1 = 0x7f;
+          header->u.s64.l64 = WS_HTON64(framePayloadLen);
+          enc_ctx->header.headerLen = WS_HYBI_HEADER_LEN_LONG_NOTMASKED;
+        }
+
+        if (wsctx->base64) {
+            rfbLog("%s: trying to encode %d bytes into encode buffer of size %d, nMax=%d framePayloadLen=%d\n", __func__, toEncode, ARRAYSIZE(enc_ctx->codeBufEncode), nMax, framePayloadLen);
+            if (-1 == (nSock = b64_ntop((unsigned char *)src, toEncode, enc_ctx->codeBufEncode + enc_ctx->header.headerLen, ARRAYSIZE(enc_ctx->codeBufEncode) - enc_ctx->header.headerLen))) {
+                rfbErr("%s: Base 64 encode failed\n", __func__);
+            } else {
+              if (nSock != framePayloadLen) {
+                rfbErr("%s: Base 64 encode; something weird happened\n", __func__);
+              }
+              rfbLog("%s: encoded %d source bytes to %d b64 bytes\n", __func__, toEncode, nSock);
+              nSock += enc_ctx->header.headerLen;
+            }
+        } else {
+            memcpy(enc_ctx->codeBufEncode + enc_ctx->header.headerLen, src, framePayloadLen);
+            nSock =  enc_ctx->header.headerLen + framePayloadLen;
+        }
+
+        while (nWritten < enc_ctx->header.headerLen + B64LEN(1)) {
+            n = wsctx->ctxInfo.writeFunc(wsctx->ctxInfo.ctxPtr, enc_ctx->codeBufEncode + nWritten, nSock - nWritten);
+            if (n < 0) {
+                if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                  int olderrno = errno;
+                  rfbErr("%s: writing to sock caused err; returning it\n", __func__);
+                  errno = olderrno;
+                  return -1;
+                }
+            } else {
+                nWritten += n;
+            }
+            rfbLog("%s: written %d bytes to sock; nWritten=%d, ret=%d, remaining=%d\n", __func__, n, nWritten, nSock, nSock - nWritten);
+        }
+        enc_ctx->readPos = enc_ctx->codeBufEncode + nWritten;
+        ret = encodeWritten(enc_ctx, wsctx->base64);
+        rfbLog("%s: write in state %d (IDLE); nWritten=%d ret=%d\n", __func__, enc_ctx->state, nWritten, ret);
+    } else if (enc_ctx->state == WS_STATE_ENCODING_FRAME_PENDING) {
+        int nRemaining = encodeRemaining(enc_ctx, wsctx->base64);
+
+        do {
+          /* write from where we left until the end of a frame */
+          n = wsctx->ctxInfo.writeFunc(wsctx->ctxInfo.ctxPtr, enc_ctx->readPos, encodeSockRemaining(enc_ctx));
+          if (n < 0) {
+            int olderrno = errno;
+            rfbErr("%s: failed writing to socket\n");
+            errno = olderrno;
+            return -1;
+          }
+          enc_ctx->readPos += n;
+          ret = nRemaining - encodeRemaining(enc_ctx, wsctx->base64);
+          rfbLog("%s: wrote %d bytes to socket; ret=%d nRemaining=%d encodeRemaining=%d\n", __func__, n, ret, nRemaining, encodeRemaining(enc_ctx, wsctx->base64));
+        } while (ret < 1);
+        rfbLog("%s: write in state %d; nRemaining=%d n=%d ret=%d\n", __func__, enc_ctx->state, nRemaining, n, ret);
     } else {
-        memcpy(wsctx->codeBufEncode + sz, src, len);
-        ret =  sz + len;
+        rfbErr("%s: invalid state (%d)\n", __func__, enc_ctx->state);
+        errno = EIO;
+        return -1;
+    }
+    int bytesRemaining = encodeSockRemaining(enc_ctx);
+    /* check if we are finished tranmitting the whole frame */
+    if (bytesRemaining == 0) {
+      rfbLog("%s: transmission finished; cleaning up\n", __func__);
+      wsEncodeCleanup(enc_ctx);
+    } else {
+      rfbLog("%s: %d bytes remaining\n", __func__, bytesRemaining);
+      enc_ctx->state = WS_STATE_ENCODING_FRAME_PENDING;
     }
 
-    *dst = wsctx->codeBufEncode;
-
+    rfbLog("%s: returning %d nextState=%d\n", __func__, ret, enc_ctx->state);
     return ret;
 }
 
 int
-webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst)
+webSocketsEncode(rfbClientPtr cl, const char *src, int len)
 {
-    return webSocketsEncodeHybi(cl, src, len, dst);
+    ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
+    if (wsctx == NULL) {
+      rfbErr("%s: websocket used uninitialized\n", __func__);
+      errno = EIO;
+      return -1;
+    }
+    wsctx->ctxInfo.ctxPtr = cl;
+    wsctx->ctxInfo.writeFunc = ws_write;
+    return webSocketsEncodeHybi(wsctx, src, len);
 }
 
 int
@@ -437,6 +609,7 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 {
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx; 
     wsctx->ctxInfo.ctxPtr = cl;
+    wsctx->ctxInfo.readFunc = ws_read;
     return webSocketsDecodeHybi(wsctx, dst, len);
 }
 
@@ -448,7 +621,7 @@ webSocketsHasDataInBuffer(rfbClientPtr cl)
 {
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
 
-    if (wsctx && wsctx->readlen)
+    if (wsctx && wsctx->dec.readlen)
         return TRUE;
 
     return (cl->sslctx && rfbssl_pending(cl) > 0);

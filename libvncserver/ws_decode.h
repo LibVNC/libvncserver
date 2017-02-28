@@ -26,38 +26,53 @@
 
 #endif
 
-#define B64LEN(__x) (((__x + 2) / 3) * 12 / 3)
+#define B64LEN(__x) ((((__x) + 2) / 3) * 12 / 3)
+#define B64_ENCODABLE_WITH_BUF_SIZE(__x) (((__x) / 4) * 3)
 #define WSHLENMAX 14LL  /* 2 + sizeof(uint64_t) + sizeof(uint32_t) */
+
 #define WS_HYBI_MASK_LEN 4
+#define WS_HYBI_HEADER_LEN_SHORT_MASKED 2 + WS_HYBI_MASK_LEN
+#define WS_HYBI_HEADER_LEN_EXTENDED_MASKED 4 + WS_HYBI_MASK_LEN
+#define WS_HYBI_HEADER_LEN_LONG_MASKED 10 + WS_HYBI_MASK_LEN
+#define WS_HYBI_HEADER_LEN_SHORT_NOTMASKED 2 
+#define WS_HYBI_HEADER_LEN_EXTENDED_NOTMASKED 4 
+#define WS_HYBI_HEADER_LEN_LONG_NOTMASKED 10 
 
 #define ARRAYSIZE(a) ((sizeof(a) / sizeof((a[0]))) / (size_t)(!(sizeof(a) % sizeof((a[0])))))
 
 struct ws_ctx_s;
 typedef struct ws_ctx_s ws_ctx_t;
 
-typedef int (*wsEncodeFunc)(rfbClientPtr cl, const char *src, int len, char **dst);
+typedef int (*wsEncodeFunc)(ws_ctx_t *wsctx, const char *src, int len);
 typedef int (*wsDecodeFunc)(ws_ctx_t *wsctx, char *dst, int len);
 
-typedef int (*wsReadFunc)(void *ctx, char *dst, size_t len);
+typedef size_t (*wsReadFunc)(void *ctx, char *dst, size_t len);
+typedef size_t (*wsWriteFunc)(void *ctx, char *dst, size_t len);
 
 typedef struct ctxInfo_s{
   void *ctxPtr;
   wsReadFunc readFunc;
+  wsWriteFunc writeFunc;
 } ctxInfo_t;
 
 enum {
   /* header not yet received completely */
-  WS_HYBI_STATE_HEADER_PENDING,
+  WS_STATE_DECODING_HEADER_PENDING,
   /* data available */
-  WS_HYBI_STATE_DATA_AVAILABLE,
-  WS_HYBI_STATE_DATA_NEEDED,
+  WS_STATE_DECODING_DATA_AVAILABLE,
+  WS_STATE_DECODING_DATA_NEEDED,
   /* received a complete frame */
-  WS_HYBI_STATE_FRAME_COMPLETE,
+  WS_STATE_DECODING_FRAME_COMPLETE,
   /* received part of a 'close' frame */
-  WS_HYBI_STATE_CLOSE_REASON_PENDING,
+  WS_STATE_DECODING_CLOSE_REASON_PENDING,
   /* */
-  WS_HYBI_STATE_ERR
+  WS_STATE_ERR,
+  /* clean state, no frame in transition */
+  WS_STATE_ENCODING_IDLE,
+  /* started a frame, underlying socket did not transmit everything */
+  WS_STATE_ENCODING_FRAME_PENDING,
 };
+
 
 typedef union ws_mask_s {
   char c[4];
@@ -100,7 +115,7 @@ __attribute__ ((__packed__))
 typedef struct ws_header_data_s {
   ws_header_t *data;
   /** bytes read */
-  int nRead;
+  int nDone;
   /** mask value */
   ws_mask_t mask;
   /** length of frame header including payload len, but without mask */
@@ -113,19 +128,31 @@ typedef struct ws_header_data_s {
   unsigned char fin;
 } ws_header_data_t;
 
-typedef struct ws_ctx_s {
-    char codeBufDecode[2048 + WSHLENMAX]; /* base64 + maximum frame header length */
+typedef struct ws_encoding_ctx_s {
+    /* encoding state */
     char codeBufEncode[B64LEN(UPDATE_BUF_SIZE) + WSHLENMAX]; /* base64 + maximum frame header length */
+    int state;
+    char *readPos;
+    ws_header_data_t header;
+} ws_encoding_ctx_t; 
+
+typedef struct ws_decoing_ctx_s {
+    char codeBufDecode[2048 + WSHLENMAX]; /* base64 + maximum frame header length */
     char *writePos;
     unsigned char *readPos;
     int readlen;
     int hybiDecodeState;
     char carryBuf[3];                      /* For base64 carry-over */
     int carrylen;
-    int base64;
     ws_header_data_t header;
     uint64_t nReadPayload;
     unsigned char continuation_opcode;
+} ws_decoding_ctx_t;
+
+typedef struct ws_ctx_s {
+    ws_decoding_ctx_t dec;
+    ws_encoding_ctx_t enc;
+    int base64;
     wsEncodeFunc encode;
     wsDecodeFunc decode;
     ctxInfo_t ctxInfo;
@@ -144,5 +171,7 @@ enum
 
 int webSocketsDecodeHybi(ws_ctx_t *wsctx, char *dst, int len);
 
-void hybiDecodeCleanupComplete(ws_ctx_t *wsctx);
+void hybiDecodeCleanupComplete(ws_decoding_ctx_t *wsctx);
+void wsEncodeCleanup(ws_encoding_ctx_t *wsctx);
+void cleanupHeader(ws_header_data_t* header);
 #endif
