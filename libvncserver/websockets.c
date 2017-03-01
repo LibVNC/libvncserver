@@ -122,13 +122,14 @@ static void webSocketsGenSha1Key(char *target, int size, char *key)
 	rfbErr("b64_ntop failed\n");
 }
 
-  
+
 void
 wsEncodeCleanup(ws_encoding_ctx_t *ctx)
 {
     wsHeaderCleanup(&(ctx->header));
     ctx->state = WS_STATE_ENCODING_IDLE;
     ctx->readPos = ctx->codeBufEncode;
+    ctx->nToWrite = 0;
 }
 
 
@@ -294,7 +295,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
             linestart = len;
         }
     }
-    
+
     /* older hixie handshake, this could be removed if
      * a final standard is established -- removed now */
     if (!sec_ws_version) {
@@ -302,7 +303,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         free(response);
         free(buf);
         return FALSE;
-    } 
+    }
 
     if (!(path && host && (origin || sec_ws_origin))) {
         rfbErr("webSocketsHandshake: incomplete client handshake\n");
@@ -408,13 +409,18 @@ encodeSockWritten(ws_encoding_ctx_t *ctx)
 
 static size_t
 encodeWritten(ws_encoding_ctx_t *ctx, int base64)
-{   
+{
     size_t nSockWritten = encodeSockWritten(ctx);
+    rfbLog("%s: nSockWritten=%d\n", __func__, nSockWritten);
     if (nSockWritten <= ctx->header.headerLen) {
       return 0;
     } else {
         if (base64) {
-            return B64_ENCODABLE_WITH_BUF_SIZE(nSockWritten - ctx->header.headerLen);
+            size_t ret = B64_ENCODABLE_WITH_BUF_SIZE(nSockWritten - ctx->header.headerLen);
+            /* the last 4 bytes may encode 1, 2 or 3 bytes paylaod;
+             * check with the original number of bytes in that case */
+            ret = ret > ctx->nToWrite ? ctx->nToWrite : ret;
+            return ret;
         } else {
             return nSockWritten - ctx->header.headerLen;
         }
@@ -434,9 +440,7 @@ encodeRemaining(ws_encoding_ctx_t *ctx, int base64)
     }
   } else {
     if (base64) {
-        size_t nWritten = encodeWritten(ctx, base64);
-        size_t additionalBytes = (ctx->readPos - ctx->codeBufEncode - ctx->header.headerLen) - (nWritten / 3 * 4);
-        return B64_ENCODABLE_WITH_BUF_SIZE(encodeSockRemaining(ctx) + additionalBytes);
+        return ctx->nToWrite - encodeWritten(ctx, base64);
     } else {
         return encodeSockRemaining(ctx);
     }
@@ -447,7 +451,7 @@ encodeRemaining(ws_encoding_ctx_t *ctx, int base64)
  * as long as our buffer can handle it. When the buffer is too large,
  * we take as many bytes as we can handle, put them into a websocket frame
  * and return the length of the raw payload data written to the underlying
- * socket. 
+ * socket.
  *
  * If the underlying socket suspends writing in the middle of a b64 encoding,
  * we return the completely written bytes and remember the position we stopped.
@@ -458,7 +462,6 @@ webSocketsEncodeHybi(ws_ctx_t *wsctx, const char *src, int len)
 {
     int framePayloadLen;
     int nSock = -1;
-    int nMax = 0;
     int n = 0;
     int ret = 0;
     size_t nWritten = 0;
@@ -481,6 +484,7 @@ webSocketsEncodeHybi(ws_ctx_t *wsctx, const char *src, int len)
     }
 
     if (enc_ctx->state == WS_STATE_ENCODING_IDLE) {
+        int nMax = 0;
         /* create websocket frame header */
         enc_ctx->header.data = (ws_header_t *)enc_ctx->codeBufEncode;
         ws_header_t *header = enc_ctx->header.data;
@@ -492,20 +496,21 @@ webSocketsEncodeHybi(ws_ctx_t *wsctx, const char *src, int len)
             nMax = B64_ENCODABLE_WITH_BUF_SIZE(ARRAYSIZE(enc_ctx->codeBufEncode) - WS_HYBI_HEADER_LEN_LONG_NOTMASKED);
 
             /* calculate the resulting size, but make sure it fits the buffer */
-            if (B64LEN(len) > nMax) {
-                framePayloadLen = B64LEN(nMax); 
+            if (len > nMax) {
+                framePayloadLen = B64LEN(nMax);
                 toEncode = nMax;
             } else {
                 framePayloadLen = B64LEN(len);
                 toEncode = len;
-            } 
+            }
         } else {
             opcode = WS_OPCODE_BINARY_FRAME;
             nMax = ARRAYSIZE(enc_ctx->codeBufEncode) - WS_HYBI_HEADER_LEN_LONG_NOTMASKED;
             toEncode = len > nMax ? nMax : len;
             framePayloadLen = toEncode;
         }
-       
+
+        enc_ctx->nToWrite = toEncode;
         enc_ctx->header.payloadLen = framePayloadLen;
         header->b0 = 0x80 | (opcode & 0x0f);
         if (framePayloadLen <= 125) {
@@ -522,7 +527,7 @@ webSocketsEncodeHybi(ws_ctx_t *wsctx, const char *src, int len)
         }
 
         if (wsctx->base64) {
-            rfbLog("%s: trying to encode %d bytes into encode buffer of size %d, nMax=%d framePayloadLen=%d\n", __func__, toEncode, ARRAYSIZE(enc_ctx->codeBufEncode), nMax, framePayloadLen);
+            rfbLog("%s: trying to encode %d bytes into encode buffer of size %d, framePayloadLen=%d\n", __func__, toEncode, ARRAYSIZE(enc_ctx->codeBufEncode), framePayloadLen);
             if (-1 == (nSock = b64_ntop((unsigned char *)src, toEncode, enc_ctx->codeBufEncode + enc_ctx->header.headerLen, ARRAYSIZE(enc_ctx->codeBufEncode) - enc_ctx->header.headerLen))) {
                 rfbErr("%s: Base 64 encode failed\n", __func__);
             } else {
@@ -607,7 +612,7 @@ webSocketsEncode(rfbClientPtr cl, const char *src, int len)
 int
 webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 {
-    ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx; 
+    ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
     wsctx->ctxInfo.ctxPtr = cl;
     wsctx->ctxInfo.readFunc = ws_read;
     return webSocketsDecodeHybi(wsctx, dst, len);

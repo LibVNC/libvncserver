@@ -28,7 +28,6 @@
 
 #define B64LEN(__x) ((((__x) + 2) / 3) * 12 / 3)
 #define B64_ENCODABLE_WITH_BUF_SIZE(__x) (((__x) / 4) * 3)
-#define WSHLENMAX 14LL  /* 2 + sizeof(uint64_t) + sizeof(uint32_t) */
 
 #define WS_HYBI_MASK_LEN 4
 #define WS_HYBI_HEADER_LEN_SHORT_MASKED 2 + WS_HYBI_MASK_LEN
@@ -37,6 +36,8 @@
 #define WS_HYBI_HEADER_LEN_SHORT_NOTMASKED 2 
 #define WS_HYBI_HEADER_LEN_EXTENDED_NOTMASKED 4 
 #define WS_HYBI_HEADER_LEN_LONG_NOTMASKED 10 
+
+#define WSHLENMAX WS_HYBI_HEADER_LEN_LONG_MASKED /* 2 + sizeof(uint64_t) + sizeof(uint32_t) */
 
 #define ARRAYSIZE(a) ((sizeof(a) / sizeof((a[0]))) / (size_t)(!(sizeof(a) % sizeof((a[0])))))
 
@@ -133,6 +134,7 @@ typedef struct ws_encoding_ctx_s {
     char codeBufEncode[B64LEN(UPDATE_BUF_SIZE) + WSHLENMAX]; /* base64 + maximum frame header length */
     int state;
     char *readPos;
+    int nToWrite;
     ws_header_data_t header;
 } ws_encoding_ctx_t; 
 
