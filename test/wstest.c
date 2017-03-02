@@ -44,6 +44,7 @@ enum {
   FAIL_DATA,
   FAIL_ERRNO,
   FAIL_CLOSED,
+  FAIL_INVALID
 };
 
 const char *result_descr[] = {
@@ -57,7 +58,7 @@ const char *result_descr[] = {
 struct ws_frame_test {
   char frame[TEST_BUF_SIZE];
   char *pos;
-  char expectedDecodeBuf[TEST_BUF_SIZE];
+  char rawData[TEST_BUF_SIZE];
   uint64_t n_compare;
   uint64_t frame_len;
   uint64_t raw_payload_len;
@@ -69,6 +70,8 @@ struct ws_frame_test {
   int simulate_sock_malfunction_at;
   int errno_val;
   int close_sock_at;
+  int test_type;
+  int enc_opcode;
 };
 
 #include "wstestdata.inc"
@@ -87,7 +90,7 @@ static void logtest(const char *fmt, ...)
 }
 
 static size_t emu_read(void *ctx, char *dst, size_t len);
-static size_t emu_write(void *ctx, char *dst, size_t len);
+static size_t emu_write(void *ctx, char *src, size_t len);
 
 static size_t emu_read(void *ctx, char *dst, size_t len)
 {
@@ -96,9 +99,9 @@ static size_t emu_read(void *ctx, char *dst, size_t len)
   int r;
   ssize_t modu;
 
-  rfbLog("emu_read called with dst=%p and len=%lu\n", dst, len);
+  rfbLog("%s: dst=%p and len=%lu\n", __func__, dst, len);
   if (ft->simulate_sock_malfunction_at > 0 && ft->simulate_sock_malfunction_at == ft->i) {
-    rfbLog("simulating IO error with errno=%d\n", ft->errno_val);
+    rfbLog("%s: simulating IO error with errno=%d\n", __func__, ft->errno_val);
     errno = ft->errno_val;
     return -1;
   }
@@ -106,18 +109,42 @@ static size_t emu_read(void *ctx, char *dst, size_t len)
   /* return something */
   r = rand();
   modu = (ft->frame + ft->frame_len) - ft->pos;
-  rfbLog("r=%d modu=%ld frame=%p pos=%p\n", r, modu, ft->frame, ft->pos);
+  rfbLog("%s: r=%d modu=%ld frame=%p pos=%p\n", __func__, r, modu, ft->frame, ft->pos);
   nret = (r % modu) + 1;
   nret = nret > len ? len : nret;
 
-  rfbLog("copy and return %ld bytes\n", nret);
+  rfbLog("%s: copy and return %ld bytes\n", __func__, nret);
   memcpy(dst, ft->pos, nret);
   ft->pos += nret;
-  rfbLog("leaving %s; pos=%p framebuf=%p nret=%ld\n", __func__, ft->pos, ft->frame, nret);
+  rfbLog("%s: leaving; pos=%p framebuf=%p nret=%ld\n", __func__, ft->pos, ft->frame, nret);
   return nret;
 }
 
-static uint64_t run_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
+static size_t emu_write(void *ctx, char *src, size_t len)
+{
+  struct ws_frame_test *ft = (struct ws_frame_test *)ctx;
+
+  ssize_t nret;
+  int r;
+  ssize_t modu;
+
+  rfbLog("%s: with src=%p and len=%lu; dst=%p\n", __func__, src, len, ft->pos);
+  if (ft->simulate_sock_malfunction_at > 0 && ft->simulate_sock_malfunction_at == ft->i) {
+    rfbLog("%s: simulating sock error with errno=%d\n", __func__, ft->errno_val);
+    errno = ft->errno_val;
+    return -1;
+  }
+
+  r = rand();
+  nret = (r % len) + 1;
+  rfbLog("%s: write %ld bytes\n", __func__, nret);
+  memcpy(ft->pos, src, nret);
+  ft->pos += nret;
+  rfbLog("%s: leaving; pos=%p src=%p nret=%ld\n", __func__, ft->pos, src, nret);
+  return nret;
+}
+
+static int run_decode_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
 {
   uint64_t nleft = ft->raw_payload_len;
   char dstbuf[ft->raw_payload_len];
@@ -157,14 +184,91 @@ static uint64_t run_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
     }
   }
 
-  if (memcmp(ft->expectedDecodeBuf, dstbuf, ft->raw_payload_len) != 0) {
-    ft->expectedDecodeBuf[ft->raw_payload_len] = '\0';
+  if (memcmp(ft->rawData, dstbuf, ft->raw_payload_len) != 0) {
+    ft->rawData[ft->raw_payload_len] = '\0';
     dstbuf[ft->raw_payload_len] = '\0';
-    rfbLog("decoded result not equal:\nexpected:\n%s\ngot\n%s\n\n", ft->expectedDecodeBuf, dstbuf);
+    rfbLog("decoded result not equal:\nexpected:\n%s\ngot\n%s\n\n", ft->rawData, dstbuf);
     return FAIL_DATA;
   }
 
   return OK;
+}
+
+static int run_encode_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
+{
+  int64_t nleft = ft->raw_payload_len;
+  char expectedFrame[ft->frame_len];
+  ssize_t n;
+  char *src = ft->rawData;
+
+  /* remember expected expectedFrameing websocket frame, and clear frame buffer;
+   * emu_write  uses this buffer to encode the frame again */
+  memcpy(expectedFrame, ft->frame, ft->frame_len);
+  memset(ft->frame, 0, ft->frame_len);
+
+  ft->pos = ft->frame;
+  ctx->ctxInfo.ctxPtr = (void *)ft;
+
+  if (ft->enc_opcode == 1) {
+    ctx->base64 = 1;
+  } else {
+    ctx->base64 = 0;
+  }
+  rfbLog("set base64 to %d\n", ctx->base64);
+
+  while (nleft > 0) {
+    rfbLog("calling webSocketsEncode with src=%p, len=%lu\n", src, nleft);
+    n = ctx->encode(ctx, src, nleft);
+    rfbLog("written n=%ld\n", n);
+    if (n == 0) {
+      if (ft->close_sock_at > 0) {
+        return OK;
+      } else {
+        return FAIL_CLOSED;
+      }
+    } else if (n < 0) {
+      if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        /* ok, just call again */
+      } else {
+        if (ft->expected_errno == errno) {
+          rfbLog("errno=%d as expected\n", errno);
+          return OK;
+        } else {
+          rfbLog("errno=%d != expected(%d)\n", errno, ft->expected_errno);
+          return FAIL_ERRNO;
+        }
+      }
+    } else {
+      nleft -= n;
+      src += n;
+      rfbLog("written n=%ld to websocketEncode; src=%p, nleft=%lu\n", n, src, nleft);
+    }
+  }
+  if (nleft < 0) {
+    rfbLog("webSocketsEncode returned more than passed; nleft=%lld\n", nleft);
+    return FAIL_INVALID;
+  }
+
+  if (memcmp(ft->frame, expectedFrame, ft->frame_len) != 0) {
+    ft->frame[ft->frame_len] = '\0';
+    expectedFrame[ft->frame_len] = '\0';
+    rfbLog("ws frame not equal:\nexpected:\n%s\ngot\n%s\n\n", expectedFrame, ft->frame);
+    return FAIL_DATA;
+  }
+
+  return OK;
+}
+
+static int run_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
+{
+  if (ft->test_type == 0) {
+    /* decode */
+    return run_decode_test(ft, ctx);
+  } else if (ft->test_type == 1) {
+    /* encode */
+    return run_encode_test(ft, ctx);
+  }
+  return FAIL_INVALID;
 }
 
 
@@ -174,10 +278,13 @@ int main()
   int retall= 0;
   int i;
   srand(RND_SEED);
-  
+
   hybiDecodeCleanupComplete(&(ctx.dec));
+  wsEncodeCleanup(&(ctx.enc));
   ctx.decode = webSocketsDecodeHybi;
+  ctx.encode = webSocketsEncodeHybi;
   ctx.ctxInfo.readFunc = emu_read;
+  ctx.ctxInfo.writeFunc = emu_write;
   rfbLog = logtest;
   rfbErr = logtest;
 

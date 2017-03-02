@@ -181,7 +181,7 @@ webSocketsEncodeHybi(ws_ctx_t *wsctx, const char *src, int len)
         }
 
         if (wsctx->base64) {
-            rfbLog("%s: trying to encode %d bytes into encode buffer of size %d, framePayloadLen=%d\n", __func__, toEncode, ARRAYSIZE(enc_ctx->codeBufEncode), framePayloadLen);
+            rfbLog("%s: trying to encode %d bytes into encode buffer @%p of size %d, framePayloadLen=%d\n", __func__, toEncode, enc_ctx->codeBufEncode, ARRAYSIZE(enc_ctx->codeBufEncode), framePayloadLen);
             if (-1 == (nSock = b64_ntop((unsigned char *)src, toEncode, enc_ctx->codeBufEncode + enc_ctx->header.headerLen, ARRAYSIZE(enc_ctx->codeBufEncode) - enc_ctx->header.headerLen))) {
                 rfbErr("%s: Base 64 encode failed\n", __func__);
             } else {
@@ -208,13 +208,13 @@ webSocketsEncodeHybi(ws_ctx_t *wsctx, const char *src, int len)
             } else {
                 nWritten += n;
             }
-            rfbLog("%s: written %d bytes to sock; nWritten=%d, ret=%d, remaining=%d\n", __func__, n, nWritten, nSock, nSock - nWritten);
+            rfbLog("%s: wrote %d bytes to sock; nWritten=%d, ret=%d, remaining=%d\n", __func__, n, nWritten, nSock, nSock - nWritten);
         }
         enc_ctx->readPos = enc_ctx->codeBufEncode + nWritten;
         ret = encodeWritten(enc_ctx, wsctx->base64);
         rfbLog("%s: write in state %d (IDLE); nWritten=%d ret=%d\n", __func__, enc_ctx->state, nWritten, ret);
     } else if (enc_ctx->state == WS_STATE_ENCODING_FRAME_PENDING) {
-        int nRemaining = encodeRemaining(enc_ctx, wsctx->base64);
+        int rawRemainingBefore = encodeRemaining(enc_ctx, wsctx->base64);
 
         do {
           /* write from where we left until the end of a frame */
@@ -226,10 +226,10 @@ webSocketsEncodeHybi(ws_ctx_t *wsctx, const char *src, int len)
             return -1;
           }
           enc_ctx->readPos += n;
-          ret = nRemaining - encodeRemaining(enc_ctx, wsctx->base64);
-          rfbLog("%s: wrote %d bytes to socket; ret=%d nRemaining=%d encodeRemaining=%d\n", __func__, n, ret, nRemaining, encodeRemaining(enc_ctx, wsctx->base64));
+          ret = rawRemainingBefore - encodeRemaining(enc_ctx, wsctx->base64);
+          rfbLog("%s: wrote %d bytes to socket; ret=%d encodeRemaining=%d\n", __func__, n, ret, encodeRemaining(enc_ctx, wsctx->base64));
         } while (ret < 1);
-        rfbLog("%s: write in state %d; nRemaining=%d n=%d ret=%d\n", __func__, enc_ctx->state, nRemaining, n, ret);
+        rfbLog("%s: write in state %d; rawRemainingBefore=%d n=%d ret=%d\n", __func__, enc_ctx->state, rawRemainingBefore, n, ret);
     } else {
         rfbErr("%s: invalid state (%d)\n", __func__, enc_ctx->state);
         errno = EIO;
