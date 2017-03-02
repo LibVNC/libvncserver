@@ -112,7 +112,7 @@ wsEncodeCleanup(ws_encoding_ctx_t *ctx)
  * The next call continues writing bytes at this position.
  */
 int
-webSocketsEncodeHybi(ws_ctx_t *wsctx, const char *src, int len)
+webSocketsEncode(ws_ctx_t *wsctx, const char *src, int len)
 {
     int framePayloadLen;
     int nSock = -1;

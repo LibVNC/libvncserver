@@ -157,7 +157,7 @@ static int run_decode_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
 
   while (nleft > 0) {
     rfbLog("calling ws_decode with dst=%p, len=%lu\n", dst, nleft);
-    n = ctx->decode(ctx, dst, nleft);
+    n = webSocketsDecode(ctx, dst, nleft);
     rfbLog("read n=%ld\n", n);
     if (n == 0) {
       if (ft->close_sock_at > 0) {
@@ -218,7 +218,7 @@ static int run_encode_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
 
   while (nleft > 0) {
     rfbLog("calling webSocketsEncode with src=%p, len=%lu\n", src, nleft);
-    n = ctx->encode(ctx, src, nleft);
+    n = webSocketsEncode(ctx, src, nleft);
     rfbLog("written n=%ld\n", n);
     if (n == 0) {
       if (ft->close_sock_at > 0) {
@@ -279,10 +279,8 @@ int main()
   int i;
   srand(RND_SEED);
 
-  hybiDecodeCleanupComplete(&(ctx.dec));
+  wsDecodeCleanupComplete(&(ctx.dec));
   wsEncodeCleanup(&(ctx.enc));
-  ctx.decode = webSocketsDecodeHybi;
-  ctx.encode = webSocketsEncodeHybi;
   ctx.ctxInfo.readFunc = emu_read;
   ctx.ctxInfo.writeFunc = emu_write;
   rfbLog = logtest;

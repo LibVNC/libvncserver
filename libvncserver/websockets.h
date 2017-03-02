@@ -171,7 +171,7 @@ typedef struct ws_decoing_ctx_s {
     char *writePos;
     unsigned char *readPos;
     int readlen;
-    int hybiDecodeState;
+    int state;
     char carryBuf[3];                      /* For base64 carry-over */
     int carrylen;
     ws_header_data_t header;
@@ -183,8 +183,6 @@ typedef struct ws_ctx_s {
     ws_decoding_ctx_t dec;
     ws_encoding_ctx_t enc;
     int base64;
-    wsEncodeFunc encode;
-    wsDecodeFunc decode;
     ctxInfo_t ctxInfo;
 } ws_ctx_t;
 
@@ -199,11 +197,11 @@ enum
     WS_OPCODE_INVALID = 0xFF
 };
 
-int webSocketsDecodeHybi(ws_ctx_t *wsctx, char *dst, int len);
+int webSocketsDecode(ws_ctx_t *wsctx, char *dst, int len);
 
-int webSocketsEncodeHybi(ws_ctx_t *ctx, const char *src, int len);
+int webSocketsEncode(ws_ctx_t *ctx, const char *src, int len);
 
-void hybiDecodeCleanupComplete(ws_decoding_ctx_t *wsctx);
+void wsDecodeCleanupComplete(ws_decoding_ctx_t *wsctx);
 
 void wsEncodeCleanup(ws_encoding_ctx_t *wsctx);
 

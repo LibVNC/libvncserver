@@ -48,34 +48,34 @@ isControlFrame(ws_header_data_t *head)
 }
 
 static uint64_t
-hybiRemaining(ws_decoding_ctx_t *wsctx)
+remaining(ws_decoding_ctx_t *wsctx)
 {
   return wsctx->header.payloadLen - wsctx->nReadPayload;
 }
 
 static void
-hybiDecodeCleanupBasics(ws_decoding_ctx_t *wsctx)
+wsDecodeCleanupBasics(ws_decoding_ctx_t *wsctx)
 {
   wsHeaderCleanup(&(wsctx->header));
   wsctx->nReadPayload = 0;
   wsctx->carrylen = 0;
   wsctx->readPos = (unsigned char *)wsctx->codeBufDecode;
   wsctx->readlen = 0;
-  wsctx->hybiDecodeState = WS_STATE_DECODING_HEADER_PENDING;
+  wsctx->state = WS_STATE_DECODING_HEADER_PENDING;
   wsctx->writePos = NULL;
 }
 
 static void
-hybiDecodeCleanupForContinuation(ws_decoding_ctx_t *wsctx)
+wsDecodeCleanupForContinuation(ws_decoding_ctx_t *wsctx)
 {
-  hybiDecodeCleanupBasics(wsctx);
+  wsDecodeCleanupBasics(wsctx);
   rfbLog("clean up frame, but expect continuation with opcode %d\n", wsctx->continuation_opcode);
 }
 
 void
-hybiDecodeCleanupComplete(ws_decoding_ctx_t *wsctx)
+wsDecodeCleanupComplete(ws_decoding_ctx_t *wsctx)
 {
-  hybiDecodeCleanupBasics(wsctx);
+  wsDecodeCleanupBasics(wsctx);
   wsctx->continuation_opcode = WS_OPCODE_INVALID;
   rfbLog("cleaned up wsctx completely\n");
 }
@@ -89,10 +89,10 @@ hybiDecodeCleanupComplete(ws_decoding_ctx_t *wsctx)
  * @param[in]      len bytes to copy to destination buffer
  * @param[in,out]  wsctx internal state of decoding procedure
  * @param[out]     number of bytes actually written to dst buffer
- * @return next hybi decoding state
+ * @return next decoding state
  */
 static int
-hybiReturnData(char *dst, int len, ws_decoding_ctx_t *wsctx, int *nWritten)
+returnData(char *dst, int len, ws_decoding_ctx_t *wsctx, int *nWritten)
 {
   int nextState = WS_STATE_ERR;
 
@@ -112,7 +112,7 @@ hybiReturnData(char *dst, int len, ws_decoding_ctx_t *wsctx, int *nWritten)
       *nWritten = wsctx->readlen;
       wsctx->readlen = 0;
       wsctx->readPos = NULL;
-      if (hybiRemaining(wsctx) == 0) {
+      if (remaining(wsctx) == 0) {
         nextState = WS_STATE_DECODING_FRAME_COMPLETE;
       } else {
         nextState = WS_STATE_DECODING_DATA_NEEDED;
@@ -122,7 +122,7 @@ hybiReturnData(char *dst, int len, ws_decoding_ctx_t *wsctx, int *nWritten)
   } else {
     /* it may happen that we read some bytes but could not decode them,
      * in that case, set errno to EAGAIN and return -1 */
-    nextState = wsctx->hybiDecodeState;
+    nextState = wsctx->state;
     errno = EAGAIN;
     *nWritten = -1;
   }
@@ -138,11 +138,11 @@ hybiReturnData(char *dst, int len, ws_decoding_ctx_t *wsctx, int *nWritten)
  * @param[in]   cl client ptr with ptr to raw socket and ws_decoding_ctx_t ptr
  * @param[out]  sockRet emulated recv return value
  * @param[out]  nPayload number of payload bytes already read
- * @return next hybi decoding state; WS_STATE_DECODING_HEADER_PENDING indicates
+ * @return next decoding state; WS_STATE_DECODING_HEADER_PENDING indicates
  *         that the header was not received completely.
  */
 static int
-hybiReadHeader(ws_ctx_t *ctx, int *sockRet, int *nPayload)
+readHeader(ws_ctx_t *ctx, int *sockRet, int *nPayload)
 {
   int ret;
   ws_decoding_ctx_t *wsctx = &ctx->dec;
@@ -277,7 +277,7 @@ hybiReadHeader(ws_ctx_t *ctx, int *sockRet, int *nPayload)
   *nPayload = wsctx->header.nDone - wsctx->header.headerLen;
   wsctx->nReadPayload = *nPayload;
 
-  rfbLog("header complete: state=%d headerlen=%d payloadlen=%llu writeTo=%p nPayload=%d\n", wsctx->hybiDecodeState, wsctx->header.headerLen, wsctx->header.payloadLen, wsctx->writePos, *nPayload);
+  rfbLog("header complete: state=%d headerlen=%d payloadlen=%llu writeTo=%p nPayload=%d\n", wsctx->state, wsctx->header.headerLen, wsctx->header.payloadLen, wsctx->writePos, *nPayload);
 
   return WS_STATE_DECODING_DATA_NEEDED;
 
@@ -289,18 +289,18 @@ ret_header_pending:
 err_cleanup_state:
   *sockRet = -1;
 err_cleanup_state_sock_closed:
-  hybiDecodeCleanupComplete(wsctx);
+  wsDecodeCleanupComplete(wsctx);
   return WS_STATE_ERR;
 }
 
 static int
-hybiWsFrameComplete(ws_decoding_ctx_t *wsctx)
+wsFrameComplete(ws_decoding_ctx_t *wsctx)
 {
-  return wsctx != NULL && hybiRemaining(wsctx) == 0;
+  return wsctx != NULL && remaining(wsctx) == 0;
 }
 
 static char *
-hybiPayloadStart(ws_decoding_ctx_t *wsctx)
+payloadStart(ws_decoding_ctx_t *wsctx)
 {
   return wsctx->codeBufDecode + wsctx->header.headerLen;
 }
@@ -330,10 +330,10 @@ hybiPayloadStart(ws_decoding_ctx_t *wsctx)
  *  @param[in]  len  size of destination buffer
  *  @param[out] sockRet emulated recv return value
  *  @param[in]  nInBuf number of undecoded bytes before writePos from header read
- *  @return next hybi decode state
+ *  @return next decode state
  */
 static int
-hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
+readAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
 {
   int n;
   int i;
@@ -352,10 +352,10 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
   /* -1 accounts for potential '\0' terminator for base64 decoding */
   bufsize = dec_ctx->codeBufDecode + ARRAYSIZE(dec_ctx->codeBufDecode) - dec_ctx->writePos - 1;
   rfbLog("bufsize=%d\n", bufsize);
-  if (hybiRemaining(dec_ctx) > bufsize) {
+  if (remaining(dec_ctx) > bufsize) {
     nextRead = bufsize;
   } else {
-    nextRead = hybiRemaining(dec_ctx);
+    nextRead = remaining(dec_ctx);
   }
 
   rfbLog("calling read with buf=%p and len=%d (decodebuf=%p headerLen=%d)\n", dec_ctx->writePos, nextRead, dec_ctx->codeBufDecode, dec_ctx->header.headerLen);
@@ -381,8 +381,8 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
   dec_ctx->nReadPayload += n;
   dec_ctx->writePos += n;
 
-  if (hybiRemaining(dec_ctx) == 0) {
-    dec_ctx->hybiDecodeState = WS_STATE_DECODING_FRAME_COMPLETE;
+  if (remaining(dec_ctx) == 0) {
+    dec_ctx->state = WS_STATE_DECODING_FRAME_COMPLETE;
   }
 
   /* number of not yet unmasked payload bytes: what we read here + what was
@@ -406,7 +406,7 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
   }
   rfbLog("mask decoding; i=%d toDecode=%d\n", i, toDecode);
 
-  if (dec_ctx->hybiDecodeState == WS_STATE_DECODING_FRAME_COMPLETE) {
+  if (dec_ctx->state == WS_STATE_DECODING_FRAME_COMPLETE) {
     /* process the remaining bytes (if any) */
     for (i*=4; i < toDecode; i++) {
       data[i] ^= dec_ctx->header.mask.c[i % 4];
@@ -433,14 +433,14 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
   switch (dec_ctx->header.opcode) {
     case WS_OPCODE_CLOSE:
       /* this data is not returned as payload data */
-      if (hybiWsFrameComplete(dec_ctx)) {
+      if (wsFrameComplete(dec_ctx)) {
         *(dec_ctx->writePos) = '\0';
-        rfbLog("got close cmd %d, reason %d: %s\n", (int)(dec_ctx->writePos - hybiPayloadStart(dec_ctx)), WS_NTOH16(((uint16_t *)hybiPayloadStart(dec_ctx))[0]), &hybiPayloadStart(dec_ctx)[2]);
+        rfbLog("got close cmd %d, reason %d: %s\n", (int)(dec_ctx->writePos - payloadStart(dec_ctx)), WS_NTOH16(((uint16_t *)payloadStart(dec_ctx))[0]), &payloadStart(dec_ctx)[2]);
         errno = ECONNRESET;
         *sockRet = -1;
         return WS_STATE_DECODING_FRAME_COMPLETE;
       } else {
-        rfbLog("got close cmd; waiting for %d more bytes to arrive\n", hybiRemaining(dec_ctx));
+        rfbLog("got close cmd; waiting for %d more bytes to arrive\n", remaining(dec_ctx));
         *sockRet = -1;
         errno = EAGAIN;
         return WS_STATE_DECODING_CLOSE_REASON_PENDING;
@@ -452,11 +452,11 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
       if (-1 == (dec_ctx->readlen = b64_pton((char *)data, data, bufsize))) {
         rfbErr("%s: Base64 decode error; %s\n", __func__, strerror(errno));
       }
-      dec_ctx->writePos = hybiPayloadStart(dec_ctx);
+      dec_ctx->writePos = payloadStart(dec_ctx);
       break;
     case WS_OPCODE_BINARY_FRAME:
       dec_ctx->readlen = toReturn;
-      dec_ctx->writePos = hybiPayloadStart(dec_ctx);
+      dec_ctx->writePos = payloadStart(dec_ctx);
       rfbLog("set readlen=%d writePos=%p\n", dec_ctx->readlen, dec_ctx->writePos);
       break;
     default:
@@ -464,7 +464,7 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
   }
   dec_ctx->readPos = data;
 
-  return hybiReturnData(dst, len, dec_ctx, sockRet);
+  return returnData(dst, len, dec_ctx, sockRet);
 }
 
 /**
@@ -499,7 +499,7 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
  * Emulates a read call on a socket.
  */
 int
-webSocketsDecodeHybi(ws_ctx_t *wsctx, char *dst, int len)
+webSocketsDecode(ws_ctx_t *wsctx, char *dst, int len)
 {
     int result = -1;
     ws_decoding_ctx_t *dec_ctx = &(wsctx->dec);
@@ -511,54 +511,54 @@ webSocketsDecodeHybi(ws_ctx_t *wsctx, char *dst, int len)
                       __func__, len,
                       dec_ctx->readlen, dec_ctx->readPos,
                       dec_ctx->writePos,
-                      dec_ctx->hybiDecodeState, dec_ctx->header.payloadLen, hybiRemaining(dec_ctx),
+                      dec_ctx->state, dec_ctx->header.payloadLen, remaining(dec_ctx),
                       dec_ctx->nReadPayload, dec_ctx->carrylen, dec_ctx->carryBuf);
 
-    switch (dec_ctx->hybiDecodeState){
+    switch (dec_ctx->state){
       int nInBuf;
       case WS_STATE_DECODING_HEADER_PENDING:
-        dec_ctx->hybiDecodeState = hybiReadHeader(wsctx, &result, &nInBuf);
-        if (dec_ctx->hybiDecodeState == WS_STATE_ERR) {
+        dec_ctx->state = readHeader(wsctx, &result, &nInBuf);
+        if (dec_ctx->state == WS_STATE_ERR) {
           goto spor;
         }
-        if (dec_ctx->hybiDecodeState != WS_STATE_DECODING_HEADER_PENDING) {
+        if (dec_ctx->state != WS_STATE_DECODING_HEADER_PENDING) {
 
           /* when header is complete, try to read some more data */
-          dec_ctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result, nInBuf);
+          dec_ctx->state = readAndDecode(wsctx, dst, len, &result, nInBuf);
         }
         break;
       case WS_STATE_DECODING_DATA_AVAILABLE:
-        dec_ctx->hybiDecodeState = hybiReturnData(dst, len, dec_ctx, &result);
+        dec_ctx->state = returnData(dst, len, dec_ctx, &result);
         break;
       case WS_STATE_DECODING_DATA_NEEDED:
-        dec_ctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result, 0);
+        dec_ctx->state = readAndDecode(wsctx, dst, len, &result, 0);
         break;
       case WS_STATE_DECODING_CLOSE_REASON_PENDING:
-        dec_ctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result, 0);
+        dec_ctx->state = readAndDecode(wsctx, dst, len, &result, 0);
         break;
       default:
         /* invalid state */
-        rfbErr("%s: called with invalid state %d\n", dec_ctx->hybiDecodeState);
+        rfbErr("%s: called with invalid state %d\n", dec_ctx->state);
         result = -1;
         errno = EIO;
-        dec_ctx->hybiDecodeState = WS_STATE_ERR;
+        dec_ctx->state = WS_STATE_ERR;
     }
 
     /* single point of return, if someone has questions :-) */
 spor:
     /* rfbLog("%s: ret: %d/%d\n", __func__, result, len); */
-    if (dec_ctx->hybiDecodeState == WS_STATE_DECODING_FRAME_COMPLETE) {
+    if (dec_ctx->state == WS_STATE_DECODING_FRAME_COMPLETE) {
       rfbLog("frame received successfully, cleaning up: read=%d hlen=%d plen=%d\n", dec_ctx->nReadPayload, dec_ctx->header.headerLen, dec_ctx->header.payloadLen);
       if (dec_ctx->header.fin && !isControlFrame(&dec_ctx->header)) {
         /* frame finished, cleanup state */
-        hybiDecodeCleanupComplete(dec_ctx);
+        wsDecodeCleanupComplete(dec_ctx);
       } else {
         /* always retain continuation opcode for unfinished data frames
          * or control frames, which may interleave with data frames */
-        hybiDecodeCleanupForContinuation(dec_ctx);
+        wsDecodeCleanupForContinuation(dec_ctx);
       }
-    } else if (dec_ctx->hybiDecodeState == WS_STATE_ERR) {
-      hybiDecodeCleanupComplete(dec_ctx);
+    } else if (dec_ctx->state == WS_STATE_ERR) {
+      wsDecodeCleanupComplete(dec_ctx);
     }
 
     rfbLog("%s_exit: len=%d; "
@@ -571,7 +571,7 @@ spor:
                       __func__, len,
                       dec_ctx->readlen, dec_ctx->readPos,
                       dec_ctx->writePos,
-                      dec_ctx->hybiDecodeState, dec_ctx->header.payloadLen, hybiRemaining(dec_ctx),
+                      dec_ctx->state, dec_ctx->header.payloadLen, remaining(dec_ctx),
                       dec_ctx->nReadPayload, dec_ctx->carrylen, dec_ctx->carryBuf,
                       result,
                       errno);

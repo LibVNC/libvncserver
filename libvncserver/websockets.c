@@ -97,9 +97,9 @@ struct timeval
 
 static rfbBool webSocketsHandshake(rfbClientPtr cl, char *scheme);
 
-static size_t ws_read(void *cl, char *buf, size_t len);
+static size_t lowerRead(void *cl, char *buf, size_t len);
 
-static size_t ws_write(void *cl, char *buf, size_t len);
+static size_t lowerWrite(void *cl, char *buf, size_t len);
 
 static int
 min (int a, int b) {
@@ -285,8 +285,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         }
     }
 
-    /* older hixie handshake, this could be removed if
-     * a final standard is established -- removed now */
+    /* older hixie handshake is no longer supported */
     if (!sec_ws_version) {
         rfbErr("Hixie no longer supported\n");
         free(response);
@@ -342,18 +341,15 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     free(buf);
 
     wsctx = calloc(1, sizeof(ws_ctx_t));
-    wsctx->encode = webSocketsEncodeHybi;
-    wsctx->decode = webSocketsDecodeHybi;
-    wsctx->ctxInfo.readFunc = ws_read;
     wsctx->base64 = base64;
-    hybiDecodeCleanupComplete(&(wsctx->dec));
+    wsDecodeCleanupComplete(&(wsctx->dec));
     wsEncodeCleanup(&(wsctx->enc));
     cl->wsctx = (wsCtx *)wsctx;
     return TRUE;
 }
 
 static size_t
-ws_read(void *ctxPtr, char *buf, size_t len)
+lowerRead(void *ctxPtr, char *buf, size_t len)
 {
     int n;
     rfbClientPtr cl = ctxPtr;
@@ -366,7 +362,7 @@ ws_read(void *ctxPtr, char *buf, size_t len)
 }
 
 static size_t
-ws_write(void *ctxPtr, char *buf, size_t len)
+lowerWrite(void *ctxPtr, char *buf, size_t len)
 {
   int n;
   rfbClientPtr cl = ctxPtr;
@@ -380,7 +376,7 @@ ws_write(void *ctxPtr, char *buf, size_t len)
 
 
 int
-webSocketsEncode(rfbClientPtr cl, const char *src, int len)
+webSocketsWrite(rfbClientPtr cl, const char *src, int len)
 {
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
     if (wsctx == NULL) {
@@ -389,17 +385,17 @@ webSocketsEncode(rfbClientPtr cl, const char *src, int len)
       return -1;
     }
     wsctx->ctxInfo.ctxPtr = cl;
-    wsctx->ctxInfo.writeFunc = ws_write;
-    return webSocketsEncodeHybi(wsctx, src, len);
+    wsctx->ctxInfo.writeFunc = lowerWrite;
+    return webSocketsEncode(wsctx, src, len);
 }
 
 int
-webSocketsDecode(rfbClientPtr cl, char *dst, int len)
+webSocketsRead(rfbClientPtr cl, char *dst, int len)
 {
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
     wsctx->ctxInfo.ctxPtr = cl;
-    wsctx->ctxInfo.readFunc = ws_read;
-    return webSocketsDecodeHybi(wsctx, dst, len);
+    wsctx->ctxInfo.readFunc = lowerRead;
+    return webSocketsDecode(wsctx, dst, len);
 }
 
 /* returns TRUE if there is data waiting to be read in our internal buffer
