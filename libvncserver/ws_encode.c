@@ -31,6 +31,16 @@
 #include <errno.h>
 #include <string.h>
 
+#undef WS_ENCODE_DEBUG
+/* set to 1 to produce very fine debugging output */
+#define WS_ENCODE_DEBUG 0
+
+#if WS_ENCODE_DEBUG == 1
+#define ws_dbg(fmt, ...) rfbLog((fmt), ##__VA_ARGS)
+#else
+#define ws_dbg(fmt, ...)
+#endif
+
 static size_t
 encodeSockTotal(ws_encoding_ctx_t *ctx)
 {
@@ -53,7 +63,7 @@ static size_t
 encodeWritten(ws_encoding_ctx_t *ctx, int base64)
 {
     size_t nSockWritten = encodeSockWritten(ctx);
-    rfbLog("%s: nSockWritten=%d\n", __func__, nSockWritten);
+    ws_dbg("%s: nSockWritten=%d\n", __func__, nSockWritten);
     if (nSockWritten <= ctx->header.headerLen) {
       return 0;
     } else {
@@ -123,7 +133,7 @@ webSocketsEncode(ws_ctx_t *wsctx, const char *src, int len)
     unsigned char opcode = '\0'; /* TODO: option! */
     ws_encoding_ctx_t *enc_ctx = &(wsctx->enc);
 
-    rfbLog("%s: src=%p len=%d\n", __func__, src, len);
+    ws_dbg("%s: src=%p len=%d\n", __func__, src, len);
     /* Optional opcode:
      *   0x0 - continuation
      *   0x1 - text frame (base64 encode buf)
@@ -181,14 +191,14 @@ webSocketsEncode(ws_ctx_t *wsctx, const char *src, int len)
         }
 
         if (wsctx->base64) {
-            rfbLog("%s: trying to encode %d bytes into encode buffer @%p of size %d, framePayloadLen=%d\n", __func__, toEncode, enc_ctx->codeBufEncode, ARRAYSIZE(enc_ctx->codeBufEncode), framePayloadLen);
+            ws_dbg("%s: trying to encode %d bytes into encode buffer @%p of size %d, framePayloadLen=%d\n", __func__, toEncode, enc_ctx->codeBufEncode, ARRAYSIZE(enc_ctx->codeBufEncode), framePayloadLen);
             if (-1 == (nSock = b64_ntop((unsigned char *)src, toEncode, enc_ctx->codeBufEncode + enc_ctx->header.headerLen, ARRAYSIZE(enc_ctx->codeBufEncode) - enc_ctx->header.headerLen))) {
                 rfbErr("%s: Base 64 encode failed\n", __func__);
             } else {
               if (nSock != framePayloadLen) {
                 rfbErr("%s: Base 64 encode; something weird happened\n", __func__);
               }
-              rfbLog("%s: encoded %d source bytes to %d b64 bytes\n", __func__, toEncode, nSock);
+              ws_dbg("%s: encoded %d source bytes to %d b64 bytes\n", __func__, toEncode, nSock);
               nSock += enc_ctx->header.headerLen;
             }
         } else {
@@ -208,11 +218,11 @@ webSocketsEncode(ws_ctx_t *wsctx, const char *src, int len)
             } else {
                 nWritten += n;
             }
-            rfbLog("%s: wrote %d bytes to sock; nWritten=%d, ret=%d, remaining=%d\n", __func__, n, nWritten, nSock, nSock - nWritten);
+            ws_dbg("%s: wrote %d bytes to sock; nWritten=%d, ret=%d, remaining=%d\n", __func__, n, nWritten, nSock, nSock - nWritten);
         }
         enc_ctx->readPos = enc_ctx->codeBufEncode + nWritten;
         ret = encodeWritten(enc_ctx, wsctx->base64);
-        rfbLog("%s: write in state %d (IDLE); nWritten=%d ret=%d\n", __func__, enc_ctx->state, nWritten, ret);
+        ws_dbg("%s: write in state %d (IDLE); nWritten=%d ret=%d\n", __func__, enc_ctx->state, nWritten, ret);
     } else if (enc_ctx->state == WS_STATE_ENCODING_FRAME_PENDING) {
         int rawRemainingBefore = encodeRemaining(enc_ctx, wsctx->base64);
 
@@ -227,9 +237,9 @@ webSocketsEncode(ws_ctx_t *wsctx, const char *src, int len)
           }
           enc_ctx->readPos += n;
           ret = rawRemainingBefore - encodeRemaining(enc_ctx, wsctx->base64);
-          rfbLog("%s: wrote %d bytes to socket; ret=%d encodeRemaining=%d\n", __func__, n, ret, encodeRemaining(enc_ctx, wsctx->base64));
+          ws_dbg("%s: wrote %d bytes to socket; ret=%d encodeRemaining=%d\n", __func__, n, ret, encodeRemaining(enc_ctx, wsctx->base64));
         } while (ret < 1);
-        rfbLog("%s: write in state %d; rawRemainingBefore=%d n=%d ret=%d\n", __func__, enc_ctx->state, rawRemainingBefore, n, ret);
+        ws_dbg("%s: write in state %d; rawRemainingBefore=%d n=%d ret=%d\n", __func__, enc_ctx->state, rawRemainingBefore, n, ret);
     } else {
         rfbErr("%s: invalid state (%d)\n", __func__, enc_ctx->state);
         errno = EIO;
@@ -238,14 +248,14 @@ webSocketsEncode(ws_ctx_t *wsctx, const char *src, int len)
     int bytesRemaining = encodeSockRemaining(enc_ctx);
     /* check if we are finished tranmitting the whole frame */
     if (bytesRemaining == 0) {
-      rfbLog("%s: transmission finished; cleaning up\n", __func__);
+      ws_dbg("%s: transmission finished; cleaning up\n", __func__);
       wsEncodeCleanup(enc_ctx);
     } else {
-      rfbLog("%s: %d bytes remaining\n", __func__, bytesRemaining);
+      ws_dbg("%s: %d bytes remaining\n", __func__, bytesRemaining);
       enc_ctx->state = WS_STATE_ENCODING_FRAME_PENDING;
     }
 
-    rfbLog("%s: returning %d nextState=%d\n", __func__, ret, enc_ctx->state);
+    ws_dbg("%s: returning %d nextState=%d\n", __func__, ret, enc_ctx->state);
     return ret;
 }
 

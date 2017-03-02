@@ -61,9 +61,9 @@
 #define WS_HYBI_HEADER_LEN_SHORT_MASKED 2 + WS_HYBI_MASK_LEN
 #define WS_HYBI_HEADER_LEN_EXTENDED_MASKED 4 + WS_HYBI_MASK_LEN
 #define WS_HYBI_HEADER_LEN_LONG_MASKED 10 + WS_HYBI_MASK_LEN
-#define WS_HYBI_HEADER_LEN_SHORT_NOTMASKED 2 
-#define WS_HYBI_HEADER_LEN_EXTENDED_NOTMASKED 4 
-#define WS_HYBI_HEADER_LEN_LONG_NOTMASKED 10 
+#define WS_HYBI_HEADER_LEN_SHORT_NOTMASKED 2
+#define WS_HYBI_HEADER_LEN_EXTENDED_NOTMASKED 4
+#define WS_HYBI_HEADER_LEN_LONG_NOTMASKED 10
 
 #define WSHLENMAX WS_HYBI_HEADER_LEN_LONG_MASKED /* 2 + sizeof(uint64_t) + sizeof(uint32_t) */
 
@@ -113,17 +113,17 @@ typedef union ws_mask_s {
  *      it from recognizing anonymous structs and unions.
  *      See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=4784
  */
-typedef struct 
+typedef struct
 #if __GNUC__
-__attribute__ ((__packed__)) 
+__attribute__ ((__packed__))
 #endif
 ws_header_s {
   unsigned char b0;
   unsigned char b1;
   union {
-    struct 
+    struct
 #if __GNUC__
-    __attribute__ ((__packed__)) 
+    __attribute__ ((__packed__))
 #endif
            {
       uint16_t l16;
@@ -131,7 +131,7 @@ ws_header_s {
     } s16;
     struct
 #if __GNUC__
-__attribute__ ((__packed__)) 
+__attribute__ ((__packed__))
 #endif
            {
       uint64_t l64;
@@ -164,7 +164,7 @@ typedef struct ws_encoding_ctx_s {
     char *readPos;
     int nToWrite;
     ws_header_data_t header;
-} ws_encoding_ctx_t; 
+} ws_encoding_ctx_t;
 
 typedef struct ws_decoing_ctx_s {
     char codeBufDecode[2048 + WSHLENMAX]; /* base64 + maximum frame header length */

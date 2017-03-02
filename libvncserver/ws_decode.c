@@ -32,6 +32,16 @@
 #include <string.h>
 #include <errno.h>
 
+#undef WS_DECODE_DEBUG
+/* set to 1 to produce very fine debugging output */
+#define WS_DECODE_DEBUG 0
+
+#if WS_DECODE_DEBUG == 1
+#define ws_dbg(fmt, ...) rfbLog((fmt), ##__VA_ARGS)
+#else
+#define ws_dbg(fmt, ...)
+#endif
+
 void wsHeaderCleanup(ws_header_data_t *header)
 {
   header->opcode = WS_OPCODE_INVALID;
@@ -69,7 +79,7 @@ static void
 wsDecodeCleanupForContinuation(ws_decoding_ctx_t *wsctx)
 {
   wsDecodeCleanupBasics(wsctx);
-  rfbLog("clean up frame, but expect continuation with opcode %d\n", wsctx->continuation_opcode);
+  ws_dbg("clean up frame, but expect continuation with opcode %d\n", wsctx->continuation_opcode);
 }
 
 void
@@ -77,7 +87,7 @@ wsDecodeCleanupComplete(ws_decoding_ctx_t *wsctx)
 {
   wsDecodeCleanupBasics(wsctx);
   wsctx->continuation_opcode = WS_OPCODE_INVALID;
-  rfbLog("cleaned up wsctx completely\n");
+  ws_dbg("cleaned up wsctx completely\n");
 }
 
 
@@ -100,14 +110,14 @@ returnData(char *dst, int len, ws_decoding_ctx_t *wsctx, int *nWritten)
   if (wsctx->readlen > 0) {
     /* simply return what we have */
     if (wsctx->readlen > len) {
-      rfbLog("copy to %d bytes to dst buffer; readPos=%p, readLen=%d\n", len, wsctx->readPos, wsctx->readlen);
+      ws_dbg("copy to %d bytes to dst buffer; readPos=%p, readLen=%d\n", len, wsctx->readPos, wsctx->readlen);
       memcpy(dst, wsctx->readPos, len);
       *nWritten = len;
       wsctx->readlen -= len;
       wsctx->readPos += len;
       nextState = WS_STATE_DECODING_DATA_AVAILABLE;
     } else {
-      rfbLog("copy to %d bytes to dst buffer; readPos=%p, readLen=%d\n", wsctx->readlen, wsctx->readPos, wsctx->readlen);
+      ws_dbg("copy to %d bytes to dst buffer; readPos=%p, readLen=%d\n", wsctx->readlen, wsctx->readPos, wsctx->readlen);
       memcpy(dst, wsctx->readPos, wsctx->readlen);
       *nWritten = wsctx->readlen;
       wsctx->readlen = 0;
@@ -118,7 +128,7 @@ returnData(char *dst, int len, ws_decoding_ctx_t *wsctx, int *nWritten)
         nextState = WS_STATE_DECODING_DATA_NEEDED;
       }
     }
-    rfbLog("after copy: readPos=%p, readLen=%d\n", wsctx->readPos, wsctx->readlen);
+    ws_dbg("after copy: readPos=%p, readLen=%d\n", wsctx->readPos, wsctx->readlen);
   } else {
     /* it may happen that we read some bytes but could not decode them,
      * in that case, set errno to EAGAIN and return -1 */
@@ -149,9 +159,9 @@ readHeader(ws_ctx_t *ctx, int *sockRet, int *nPayload)
   char *headerDst = wsctx->codeBufDecode + wsctx->header.nDone;
   int n = ((uint64_t)WSHLENMAX) - wsctx->header.nDone;
 
-  rfbLog("header_read to %p with len=%d\n", headerDst, n);
+  ws_dbg("header_read to %p with len=%d\n", headerDst, n);
   ret = ctx->ctxInfo.readFunc(ctx->ctxInfo.ctxPtr, headerDst, n);
-  rfbLog("read %d bytes from socket\n", ret);
+  ws_dbg("read %d bytes from socket\n", ret);
   if (ret <= 0) {
     if (-1 == ret) {
       /* save errno because rfbErr() will tamper it */
@@ -177,7 +187,7 @@ readHeader(ws_ctx_t *ctx, int *sockRet, int *nPayload)
   wsctx->header.opcode = wsctx->header.data->b0 & 0x0f;
   wsctx->header.fin = (wsctx->header.data->b0 & 0x80) >> 7;
   if (isControlFrame(&wsctx->header)) {
-    rfbLog("is control frame\n");
+    ws_dbg("is control frame\n");
     /* is a control frame, leave remembered continuation opcode unchanged;
      * just check if there is a wrong fragmentation */
     if (wsctx->header.fin == 0) {
@@ -191,10 +201,10 @@ readHeader(ws_ctx_t *ctx, int *sockRet, int *nPayload)
       goto err_cleanup_state;
     }
   } else {
-    rfbLog("not a control frame\n");
+    ws_dbg("not a control frame\n");
     /* not a control frame, check for continuation opcode */
     if (wsctx->header.opcode == WS_OPCODE_CONTINUATION) {
-      rfbLog("cont_frame\n");
+      ws_dbg("cont_frame\n");
       /* do we have state (i.e., opcode) for continuation frame? */
       if (wsctx->continuation_opcode == WS_OPCODE_INVALID) {
         rfbErr("no continuation state\n");
@@ -204,19 +214,19 @@ readHeader(ws_ctx_t *ctx, int *sockRet, int *nPayload)
 
       /* otherwise, set opcode = continuation_opcode */
       wsctx->header.opcode = wsctx->continuation_opcode;
-      rfbLog("set opcode to continuation_opcode: %d\n", wsctx->header.opcode);
+      ws_dbg("set opcode to continuation_opcode: %d\n", wsctx->header.opcode);
     } else {
       if (wsctx->header.fin == 0) {
         wsctx->continuation_opcode = wsctx->header.opcode;
       } else {
         wsctx->continuation_opcode = WS_OPCODE_INVALID;
       }
-      rfbLog("set continuation_opcode to %d\n", wsctx->continuation_opcode);
+      ws_dbg("set continuation_opcode to %d\n", wsctx->continuation_opcode);
     }
   }
 
   wsctx->header.payloadLen = (uint64_t)(wsctx->header.data->b1 & 0x7f);
-  rfbLog("first header bytes received; opcode=%d lenbyte=%d fin=%d\n", wsctx->header.opcode, wsctx->header.payloadLen, wsctx->header.fin);
+  ws_dbg("first header bytes received; opcode=%d lenbyte=%d fin=%d\n", wsctx->header.opcode, wsctx->header.payloadLen, wsctx->header.fin);
 
   /*
    * 4.3. Client-to-Server Masking
@@ -250,11 +260,11 @@ readHeader(ws_ctx_t *ctx, int *sockRet, int *nPayload)
 
   char *h = wsctx->codeBufDecode;
   int i;
-  rfbLog("Header:\n");
+  ws_dbg("Header:\n");
   for (i=0; i <10; i++) {
-    rfbLog("0x%02X\n", (unsigned char)h[i]);
+    ws_dbg("0x%02X\n", (unsigned char)h[i]);
   }
-  rfbLog("\n");
+  ws_dbg("\n");
 
   /* while RFC 6455 mandates that lengths MUST be encoded with the minimum
    * number of bytes, it does not specify for the server how to react on
@@ -277,7 +287,7 @@ readHeader(ws_ctx_t *ctx, int *sockRet, int *nPayload)
   *nPayload = wsctx->header.nDone - wsctx->header.headerLen;
   wsctx->nReadPayload = *nPayload;
 
-  rfbLog("header complete: state=%d headerlen=%d payloadlen=%llu writeTo=%p nPayload=%d\n", wsctx->state, wsctx->header.headerLen, wsctx->header.payloadLen, wsctx->writePos, *nPayload);
+  ws_dbg("header complete: state=%d headerlen=%d payloadlen=%llu writeTo=%p nPayload=%d\n", wsctx->state, wsctx->header.headerLen, wsctx->header.payloadLen, wsctx->writePos, *nPayload);
 
   return WS_STATE_DECODING_DATA_NEEDED;
 
@@ -351,14 +361,14 @@ readAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
 
   /* -1 accounts for potential '\0' terminator for base64 decoding */
   bufsize = dec_ctx->codeBufDecode + ARRAYSIZE(dec_ctx->codeBufDecode) - dec_ctx->writePos - 1;
-  rfbLog("bufsize=%d\n", bufsize);
+  ws_dbg("bufsize=%d\n", bufsize);
   if (remaining(dec_ctx) > bufsize) {
     nextRead = bufsize;
   } else {
     nextRead = remaining(dec_ctx);
   }
 
-  rfbLog("calling read with buf=%p and len=%d (decodebuf=%p headerLen=%d)\n", dec_ctx->writePos, nextRead, dec_ctx->codeBufDecode, dec_ctx->header.headerLen);
+  ws_dbg("calling read with buf=%p and len=%d (decodebuf=%p headerLen=%d)\n", dec_ctx->writePos, nextRead, dec_ctx->codeBufDecode, dec_ctx->header.headerLen);
 
   if (nextRead > 0) {
     /* decode more data */
@@ -372,7 +382,7 @@ readAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
       *sockRet = 0;
       return WS_STATE_ERR;
     } else {
-      rfbLog("read %d bytes from socket; nRead=%d\n", n, dec_ctx->nReadPayload);
+      ws_dbg("read %d bytes from socket; nRead=%d\n", n, dec_ctx->nReadPayload);
     }
   } else {
     n = 0;
@@ -388,7 +398,7 @@ readAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
   /* number of not yet unmasked payload bytes: what we read here + what was
    * carried over + what was read with the header */
   toDecode = n + dec_ctx->carrylen + nInBuf;
-  rfbLog("toDecode=%d from n=%d carrylen=%d headerLen=%d\n", toDecode, n, dec_ctx->carrylen, dec_ctx->header.headerLen);
+  ws_dbg("toDecode=%d from n=%d carrylen=%d headerLen=%d\n", toDecode, n, dec_ctx->carrylen, dec_ctx->header.headerLen);
   if (toDecode < 0) {
     rfbErr("%s: internal error; negative number of bytes to decode: %d", __func__, toDecode);
     errno=EIO;
@@ -404,7 +414,7 @@ readAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
   for (i = 0; i < (toDecode >> 2); i++) {
     data32[i] ^= dec_ctx->header.mask.u;
   }
-  rfbLog("mask decoding; i=%d toDecode=%d\n", i, toDecode);
+  ws_dbg("mask decoding; i=%d toDecode=%d\n", i, toDecode);
 
   if (dec_ctx->state == WS_STATE_DECODING_FRAME_COMPLETE) {
     /* process the remaining bytes (if any) */
@@ -423,7 +433,7 @@ readAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
       errno = EIO;
       return WS_STATE_ERR;
     }
-    rfbLog("carrying over %d bytes from %p to %p\n", dec_ctx->carrylen, dec_ctx->writePos + (i * 4), dec_ctx->carryBuf);
+    ws_dbg("carrying over %d bytes from %p to %p\n", dec_ctx->carrylen, dec_ctx->writePos + (i * 4), dec_ctx->carryBuf);
     memcpy(dec_ctx->carryBuf, data + (i * 4), dec_ctx->carrylen);
     dec_ctx->writePos -= dec_ctx->carrylen;
   }
@@ -435,12 +445,12 @@ readAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
       /* this data is not returned as payload data */
       if (wsFrameComplete(dec_ctx)) {
         *(dec_ctx->writePos) = '\0';
-        rfbLog("got close cmd %d, reason %d: %s\n", (int)(dec_ctx->writePos - payloadStart(dec_ctx)), WS_NTOH16(((uint16_t *)payloadStart(dec_ctx))[0]), &payloadStart(dec_ctx)[2]);
+        ws_dbg("got close cmd %d, reason %d: %s\n", (int)(dec_ctx->writePos - payloadStart(dec_ctx)), WS_NTOH16(((uint16_t *)payloadStart(dec_ctx))[0]), &payloadStart(dec_ctx)[2]);
         errno = ECONNRESET;
         *sockRet = -1;
         return WS_STATE_DECODING_FRAME_COMPLETE;
       } else {
-        rfbLog("got close cmd; waiting for %d more bytes to arrive\n", remaining(dec_ctx));
+        ws_dbg("got close cmd; waiting for %d more bytes to arrive\n", remaining(dec_ctx));
         *sockRet = -1;
         errno = EAGAIN;
         return WS_STATE_DECODING_CLOSE_REASON_PENDING;
@@ -448,7 +458,7 @@ readAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
       break;
     case WS_OPCODE_TEXT_FRAME:
       data[toReturn] = '\0';
-      rfbLog("Initiate Base64 decoding in %p with max size %d and '\\0' at %p\n", data, bufsize, data + toReturn);
+      ws_dbg("Initiate Base64 decoding in %p with max size %d and '\\0' at %p\n", data, bufsize, data + toReturn);
       if (-1 == (dec_ctx->readlen = b64_pton((char *)data, data, bufsize))) {
         rfbErr("%s: Base64 decode error; %s\n", __func__, strerror(errno));
       }
@@ -457,7 +467,7 @@ readAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
     case WS_OPCODE_BINARY_FRAME:
       dec_ctx->readlen = toReturn;
       dec_ctx->writePos = payloadStart(dec_ctx);
-      rfbLog("set readlen=%d writePos=%p\n", dec_ctx->readlen, dec_ctx->writePos);
+      ws_dbg("set readlen=%d writePos=%p\n", dec_ctx->readlen, dec_ctx->writePos);
       break;
     default:
       rfbErr("%s: unhandled opcode %d, b0: %02x, b1: %02x\n", __func__, (int)dec_ctx->header.opcode, dec_ctx->header.data->b0, dec_ctx->header.data->b1);
@@ -503,7 +513,7 @@ webSocketsDecode(ws_ctx_t *wsctx, char *dst, int len)
 {
     int result = -1;
     ws_decoding_ctx_t *dec_ctx = &(wsctx->dec);
-    rfbLog("%s_enter: len=%d; "
+    ws_dbg("%s_enter: len=%d; "
                       "CTX: readlen=%d readPos=%p "
                       "writeTo=%p "
                       "state=%d payloadtoRead=%d payloadRemaining=%llu "
@@ -546,9 +556,8 @@ webSocketsDecode(ws_ctx_t *wsctx, char *dst, int len)
 
     /* single point of return, if someone has questions :-) */
 spor:
-    /* rfbLog("%s: ret: %d/%d\n", __func__, result, len); */
     if (dec_ctx->state == WS_STATE_DECODING_FRAME_COMPLETE) {
-      rfbLog("frame received successfully, cleaning up: read=%d hlen=%d plen=%d\n", dec_ctx->nReadPayload, dec_ctx->header.headerLen, dec_ctx->header.payloadLen);
+      ws_dbg("frame received successfully, cleaning up: read=%d hlen=%d plen=%d\n", dec_ctx->nReadPayload, dec_ctx->header.headerLen, dec_ctx->header.payloadLen);
       if (dec_ctx->header.fin && !isControlFrame(&dec_ctx->header)) {
         /* frame finished, cleanup state */
         wsDecodeCleanupComplete(dec_ctx);
@@ -561,7 +570,7 @@ spor:
       wsDecodeCleanupComplete(dec_ctx);
     }
 
-    rfbLog("%s_exit: len=%d; "
+    ws_dbg("%s_exit: len=%d; "
                       "CTX: readlen=%d readPos=%p "
                       "writePos=%p "
                       "state=%d payloadtoRead=%d payloadRemaining=%d "
