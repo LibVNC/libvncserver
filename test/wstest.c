@@ -25,7 +25,7 @@
 
 #ifndef _WIN32
 
-#include <ws_decode.h>
+#include <websockets.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,9 +86,10 @@ static void logtest(const char *fmt, ...)
   va_end(args);
 }
 
-static int emu_read(void *ctx, char *dst, size_t len);
+static size_t emu_read(void *ctx, char *dst, size_t len);
+static size_t emu_write(void *ctx, char *dst, size_t len);
 
-static int emu_read(void *ctx, char *dst, size_t len)
+static size_t emu_read(void *ctx, char *dst, size_t len)
 {
   struct ws_frame_test *ft = (struct ws_frame_test *)ctx;
   ssize_t nret;
@@ -174,7 +175,7 @@ int main()
   int i;
   srand(RND_SEED);
   
-  hybiDecodeCleanupComplete(&ctx);
+  hybiDecodeCleanupComplete(&(ctx.dec));
   ctx.decode = webSocketsDecodeHybi;
   ctx.ctxInfo.readFunc = emu_read;
   rfbLog = logtest;

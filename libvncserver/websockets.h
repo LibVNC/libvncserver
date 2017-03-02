@@ -1,3 +1,31 @@
+/*
+ * websockets.h - constants, macros and structures for websocket implementation
+ *
+ * This code should be independent of any changes in the RFB protocol. It is
+ * an additional handshake and framing of normal sockets:
+ *   http://www.whatwg.org/specs/web-socket-protocol/
+ *
+ */
+
+/*
+ *  Copyright (C) 2010-2017 Joel Martin, Andreas Weigel
+ *
+ *  This is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This software is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this software; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307,
+ *  USA.
+ */
+
 #ifndef _WS_DECODE_H_
 #define _WS_DECODE_H_
 
@@ -173,7 +201,11 @@ enum
 
 int webSocketsDecodeHybi(ws_ctx_t *wsctx, char *dst, int len);
 
+int webSocketsEncodeHybi(ws_ctx_t *ctx, const char *src, int len);
+
 void hybiDecodeCleanupComplete(ws_decoding_ctx_t *wsctx);
+
 void wsEncodeCleanup(ws_encoding_ctx_t *wsctx);
-void cleanupHeader(ws_header_data_t* header);
+
+void wsHeaderCleanup(ws_header_data_t* header);
 #endif
