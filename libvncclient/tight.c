@@ -131,7 +131,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	return FALSE;
 #endif
 
-    FillRectangle(client, rx, ry, rw, rh, fill_colour);
+    client->GotFillRect(client, rx, ry, rw, rh, fill_colour);
 
     return TRUE;
   }
@@ -198,7 +198,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     buffer2 = &client->buffer[TIGHT_MIN_TO_COMPRESS * 4];
     filterFn(client, rh, (CARDBPP *)buffer2);
 
-    CopyRectangle(client, (uint8_t *)buffer2, rx, ry, rw, rh);
+    client->GotBitmap(client, (uint8_t *)buffer2, rx, ry, rw, rh);
 
     return TRUE;
   }
@@ -277,7 +277,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
       if (extraBytes > 0)
 	memcpy(client->buffer, &client->buffer[numRows * rowSize], extraBytes);
 
-      CopyRectangle(client, (uint8_t *)buffer2, rx, ry+rowsProcessed, rw, numRows);
+      client->GotBitmap(client, (uint8_t *)buffer2, rx, ry+rowsProcessed, rw, numRows);
 
       rowsProcessed += numRows;
     }
@@ -547,6 +547,9 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
     return FALSE;
   }
 
+  if(client->GotJpeg != NULL)
+    return client->GotJpeg(client, compressedData, compressedLen, x, y, w, h);
+  
   cinfo.err = jpeg_std_error(&jerr);
   cinfo.client_data = client;
   jpeg_create_decompress(&cinfo);
@@ -577,7 +580,7 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
       *pixelPtr++ =
 	RGB24_TO_PIXEL(BPP, client->buffer[dx*3], client->buffer[dx*3+1], client->buffer[dx*3+2]);
     }
-    CopyRectangle(client, (uint8_t *)&client->buffer[RFB_BUFFER_SIZE / 2], x, y + dy, w, 1);
+    client->GotBitmap(client, (uint8_t *)&client->buffer[RFB_BUFFER_SIZE / 2], x, y + dy, w, 1);
     dy++;
   }
 

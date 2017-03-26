@@ -55,7 +55,7 @@ HandleHextileBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	if (!ReadFromRFBServer(client, client->buffer, w * h * (BPP / 8)))
 	  return FALSE;
 
-	CopyRectangle(client, (uint8_t *)client->buffer, x, y, w, h);
+	client->GotBitmap(client, (uint8_t *)client->buffer, x, y, w, h);
 
 	continue;
       }
@@ -64,7 +64,7 @@ HandleHextileBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	if (!ReadFromRFBServer(client, (char *)&bg, sizeof(bg)))
 	  return FALSE;
 
-      FillRectangle(client, x, y, w, h, bg);
+      client->GotFillRect(client, x, y, w, h, bg);
 
       if (subencoding & rfbHextileForegroundSpecified)
 	if (!ReadFromRFBServer(client, (char *)&fg, sizeof(fg)))
@@ -100,7 +100,7 @@ HandleHextileBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	  sh = rfbHextileExtractH(*ptr);
 	  ptr++;
 
-	  FillRectangle(client, x+sx, y+sy, sw, sh, fg);
+	  client->GotFillRect(client, x+sx, y+sy, sw, sh, fg);
 	}
 
       } else {
@@ -115,7 +115,7 @@ HandleHextileBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	  sh = rfbHextileExtractH(*ptr);
 	  ptr++;
 
-	  FillRectangle(client, x+sx, y+sy, sw, sh, fg);
+	  client->GotFillRect(client, x+sx, y+sy, sw, sh, fg);
 	}
       }
     }
