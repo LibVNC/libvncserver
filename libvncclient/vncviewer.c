@@ -145,7 +145,7 @@ static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_
   }
 }
 
-static void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int h) {
+static void CopyRectangle(rfbClient* client, const uint8_t* buffer, int x, int y, int w, int h) {
   int j;
 
   if (client->frameBuffer == NULL) {
