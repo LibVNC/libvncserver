@@ -81,6 +81,17 @@ LibVNCServer uses CMake, so you can build via:
 For some more comprehensive examples that include installation of dependencies, see
 the [Unix CI](.travis.yml) and [Windows CI](.appveyor.yml) build setups.
 
+Crosscompiling involves some more advanced command line switches but is easily possible
+as well.
+
+For instance, building for Android (see https://developer.android.com/ndk/guides/cmake.html as a reference):
+
+    mkdir build
+    cd build
+    cmake .. -DANDROID_NDK=<path> -DCMAKE_TOOLCHAIN_FILE=<path> -DANDROID_NATIVE_API_LEVEL=<API level you want> -DWITH_PNG=OFF # NDK not shipping png per default
+    cmake --build .
+
+
 How to use
 ----------
 

@@ -35,6 +35,11 @@
 #define WIN32_LEAN_AND_MEAN /* Prevent loading any Winsock 1.x headers from windows.h */
 #endif
 
+#if defined(ANDROID) || defined(LIBVNCSERVER_HAVE_ANDROID)
+#include <arpa/inet.h>
+#include <sys/select.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
