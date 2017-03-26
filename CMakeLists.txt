@@ -116,10 +116,10 @@ if(WITH_OPENSSL)
 endif(WITH_OPENSSL)
 
 
-if(WITH_SYSTEMD)
+if(WITH_SYSTEMD AND NOT ANDROID)
   find_package(PkgConfig)
   pkg_check_modules(SYSTEMD "libsystemd")
-endif(WITH_SYSTEMD)
+endif(WITH_SYSTEMD AND NOT ANDROID)
 
 
 if(WITH_GCRYPT)
