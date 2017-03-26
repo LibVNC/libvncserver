@@ -186,6 +186,9 @@ typedef void (*BellProc)(struct _rfbClient* client);
 */
 typedef void (*GotCursorShapeProc)(struct _rfbClient* client, int xhot, int yhot, int width, int height, int bytesPerPixel);
 typedef void (*GotCopyRectProc)(struct _rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y);
+typedef void (*GotFillRectProc)(struct _rfbClient* client, int x, int y, int w, int h, uint32_t colour);
+typedef void (*GotBitmapProc)(struct _rfbClient* client, const uint8_t* buffer, int x, int y, int w, int h);
+typedef rfbBool (*GotJpegProc)(struct _rfbClient* client, const uint8_t* buffer, int length, int x, int y, int w, int h);
 typedef rfbBool (*LockWriteToTLSProc)(struct _rfbClient* client);
 typedef rfbBool (*UnlockWriteToTLSProc)(struct _rfbClient* client);
 
@@ -371,6 +374,18 @@ typedef struct _rfbClient {
 	LockWriteToTLSProc LockWriteToTLS;
 	UnlockWriteToTLSProc UnlockWriteToTLS;
 
+        /** Hooks for custom rendering
+         *
+         * VNC rendering boils down to 3 activities:
+         * - GotCopyRect: copy an area of the framebuffer
+         * - GotFillRect: fill an area of the framebuffer with a solid color
+         * - GotBitmap: copy the bitmap in the buffer into the framebuffer
+         * The client application should either set all three of these or none!
+         */
+        GotFillRectProc GotFillRect;
+        GotBitmapProc GotBitmap;
+        /** Hook for custom JPEG decoding and rendering */
+        GotJpegProc GotJpeg;
 } rfbClient;
 
 /* cursor.c */

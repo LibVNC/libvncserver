@@ -45,7 +45,7 @@ HandleRREBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   if (!ReadFromRFBServer(client, (char *)&pix, sizeof(pix)))
     return FALSE;
 
-  FillRectangle(client, rx, ry, rw, rh, pix);
+  client->GotFillRect(client, rx, ry, rw, rh, pix);
 
   for (i = 0; i < hdr.nSubrects; i++) {
     if (!ReadFromRFBServer(client, (char *)&pix, sizeof(pix)))
@@ -59,7 +59,7 @@ HandleRREBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     subrect.w = rfbClientSwap16IfLE(subrect.w);
     subrect.h = rfbClientSwap16IfLE(subrect.h);
 
-    FillRectangle(client, rx+subrect.x, ry+subrect.y, subrect.w, subrect.h, pix);
+    client->GotFillRect(client, rx+subrect.x, ry+subrect.y, subrect.w, subrect.h, pix);
   }
 
   return TRUE;

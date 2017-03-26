@@ -113,6 +113,125 @@ static rfbBool MallocFrameBuffer(rfbClient* client) {
   return client->frameBuffer?TRUE:FALSE;
 }
 
+/* messages */
+
+static rfbBool CheckRect(rfbClient* client, int x, int y, int w, int h) {
+  return x + w <= client->width && y + h <= client->height;
+}
+
+static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_t colour) {
+  int i,j;
+
+  if (client->frameBuffer == NULL) {
+      return;
+  }
+
+  if (!CheckRect(client, x, y, w, h)) {
+    rfbClientLog("Rect out of bounds: %dx%d at (%d, %d)\n", x, y, w, h);
+    return;
+  }
+
+#define FILL_RECT(BPP) \
+    for(j=y*client->width;j<(y+h)*client->width;j+=client->width) \
+      for(i=x;i<x+w;i++) \
+	((uint##BPP##_t*)client->frameBuffer)[j+i]=colour;
+
+  switch(client->format.bitsPerPixel) {
+  case  8: FILL_RECT(8);  break;
+  case 16: FILL_RECT(16); break;
+  case 32: FILL_RECT(32); break;
+  default:
+    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
+  }
+}
+
+static void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int h) {
+  int j;
+
+  if (client->frameBuffer == NULL) {
+      return;
+  }
+
+  if (!CheckRect(client, x, y, w, h)) {
+    rfbClientLog("Rect out of bounds: %dx%d at (%d, %d)\n", x, y, w, h);
+    return;
+  }
+
+#define COPY_RECT(BPP) \
+  { \
+    int rs = w * BPP / 8, rs2 = client->width * BPP / 8; \
+    for (j = ((x * (BPP / 8)) + (y * rs2)); j < (y + h) * rs2; j += rs2) { \
+      memcpy(client->frameBuffer + j, buffer, rs); \
+      buffer += rs; \
+    } \
+  }
+
+  switch(client->format.bitsPerPixel) {
+  case  8: COPY_RECT(8);  break;
+  case 16: COPY_RECT(16); break;
+  case 32: COPY_RECT(32); break;
+  default:
+    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
+  }
+}
+
+/* TODO: test */
+static void CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y) {
+  int i,j;
+
+  if (client->frameBuffer == NULL) {
+      return;
+  }
+
+  if (!CheckRect(client, src_x, src_y, w, h)) {
+    rfbClientLog("Source rect out of bounds: %dx%d at (%d, %d)\n", src_x, src_y, w, h);
+    return;
+  }
+
+  if (!CheckRect(client, dest_x, dest_y, w, h)) {
+    rfbClientLog("Dest rect out of bounds: %dx%d at (%d, %d)\n", dest_x, dest_y, w, h);
+    return;
+  }
+
+#define COPY_RECT_FROM_RECT(BPP) \
+  { \
+    uint##BPP##_t* _buffer=((uint##BPP##_t*)client->frameBuffer)+(src_y-dest_y)*client->width+src_x-dest_x; \
+    if (dest_y < src_y) { \
+      for(j = dest_y*client->width; j < (dest_y+h)*client->width; j += client->width) { \
+        if (dest_x < src_x) { \
+          for(i = dest_x; i < dest_x+w; i++) { \
+            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
+          } \
+        } else { \
+          for(i = dest_x+w-1; i >= dest_x; i--) { \
+            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
+          } \
+        } \
+      } \
+    } else { \
+      for(j = (dest_y+h-1)*client->width; j >= dest_y*client->width; j-=client->width) { \
+        if (dest_x < src_x) { \
+          for(i = dest_x; i < dest_x+w; i++) { \
+            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
+          } \
+        } else { \
+          for(i = dest_x+w-1; i >= dest_x; i--) { \
+            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
+          } \
+        } \
+      } \
+    } \
+  }
+
+  switch(client->format.bitsPerPixel) {
+  case  8: COPY_RECT_FROM_RECT(8);  break;
+  case 16: COPY_RECT_FROM_RECT(16); break;
+  case 32: COPY_RECT_FROM_RECT(32); break;
+  default:
+    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
+  }
+}
+
 static void initAppData(AppData* data) {
 	data->shareDesktop=TRUE;
 	data->viewOnly=FALSE;
@@ -208,6 +327,9 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->SoftCursorLockArea = DummyRect;
   client->SoftCursorUnlockScreen = Dummy;
   client->GotFrameBufferUpdate = DummyRect;
+  client->GotCopyRect = CopyRectangleFromRectangle;
+  client->GotFillRect = FillRectangle;
+  client->GotBitmap = CopyRectangle;
   client->FinishedFrameBufferUpdate = NULL;
   client->GetPassword = ReadPassword;
   client->MallocFrameBuffer = MallocFrameBuffer;
