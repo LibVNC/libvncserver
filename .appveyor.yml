@@ -15,7 +15,7 @@ install:
   - cmake --build .
   - cd ..
   # libPNG
-  - curl -fsSL -o libpng.tar.gz ftp://ftp.simplesystems.org/pub/libpng/png/src/libpng16/libpng-1.6.28.tar.gz
+  - curl -fsSL -o libpng.tar.gz http://prdownloads.sourceforge.net/libpng/libpng-1.6.28.tar.gz?download
   - 7z x libpng.tar.gz -so | 7z x -si -ttar > nul
   - move libpng-1.6.28 libpng
   - cd libpng
