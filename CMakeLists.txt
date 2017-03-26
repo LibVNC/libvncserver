@@ -431,6 +431,13 @@ if(MACOS)
   )
 endif(MACOS)
 
+if(ANDROID)
+  set(LIBVNCSERVER_EXAMPLES
+    ${LIBVNCSERVER_EXAMPLES}
+    androidvncserver
+  )
+endif(ANDROID)
+
 set(LIBVNCCLIENT_EXAMPLES
     backchannel
     ppmtest
