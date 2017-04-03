@@ -280,7 +280,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->format.depth = bitsPerSample*samplesPerPixel;
   client->appData.requestedDepth=client->format.depth;
   client->format.bigEndian = *(char *)&client->endianTest?FALSE:TRUE;
-  client->format.trueColour = TRUE;
+  client->format.trueColour = 1;
 
   if (client->format.bitsPerPixel == 8) {
     client->format.redMax = 7;
