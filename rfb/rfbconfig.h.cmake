@@ -75,6 +75,9 @@
 /* Define to 1 if `mmap' exists. */
 #cmakedefine LIBVNCSERVER_HAVE_MMAP  1 
 
+/* Define to 1 if `fork' exists. */
+#cmakedefine LIBVNCSERVER_HAVE_FORK  1 
+
 /* Define to 1 if you have the <ws2tcpip.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_WS2TCPIP_H  1 
 
