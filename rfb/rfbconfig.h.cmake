@@ -100,6 +100,9 @@
 /* Define to 1 if GnuTLS is present */
 #cmakedefine LIBVNCSERVER_WITH_CLIENT_TLS 1
 
+/* Define to 1 if OpenSSL is present */
+#cmakedefine LIBVNCSERVER_HAVE_LIBSSL 1
+
 /* Define to 1 to build with websockets */
 #cmakedefine LIBVNCSERVER_WITH_WEBSOCKETS 1
 
