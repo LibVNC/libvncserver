@@ -151,6 +151,7 @@ check_include_file("sys/types.h"   HAVE_SYS_TYPES_H)
 check_function_exists(gettimeofday    LIBVNCSERVER_HAVE_GETTIMEOFDAY)
 check_function_exists(vfork           LIBVNCSERVER_HAVE_VFORK)
 check_function_exists(vprintf         LIBVNCSERVER_HAVE_VPRINTF)
+check_function_exists(mmap            LIBVNCSERVER_HAVE_MMAP)
 
 
 # On systems such as GNU/Linux with glibc, __b64_ntop is defined in a
