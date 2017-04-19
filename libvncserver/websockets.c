@@ -376,7 +376,7 @@ lowerWrite(void *ctxPtr, char *buf, size_t len)
 
 
 int
-webSocketsWrite(rfbClientPtr cl, const char *src, int len)
+webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst)
 {
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
     if (wsctx == NULL) {
@@ -386,16 +386,16 @@ webSocketsWrite(rfbClientPtr cl, const char *src, int len)
     }
     wsctx->ctxInfo.ctxPtr = cl;
     wsctx->ctxInfo.writeFunc = lowerWrite;
-    return webSocketsEncode(wsctx, src, len);
+    return _webSocketsEncode(wsctx, src, len);
 }
 
 int
-webSocketsRead(rfbClientPtr cl, char *dst, int len)
+webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 {
     ws_ctx_t *wsctx = (ws_ctx_t *)cl->wsctx;
     wsctx->ctxInfo.ctxPtr = cl;
     wsctx->ctxInfo.readFunc = lowerRead;
-    return webSocketsDecode(wsctx, dst, len);
+    return _webSocketsDecode(wsctx, dst, len);
 }
 
 /* returns TRUE if there is data waiting to be read in our internal buffer
@@ -410,4 +410,9 @@ webSocketsHasDataInBuffer(rfbClientPtr cl)
         return TRUE;
 
     return (cl->sslctx && rfbssl_pending(cl) > 0);
+}
+
+rfbBool webSocketCheckDisconnect(rfbClientPtr cl)
+{
+  return FALSE;
 }

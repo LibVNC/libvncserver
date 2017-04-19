@@ -197,9 +197,9 @@ enum
     WS_OPCODE_INVALID = 0xFF
 };
 
-int webSocketsDecode(ws_ctx_t *wsctx, char *dst, int len);
+int _webSocketsDecode(ws_ctx_t *wsctx, char *dst, int len);
 
-int webSocketsEncode(ws_ctx_t *ctx, const char *src, int len);
+int _webSocketsEncode(ws_ctx_t *ctx, const char *src, int len);
 
 void wsDecodeCleanupComplete(ws_decoding_ctx_t *wsctx);
 

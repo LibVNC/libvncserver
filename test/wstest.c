@@ -157,7 +157,7 @@ static int run_decode_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
 
   while (nleft > 0) {
     rfbLog("calling ws_decode with dst=%p, len=%lu\n", dst, nleft);
-    n = webSocketsDecode(ctx, dst, nleft);
+    n = _webSocketsDecode(ctx, dst, nleft);
     rfbLog("read n=%ld\n", n);
     if (n == 0) {
       if (ft->close_sock_at > 0) {
@@ -217,8 +217,8 @@ static int run_encode_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
   rfbLog("set base64 to %d\n", ctx->base64);
 
   while (nleft > 0) {
-    rfbLog("calling webSocketsEncode with src=%p, len=%lu\n", src, nleft);
-    n = webSocketsEncode(ctx, src, nleft);
+    rfbLog("calling _webSocketsEncode with src=%p, len=%lu\n", src, nleft);
+    n = _webSocketsEncode(ctx, src, nleft);
     rfbLog("written n=%ld\n", n);
     if (n == 0) {
       if (ft->close_sock_at > 0) {
@@ -245,7 +245,7 @@ static int run_encode_test(struct ws_frame_test *ft, ws_ctx_t *ctx)
     }
   }
   if (nleft < 0) {
-    rfbLog("webSocketsEncode returned more than passed; nleft=%lld\n", nleft);
+    rfbLog("_webSocketsEncode returned more than passed; nleft=%lld\n", nleft);
     return FAIL_INVALID;
   }
 

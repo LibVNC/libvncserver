@@ -539,20 +539,24 @@ if(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
 
 endif(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
 
-add_executable(test_wstest
-               ${TESTS_DIR}/wstest.c
-               ${TESTS_DIR}/wstestdata.inc
-              )
-set_target_properties(test_wstest PROPERTIES OUTPUT_NAME wstest)
-set_target_properties(test_wstest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
-target_link_libraries(test_wstest vncserver vncclient ${ADDITIONAL_TEST_LIBS})
+if(LIBVNCSERVER_WITH_WEBSOCKETS)
+  add_executable(test_wstest
+                 ${TESTS_DIR}/wstest.c
+                 ${TESTS_DIR}/wstestdata.inc
+                )
+  set_target_properties(test_wstest PROPERTIES OUTPUT_NAME wstest)
+  set_target_properties(test_wstest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
+  target_link_libraries(test_wstest vncserver vncclient ${ADDITIONAL_TEST_LIBS})
+endif(LIBVNCSERVER_WITH_WEBSOCKETS)
 
 add_test(NAME cargs COMMAND test_cargstest)
 if(FOUND_LIBJPEG_TURBO)
     add_test(NAME turbojpeg COMMAND test_tjunittest)
 endif(FOUND_LIBJPEG_TURBO)
-add_test(NAME wstest COMMAND test_wstest)
 
+if(LIBVNCSERVER_WITH_WEBSOCKETS)
+  add_test(NAME wstest COMMAND test_wstest)
+endif(LIBVNCSERVER_WITH_WEBSOCKETS)
 #
 # this gets the libraries needed by TARGET in "-libx -liby ..." form
 #

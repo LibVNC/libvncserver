@@ -509,7 +509,7 @@ readAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
  * Emulates a read call on a socket.
  */
 int
-webSocketsDecode(ws_ctx_t *wsctx, char *dst, int len)
+_webSocketsDecode(ws_ctx_t *wsctx, char *dst, int len)
 {
     int result = -1;
     ws_decoding_ctx_t *dec_ctx = &(wsctx->dec);
