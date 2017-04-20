@@ -170,7 +170,7 @@ InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
 static rfbBool
 SetTLSAnonCredential(rfbClient* client)
 {
-  gnutls_anon_client_credentials anonCred;
+  gnutls_anon_client_credentials_t anonCred;
   int ret;
 
   if ((ret = gnutls_anon_allocate_client_credentials(&anonCred)) < 0 ||
@@ -200,6 +200,21 @@ HandshakeTLS(rfbClient* client)
       continue;
     }
     rfbClientLog("TLS handshake failed: %s.\n", gnutls_strerror(ret));
+    if (ret == GNUTLS_E_CERTIFICATE_VERIFICATION_ERROR) {
+        gnutls_datum_t out;
+        unsigned status;
+        int type;
+
+        type = gnutls_certificate_type_get((gnutls_session_t)client->tlsSession);
+        status = gnutls_session_get_verify_cert_status((gnutls_session_t)client->tlsSession);
+
+        if (gnutls_certificate_verification_status_print(status, type, &out, 0))
+            rfbClientLog("Certificate verification failed but could not determine reason");
+        else {
+            rfbClientLog("Certificate verification failed: %s\n", out.data);
+            gnutls_free(out.data);
+        }
+    }
     FreeTLS(client);
     return FALSE;
   }
@@ -212,6 +227,11 @@ HandshakeTLS(rfbClient* client)
   }
 
   rfbClientLog("TLS handshake done.\n");
+  char *desc;
+  desc = gnutls_session_get_desc((gnutls_session_t)client->tlsSession);
+  rfbClientLog("Session info: %s\n", desc);
+  gnutls_free(desc);
+
   return TRUE;
 }
 
@@ -455,11 +475,10 @@ HandleVeNCryptAuth(rfbClient* client)
       FreeTLS(client);
       return FALSE;
     }
+    gnutls_session_set_verify_cert((gnutls_session_t)client->tlsSession, client->serverHost, 0);
   }
 
   if (!HandshakeTLS(client)) return FALSE;
-
-  /* TODO: validate certificate */
 
   /* We are done here. The caller should continue with client->subAuthScheme
    * to do actual sub authentication.
