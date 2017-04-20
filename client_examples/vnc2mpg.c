@@ -465,7 +465,7 @@ int main(int argc, char **argv)
 	}
         if (!quit) {
             clock_gettime(CLOCK_MONOTONIC, &cur_time);
-            write_video_frame(oc, &video_st, update_time_for_next(framerate, &start_time, &cur_time));
+            write_video_frame(oc, &video_st, time_to_pts(framerate, &start_time, &cur_time));
             if ((cur_time.tv_sec - start_time.tv_sec) > max_time && max_time > 0) {
 		quit = TRUE;
             }
