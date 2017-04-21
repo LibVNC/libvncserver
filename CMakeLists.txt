@@ -159,7 +159,20 @@ check_function_exists(vfork           LIBVNCSERVER_HAVE_VFORK)
 check_function_exists(vprintf         LIBVNCSERVER_HAVE_VPRINTF)
 check_function_exists(mmap            LIBVNCSERVER_HAVE_MMAP)
 check_function_exists(fork            LIBVNCSERVER_HAVE_FORK)
-
+check_function_exists(ftime           LIBVNCSERVER_HAVE_FTIME)
+check_function_exists(gethostbyname   LIBVNCSERVER_HAVE_GETHOSTBYNAME)
+check_function_exists(gethostname     LIBVNCSERVER_HAVE_GETHOSTNAME)
+check_function_exists(inet_ntoa       LIBVNCSERVER_HAVE_INET_NTOA)
+check_function_exists(memmove         LIBVNCSERVER_HAVE_MEMMOVE)
+check_function_exists(memset          LIBVNCSERVER_HAVE_MEMSET)
+check_function_exists(mkfifo          LIBVNCSERVER_HAVE_MKFIFO)
+check_function_exists(select          LIBVNCSERVER_HAVE_SELECT)
+check_function_exists(socket          LIBVNCSERVER_HAVE_SOCKET)
+check_function_exists(strchr          LIBVNCSERVER_HAVE_STRCHR)
+check_function_exists(strcspn         LIBVNCSERVER_HAVE_STRCSPN)
+check_function_exists(strdup          LIBVNCSERVER_HAVE_STRDUP)
+check_function_exists(strerror        LIBVNCSERVER_HAVE_STRERROR)
+check_function_exists(strstr          LIBVNCSERVER_HAVE_STRSTR)
 
 # On systems such as GNU/Linux with glibc, __b64_ntop is defined in a
 # separate library, libresolv. On some others, such as FreeBSD, it is

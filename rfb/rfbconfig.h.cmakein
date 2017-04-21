@@ -18,6 +18,48 @@
 /* Define to 1 if you have the `gettimeofday' function. */
 #cmakedefine LIBVNCSERVER_HAVE_GETTIMEOFDAY  1 
 
+/* Define to 1 if you have the `ftime' function. */
+#cmakedefine LIBVNCSERVER_HAVE_FTIME  1 
+
+/* Define to 1 if you have the `gethostbyname' function. */
+#cmakedefine LIBVNCSERVER_HAVE_GETHOSTBYNAME  1 
+
+/* Define to 1 if you have the `gethostname' function. */
+#cmakedefine LIBVNCSERVER_HAVE_GETHOSTNAME  1 
+
+/* Define to 1 if you have the `inet_ntoa' function. */
+#cmakedefine LIBVNCSERVER_HAVE_INET_NTOA  1 
+
+/* Define to 1 if you have the `memmove' function. */
+#cmakedefine LIBVNCSERVER_HAVE_MEMMOVE  1 
+
+/* Define to 1 if you have the `memset' function. */
+#cmakedefine LIBVNCSERVER_HAVE_MEMSET  1 
+
+/* Define to 1 if you have the `mkfifo' function. */
+#cmakedefine LIBVNCSERVER_HAVE_MKFIFO  1 
+
+/* Define to 1 if you have the `select' function. */
+#cmakedefine LIBVNCSERVER_HAVE_SELECT  1 
+
+/* Define to 1 if you have the `socket' function. */
+#cmakedefine LIBVNCSERVER_HAVE_SOCKET  1 
+
+/* Define to 1 if you have the `strchr' function. */
+#cmakedefine LIBVNCSERVER_HAVE_STRCHR  1 
+
+/* Define to 1 if you have the `strcspn' function. */
+#cmakedefine LIBVNCSERVER_HAVE_STRCSPN  1 
+
+/* Define to 1 if you have the `strdup' function. */
+#cmakedefine LIBVNCSERVER_HAVE_STRDUP  1 
+
+/* Define to 1 if you have the `strerror' function. */
+#cmakedefine LIBVNCSERVER_HAVE_STRERROR  1 
+
+/* Define to 1 if you have the `strstr' function. */
+#cmakedefine LIBVNCSERVER_HAVE_STRSTR  1 
+
 /* Define to 1 if you have the `jpeg' library (-ljpeg). */
 #cmakedefine LIBVNCSERVER_HAVE_LIBJPEG  1 
 
