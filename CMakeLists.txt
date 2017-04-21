@@ -47,6 +47,7 @@ option(WITH_TIGHTVNC_FILETRANSFER "Enable filetransfer if there is pthreads supp
 option(WITH_24BPP "Allow 24 bpp" ON)
 option(WITH_IPv6 "Enable IPv6 Support" ON)
 option(WITH_WEBSOCKETS "Build with websockets support" ON)
+option(WITH_SASL "Build with SASL support" ON)
 
 
 
@@ -286,6 +287,18 @@ endif(NOT HAVE_LIBVNCSERVER_IN_ADDR_T)
 
 TEST_BIG_ENDIAN(LIBVNCSERVER_WORDS_BIGENDIAN)
 
+if(WITH_SASL)
+  find_path(SASL2_INCLUDE_DIR sasl/sasl.h)
+  find_library(LIBSASL2_LIBRARIES sasl2 libsasl.lib)
+endif(WITH_SASL)
+
+if(WITH_SASL AND LIBSASL2_LIBRARIES AND SASL2_INCLUDE_DIR)
+  message(STATUS "Building with SASL: ${LIBSASL2_LIBRARIES} and ${SASL2_INCLUDE_DIR}")
+  set(LIBVNCSERVER_HAVE_SASL 1)
+  set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${LIBSASL2_LIBRARIES})
+  include_directories(${SASL2_INCLUDE_DIR})
+endif(WITH_SASL AND LIBSASL2_LIBRARIES AND SASL2_INCLUDE_DIR)
+
 # TODO:
 # LIBVNCSERVER_ENOENT_WORKAROUND
 # inline
@@ -341,6 +354,13 @@ else()
   set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_SOURCES}
     ${LIBVNCCLIENT_DIR}/tls_none.c
+  )
+endif()
+
+if(LIBVNCSERVER_HAVE_SASL)
+  set(LIBVNCCLIENT_SOURCES
+    ${LIBVNCCLIENT_SOURCES}
+    ${LIBVNCCLIENT_DIR}/rfbsasl.c
   )
 endif()
 

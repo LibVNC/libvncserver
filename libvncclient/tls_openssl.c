@@ -397,6 +397,10 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
         if (t==rfbVeNCryptTLSNone ||
             t==rfbVeNCryptTLSVNC ||
             t==rfbVeNCryptTLSPlain ||
+#ifdef LIBVNCSERVER_HAVE_SASL
+            t==rfbVeNCryptTLSSASL ||
+            t==rfbVeNCryptX509SASL ||
+#endif /*LIBVNCSERVER_HAVE_SASL */
             t==rfbVeNCryptX509None ||
             t==rfbVeNCryptX509VNC ||
             t==rfbVeNCryptX509Plain)
@@ -489,6 +493,9 @@ HandleVeNCryptAuth(rfbClient* client)
     case rfbVeNCryptTLSNone:
     case rfbVeNCryptTLSVNC:
     case rfbVeNCryptTLSPlain:
+#ifdef LIBVNCSERVER_HAVE_SASL
+    case rfbVeNCryptTLSSASL:
+#endif /* LIBVNCSERVER_HAVE_SASL */
       anonTLS = TRUE;
       break;
     default:
@@ -613,4 +620,15 @@ void FreeTLS(rfbClient* client)
 
   SSL_free(client->tlsSession);
 }
+
+#ifdef LIBVNCSERVER_HAVE_SASL
+int GetTLSCipherBits(rfbClient* client)
+{
+    SSL *ssl = (SSL *)(client->tlsSession);
+
+    const SSL_CIPHER *cipher = SSL_get_current_cipher(ssl);
+
+    return SSL_CIPHER_get_bits(cipher, NULL);
+}
+#endif /* LIBVNCSERVER_HAVE_SASL */
 
