@@ -26,6 +26,7 @@ set(LIBVNCSRVEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples)
 set(LIBVNCCLIEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/client_examples)
 set(TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver ${CMAKE_CURRENT_SOURCE_DIR}/common)
@@ -41,6 +42,7 @@ option(WITH_GNUTLS "Search for the GnuTLS secure communications library to suppo
 option(WITH_OPENSSL "Search for the OpenSSL cryptography library to support encryption" ON)
 option(WITH_SYSTEMD "Search for libsystemd to build with systemd socket activation support" ON)
 option(WITH_GCRYPT "Search for libgcrypt to support additional authentication methods in LibVNCClient" ON)
+option(WITH_FFMPEG "Search for FFMPEG to build an example VNC to MPEG encoder" ON)
 option(WITH_TIGHTVNC_FILETRANSFER "Enable filetransfer if there is pthreads support" ON)
 option(WITH_24BPP "Allow 24 bpp" ON)
 option(WITH_IPv6 "Enable IPv6 Support" ON)
@@ -125,6 +127,10 @@ endif(WITH_SYSTEMD AND NOT ANDROID)
 if(WITH_GCRYPT)
   find_library(LIBGCRYPT_LIBRARIES gcrypt)
 endif(WITH_GCRYPT)
+
+if(WITH_FFMPEG)
+  find_package(FFMPEG)
+endif(WITH_FFMPEG)
 
 
 check_include_file("endian.h"      LIBVNCSERVER_HAVE_ENDIAN_H)
@@ -457,12 +463,12 @@ if(SDL_FOUND)
   set(SDLvncviewer_EXTRA_SOURCES scrap.c)
 endif(SDL_FOUND)
 
-if(HAVE_FFMPEG)
+if(FFMPEG_FOUND)
   set(LIBVNCCLIENT_EXAMPLES
     ${LIBVNCCLIENT_EXAMPLES}
     vnc2mpg
   )
-endif(HAVE_FFMPEG)
+endif(FFMPEG_FOUND)
 
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
