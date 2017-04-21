@@ -11,7 +11,6 @@ compiler:
   - clang
 
 before_install:
-- 'if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export CFLAGS="-I/usr/local/opt/openssl/include $CFLAGS" LDFLAGS="-L/usr/local/opt/openssl/lib $LDFLAGS"; fi'
 - |
   if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
     CMAKE_URL="http://www.cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz"
@@ -23,7 +22,7 @@ before_install:
 script:
   - mkdir build
   - cd build
-  - cmake ..
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cmake .. -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl; else cmake ..; fi
   - cmake --build .
   - ctest --output-on-failure
 
