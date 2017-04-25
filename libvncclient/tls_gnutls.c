@@ -113,9 +113,6 @@ verify_certificate_callback (gnutls_session_t session)
       return GNUTLS_E_CERTIFICATE_ERROR;
     }
 
-  /* This is not a real world example, since we only check the first 
-   * certificate in the given chain.
-   */
   if (gnutls_x509_crt_import (cert, &cert_list[0], GNUTLS_X509_FMT_DER) < 0)
     {
       rfbClientLog("Error parsing certificate\n");
