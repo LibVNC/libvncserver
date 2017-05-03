@@ -120,6 +120,14 @@ typedef uint32_t in_addr_t;
 
 #define MAX_ENCODINGS 64
 
+#define rfbNetworkConnectionSuccess 0
+#define rfbNetworkRFBConnectionSuccess 1
+#define rfbNetworkConnectionClosed 2
+#define rfbNetworkConnectionFailed 3
+#define rfbNetworkNameResolutionFailed 4
+#define rfbNetworkRFBServerNotValid 5
+#define rfbNetworkRFBProtocolFailure 6
+
 /*****************************************************************************
  *
  * Structures used in several messages

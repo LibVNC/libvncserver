@@ -370,10 +370,16 @@ static rfbBool rfbInitConnection(rfbClient* client)
     }
   }
 
+  if (client->NetworkStatus)
+    client->NetworkStatus(client, rfbNetworkConnectionSuccess);
+
   /* Initialise the VNC connection, including reading the password */
 
   if (!InitialiseRFBConnection(client))
     return FALSE;
+
+  if (client->NetworkStatus)
+    client->NetworkStatus(client, rfbNetworkRFBConnectionSuccess);
 
   client->width=client->si.framebufferWidth;
   client->height=client->si.framebufferHeight;
