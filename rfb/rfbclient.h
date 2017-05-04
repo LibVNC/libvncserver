@@ -136,6 +136,7 @@ typedef union _rfbCredential
     char *x509CACrlFile;
     char *x509ClientCertFile;
     char *x509ClientKeyFile;
+    uint8_t x509CrlVerifyMode; /* Only required for OpenSSL - see meanings below */
   } x509Credential;
   /** Plain (VeNCrypt), MSLogon (UltraVNC) */
   struct
@@ -147,6 +148,13 @@ typedef union _rfbCredential
 
 #define rfbCredentialTypeX509 1
 #define rfbCredentialTypeUser 2
+
+/* When using OpenSSL, CRLs can be included in both the x509CACrlFile and appended
+   to the x509CACertFile as is common with OpenSSL.  When rfbX509CrlVerifyAll is
+   specified the CRL list must include CRLs for all certificates in the chain */
+#define rfbX509CrlVerifyNone   0    /* No CRL checking is performed */
+#define rfbX509CrlVerifyClient 1    /* Only the leaf server certificate is checked */
+#define rfbX509CrlVerifyAll    2    /* All certificates in the server chain are checked */
 
 struct _rfbClient;
 

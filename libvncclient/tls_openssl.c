@@ -168,51 +168,9 @@ InitializeTLS(void)
   SSLeay_add_ssl_algorithms();
   RAND_load_file("/dev/urandom", 1024);
 
-  rfbClientLog("OpenSSL initialized.\n");
+  rfbClientLog("OpenSSL version %s initialized.\n", SSLeay_version(SSLEAY_VERSION));
   rfbTLSInitialized = TRUE;
   return TRUE;
-}
-
-static int
-ssl_verify (int ok, X509_STORE_CTX *ctx)
-{
-  unsigned char md5sum[16], fingerprint[40], *f;
-  rfbClient *client;
-  int err, i;
-  unsigned int md5len;
-  //char buf[257];
-  X509 *cert;
-  SSL *ssl;
-
-  if (ok)
-    return TRUE;
-
-  ssl = X509_STORE_CTX_get_ex_data (ctx, SSL_get_ex_data_X509_STORE_CTX_idx ());
-
-  client = SSL_CTX_get_app_data (SSL_get_SSL_CTX(ssl));
-
-  cert = X509_STORE_CTX_get_current_cert (ctx);
-  err = X509_STORE_CTX_get_error (ctx);
-
-  /* calculate the MD5 hash of the raw certificate */
-  md5len = sizeof (md5sum);
-  X509_digest (cert, EVP_md5 (), md5sum, &md5len);
-  for (i = 0, f = fingerprint; i < 16; i++, f += 3)
-    sprintf ((char *) f, "%.2x%c", md5sum[i], i != 15 ? ':' : '\0');
-
-#define GET_STRING(name) X509_NAME_oneline (name, buf, 256)
-
-  /* TODO: Don't just ignore certificate checks
-
-   fingerprint = key to check in db
-
-   GET_STRING (X509_get_issuer_name (cert));
-   GET_STRING (X509_get_subject_name (cert));
-   cert->valid (bool: GOOD or BAD) */
-
-  ok = TRUE;
-
-  return ok;
 }
 
 static int sock_read_ready(SSL *ssl, uint32_t ms)
@@ -251,8 +209,12 @@ static int wait_for_data(SSL *ssl, int ret, int timeout)
       }
 				
       break;
-      default:
+    default:
       retval = 3;
+      long verify_res = SSL_get_verify_result(ssl);
+      if (verify_res != X509_V_OK)
+        rfbClientLog("Could not verify server certificate: %s.\n",
+                     X509_verify_cert_error_string(verify_res));
       break;
    }
 	
@@ -261,17 +223,131 @@ static int wait_for_data(SSL *ssl, int ret, int timeout)
   return retval;
 }
 
+static rfbBool
+load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
+{
+  X509_STORE *st;
+  X509_CRL *crl;
+  int i;
+  int count = 0;
+  BIO *bio;
+  STACK_OF(X509_INFO) *xis = NULL;
+  X509_INFO *xi;
+
+  st = SSL_CTX_get_cert_store(ssl_ctx);
+
+    int rv = 0;
+
+  bio = BIO_new_file(file, "r");
+  if (bio == NULL)
+    return FALSE;
+
+  xis = PEM_X509_INFO_read_bio(bio, NULL, NULL, NULL);
+  BIO_free(bio);
+
+  for (i = 0; i < sk_X509_INFO_num(xis); i++)
+  {
+    xi = sk_X509_INFO_value(xis, i);
+    if (xi->crl)
+    {
+      X509_STORE_add_crl(st, xi->crl);
+      xi->crl = NULL;
+      count++;
+    }
+  }
+
+  sk_X509_INFO_pop_free(xis, X509_INFO_free);
+
+  if (count > 0)
+    return TRUE;
+  else
+    return FALSE;
+}
+
 static SSL *
-open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS)
+open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredential *cred)
 {
   SSL_CTX *ssl_ctx = NULL;
   SSL *ssl = NULL;
   int n, finished = 0;
+  X509_VERIFY_PARAM *param;
+  uint8_t verify_crls = cred->x509Credential.x509CrlVerifyMode;
 
-  ssl_ctx = SSL_CTX_new (SSLv23_client_method ());
-  SSL_CTX_set_default_verify_paths (ssl_ctx);
-  SSL_CTX_set_verify (ssl_ctx, SSL_VERIFY_NONE, &ssl_verify);
-  ssl = SSL_new (ssl_ctx);
+  if (!(ssl_ctx = SSL_CTX_new(SSLv23_client_method())))
+  {
+    rfbClientLog("Could not create new SSL context.\n");
+    return NULL;
+  }
+
+  param = X509_VERIFY_PARAM_new();
+
+  /* Setup verification if not anonymous */
+  if (!anonTLS)
+  {
+    if (cred->x509Credential.x509CACertFile)
+    {
+      if (!SSL_CTX_load_verify_locations(ssl_ctx, cred->x509Credential.x509CACertFile, NULL))
+      {
+        rfbClientLog("Failed to load CA certificate from %s.\n",
+                     cred->x509Credential.x509CACertFile);
+        goto error_free_ctx;
+      }
+    } else {
+      rfbClientLog("Using default paths for certificate verification.\n");
+      SSL_CTX_set_default_verify_paths (ssl_ctx);
+    }
+
+    if (cred->x509Credential.x509CACrlFile)
+    {
+      if (!load_crls_from_file(cred->x509Credential.x509CACrlFile, ssl_ctx))
+      {
+        rfbClientLog("CRLs could not be loaded.\n");
+        goto error_free_ctx;
+      }
+      if (verify_crls == rfbX509CrlVerifyNone) verify_crls = rfbX509CrlVerifyAll;
+    }
+
+    if (cred->x509Credential.x509ClientCertFile && cred->x509Credential.x509ClientKeyFile)
+    {
+      if (SSL_CTX_use_certificate_chain_file(ssl_ctx, cred->x509Credential.x509ClientCertFile) != 1)
+      {
+        rfbClientLog("Client certificate could not be loaded.\n");
+        goto error_free_ctx;
+      }
+
+      if (SSL_CTX_use_PrivateKey_file(ssl_ctx, cred->x509Credential.x509ClientKeyFile,
+                                      SSL_FILETYPE_PEM) != 1)
+      {
+        rfbClientLog("Client private key could not be loaded.\n");
+        goto error_free_ctx;
+      }
+
+      if (SSL_CTX_check_private_key(ssl_ctx) == 0) {
+        rfbClientLog("Client certificate and private key do not match.\n");
+        goto error_free_ctx;
+      }
+    }
+
+    SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, NULL);
+
+    if (verify_crls == rfbX509CrlVerifyClient) 
+      X509_VERIFY_PARAM_set_flags(param, X509_V_FLAG_CRL_CHECK);
+    else if (verify_crls == rfbX509CrlVerifyAll)
+      X509_VERIFY_PARAM_set_flags(param, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
+
+    if(!X509_VERIFY_PARAM_set1_host(param, client->serverHost, strlen(client->serverHost)))
+    {
+      rfbClientLog("Could not set server name for verification.\n");
+      goto error_free_ctx;
+    }
+    SSL_CTX_set1_param(ssl_ctx, param);
+  }
+
+  if (!(ssl = SSL_new (ssl_ctx)))
+  {
+    rfbClientLog("Could not create a new SSL session.\n");
+    goto error_free_ctx;
+  }
 
   /* TODO: finetune this list, take into account anonTLS bool */
   SSL_set_cipher_list(ssl, "ALL");
@@ -289,37 +365,38 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS)
       {
         finished = 1;
         SSL_shutdown(ssl);
-        SSL_free(ssl);
-        SSL_CTX_free(ssl_ctx);
 
-        return NULL;
+        goto error_free_ssl;
       }
     }
   } while( n != 1 && finished != 1 );
 
+  X509_VERIFY_PARAM_free(param);
   return ssl;
+
+error_free_ssl:
+  SSL_free(ssl);
+
+error_free_ctx:
+  X509_VERIFY_PARAM_free(param);
+  SSL_CTX_free(ssl_ctx);
+
+  return NULL;
 }
 
 
 static rfbBool
-InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
+InitializeTLSSession(rfbClient* client, rfbBool anonTLS, rfbCredential *cred)
 {
   if (client->tlsSession) return TRUE;
 
-  client->tlsSession = open_ssl_connection (client, client->sock, anonTLS);
+  client->tlsSession = open_ssl_connection (client, client->sock, anonTLS, cred);
 
   if (!client->tlsSession)
     return FALSE;
 
   rfbClientLog("TLS session initialized.\n");
 
-  return TRUE;
-}
-
-static rfbBool
-SetTLSAnonCredential(rfbClient* client)
-{
-  rfbClientLog("TLS anonymous credential created.\n");
   return TRUE;
 }
 
@@ -344,7 +421,8 @@ return TRUE;
       timeout--;
       continue;
     }
-    rfbClientLog("TLS handshake failed: -.\n");
+    rfbClientLog("TLS handshake failed.\n");
+
     FreeTLS(client);
     return FALSE;
   }
@@ -429,13 +507,21 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
 rfbBool
 HandleAnonTLSAuth(rfbClient* client)
 {
-  if (!InitializeTLS() || !InitializeTLSSession(client, TRUE)) return FALSE;
-
-  if (!SetTLSAnonCredential(client)) return FALSE;
+  if (!InitializeTLS() || !InitializeTLSSession(client, TRUE, NULL)) return FALSE;
 
   if (!HandshakeTLS(client)) return FALSE;
 
   return TRUE;
+}
+
+static void
+FreeX509Credential(rfbCredential *cred)
+{
+  if (cred->x509Credential.x509CACertFile) free(cred->x509Credential.x509CACertFile);
+  if (cred->x509Credential.x509CACrlFile) free(cred->x509Credential.x509CACrlFile);
+  if (cred->x509Credential.x509ClientCertFile) free(cred->x509Credential.x509ClientCertFile);
+  if (cred->x509Credential.x509ClientKeyFile) free(cred->x509Credential.x509ClientKeyFile);
+  free(cred);
 }
 
 rfbBool
@@ -444,7 +530,8 @@ HandleVeNCryptAuth(rfbClient* client)
   uint8_t major, minor, status;
   uint32_t authScheme;
   rfbBool anonTLS;
-//  gnutls_certificate_credentials_t x509_cred = NULL;
+  rfbCredential *cred = NULL;
+  rfbBool result = TRUE;
 
   if (!InitializeTLS()) return FALSE;
 
@@ -499,7 +586,6 @@ HandleVeNCryptAuth(rfbClient* client)
   /* Get X509 Credentials if it's not anonymous */
   if (!anonTLS)
   {
-    rfbCredential *cred;
 
     if (!client->GetCredential)
     {
@@ -512,39 +598,18 @@ HandleVeNCryptAuth(rfbClient* client)
       rfbClientLog("Reading credential failed\n");
       return FALSE;
     }
-
-    /* TODO: don't just ignore this
-    x509_cred = CreateX509CertCredential(cred);
-    FreeX509Credential(cred);
-    if (!x509_cred) return FALSE; */
   }
 
   /* Start up the TLS session */
-  if (!InitializeTLSSession(client, anonTLS)) return FALSE;
+  if (!InitializeTLSSession(client, anonTLS, cred)) result = FALSE;
 
-  if (anonTLS)
-  {
-    if (!SetTLSAnonCredential(client)) return FALSE;
-  }
-  else
-  {
-/* TODO: don't just ignore this
-     if ((ret = gnutls_credentials_set(client->tlsSession, GNUTLS_CRD_CERTIFICATE, x509_cred)) < 0)
-     {
-        rfbClientLog("Cannot set x509 credential: %s.\n", gnutls_strerror(ret));
-        FreeTLS(client); */
-      return FALSE;
-      //  }  
-  }
-
-  if (!HandshakeTLS(client)) return FALSE;
-
-  /* TODO: validate certificate */
+  if (!HandshakeTLS(client)) result = FALSE;
 
   /* We are done here. The caller should continue with client->subAuthScheme
    * to do actual sub authentication.
    */
-  return TRUE;
+  if (cred) FreeX509Credential(cred);
+  return result;
 }
 
 int
