@@ -174,6 +174,7 @@ rfbFontDataPtr rfbLoadConsoleFont(char *filename)
   if(1!=fread(p->data,4096,1,f)) {
     free(p->data);
     free(p);
+    fclose(f);
     return NULL;
   }
   fclose(f);
