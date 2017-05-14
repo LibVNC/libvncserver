@@ -783,25 +783,16 @@ rfbWriteExact(rfbClientPtr cl,
     fprintf(stderr,"\n");
 #endif
 
-#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-    if (cl->wsctx) {
-        char *tmp = NULL;
-        if ((len = webSocketsEncode(cl, buf, len, &tmp)) < 0) {
-            rfbErr("WriteExact: WebSockets encode error\n");
-            return -1;
-        }
-        buf = tmp;
-    }
-#endif
-
     LOCK(cl->outputMutex);
     while (len > 0) {
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-        if (cl->sslctx)
-	    n = rfbssl_write(cl, buf, len);
-	else
+      if (cl->wsctx)
+        n = webSocketsEncode(cl, buf, len, NULL);
+      else if (cl->sslctx)
+        n = rfbssl_write(cl, buf, len);
+      else
 #endif
-	    n = write(sock, buf, len);
+        n = write(sock, buf, len);
 
         if (n > 0) {
 

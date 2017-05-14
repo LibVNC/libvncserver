@@ -66,6 +66,7 @@ test/cargstest
 test/copyrecttest
 test/cursortest
 test/encodingstest
+test/wstest
 /test/tjbench
 /test/tjunittest
 vncterm/LinuxVNC
