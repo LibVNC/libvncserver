@@ -440,6 +440,17 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
     return webSocketsDecodeHybi(wsctx, dst, len);
 }
 
+/**
+ * This is a stub function that was once used for Hixie-encoding.
+ * We keep it for API compatibility.
+ */
+rfbBool
+webSocketCheckDisconnect(rfbClientPtr cl)
+{
+    return FALSE;
+}
+
+
 /* returns TRUE if there is data waiting to be read in our internal buffer
  * or if is there any pending data in the buffer of the SSL implementation
  */

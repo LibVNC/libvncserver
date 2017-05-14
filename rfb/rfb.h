@@ -763,6 +763,7 @@ extern rfbBool rfbSetNonBlocking(int sock);
 /* websockets.c */
 
 extern rfbBool webSocketsCheck(rfbClientPtr cl);
+extern rfbBool webSocketCheckDisconnect(rfbClientPtr cl);
 extern int webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst);
 extern int webSocketsDecode(rfbClientPtr cl, char *dst, int len);
 extern rfbBool webSocketsHasDataInBuffer(rfbClientPtr cl);
