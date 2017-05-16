@@ -163,6 +163,11 @@ webSocketsCheck (rfbClientPtr cl)
         scheme = "ws";
     }
 
+    if (strncmp(bbuf, "RFB ", 4) == 0) {
+        rfbLog("Normal socket connection\n");
+        return TRUE;
+    }
+
     if (strncmp(bbuf, "GET ", 4) != 0) {
       rfbErr("webSocketsHandshake: invalid client header\n");
       return FALSE;
