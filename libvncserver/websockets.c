@@ -133,7 +133,7 @@ webSocketsCheck (rfbClientPtr cl)
 
     ret = rfbPeekExactTimeout(cl, bbuf, 4,
                                    WEBSOCKETS_CLIENT_CONNECT_WAIT_MS);
-    if ((ret < 0) && (errno == ETIMEDOUT)) {
+    if (((ret < 0) && (errno == ETIMEDOUT)) || strncmp(bbuf, "RFB ", 4) == 0) {
       rfbLog("Normal socket connection\n");
       return TRUE;
     } else if (ret <= 0) {
