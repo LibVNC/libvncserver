@@ -14,7 +14,7 @@
  *                     Johannes E. Schindelin <johannes.schindelin@gmx.de>
  *  Copyright (C) 2002 RealVNC Ltd.
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
- *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.  
+ *  Original Xvnc code Copyright (C) 1999 AT&T Laboratories Cambridge.
  *  All Rights Reserved.
  *
  *  This is free software; you can redistribute it and/or modify
@@ -751,13 +751,13 @@ extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbPeekExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
 extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
-extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
-extern int rfbConnectToTcpAddr(char* host, int port);
-extern int rfbListenOnTCPPort(int port, in_addr_t iface);
-extern int rfbListenOnTCP6Port(int port, const char* iface);
-extern int rfbListenOnUDPPort(int port, in_addr_t iface);
+extern SOCKET rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
+extern SOCKET rfbConnectToTcpAddr(char* host, int port);
+extern SOCKET rfbListenOnTCPPort(int port, in_addr_t iface);
+extern SOCKET rfbListenOnTCP6Port(int port, const char* iface);
+extern SOCKET rfbListenOnUDPPort(int port, in_addr_t iface);
 extern int rfbStringToAddr(char* string,in_addr_t* addr);
-extern rfbBool rfbSetNonBlocking(int sock);
+extern rfbBool rfbSetNonBlocking(SOCKET sock);
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 /* websockets.c */
