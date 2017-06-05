@@ -53,6 +53,8 @@
 #define ssize_t SSIZE_T
 #define read _read /* Prevent POSIX deprecation warnings */
 #endif
+#define read(sock,buf,len) recv(sock,buf,len,0)
+#define write(sock,buf,len) send(sock,buf,len,0)
 #else
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
