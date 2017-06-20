@@ -52,7 +52,7 @@
 #include "rfbssl.h"
 #include "rfbcrypto.h"
 #include "ws_decode.h"
-
+#include "base64.h"
 
 #if 0
 #include <sys/syscall.h>
@@ -117,8 +117,8 @@ static void webSocketsGenSha1Key(char *target, int size, char *key)
     iov[1].iov_base = GUID;
     iov[1].iov_len = sizeof(GUID) - 1;
     digestsha1(iov, 2, hash);
-    if (-1 == b64_ntop(hash, sizeof(hash), target, size))
-	rfbErr("b64_ntop failed\n");
+    if (-1 == rfbBase64NtoP(hash, sizeof(hash), target, size))
+	rfbErr("rfbBase64NtoP failed\n");
 }
 
 /*
@@ -412,7 +412,7 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
     }
 
     if (wsctx->base64) {
-        if (-1 == (ret = b64_ntop((unsigned char *)src, len, wsctx->codeBufEncode + sz, sizeof(wsctx->codeBufEncode) - sz))) {
+        if (-1 == (ret = rfbBase64NtoP((unsigned char *)src, len, wsctx->codeBufEncode + sz, sizeof(wsctx->codeBufEncode) - sz))) {
             rfbErr("%s: Base 64 encode failed\n", __func__);
         } else {
           if (ret != blen)

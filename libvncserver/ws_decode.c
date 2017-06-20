@@ -1,4 +1,5 @@
 #include "ws_decode.h"
+#include "base64.h"
 
 #include <string.h>
 #include <errno.h>
@@ -432,7 +433,7 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
     case WS_OPCODE_TEXT_FRAME:
       data[toReturn] = '\0';
       ws_dbg("Initiate Base64 decoding in %p with max size %d and '\\0' at %p\n", data, bufsize, data + toReturn);
-      if (-1 == (wsctx->readlen = b64_pton((char *)data, data, bufsize))) {
+      if (-1 == (wsctx->readlen = rfbBase64PtoN((char *)data, data, bufsize))) {
         rfbErr("%s: Base64 decode error; %s\n", __func__, strerror(errno));
       }
       wsctx->writePos = hybiPayloadStart(wsctx);
