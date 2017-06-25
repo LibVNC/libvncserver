@@ -1066,7 +1066,7 @@ void rfbInitServer(rfbScreenInfoPtr screen)
     int i=WSAStartup(MAKEWORD(2,0),&trash);
     if(i!=0) {
       rfbErr("Couldn't init Windows Sockets\n");
-      return 0;
+      return;
     }
     WSAinitted=TRUE;
   }
