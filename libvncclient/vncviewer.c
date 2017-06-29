@@ -253,8 +253,8 @@ static void initAppData(AppData* data) {
 
 rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 			int bytesPerPixel) {
-  rfbClient* client=(rfbClient*)calloc(sizeof(rfbClient),1);
-  if(!client) {
+  rfbClient* client=(rfbClient*)calloc(1, sizeof(rfbClient));
+  if (!client) {
     rfbClientErr("Couldn't allocate client structure!\n");
     return NULL;
   }
