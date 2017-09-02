@@ -58,10 +58,7 @@
 #include <netdb.h>
 #endif
 #include "tls.h"
-
-#ifdef LIBVNCSERVER_HAVE_SASL
 #include "rfbsasl.h"
-#endif /* LIBVNCSERVER_HAVE_SASL */
 
 #ifdef _MSC_VER
 #  define snprintf _snprintf

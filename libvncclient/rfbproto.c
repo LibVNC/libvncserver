@@ -66,10 +66,7 @@
 #include <gcrypt.h>
 #endif
 
-#ifdef LIBVNCSERVER_HAVE_SASL
 #include "rfbsasl.h"
-#endif /* LIBVNCSERVER_HAVE_SASL */
-
 #include "minilzo.h"
 #include "tls.h"
 
