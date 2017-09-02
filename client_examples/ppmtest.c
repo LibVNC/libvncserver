@@ -74,8 +74,10 @@ main(int argc, char **argv)
 	rfbClient* client = rfbGetClient(8,3,4);
 	time_t t=time(NULL);
 
+#ifdef LIBVNCSERVER_HAVE_SASL
         client->GetUser = getuser;
         client->GetPassword = getpassword;
+#endif
 
 	if(argc>1 && !strcmp("-print",argv[1])) {
 		client->GotFrameBufferUpdate = PrintRect;
