@@ -1,5 +1,5 @@
-#ifndef RFBSASL_H
-#define RFBSASL_H
+#ifndef SASL_H
+#define SASL_H
 
 /*
  *  Copyright (C) 2017 S. Waterman.  All Rights Reserved.
@@ -36,4 +36,4 @@ int ReadFromSASL(rfbClient* client, char *out, unsigned int n);
 
 #endif  /* LIBVNCSERVER_HAVE_SASL */
 
-#endif /* RFBSASL_H */
+#endif /* SASL_H */

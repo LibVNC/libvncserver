@@ -338,7 +338,7 @@ endif()
 if(LIBVNCSERVER_HAVE_SASL)
   set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_SOURCES}
-    ${LIBVNCCLIENT_DIR}/rfbsasl.c
+    ${LIBVNCCLIENT_DIR}/sasl.c
   )
 endif()
 

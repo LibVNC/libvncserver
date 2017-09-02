@@ -58,7 +58,7 @@
 #include <netdb.h>
 #endif
 #include "tls.h"
-#include "rfbsasl.h"
+#include "sasl.h"
 
 #ifdef _MSC_VER
 #  define snprintf _snprintf

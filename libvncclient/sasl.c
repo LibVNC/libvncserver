@@ -26,7 +26,7 @@
  */
 
 /*
- * rfbsasl.c - functions to deal with client side of the SASL protocol.
+ * sasl.c - functions to deal with client side of the SASL protocol.
  */
 
 #ifdef __STRICT_ANSI__
@@ -54,7 +54,7 @@
 #include <arpa/inet.h>
 #endif /* WIN32 */
 
-#include "rfbsasl.h"
+#include "sasl.h"
 
 #include "tls.h"
 

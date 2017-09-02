@@ -66,7 +66,7 @@
 #include <gcrypt.h>
 #endif
 
-#include "rfbsasl.h"
+#include "sasl.h"
 #include "minilzo.h"
 #include "tls.h"
 
