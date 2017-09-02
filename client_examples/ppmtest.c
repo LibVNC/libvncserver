@@ -58,11 +58,24 @@ static void SaveFramebufferAsPPM(rfbClient* client, int x, int y, int w, int h) 
 	fclose(f);
 }
 
+char * getuser(rfbClient *client)
+{
+return strdup("testuser@test");
+}
+
+char * getpassword(rfbClient *client)
+{
+return strdup("Password");
+}
+
 int
 main(int argc, char **argv)
 {
 	rfbClient* client = rfbGetClient(8,3,4);
 	time_t t=time(NULL);
+
+        client->GetUser = getuser;
+        client->GetPassword = getpassword;
 
 	if(argc>1 && !strcmp("-print",argv[1])) {
 		client->GotFrameBufferUpdate = PrintRect;

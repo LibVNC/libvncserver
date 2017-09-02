@@ -59,6 +59,10 @@
 #endif
 #include "tls.h"
 
+#ifdef LIBVNCSERVER_HAVE_SASL
+#include "rfbsasl.h"
+#endif /* LIBVNCSERVER_HAVE_SASL */
+
 #ifdef _MSC_VER
 #  define snprintf _snprintf
 #endif
@@ -154,16 +158,24 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 
     while (client->buffered < n) {
       int i;
-      if (client->tlsSession) {
+      if (client->tlsSession)
         i = ReadFromTLS(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
-      } else {
+      else
+#ifdef LIBVNCSERVER_HAVE_SASL
+      if (client->saslconn)
+        i = ReadFromSASL(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
+      else {
+#endif /* LIBVNCSERVER_HAVE_SASL */
         i = read(client->sock, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
+#ifdef WIN32
+	if (i < 0) errno=WSAGetLastError();
+#endif
+#ifdef LIBVNCSERVER_HAVE_SASL
       }
+#endif
+  
       if (i <= 0) {
 	if (i < 0) {
-#ifdef WIN32
-	  errno=WSAGetLastError();
-#endif
 	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
 	    /* TODO:
 	       ProcessXtEvents();
@@ -192,11 +204,15 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 
     while (n > 0) {
       int i;
-      if (client->tlsSession) {
+      if (client->tlsSession)
         i = ReadFromTLS(client, out, n);
-      } else {
+      else
+#ifdef LIBVNCSERVER_HAVE_SASL
+      if (client->saslconn)
+        i = ReadFromSASL(client, out, n);
+      else
+#endif
         i = read(client->sock, out, n);
-      }
 
       if (i <= 0) {
 	if (i < 0) {
@@ -248,6 +264,12 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
   fd_set fds;
   int i = 0;
   int j;
+  const char *obuf = buf;
+#ifdef LIBVNCSERVER_HAVE_SASL
+  const char *output;
+  unsigned int outputlen;
+  int err;
+#endif /* LIBVNCSERVER_HAVE_SASL */
 
   if (client->serverPort==-1)
     return TRUE; /* vncrec playing */
@@ -259,9 +281,23 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
 
     return TRUE;
   }
+#ifdef LIBVNCSERVER_HAVE_SASL
+  if (client->saslconn) {
+    err = sasl_encode(client->saslconn,
+                      buf, n,
+                      &output, &outputlen);
+    if (err != SASL_OK) {
+      rfbClientLog("Failed to encode SASL data %s",
+                   sasl_errstring(err, NULL, NULL));
+      return FALSE;
+    }
+    obuf = output;
+    n = outputlen;
+  }
+#endif /* LIBVNCSERVER_HAVE_SASL */
 
   while (i < n) {
-    j = write(client->sock, buf + i, (n - i));
+    j = write(client->sock, obuf + i, (n - i));
     if (j <= 0) {
       if (j < 0) {
 #ifdef WIN32
@@ -293,8 +329,6 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
   }
   return TRUE;
 }
-
-
 
 static int initSockets() {
 #ifdef WIN32
