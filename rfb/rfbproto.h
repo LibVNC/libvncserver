@@ -438,6 +438,7 @@ typedef struct {
 #define rfbEncodingTightPng 0xFFFFFEFC /* -260 */
 #define rfbEncodingZlibHex 8
 #define rfbEncodingUltra 9
+#define rfbEncodingTRLE 15
 #define rfbEncodingZRLE 16
 #define rfbEncodingZYWRLE 17
 
