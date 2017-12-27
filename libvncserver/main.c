@@ -1082,15 +1082,17 @@ void rfbInitServer(rfbScreenInfoPtr screen)
 void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
   if(disconnectClients) {
     rfbClientPtr cl;
-    rfbClientIteratorPtr iter = rfbGetClientIterator(screen);
-    while( (cl = rfbClientIteratorNext(iter)) ) {
+    while (1) {
+      //TODO: screen->clientHead has to be locked by LOCK(rfbClientListMutex) and UNLOCK(rfbClientListMutex)
+      cl = screen->clientHead;
+      if (cl == NULL) break;
+
       if (cl->sock > -1) {
        /* we don't care about maxfd here, because the server goes away */
        rfbCloseClient(cl);
-       rfbClientConnectionGone(cl);
       }
+      rfbClientConnectionGone(cl);
     }
-    rfbReleaseClientIterator(iter);
   }
 
   rfbShutdownSockets(screen);
