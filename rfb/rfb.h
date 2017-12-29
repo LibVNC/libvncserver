@@ -1017,8 +1017,8 @@ void rfbDoNothingWithClient(rfbClientPtr cl);
 enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl);
 void rfbRegisterProtocolExtension(rfbProtocolExtension* extension);
 void rfbUnregisterProtocolExtension(rfbProtocolExtension* extension);
-struct _rfbProtocolExtension* rfbGetExtensionIterator();
-void rfbReleaseExtensionIterator();
+struct _rfbProtocolExtension* rfbGetExtensionIterator(void);
+void rfbReleaseExtensionIterator(void);
 rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
 	void* data);
 rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension);
@@ -1057,8 +1057,8 @@ extern rfbBool rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
 extern rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo);
 
 /* TightVNC file transfer extension */
-void rfbRegisterTightVNCFileTransferExtension();
-void rfbUnregisterTightVNCFileTransferExtension();
+void rfbRegisterTightVNCFileTransferExtension(void);
+void rfbUnregisterTightVNCFileTransferExtension(void);
 
 /* Statistics */
 extern char *messageNameServer2Client(uint32_t type, char *buf, int len);

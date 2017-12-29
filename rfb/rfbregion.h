@@ -19,7 +19,7 @@ typedef struct sraRegion sraRegion;
 
 /* -=- Region manipulation functions */
 
-extern sraRegion *sraRgnCreate();
+extern sraRegion *sraRgnCreate(void);
 extern sraRegion *sraRgnCreateRect(int x1, int y1, int x2, int y2);
 extern sraRegion *sraRgnCreateRgn(const sraRegion *src);
 
