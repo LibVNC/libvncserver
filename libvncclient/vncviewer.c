@@ -319,7 +319,6 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
   memset(client->zlibStreamActive,0,sizeof(rfbBool)*4);
-  client->jpegSrcManager = NULL;
 #endif
 #endif
 
@@ -517,9 +516,6 @@ void rfbClientCleanup(rfbClient* client) {
 	client->decompStream.msg != NULL)
       rfbClientLog("inflateEnd: %s\n", client->decompStream.msg );
   }
-
-  if (client->jpegSrcManager)
-    free(client->jpegSrcManager);
 #endif
 #endif
 

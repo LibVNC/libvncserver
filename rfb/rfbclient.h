@@ -7,6 +7,7 @@
  */
 
 /*
+ *  Copyright (C) 2017 D. R. Commander.  All Rights Reserved.
  *  Copyright (C) 2000, 2001 Const Kaplinsky.  All Rights Reserved.
  *  Copyright (C) 2000 Tridia Corporation.  All Rights Reserved.
  *  Copyright (C) 1999 AT&T Laboratories Cambridge.  All Rights Reserved.
@@ -51,6 +52,7 @@
 #endif
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
+#include "turbojpeg.h"
 
 #ifdef LIBVNCSERVER_HAVE_SASL
 #include <sasl/sasl.h>
@@ -295,7 +297,7 @@ typedef struct _rfbClient {
 	uint8_t tightPrevRow[2048*3*sizeof(uint16_t)];
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
-	/** JPEG decoder state. */
+	/** JPEG decoder state (obsolete-- do not use). */
 	rfbBool jpegError;
 
 	struct jpeg_source_mgr* jpegSrcManager;
@@ -422,6 +424,14 @@ typedef struct _rfbClient {
         GetUserProc GetUser;
 
 #endif /* LIBVNCSERVER_HAVE_SASL */
+
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+	/** JPEG decoder state. */
+	tjhandle tjhnd;
+
+#endif
+#endif
 } rfbClient;
 
 /* cursor.c */

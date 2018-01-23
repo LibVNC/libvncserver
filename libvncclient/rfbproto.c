@@ -47,12 +47,6 @@
 #define Z_NULL NULL
 #endif
 #endif
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-#ifdef _RPCNDR_H /* This Windows header typedefs 'boolean', jpeglib has to know */
-#define HAVE_BOOLEAN
-#endif
-#include <jpeglib.h>
-#endif
 
 #ifndef _MSC_VER
 /* Strings.h is not available in MSVC */
@@ -178,13 +172,6 @@ static rfbBool HandleTight16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleTight32(rfbClient* client, int rx, int ry, int rw, int rh);
 
 static long ReadCompactLen (rfbClient* client);
-
-static void JpegInitSource(j_decompress_ptr cinfo);
-static boolean JpegFillInputBuffer(j_decompress_ptr cinfo);
-static void JpegSkipInputData(j_decompress_ptr cinfo, long num_bytes);
-static void JpegTermSource(j_decompress_ptr cinfo);
-static void JpegSetSrcManager(j_decompress_ptr cinfo, uint8_t *compressedData,
-                              int compressedLen);
 #endif
 static rfbBool HandleZRLE8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZRLE15(rfbClient* client, int rx, int ry, int rw, int rh);
