@@ -2,9 +2,12 @@
 #environment:
 #  APPVEYOR_RDP_PASSWORD: Pa55word
 
-os:
-  - Visual Studio 2013
-  - Visual Studio 2015
+environment:
+  matrix:
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2013
+      DEVENV_EXE: C:\"Program Files (x86)"\"Microsoft Visual Studio 12.0"\Common7\IDE\devenv.exe
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      DEVENV_EXE: C:\"Program Files (x86)"\"Microsoft Visual Studio 14.0"\Common7\IDE\devenv.exe
 
 #init:
 #  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
@@ -33,7 +36,8 @@ install:
   - 7z x db-4.1.25.tar.gz -so | 7z x -si -ttar > nul
   - move db-4.1.25 db
   - cd db\build_win32
-  - C:\"Program Files (x86)"\"Microsoft Visual Studio 12.0"\Common7\IDE\devenv.exe db_dll.dsp /upgrade
+  - echo using devenv %DEVENV_EXE%
+  - '%DEVENV_EXE% db_dll.dsp /upgrade'
   - msbuild /p:Configuration=Release db_dll.vcxproj
   - cd ..\..
   # Cyrus SASL
