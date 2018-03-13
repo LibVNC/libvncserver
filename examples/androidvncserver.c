@@ -513,6 +513,6 @@ int main(int argc, char **argv)
 
 	printf("Cleaning up...\n");
 	cleanup_fb();
-	cleanup_kdb();
+	cleanup_kbd();
 	cleanup_touch();
 }
