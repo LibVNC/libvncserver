@@ -460,7 +460,7 @@ void print_usage(char **argv)
 	printf("%s [-k device] [-t device] [-h]\n"
 		"-k device: keyboard device node, default is /dev/input/event3\n"
 		"-t device: touch device node, default is /dev/input/event1\n"
-		"-h : print this help\n");
+		"-h : print this help\n", argv[0]);
 }
 
 int main(int argc, char **argv)
