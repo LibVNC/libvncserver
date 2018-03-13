@@ -1,5 +1,10 @@
 /*
- * $Id$
+ * This example VNC server for Android is adopted from
+ * http://code.google.com/p/android-vnc-server/ with some additional
+ * fixes applied.
+ *
+ * To build, you'll need the Android Native Development Kit from
+ * http://developer.android.com/sdk/ndk/.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
