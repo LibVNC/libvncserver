@@ -88,8 +88,6 @@
 #include <errno.h>
 /* strftime() */
 #include <time.h>
-/* PRIu32 */
-#include <inttypes.h>
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 #include "rfbssl.h"
@@ -2586,8 +2584,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	 * prevent from a denial-of-service by allocating to much memory in
 	 * the server. */
 	if (msg.cct.length > 1<<20) {
-	    rfbLog("rfbClientCutText: too big cut text length requested: %" PRIu32 "\n",
-		    msg.cct.length);
+	    rfbLog("rfbClientCutText: too big cut text length requested: %u B > 1 MB\n", (unsigned int)msg.cct.length);
 	    rfbCloseClient(cl);
 	    return;
 	}
