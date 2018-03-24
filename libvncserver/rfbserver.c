@@ -88,6 +88,8 @@
 #include <errno.h>
 /* strftime() */
 #include <time.h>
+/* PRIu32 */
+#include <inttypes.h>
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 #include "rfbssl.h"
@@ -2575,7 +2577,23 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	msg.cct.length = Swap32IfLE(msg.cct.length);
 
-	str = (char *)malloc(msg.cct.length);
+	/* uint32_t input is passed to malloc()'s size_t argument,
+	 * to rfbReadExact()'s int argument, to rfbStatRecordMessageRcvd()'s int
+	 * argument increased of sz_rfbClientCutTextMsg, and to setXCutText()'s int
+	 * argument. Here we impose a limit of 1 MB so that the value fits
+	 * into all of the types to prevent from misinterpretation and thus
+	 * from accessing uninitialized memory (CVE-2018-7225) and also to
+	 * prevent from a denial-of-service by allocating to much memory in
+	 * the server. */
+	if (msg.cct.length > 1<<20) {
+	    rfbLog("rfbClientCutText: too big cut text length requested: %" PRIu32 "\n",
+		    msg.cct.length);
+	    rfbCloseClient(cl);
+	    return;
+	}
+
+	/* Allow zero-length client cut text. */
+	str = (char *)calloc(msg.cct.length ? msg.cct.length : 1, 1);
 	if (str == NULL) {
 		rfbLogPerror("rfbProcessClientNormalMessage: not enough memory");
 		rfbCloseClient(cl);
