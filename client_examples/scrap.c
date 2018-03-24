@@ -14,7 +14,7 @@
 #include "rfb/rfbconfig.h"
 
 /* Determine what type of clipboard we are using */
-#if defined(__unix__) && !defined(__QNXNTO__) && defined(LIBVNCSERVER_HAVE_X11)
+#if defined(__unix__) && !defined(__QNXNTO__) && defined(SDL_VIDEO_DRIVER_X11)
 #define X11_SCRAP
 #elif defined(__WIN32__)
 #define WIN_SCRAP

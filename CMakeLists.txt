@@ -37,6 +37,7 @@ option(WITH_ZLIB "Search for the zlib compression library to support additional 
 option(WITH_JPEG "Search for the libjpeg compression library to support additional encodings" ON)
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
+option(WITH_X11 "Search for X11 to build the example SDL vnc client with clipboard support" ON)
 option(WITH_THREADS "Search for a threading library to build with multithreading support" ON)
 option(WITH_GNUTLS "Search for the GnuTLS secure communications library to support encryption" ON)
 option(WITH_OPENSSL "Search for the OpenSSL cryptography library to support encryption" ON)
@@ -102,6 +103,11 @@ endif(WITH_PNG)
 if(WITH_SDL)
   find_package(SDL)
 endif(WITH_SDL)
+
+
+if(WITH_X11)
+  find_package(X11)
+endif(WITH_X11)
 
 
 if(WITH_THREADS)
@@ -503,7 +509,7 @@ foreach(e ${LIBVNCCLIENT_EXAMPLES})
   add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
   set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
   set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
-  target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL_LIBRARY} ${FFMPEG_LIBRARIES})
+  target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL_LIBRARY} ${X11_LIBRARIES} ${FFMPEG_LIBRARIES})
 endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 
 
