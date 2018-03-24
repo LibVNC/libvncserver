@@ -2581,7 +2581,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	 * argument. Here we impose a limit of 1 MB so that the value fits
 	 * into all of the types to prevent from misinterpretation and thus
 	 * from accessing uninitialized memory (CVE-2018-7225) and also to
-	 * prevent from a denial-of-service by allocating to much memory in
+	 * prevent from a denial-of-service by allocating too much memory in
 	 * the server. */
 	if (msg.cct.length > 1<<20) {
 	    rfbLog("rfbClientCutText: too big cut text length requested: %u B > 1 MB\n", (unsigned int)msg.cct.length);
