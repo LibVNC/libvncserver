@@ -136,7 +136,7 @@ if(WITH_GCRYPT)
 endif(WITH_GCRYPT)
 
 if(WITH_FFMPEG)
-  find_package(FFMPEG)
+  find_package(FFMPEG 3.1.0)
 endif(WITH_FFMPEG)
 
 
