@@ -420,8 +420,8 @@ static int HandleZRLETile(rfbClient* client,
 #undef HandleZRLE
 #undef HandleZRLETile
 #undef UncompressCPixel
-#undef REALBPP
 
 #endif
 
 #undef UNCOMP
+#undef REALBPP
