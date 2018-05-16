@@ -17,13 +17,12 @@ struct { int sdl; int rfb; } buttonMapping[]={
 };
 
 static int enableResizable = 1, viewOnly, listenLoop, buttonMask;
-#ifdef SDL_ASYNCBLIT
-	int sdlFlags = SDL_HWSURFACE | SDL_ASYNCBLIT | SDL_HWACCEL;
-#else
-	int sdlFlags = SDL_HWSURFACE | SDL_HWACCEL;
-#endif
+int sdlFlags;
 static int realWidth, realHeight, bytesPerPixel, rowStride;
 static char *sdlPixels;
+SDL_Texture *sdlTexture;
+SDL_Renderer *sdlRenderer;
+SDL_Window *sdlWindow;
 
 static int rightAltKeyDown, leftAltKeyDown;
 
@@ -32,53 +31,76 @@ static rfbBool resize(rfbClient* client) {
 		depth=client->format.bitsPerPixel;
 
 	if (enableResizable)
-		sdlFlags |= SDL_RESIZABLE;
+		sdlFlags |= SDL_WINDOW_RESIZABLE;
 
 	client->updateRect.x = client->updateRect.y = 0;
 	client->updateRect.w = width; client->updateRect.h = height;
-	rfbBool okay=SDL_VideoModeOK(width,height,depth,sdlFlags);
-	if(!okay)
-		for(depth=24;!okay && depth>4;depth/=2)
-			okay=SDL_VideoModeOK(width,height,depth,sdlFlags);
-	if(okay) {
-		SDL_Surface* sdl=SDL_SetVideoMode(width,height,depth,sdlFlags);
-		rfbClientSetClientData(client, SDL_Init, sdl);
-		client->width = sdl->pitch / (depth / 8);
-		if (sdlPixels) {
-			free(client->frameBuffer);
-			sdlPixels = NULL;
-		}
-		client->frameBuffer=sdl->pixels;
 
-		client->format.bitsPerPixel=depth;
-		client->format.redShift=sdl->format->Rshift;
-		client->format.greenShift=sdl->format->Gshift;
-		client->format.blueShift=sdl->format->Bshift;
-		client->format.redMax=sdl->format->Rmask>>client->format.redShift;
-		client->format.greenMax=sdl->format->Gmask>>client->format.greenShift;
-		client->format.blueMax=sdl->format->Bmask>>client->format.blueShift;
-		SetFormatAndEncodings(client);
+	/* (re)create the surface used as the client's framebuffer */
+	SDL_FreeSurface(rfbClientGetClientData(client, SDL_Init));
+	SDL_Surface* sdl=SDL_CreateRGBSurface(0,
+					      width,
+					      height,
+					      depth,
+					      0,0,0,0);
+	if(!sdl)
+	    rfbClientErr("resize: error creating surface: %s\n", SDL_GetError());
 
-	} else {
-		SDL_Surface* sdl=rfbClientGetClientData(client, SDL_Init);
-		rfbClientLog("Could not set resolution %dx%d!\n",
-				client->width,client->height);
-		if(sdl) {
-			client->width=sdl->pitch / (depth / 8);
-			client->height=sdl->h;
-		} else {
-			client->width=0;
-			client->height=0;
-		}
-		return FALSE;
+	rfbClientSetClientData(client, SDL_Init, sdl);
+	client->width = sdl->pitch / (depth / 8);
+	if (sdlPixels) {
+	    free(client->frameBuffer);
+	    sdlPixels = NULL;
 	}
-	SDL_WM_SetCaption(client->desktopName, "SDL");
+	client->frameBuffer=sdl->pixels;
+
+	client->format.bitsPerPixel=depth;
+	client->format.redShift=sdl->format->Rshift;
+	client->format.greenShift=sdl->format->Gshift;
+	client->format.blueShift=sdl->format->Bshift;
+	client->format.redMax=sdl->format->Rmask>>client->format.redShift;
+	client->format.greenMax=sdl->format->Gmask>>client->format.greenShift;
+	client->format.blueMax=sdl->format->Bmask>>client->format.blueShift;
+	SetFormatAndEncodings(client);
+
+	/* create or resize the window */
+	if(!sdlWindow) {
+	    sdlWindow = SDL_CreateWindow(client->desktopName,
+					 SDL_WINDOWPOS_UNDEFINED,
+					 SDL_WINDOWPOS_UNDEFINED,
+					 width,
+					 height,
+					 sdlFlags);
+	    if(!sdlWindow)
+		rfbClientErr("resize: error creating window: %s\n", SDL_GetError());
+	} else {
+	    SDL_SetWindowSize(sdlWindow, width, height);
+	}
+
+	/* create the renderer if it does not already exist */
+	if(!sdlRenderer) {
+	    sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
+	    if(!sdlRenderer)
+		rfbClientErr("resize: error creating renderer: %s\n", SDL_GetError());
+	    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  /* make the scaled rendering look smoother. */
+	}
+	SDL_RenderSetLogicalSize(sdlRenderer, width, height);  /* this is a departure from the SDL1.2-based version, but more in the sense of a VNC viewer in keeeping aspect ratio */
+
+	/* (re)create the texture that sits in between the surface->pixels and the renderer */
+	if(sdlTexture)
+	    SDL_DestroyTexture(sdlTexture);
+	sdlTexture = SDL_CreateTexture(sdlRenderer,
+				       SDL_PIXELFORMAT_ARGB8888,
+				       SDL_TEXTUREACCESS_STREAMING,
+				       width, height);
+	if(!sdlTexture)
+	    rfbClientErr("resize: error creating texture: %s\n", SDL_GetError());
 	return TRUE;
 }
 
 static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	rfbKeySym k = 0;
-	SDLKey sym = e->keysym.sym;
+	/*FIXMESDLKey sym = e->keysym.sym;
 
 	switch (sym) {
 	case SDLK_BACKSPACE: k = XK_BackSpace; break;
@@ -153,7 +175,7 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_BREAK: k = XK_Break; break;
 	default: break;
 	}
-	/* both SDL and X11 keysyms match ASCII in the range 0x01-0x7f */
+	// both SDL and X11 keysyms match ASCII in the range 0x01-0x7f
 	if (k == 0 && sym > 0x0 && sym < 0x100) {
 		k = sym;
 		if (e->keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT)) {
@@ -169,7 +191,7 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 		else
 			rfbClientLog("Unknown keysym: %d\n", sym);
 	}
-
+*/
 	return k;
 }
 
@@ -245,19 +267,29 @@ static void update(rfbClient* cl,int x,int y,int w,int h) {
 		w -= x;
 		h -= y;
 	}
-	SDL_UpdateRect(rfbClientGetClientData(cl, SDL_Init), x, y, w, h);
+	SDL_Surface *sdl = rfbClientGetClientData(cl, SDL_Init);
+	/* update texture from surface->pixels */
+	SDL_Rect r = {x,y,w,h};
+ 	if(SDL_UpdateTexture(sdlTexture, &r, sdl->pixels + y*sdl->pitch + x*4, sdl->pitch) < 0)
+	    rfbClientErr("update: failed to update texture: %s\n", SDL_GetError());
+	/* copy texture to renderer and show */
+	if(SDL_RenderClear(sdlRenderer) < 0)
+	    rfbClientErr("update: failed to clear renderer: %s\n", SDL_GetError());
+	if(SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL) < 0)
+	    rfbClientErr("update: failed to copy texture to renderer: %s\n", SDL_GetError());
+	SDL_RenderPresent(sdlRenderer);
 }
 
 static void setRealDimension(rfbClient *client, int w, int h)
 {
 	SDL_Surface* sdl;
-
+	/*FIXME
 	if (w < 0) {
 		const SDL_VideoInfo *info = SDL_GetVideoInfo();
 		w = info->current_h;
 		h = info->current_w;
 	}
-
+	*/
 	if (w == realWidth && h == realHeight)
 		return;
 
@@ -280,7 +312,7 @@ static void setRealDimension(rfbClient *client, int w, int h)
 	sdl = rfbClientGetClientData(client, SDL_Init);
 	if (sdl->w != w || sdl->h != h) {
 		int depth = sdl->format->BitsPerPixel;
-		sdl = SDL_SetVideoMode(w, h, depth, sdlFlags);
+		//FIXMEsdl = SDL_SetVideoMode(w, h, depth, sdlFlags);
 		rfbClientSetClientData(client, SDL_Init, sdl);
 		sdlPixels = sdl->pixels;
 		rowStride = sdl->pitch / (depth / 8);
@@ -374,12 +406,14 @@ static void cleanup(rfbClient* cl)
 static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 {
 	switch(e->type) {
-#if SDL_MAJOR_VERSION > 1 || SDL_MINOR_VERSION >= 2
-	case SDL_VIDEOEXPOSE:
+	case SDL_WINDOWEVENT:
+	    switch (e->window.event) {
+	    case SDL_WINDOWEVENT_EXPOSED:
 		SendFramebufferUpdateRequest(cl, 0, 0,
 					cl->width, cl->height, FALSE);
 		break;
-#endif
+	    }
+	    break;
 	case SDL_MOUSEBUTTONUP:
 	case SDL_MOUSEBUTTONDOWN:
 	case SDL_MOUSEMOTION:
@@ -437,6 +471,7 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		    rfbClientCleanup(cl);
 		    exit(0);
 		  }
+		/*FIXME
 	case SDL_ACTIVEEVENT:
 		if (!e->active.gain && rightAltKeyDown) {
 			SendKeyEvent(cl, XK_Alt_R, FALSE);
@@ -457,12 +492,15 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 				SendClientCutText(cl, data, len);
 		}
 		break;
+		*/
 	case SDL_SYSWMEVENT:
 		clipboard_filter(e);
 		break;
+		/*FIXME
 	case SDL_VIDEORESIZE:
 		setRealDimension(cl, e->resize.w, e->resize.h);
 		break;
+		*/
 	default:
 		rfbClientLog("ignore SDL event: 0x%x\n", e->type);
 	}
@@ -471,7 +509,7 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 
 static void got_selection(rfbClient *cl, const char *text, int len)
 {
-	put_scrap(T('T', 'E', 'X', 'T'), len, text);
+    //FIXMEput_scrap(T('T', 'E', 'X', 'T'), len, text);
 }
 
 
@@ -532,9 +570,7 @@ int main(int argc,char** argv) {
 	argc = j;
 
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
-	SDL_EnableUNICODE(1);
-	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY,
-			SDL_DEFAULT_REPEAT_INTERVAL);
+	//FIXME SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 	atexit(SDL_Quit);
 	signal(SIGINT, exit);
 

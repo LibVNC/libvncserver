@@ -209,7 +209,8 @@ int init_scrap(void)
 	SDL_SetError("SDL is not running on known window manager");
 
 	SDL_VERSION(&info.version);
-	if (SDL_GetWMInfo(&info)) {
+	//FIXMEif (SDL_GetWMInfo(&info))
+	    {
 		/* Save the information for later use */
 #if defined(X11_SCRAP)
 		if (info.subsystem == SDL_SYSWM_X11) {
