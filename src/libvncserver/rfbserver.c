@@ -376,6 +376,10 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
     cl->screen = rfbScreen;
     cl->sock = sock;
+    cl->readFromSocket = rfbDefaultReadFromSocket;
+    cl->peekAtSocket = rfbDefaultPeekAtSocket;
+    cl->hasPendingOnSocket = rfbDefaultHasPendingOnSocket;
+    cl->writeToSocket = rfbDefaultWriteToSocket;
     cl->viewOnly = FALSE;
     /* setup pseudo scaling */
     cl->scaledScreen = rfbScreen;

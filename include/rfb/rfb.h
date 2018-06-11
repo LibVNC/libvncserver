@@ -402,6 +402,14 @@ typedef struct sraRegion* sraRegionPtr;
 typedef void (*ClientGoneHookPtr)(struct _rfbClientRec* cl);
 typedef void (*ClientFramebufferUpdateRequestHookPtr)(struct _rfbClientRec* cl, rfbFramebufferUpdateRequestMsg* furMsg);
 
+typedef int (*ClientReadFromSocket)(struct _rfbClientRec* cl,
+                                    char *buf, int len);
+typedef int (*ClientPeekAtSocket)(struct _rfbClientRec* cl,
+                                  char *buf, int len);
+typedef rfbBool (*ClientHasPendingOnSocket)(struct _rfbClientRec* cl);
+typedef int (*ClientWriteToSocket)(struct _rfbClientRec* cl,
+                                   const char *buf, int len);
+
 typedef struct _rfbFileTransferData {
   int fd;
   int compressionEnabled;
@@ -715,6 +723,11 @@ typedef struct _rfbClientRec {
     int destPort;
     /** ID on repeater in case of an UltraVNC mode 2 repeater connection */
     char *repeaterId;
+
+    ClientReadFromSocket readFromSocket;         /* Read data from socket */
+    ClientPeekAtSocket peekAtSocket;             /* Peek at data from socket */
+    ClientHasPendingOnSocket hasPendingOnSocket; /* Has pending data on socket */
+    ClientWriteToSocket writeToSocket;           /* Write data to socket */
 } rfbClientRec, *rfbClientPtr;
 
 /**
@@ -767,8 +780,12 @@ extern void rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen);
 extern void rfbCloseClient(rfbClientPtr cl);
 extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
 extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
+extern int rfbDefaultReadFromSocket(rfbClientPtr cl, char *buf, int len);
 extern int rfbPeekExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
+extern int rfbDefaultPeekAtSocket(rfbClientPtr cl, char *buf, int len);
+extern rfbBool rfbDefaultHasPendingOnSocket(rfbClientPtr cl);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
+extern int rfbDefaultWriteToSocket(rfbClientPtr cl, const char *buf, int len);
 extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern rfbSocket rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern rfbSocket rfbConnectToTcpAddr(char* host, int port);
