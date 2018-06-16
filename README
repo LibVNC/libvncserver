@@ -122,9 +122,6 @@ Making it interactive
 Input is handled by IO functions (see below).
 
 Whenever you change something in the frame buffer, call rfbMarkRectAsModified.
-You should make sure that the cursor is not drawn before drawing yourself
-by calling rfbUndrawCursor. You can also draw the cursor using rfbDrawCursor,
-but it hardly seems necessary. For cursor details, see below.
 
 Utility functions
 -----------------
