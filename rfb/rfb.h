@@ -895,6 +895,8 @@ extern rfbBool rfbTightDisableGradient;
 extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
 
 extern rfbBool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
+extern rfbBool rfbSendTightHeader(rfbClientPtr cl, int x, int y, int w, int h);
+extern rfbBool rfbSendCompressedDataTight(rfbClientPtr cl, char *buf, int compressedLen);
 
 #if defined(LIBVNCSERVER_HAVE_LIBPNG)
 extern rfbBool rfbSendRectEncodingTightPng(rfbClientPtr cl, int x,int y,int w,int h);
