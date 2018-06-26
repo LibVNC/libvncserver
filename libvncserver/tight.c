@@ -191,7 +191,6 @@ static rfbBool CheckSolidTile32  (rfbClientPtr cl, int x, int y, int w, int h,
 
 static rfbBool SendRectSimple    (rfbClientPtr cl, int x, int y, int w, int h);
 static rfbBool SendSubrect       (rfbClientPtr cl, int x, int y, int w, int h);
-static rfbBool SendTightHeader   (rfbClientPtr cl, int x, int y, int w, int h);
 
 static rfbBool SendSolidRect     (rfbClientPtr cl);
 static rfbBool SendMonoRect      (rfbClientPtr cl, int x, int y, int w, int h);
@@ -200,8 +199,6 @@ static rfbBool SendFullColorRect (rfbClientPtr cl, int x, int y, int w, int h);
 
 static rfbBool CompressData (rfbClientPtr cl, int streamId, int dataLen,
                              int zlibLevel, int zlibStrategy);
-static rfbBool SendCompressedData (rfbClientPtr cl, char *buf,
-                                   int compressedLen);
 
 static void FillPalette8 (int count);
 static void FillPalette16 (int count);
@@ -430,7 +427,7 @@ SendRectEncodingTight(rfbClientPtr cl,
 
                 /* Send solid-color rectangle. */
 
-                if (!SendTightHeader(cl, x_best, y_best, w_best, h_best))
+                if (!rfbSendTightHeader(cl, x_best, y_best, w_best, h_best))
                     return FALSE;
 
                 fbptr = (cl->scaledScreen->frameBuffer +
@@ -683,7 +680,7 @@ SendSubrect(rfbClientPtr cl,
             return FALSE;
     }
 
-    if (!SendTightHeader(cl, x, y, w, h))
+    if (!rfbSendTightHeader(cl, x, y, w, h))
         return FALSE;
 
     fbptr = (cl->scaledScreen->frameBuffer
@@ -767,8 +764,8 @@ SendSubrect(rfbClientPtr cl,
     return success;
 }
 
-static rfbBool
-SendTightHeader(rfbClientPtr cl,
+rfbBool
+rfbSendTightHeader(rfbClientPtr cl,
                 int x,
                 int y,
                 int w,
@@ -1044,7 +1041,7 @@ CompressData(rfbClientPtr cl,
     }
 
     if (zlibLevel == 0)
-        return SendCompressedData (cl, tightBeforeBuf, dataLen);
+        return rfbSendCompressedDataTight(cl, tightBeforeBuf, dataLen);
 
     pz = &cl->zsStruct[streamId];
 
@@ -1083,12 +1080,12 @@ CompressData(rfbClientPtr cl,
         return FALSE;
     }
 
-    return SendCompressedData(cl, tightAfterBuf,
-                              tightAfterBufSize - pz->avail_out);
+    return rfbSendCompressedDataTight(cl, tightAfterBuf,
+                                      tightAfterBufSize - pz->avail_out);
 }
 
-static rfbBool SendCompressedData(rfbClientPtr cl, char *buf,
-                                  int compressedLen)
+rfbBool rfbSendCompressedDataTight(rfbClientPtr cl, char *buf,
+                                   int compressedLen)
 {
     int i, portionLen;
 
@@ -1665,7 +1662,7 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
     cl->updateBuf[cl->ublen++] = (char)(rfbTightJpeg << 4);
     rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, 1);
 
-    return SendCompressedData(cl, tightAfterBuf, (int)size);
+    return rfbSendCompressedDataTight(cl, tightAfterBuf, (int)size);
 }
 
 static void
@@ -1899,6 +1896,6 @@ static rfbBool SendPngRect(rfbClientPtr cl, int x, int y, int w, int h) {
     rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, 1);
 
     /* rfbLog("<< SendPngRect\n"); */
-    return SendCompressedData(cl, tightAfterBuf, pngDstDataLen);
+    return rfbSendCompressedDataTight(cl, tightAfterBuf, pngDstDataLen);
 }
 #endif
