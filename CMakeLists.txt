@@ -204,25 +204,40 @@ if(SYSTEMD_FOUND)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${SYSTEMD_LIBRARIES})
 endif(SYSTEMD_FOUND)
 
+if(LIBVNCSERVER_HAVE_SYS_UIO_H)
+  if(GNUTLS_FOUND)
+    message(STATUS "Building crypto with GnuTLS")
+    set(CRYPTO_LIBRARIES ${GNUTLS_LIBRARIES})
+    set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_gnutls)
+    include_directories(${GNUTLS_INCLUDE_DIR})
+  elseif(OPENSSL_FOUND)
+    message(STATUS "Building crypto with OpenSSL")
+    set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
+    set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_openssl)
+  else()
+    message(STATUS "Building crypto with builtin functions")
+    set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_included.c ${COMMON_DIR}/md5.c ${COMMON_DIR}/sha1.c)
+  endif()
+endif(LIBVNCSERVER_HAVE_SYS_UIO_H)
 
-if(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_SYS_UIO_H)
+
+if(WITH_WEBSOCKETS)
   set(LIBVNCSERVER_WITH_WEBSOCKETS 1)
   if(GNUTLS_FOUND)
-    set(LIBVNCSERVER_WITH_CLIENT_TLS 1)
     message(STATUS "Building websockets with GnuTLS")
     set(WEBSOCKET_LIBRARIES ${GNUTLS_LIBRARIES})
-    set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_gnutls ${LIBVNCSERVER_DIR}/rfbcrypto_gnutls)
+    set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_gnutls)
     include_directories(${GNUTLS_INCLUDE_DIR})
   elseif(OPENSSL_FOUND)
     message(STATUS "Building websockets with OpenSSL")
     set(WEBSOCKET_LIBRARIES ${OPENSSL_LIBRARIES})
-    set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_openssl ${LIBVNCSERVER_DIR}/rfbcrypto_openssl)
+    set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_openssl)
   else()
     message(STATUS "Building websockets without SSL")
     set(WEBSOCKET_LIBRARIES)
-    set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_none.c ${LIBVNCSERVER_DIR}/rfbcrypto_included.c ${COMMON_DIR}/md5.c ${COMMON_DIR}/sha1.c)
+    set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_none.c)
   endif()
-endif(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_SYS_UIO_H)
+endif(WITH_WEBSOCKETS)
 
 if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
   message(STATUS "Found libgcrypt: ${LIBGCRYPT_LIBRARIES}")
@@ -400,6 +415,7 @@ if(LIBVNCSERVER_WITH_WEBSOCKETS)
     ${LIBVNCSERVER_DIR}/websockets.c
     ${LIBVNCSERVER_DIR}/ws_decode.c
     ${COMMON_DIR}/base64.c
+    ${CRYPTO_SOURCES}
     ${WSSRCS}
   )
 endif(LIBVNCSERVER_WITH_WEBSOCKETS)
@@ -422,6 +438,7 @@ target_link_libraries(vncserver
                       ${ZLIB_LIBRARIES}
                       ${JPEG_LIBRARIES}
 		      ${PNG_LIBRARIES}
+		      ${CRYPTO_LIBRARIES}
 		      ${WEBSOCKET_LIBRARIES}
 )
 
