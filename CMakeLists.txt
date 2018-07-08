@@ -224,20 +224,6 @@ endif(LIBVNCSERVER_HAVE_SYS_UIO_H)
 
 if(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_CRYPTO)
   set(LIBVNCSERVER_WITH_WEBSOCKETS 1)
-  if(GNUTLS_FOUND)
-    message(STATUS "Building websockets with GnuTLS")
-    set(WEBSOCKET_LIBRARIES ${GNUTLS_LIBRARIES})
-    set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_gnutls)
-    include_directories(${GNUTLS_INCLUDE_DIR})
-  elseif(OPENSSL_FOUND)
-    message(STATUS "Building websockets with OpenSSL")
-    set(WEBSOCKET_LIBRARIES ${OPENSSL_LIBRARIES})
-    set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_openssl)
-  else()
-    message(STATUS "Building websockets without SSL")
-    set(WEBSOCKET_LIBRARIES)
-    set(WSSRCS ${LIBVNCSERVER_DIR}/rfbssl_none.c)
-  endif()
 endif(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_CRYPTO)
 
 if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
@@ -351,16 +337,29 @@ if(GNUTLS_FOUND)
     ${LIBVNCCLIENT_SOURCES}
     ${LIBVNCCLIENT_DIR}/tls_gnutls.c
   )
+  set(LIBVNCSERVER_SOURCES
+    ${LIBVNCSERVER_SOURCES}
+    ${LIBVNCSERVER_DIR}/rfbssl_gnutls.c
+    )
+  include_directories(${GNUTLS_INCLUDE_DIR})
 elseif(OPENSSL_FOUND)
   set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_SOURCES}
     ${LIBVNCCLIENT_DIR}/tls_openssl.c
+  )
+  set(LIBVNCSERVER_SOURCES
+    ${LIBVNCSERVER_SOURCES}
+    ${LIBVNCSERVER_DIR}/rfbssl_openssl.c
   )
   include_directories(${OPENSSL_INCLUDE_DIR})
 else()
   set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_SOURCES}
     ${LIBVNCCLIENT_DIR}/tls_none.c
+  )
+  set(LIBVNCSERVER_SOURCES
+    ${LIBVNCSERVER_SOURCES}
+    ${LIBVNCSERVER_DIR}/rfbssl_none.c
   )
 endif()
 
@@ -417,7 +416,6 @@ if(LIBVNCSERVER_WITH_WEBSOCKETS)
     ${LIBVNCSERVER_DIR}/ws_decode.c
     ${COMMON_DIR}/base64.c
     ${CRYPTO_SOURCES}
-    ${WSSRCS}
   )
 endif(LIBVNCSERVER_WITH_WEBSOCKETS)
 
@@ -440,7 +438,8 @@ target_link_libraries(vncserver
                       ${JPEG_LIBRARIES}
 		      ${PNG_LIBRARIES}
 		      ${CRYPTO_LIBRARIES}
-		      ${WEBSOCKET_LIBRARIES}
+                      ${GNUTLS_LIBRARIES}
+                      ${OPENSSL_LIBRARIES}
 )
 
 SET_TARGET_PROPERTIES(vncclient vncserver

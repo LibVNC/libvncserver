@@ -378,10 +378,8 @@ typedef struct _rfbScreenInfo
     rfbDisplayFinishedHookPtr displayFinishedHook;
     /** xvpHook is called to handle an xvp client message */
     rfbXvpHookPtr xvpHook;
-#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
     char *sslkeyfile;
     char *sslcertfile;
-#endif
     int ipv6port; /**< The port to listen on when using IPv6.  */
     char* listen6Interface;
     /* We have an additional IPv6 listen socket since there are systems that
@@ -690,12 +688,9 @@ typedef struct _rfbClientRec {
     int turboQualityLevel;  /* 1-100 scale */
 #endif
 #endif
-
-#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
     rfbSslCtx *sslctx;
     wsCtx     *wsctx;
     char *wspath;                          /* Requests path component */
-#endif
 } rfbClientRec, *rfbClientPtr;
 
 /**
