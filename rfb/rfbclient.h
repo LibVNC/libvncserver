@@ -432,6 +432,7 @@ typedef struct _rfbClient {
 
 #endif
 #endif
+	rfbBool lastFramebufferUpdateIncremental;
 } rfbClient;
 
 /* cursor.c */
@@ -475,7 +476,6 @@ extern rfbBool InitialiseRFBConnection(rfbClient* client);
  * false otherwise
  */
 extern rfbBool SetFormatAndEncodings(rfbClient* client);
-extern rfbBool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
 /**
  * Sends a framebuffer update request to the server. A VNC client may request an
  * update from the server at any time. You can also specify which portions of

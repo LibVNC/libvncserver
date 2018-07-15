@@ -1431,19 +1431,6 @@ SetFormatAndEncodings(rfbClient* client)
 
 
 /*
- * SendIncrementalFramebufferUpdateRequest.
- */
-
-rfbBool
-SendIncrementalFramebufferUpdateRequest(rfbClient* client)
-{
-	return SendFramebufferUpdateRequest(client,
-			client->updateRect.x, client->updateRect.y,
-			client->updateRect.w, client->updateRect.h, TRUE);
-}
-
-
-/*
  * SendFramebufferUpdateRequest.
  */
 
@@ -1453,7 +1440,9 @@ SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, rfbB
   rfbFramebufferUpdateRequestMsg fur;
 
   if (!SupportsClient2Server(client, rfbFramebufferUpdateRequest)) return TRUE;
-  
+
+  client->lastFramebufferUpdateIncremental = incremental;
+
   fur.type = rfbFramebufferUpdateRequest;
   fur.incremental = incremental ? 1 : 0;
   fur.x = rfbClientSwap16IfLE(x);
@@ -1716,6 +1705,7 @@ HandleRFBServerMessage(rfbClient* client)
     int linesToRead;
     int bytesPerLine;
     int i;
+    rfbBool framebufferUpdateFull = FALSE;
 
     if (!ReadFromRFBServer(client, ((char *)&msg.fu) + 1,
 			   sz_rfbFramebufferUpdateMsg - 1))
@@ -1736,6 +1726,10 @@ HandleRFBServerMessage(rfbClient* client)
       rect.r.w = rfbClientSwap16IfLE(rect.r.w);
       rect.r.h = rfbClientSwap16IfLE(rect.r.h);
 
+#if LIBVNCCLIENT_WITH_MACOS_SPACES_UPDATE_WORKAROUND
+      framebufferUpdateFull |= (rect.r.x == 0 &&
+				rect.r.w == client->width);
+#endif
 
       if (rect.encoding == rfbEncodingXCursor ||
 	  rect.encoding == rfbEncodingRichCursor) {
@@ -2155,7 +2149,10 @@ HandleRFBServerMessage(rfbClient* client)
       client->GotFrameBufferUpdate(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
     }
 
-    if (!SendIncrementalFramebufferUpdateRequest(client))
+    if (!SendFramebufferUpdateRequest(client,
+          client->updateRect.x, client->updateRect.y,
+          client->updateRect.w, client->updateRect.h,
+	  !(client->lastFramebufferUpdateIncremental && framebufferUpdateFull)))
       return FALSE;
 
     if (client->FinishedFrameBufferUpdate)

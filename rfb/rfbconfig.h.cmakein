@@ -158,6 +158,10 @@
    first (like Motorola and SPARC, unlike Intel and VAX). */
 #cmakedefine LIBVNCSERVER_WORDS_BIGENDIAN 1
 
+/* Define to 1 to enable workaround for switching between spaces
+   needing an explicit refresh. */
+#cmakedefine LIBVNCCLIENT_WITH_MACOS_SPACES_UPDATE_WORKAROUND 1
+
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #cmakedefine const @CMAKE_CONST@ */
 
