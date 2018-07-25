@@ -100,7 +100,7 @@ static rfbBool resize(rfbClient* client) {
 
 static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	rfbKeySym k = 0;
-	/*FIXMESDLKey sym = e->keysym.sym;
+	SDL_Keycode sym = e->keysym.sym;
 
 	switch (sym) {
 	case SDLK_BACKSPACE: k = XK_BackSpace; break;
@@ -111,16 +111,16 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_ESCAPE: k = XK_Escape; break;
 	case SDLK_SPACE: k = XK_space; break;
 	case SDLK_DELETE: k = XK_Delete; break;
-	case SDLK_KP0: k = XK_KP_0; break;
-	case SDLK_KP1: k = XK_KP_1; break;
-	case SDLK_KP2: k = XK_KP_2; break;
-	case SDLK_KP3: k = XK_KP_3; break;
-	case SDLK_KP4: k = XK_KP_4; break;
-	case SDLK_KP5: k = XK_KP_5; break;
-	case SDLK_KP6: k = XK_KP_6; break;
-	case SDLK_KP7: k = XK_KP_7; break;
-	case SDLK_KP8: k = XK_KP_8; break;
-	case SDLK_KP9: k = XK_KP_9; break;
+	case SDLK_KP_0: k = XK_KP_0; break;
+	case SDLK_KP_1: k = XK_KP_1; break;
+	case SDLK_KP_2: k = XK_KP_2; break;
+	case SDLK_KP_3: k = XK_KP_3; break;
+	case SDLK_KP_4: k = XK_KP_4; break;
+	case SDLK_KP_5: k = XK_KP_5; break;
+	case SDLK_KP_6: k = XK_KP_6; break;
+	case SDLK_KP_7: k = XK_KP_7; break;
+	case SDLK_KP_8: k = XK_KP_8; break;
+	case SDLK_KP_9: k = XK_KP_9; break;
 	case SDLK_KP_PERIOD: k = XK_KP_Decimal; break;
 	case SDLK_KP_DIVIDE: k = XK_KP_Divide; break;
 	case SDLK_KP_MULTIPLY: k = XK_KP_Multiply; break;
@@ -152,27 +152,24 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_F13: k = XK_F13; break;
 	case SDLK_F14: k = XK_F14; break;
 	case SDLK_F15: k = XK_F15; break;
-	case SDLK_NUMLOCK: k = XK_Num_Lock; break;
+	case SDLK_NUMLOCKCLEAR: k = XK_Num_Lock; break;
 	case SDLK_CAPSLOCK: k = XK_Caps_Lock; break;
-	case SDLK_SCROLLOCK: k = XK_Scroll_Lock; break;
+	case SDLK_SCROLLLOCK: k = XK_Scroll_Lock; break;
 	case SDLK_RSHIFT: k = XK_Shift_R; break;
 	case SDLK_LSHIFT: k = XK_Shift_L; break;
 	case SDLK_RCTRL: k = XK_Control_R; break;
 	case SDLK_LCTRL: k = XK_Control_L; break;
 	case SDLK_RALT: k = XK_Alt_R; break;
 	case SDLK_LALT: k = XK_Alt_L; break;
-	case SDLK_RMETA: k = XK_Meta_R; break;
-	case SDLK_LMETA: k = XK_Meta_L; break;
-	case SDLK_LSUPER: k = XK_Super_L; break;
-	case SDLK_RSUPER: k = XK_Super_R; break;
+	case SDLK_LGUI: k = XK_Super_L; break;
+	case SDLK_RGUI: k = XK_Super_R; break;
 #if 0
 	case SDLK_COMPOSE: k = XK_Compose; break;
 #endif
 	case SDLK_MODE: k = XK_Mode_switch; break;
 	case SDLK_HELP: k = XK_Help; break;
-	case SDLK_PRINT: k = XK_Print; break;
+	case SDLK_PRINTSCREEN: k = XK_Print; break;
 	case SDLK_SYSREQ: k = XK_Sys_Req; break;
-	case SDLK_BREAK: k = XK_Break; break;
 	default: break;
 	}
 	// both SDL and X11 keysyms match ASCII in the range 0x01-0x7f
@@ -185,13 +182,14 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 				k &= ~0x20;
 		}
 	}
-	if (k == 0) {
+	/*TODO: try out SDL_TEXTINPUT for unicode input
+        if (k == 0) {
 		if (e->keysym.unicode < 0x100)
 			k = e->keysym.unicode;
 		else
 			rfbClientLog("Unknown keysym: %d\n", sym);
 	}
-*/
+	*/
 	return k;
 }
 
@@ -460,6 +458,9 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		if (e->key.keysym.sym == SDLK_LALT)
 			leftAltKeyDown = e->type == SDL_KEYDOWN;
 		break;
+	case SDL_TEXTINPUT:
+	        /* TODO: maybe use this for unicode input */
+                break;
 	case SDL_QUIT:
                 if(listenLoop)
 		  {
@@ -570,7 +571,6 @@ int main(int argc,char** argv) {
 	argc = j;
 
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
-	//FIXME SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 	atexit(SDL_Quit);
 	signal(SIGINT, exit);
 
