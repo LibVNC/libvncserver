@@ -475,6 +475,30 @@ static void got_selection(rfbClient *cl, const char *text, int len)
 }
 
 
+static rfbCredential* get_credential(rfbClient* cl, int credentialType){
+        rfbCredential *c = malloc(sizeof(rfbCredential));
+	c->userCredential.username = malloc(RFB_BUF_SIZE);
+	c->userCredential.password = malloc(RFB_BUF_SIZE);
+
+	if(credentialType != rfbCredentialTypeUser) {
+	    rfbClientErr("something else than username and password required for authentication\n");
+	    return NULL;
+	}
+
+	rfbClientLog("username and password required for authentication!\n");
+	printf("user: ");
+	fgets(c->userCredential.username, RFB_BUF_SIZE, stdin);
+	printf("pass: ");
+	fgets(c->userCredential.password, RFB_BUF_SIZE, stdin);
+
+	/* remove trailing newlines */
+	c->userCredential.username[strcspn(c->userCredential.username, "\n")] = 0;
+	c->userCredential.password[strcspn(c->userCredential.password, "\n")] = 0;
+
+	return c;
+}
+
+
 #ifdef mac
 #define main SDLmain
 #endif
@@ -523,6 +547,7 @@ int main(int argc,char** argv) {
 	  cl->HandleKeyboardLedState=kbd_leds;
 	  cl->HandleTextChat=text_chat;
 	  cl->GotXCutText = got_selection;
+	  cl->GetCredential = get_credential;
 	  cl->listenPort = LISTEN_PORT_OFFSET;
 	  cl->listen6Port = LISTEN_PORT_OFFSET;
 	  if(!rfbInitClient(cl,&argc,argv))
