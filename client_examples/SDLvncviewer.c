@@ -17,8 +17,6 @@ struct { int sdl; int rfb; } buttonMapping[]={
 
 static int enableResizable = 1, viewOnly, listenLoop, buttonMask;
 int sdlFlags;
-static int realWidth, realHeight, bytesPerPixel, rowStride;
-static char *sdlPixels;
 SDL_Texture *sdlTexture;
 SDL_Renderer *sdlRenderer;
 SDL_Window *sdlWindow;
@@ -47,10 +45,6 @@ static rfbBool resize(rfbClient* client) {
 
 	rfbClientSetClientData(client, SDL_Init, sdl);
 	client->width = sdl->pitch / (depth / 8);
-	if (sdlPixels) {
-	    free(client->frameBuffer);
-	    sdlPixels = NULL;
-	}
 	client->frameBuffer=sdl->pixels;
 
 	client->format.bitsPerPixel=depth;
@@ -192,78 +186,7 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	return k;
 }
 
-static uint32_t get(rfbClient *cl, int x, int y)
-{
-	switch (bytesPerPixel) {
-	case 1: return ((uint8_t *)cl->frameBuffer)[x + y * cl->width];
-	case 2: return ((uint16_t *)cl->frameBuffer)[x + y * cl->width];
-	case 4: return ((uint32_t *)cl->frameBuffer)[x + y * cl->width];
-	default:
-		rfbClientErr("Unknown bytes/pixel: %d", bytesPerPixel);
-		exit(1);
-	}
-}
-
-static void put(int x, int y, uint32_t v)
-{
-	switch (bytesPerPixel) {
-	case 1: ((uint8_t *)sdlPixels)[x + y * rowStride] = v; break;
-	case 2: ((uint16_t *)sdlPixels)[x + y * rowStride] = v; break;
-	case 4: ((uint32_t *)sdlPixels)[x + y * rowStride] = v; break;
-	default:
-		rfbClientErr("Unknown bytes/pixel: %d", bytesPerPixel);
-		exit(1);
-	}
-}
-
-static void resizeRectangleToReal(rfbClient *cl, int x, int y, int w, int h)
-{
-	int i0 = x * realWidth / cl->width;
-	int i1 = ((x + w) * realWidth - 1) / cl->width + 1;
-	int j0 = y * realHeight / cl->height;
-	int j1 = ((y + h) * realHeight - 1) / cl->height + 1;
-	int i, j;
-
-	for (j = j0; j < j1; j++)
-		for (i = i0; i < i1; i++) {
-			int x0 = i * cl->width / realWidth;
-			int x1 = ((i + 1) * cl->width - 1) / realWidth + 1;
-			int y0 = j * cl->height / realHeight;
-			int y1 = ((j + 1) * cl->height - 1) / realHeight + 1;
-			uint32_t r = 0, g = 0, b = 0;
-
-			for (y = y0; y < y1; y++)
-				for (x = x0; x < x1; x++) {
-					uint32_t v = get(cl, x, y);
-#define REDSHIFT cl->format.redShift
-#define REDMAX cl->format.redMax
-#define GREENSHIFT cl->format.greenShift
-#define GREENMAX cl->format.greenMax
-#define BLUESHIFT cl->format.blueShift
-#define BLUEMAX cl->format.blueMax
-					r += (v >> REDSHIFT) & REDMAX;
-					g += (v >> GREENSHIFT) & GREENMAX;
-					b += (v >> BLUESHIFT) & BLUEMAX;
-				}
-			r /= (x1 - x0) * (y1 - y0);
-			g /= (x1 - x0) * (y1 - y0);
-			b /= (x1 - x0) * (y1 - y0);
-
-			put(i, j, (r << REDSHIFT) | (g << GREENSHIFT) |
-				(b << BLUESHIFT));
-		}
-}
-
 static void update(rfbClient* cl,int x,int y,int w,int h) {
-	if (sdlPixels) {
-		resizeRectangleToReal(cl, x, y, w, h);
-		w = ((x + w) * realWidth - 1) / cl->width + 1;
-		h = ((y + h) * realHeight - 1) / cl->height + 1;
-		x = x * realWidth / cl->width;
-		y = y * realHeight / cl->height;
-		w -= x;
-		h -= y;
-	}
 	SDL_Surface *sdl = rfbClientGetClientData(cl, SDL_Init);
 	/* update texture from surface->pixels */
 	SDL_Rect r = {x,y,w,h};
@@ -275,49 +198,6 @@ static void update(rfbClient* cl,int x,int y,int w,int h) {
 	if(SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL) < 0)
 	    rfbClientErr("update: failed to copy texture to renderer: %s\n", SDL_GetError());
 	SDL_RenderPresent(sdlRenderer);
-}
-
-static void setRealDimension(rfbClient *client, int w, int h)
-{
-	SDL_Surface* sdl;
-	/*FIXME
-	if (w < 0) {
-		const SDL_VideoInfo *info = SDL_GetVideoInfo();
-		w = info->current_h;
-		h = info->current_w;
-	}
-	*/
-	if (w == realWidth && h == realHeight)
-		return;
-
-	if (!sdlPixels) {
-		int size;
-
-		sdlPixels = (char *)client->frameBuffer;
-		rowStride = client->width;
-
-		bytesPerPixel = client->format.bitsPerPixel / 8;
-		size = client->width * bytesPerPixel * client->height;
-		client->frameBuffer = malloc(size);
-		if (!client->frameBuffer) {
-			rfbClientErr("Could not allocate %d bytes", size);
-			exit(1);
-		}
-		memcpy(client->frameBuffer, sdlPixels, size);
-	}
-
-	sdl = rfbClientGetClientData(client, SDL_Init);
-	if (sdl->w != w || sdl->h != h) {
-		int depth = sdl->format->BitsPerPixel;
-		//FIXMEsdl = SDL_SetVideoMode(w, h, depth, sdlFlags);
-		rfbClientSetClientData(client, SDL_Init, sdl);
-		sdlPixels = sdl->pixels;
-		rowStride = sdl->pitch / (depth / 8);
-	}
-
-	realWidth = w;
-	realHeight = h;
-	update(client, 0, 0, client->width, client->height);
 }
 
 static void kbd_leds(rfbClient* cl, int value, int pad) {
@@ -460,10 +340,6 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 					break;
 				}
 		}
-		if (sdlPixels) {
-			x = x * cl->width / realWidth;
-			y = y * cl->height / realHeight;
-		}
 		SendPointerEvent(cl, x, y, buttonMask);
 		buttonMask &= ~(rfbButton4Mask | rfbButton5Mask);
 		break;
@@ -493,11 +369,6 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		    rfbClientCleanup(cl);
 		    exit(0);
 		  }
-		/*FIXME
-	case SDL_VIDEORESIZE:
-		setRealDimension(cl, e->resize.w, e->resize.h);
-		break;
-		*/
 	default:
 		rfbClientLog("ignore SDL event: 0x%x\n", e->type);
 	}
