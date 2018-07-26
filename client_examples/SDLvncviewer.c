@@ -5,7 +5,6 @@
 #include <SDL.h>
 #include <signal.h>
 #include <rfb/rfbclient.h>
-#include "scrap.h"
 
 struct { int sdl; int rfb; } buttonMapping[]={
 	{1, rfbButton1Mask},
@@ -410,6 +409,28 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		SendFramebufferUpdateRequest(cl, 0, 0,
 					cl->width, cl->height, FALSE);
 		break;
+	    case SDL_WINDOWEVENT_FOCUS_GAINED:
+                if (SDL_HasClipboardText()) {
+		        char *text = SDL_GetClipboardText();
+			if(text) {
+			    rfbClientLog("sending clipboard text '%s'\n", text);
+			    SendClientCutText(cl, text, strlen(text));
+			}
+		}
+
+		break;
+	    case SDL_WINDOWEVENT_FOCUS_LOST:
+		if (rightAltKeyDown) {
+			SendKeyEvent(cl, XK_Alt_R, FALSE);
+			rightAltKeyDown = FALSE;
+			rfbClientLog("released right Alt key\n");
+		}
+		if (leftAltKeyDown) {
+			SendKeyEvent(cl, XK_Alt_L, FALSE);
+			leftAltKeyDown = FALSE;
+			rfbClientLog("released left Alt key\n");
+		}
+		break;
 	    }
 	    break;
 	case SDL_MOUSEBUTTONUP:
@@ -473,31 +494,6 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		    exit(0);
 		  }
 		/*FIXME
-	case SDL_ACTIVEEVENT:
-		if (!e->active.gain && rightAltKeyDown) {
-			SendKeyEvent(cl, XK_Alt_R, FALSE);
-			rightAltKeyDown = FALSE;
-			rfbClientLog("released right Alt key\n");
-		}
-		if (!e->active.gain && leftAltKeyDown) {
-			SendKeyEvent(cl, XK_Alt_L, FALSE);
-			leftAltKeyDown = FALSE;
-			rfbClientLog("released left Alt key\n");
-		}
-
-		if (e->active.gain && lost_scrap()) {
-			static char *data = NULL;
-			static int len = 0;
-			get_scrap(T('T', 'E', 'X', 'T'), &len, &data);
-			if (len)
-				SendClientCutText(cl, data, len);
-		}
-		break;
-		*/
-	case SDL_SYSWMEVENT:
-		clipboard_filter(e);
-		break;
-		/*FIXME
 	case SDL_VIDEORESIZE:
 		setRealDimension(cl, e->resize.w, e->resize.h);
 		break;
@@ -510,7 +506,9 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 
 static void got_selection(rfbClient *cl, const char *text, int len)
 {
-    //FIXMEput_scrap(T('T', 'E', 'X', 'T'), len, text);
+        rfbClientLog("received clipboard text '%s'\n", text);
+        if(SDL_SetClipboardText(text) != 0)
+	    rfbClientErr("could not set received clipboard text: %s\n", SDL_GetError());
 }
 
 
@@ -592,8 +590,6 @@ int main(int argc,char** argv) {
 	      cleanup(cl);
 	      break;
 	    }
-
-	  init_scrap();
 
 	  while(1) {
 	    if(SDL_PollEvent(&e)) {
