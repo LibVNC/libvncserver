@@ -15,6 +15,15 @@ struct { int sdl; int rfb; } buttonMapping[]={
 	{0,0}
 };
 
+struct { char mask; int bits_stored; } utf8Mapping[]= {
+	{0b00111111, 6},
+	{0b01111111, 7},
+	{0b00011111, 5},
+	{0b00001111, 4},
+	{0b00000111, 3},
+	{0,0}
+};
+
 static int enableResizable = 1, viewOnly, listenLoop, buttonMask;
 int sdlFlags;
 SDL_Texture *sdlTexture;
@@ -102,7 +111,6 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_RETURN: k = XK_Return; break;
 	case SDLK_PAUSE: k = XK_Pause; break;
 	case SDLK_ESCAPE: k = XK_Escape; break;
-	case SDLK_SPACE: k = XK_space; break;
 	case SDLK_DELETE: k = XK_Delete; break;
 	case SDLK_KP_0: k = XK_KP_0; break;
 	case SDLK_KP_1: k = XK_KP_1; break;
@@ -165,25 +173,19 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_SYSREQ: k = XK_Sys_Req; break;
 	default: break;
 	}
-	// both SDL and X11 keysyms match ASCII in the range 0x01-0x7f
-	if (k == 0 && sym > 0x0 && sym < 0x100) {
-		k = sym;
-		if (e->keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT)) {
-			if (k >= '1' && k <= '9')
-				k &= ~0x10;
-			else if (k >= 'a' && k <= 'f')
-				k &= ~0x20;
-		}
-	}
-	/*TODO: try out SDL_TEXTINPUT for unicode input
-        if (k == 0) {
-		if (e->keysym.unicode < 0x100)
-			k = e->keysym.unicode;
-		else
-			rfbClientLog("Unknown keysym: %d\n", sym);
-	}
-	*/
 	return k;
+}
+
+/* UTF-8 decoding is from https://rosettacode.org/wiki/UTF-8_encode_and_decode which is under GFDL 1.2 */
+static rfbKeySym utf8char2rfbKeySym(const char chr[4]) {
+	int bytes = strlen(chr);
+	int shift = utf8Mapping[0].bits_stored * (bytes - 1);
+	rfbKeySym codep = (*chr++ & utf8Mapping[bytes].mask) << shift;
+	for(int i = 1; i < bytes; ++i, ++chr) {
+		shift -= utf8Mapping[0].bits_stored;
+		codep |= ((char)*chr & utf8Mapping[0].mask) << shift;
+	}
+	return codep;
 }
 
 static void update(rfbClient* cl,int x,int y,int w,int h) {
@@ -356,7 +358,11 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 			leftAltKeyDown = e->type == SDL_KEYDOWN;
 		break;
 	case SDL_TEXTINPUT:
-	        /* TODO: maybe use this for unicode input */
+                if (viewOnly)
+			break;
+		rfbKeySym sym = utf8char2rfbKeySym(e->text.text);
+		SendKeyEvent(cl, sym, TRUE);
+		SendKeyEvent(cl, sym, FALSE);
                 break;
 	case SDL_QUIT:
                 if(listenLoop)
