@@ -181,7 +181,8 @@ static rfbKeySym utf8char2rfbKeySym(const char chr[4]) {
 	int bytes = strlen(chr);
 	int shift = utf8Mapping[0].bits_stored * (bytes - 1);
 	rfbKeySym codep = (*chr++ & utf8Mapping[bytes].mask) << shift;
-	for(int i = 1; i < bytes; ++i, ++chr) {
+	int i;
+	for(i = 1; i < bytes; ++i, ++chr) {
 		shift -= utf8Mapping[0].bits_stored;
 		codep |= ((char)*chr & utf8Mapping[0].mask) << shift;
 	}
