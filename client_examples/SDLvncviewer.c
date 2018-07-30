@@ -175,6 +175,10 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_SYSREQ: k = XK_Sys_Req; break;
 	default: break;
 	}
+	/* SDL_TEXTINPUT does not generate characters if ctrl is down, so handle those here */
+        if (k == 0 && sym > 0x0 && sym < 0x100 && e->keysym.mod & KMOD_CTRL)
+               k = sym;
+
 	return k;
 }
 
