@@ -29,6 +29,8 @@ int sdlFlags;
 SDL_Texture *sdlTexture;
 SDL_Renderer *sdlRenderer;
 SDL_Window *sdlWindow;
+/* client's pointer position */
+int x,y;
 
 static int rightAltKeyDown, leftAltKeyDown;
 
@@ -316,11 +318,39 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		break;
 	    }
 	    break;
+	case SDL_MOUSEWHEEL:
+	{
+	        int steps;
+	        if (viewOnly)
+			break;
+
+		if(e->wheel.y > 0)
+		    for(steps = 0; steps < e->wheel.y; ++steps) {
+			SendPointerEvent(cl, x, y, rfbButton4Mask);
+			SendPointerEvent(cl, x, y, 0);
+		    }
+		if(e->wheel.y < 0)
+		    for(steps = 0; steps > e->wheel.y; --steps) {
+			SendPointerEvent(cl, x, y, rfbButton5Mask);
+			SendPointerEvent(cl, x, y, 0);
+		    }
+		if(e->wheel.x > 0)
+		    for(steps = 0; steps < e->wheel.x; ++steps) {
+			SendPointerEvent(cl, x, y, 0b01000000);
+			SendPointerEvent(cl, x, y, 0);
+		    }
+		if(e->wheel.x < 0)
+		    for(steps = 0; steps > e->wheel.x; --steps) {
+			SendPointerEvent(cl, x, y, 0b00100000);
+			SendPointerEvent(cl, x, y, 0);
+		    }
+		break;
+	}
 	case SDL_MOUSEBUTTONUP:
 	case SDL_MOUSEBUTTONDOWN:
 	case SDL_MOUSEMOTION:
 	{
-		int x, y, state, i;
+		int state, i;
 		if (viewOnly)
 			break;
 
