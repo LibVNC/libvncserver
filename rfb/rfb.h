@@ -465,6 +465,7 @@ typedef struct _rfbClientRec {
     int protocolMinorVersion;
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+    int pipe_notify_client_thread[2];
     pthread_t client_thread;
 #endif
 
