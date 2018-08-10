@@ -617,7 +617,9 @@ function(get_link_libraries OUT TARGET)
     endforeach()
     list(REMOVE_DUPLICATES RESULT)
     string(CONCAT RESULT ${RESULT}) # back to string
-    string(REPLACE "-l" " -l" RESULT ${RESULT}) # re-add separators
+    if(RESULT)
+	string(REPLACE "-l" " -l" RESULT ${RESULT}) # re-add separators
+    endif(RESULT)
     set(${OUT} ${RESULT} PARENT_SCOPE)
 endfunction()
 
