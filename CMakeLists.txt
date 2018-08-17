@@ -28,7 +28,6 @@ set(TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver ${CMAKE_CURRENT_SOURCE_DIR}/common)
 
 # all the build configuration switches
@@ -48,8 +47,7 @@ option(WITH_24BPP "Allow 24 bpp" ON)
 option(WITH_IPv6 "Enable IPv6 Support" ON)
 option(WITH_WEBSOCKETS "Build with websockets support" ON)
 option(WITH_SASL "Build with SASL support" ON)
-
-
+option(WITH_HWDIFF "Build with hardware video frame differentiation" OFF)
 
 if(WITH_ZLIB)
   find_package(ZLIB)
@@ -248,6 +246,9 @@ if(WITH_24BPP)
   set(LIBVNCSERVER_ALLOW24BPP 1)
 endif()
 
+if(WITH_HWDIFF)
+  set(LIBVNCSERVER_HAVE_HWDIFF 1)
+endif()
 
 if(CMAKE_USE_PTHREADS_INIT)
   set(LIBVNCSERVER_HAVE_LIBPTHREAD 1)

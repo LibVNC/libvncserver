@@ -185,5 +185,8 @@ typedef int size_t;
 typedef int socklen_t;
 #endif
 
+/* Define to 1 if you have hardware video frame differentiation */
+#cmakedefine LIBVNCSERVER_HAVE_HWDIFF  1
+
 /* once: _RFB_RFBCONFIG_H */
 #endif

@@ -691,6 +691,10 @@ typedef struct _rfbClientRec {
     rfbSslCtx *sslctx;
     wsCtx     *wsctx;
     char *wspath;                          /* Requests path component */
+#ifdef LIBVNCSERVER_HAVE_HWDIFF
+    int incremental;
+    int fb_req;
+#endif
 } rfbClientRec, *rfbClientPtr;
 
 /**

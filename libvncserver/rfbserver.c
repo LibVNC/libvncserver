@@ -2342,7 +2342,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
     case rfbFramebufferUpdateRequest:
     {
+#ifndef LIBVNCSERVER_HAVE_HWDIFF
         sraRegionPtr tmpRegion;
+#endif
 
         if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
                            sz_rfbFramebufferUpdateRequestMsg-1)) <= 0) {
@@ -2362,15 +2364,15 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	        rfbLog("Warning, ignoring rfbFramebufferUpdateRequest: %dXx%dY-%dWx%dH\n",msg.fur.x, msg.fur.y, msg.fur.w, msg.fur.h);
 		return;
         }
- 
-        
+#ifndef LIBVNCSERVER_HAVE_HWDIFF
 	tmpRegion =
 	  sraRgnCreateRect(msg.fur.x,
 			   msg.fur.y,
 			   msg.fur.x+msg.fur.w,
 			   msg.fur.y+msg.fur.h);
-
+#endif
         LOCK(cl->updateMutex);
+#ifndef LIBVNCSERVER_HAVE_HWDIFF
 	sraRgnOr(cl->requestedRegion,tmpRegion);
 
 	if (!cl->readyForSetColourMapEntries) {
@@ -2390,11 +2392,15 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    sraRgnOr(cl->modifiedRegion,tmpRegion);
 	    sraRgnSubtract(cl->copyRegion,tmpRegion);
        }
+#else
+    cl->incremental= msg.fur.incremental;
+    cl->fb_req = TRUE;
+#endif
        TSIGNAL(cl->updateCond);
        UNLOCK(cl->updateMutex);
-
+#ifndef LIBVNCSERVER_HAVE_HWDIFF
        sraRgnDestroy(tmpRegion);
-
+#endif
        return;
     }
 
