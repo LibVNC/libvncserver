@@ -2126,6 +2126,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
             case rfbEncodingRRE:
             case rfbEncodingCoRRE:
             case rfbEncodingHextile:
+		cl->preferredEncoding = rfbEncodingHextile;
             case rfbEncodingUltra:
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	    case rfbEncodingZlib:
