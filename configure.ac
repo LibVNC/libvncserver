@@ -45,6 +45,15 @@ if test "x$HAVE_B64_IN_LIBC" != "xtrue"; then
 else
 	HAVE_B64="true"
 fi
+
+AH_TEMPLATE(HAVE_HWDIFF, [Build for NUVOTON Poleg])
+AC_ARG_WITH(hwdiff,
+        [  --without-hwdiff         disable hwdiff],
+        , [ with_hwdiff=yes ])
+if test "x$with_hwdiff" = "xyes"; then
+        AC_DEFINE(HAVE_HWDIFF)
+fi
+
 AH_TEMPLATE(WITH_WEBSOCKETS, [Disable WebSockets support])
 AC_ARG_WITH(websockets,
 	[  --without-websockets    disable WebSockets support],
