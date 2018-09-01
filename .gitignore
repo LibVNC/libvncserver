@@ -60,7 +60,9 @@ examples/storepasswd
 examples/vncev
 libtool
 libvncclient/libvncclient.la
+libvncclient.a
 libvncserver/libvncserver.la
+libvncserver.a
 test/blooptest
 test/cargstest
 test/copyrecttest
@@ -77,6 +79,7 @@ vncterm/example
 x11vnc.spec
 x11vnc/x11vnc
 CMakeCache.txt
+CTestTestfile.cmake
 cmake_install.cmake
 /CMakeFiles
 /rfbproto.pdf
