@@ -66,6 +66,8 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     if ((client->raw_buffer_size % 4)!=0)
       client->raw_buffer_size += (4-(client->raw_buffer_size % 4));
     client->raw_buffer = (char*) malloc( client->raw_buffer_size );
+    if (client->raw_buffer == NULL)
+        return FALSE;
   }
   
   /* allocate enough space to store the incoming compressed packet */
@@ -78,6 +80,9 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     if ((client->ultra_buffer_size % 4)!=0)
       client->ultra_buffer_size += (4-(client->ultra_buffer_size % 4));
     client->ultra_buffer = (char*) malloc( client->ultra_buffer_size );
+    if (client->ultra_buffer == NULL)
+        return FALSE;
+
   }
 
   /* Fill the buffer, obtaining data from the server. */

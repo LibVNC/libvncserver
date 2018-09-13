@@ -398,6 +398,8 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 
   rfbClientLog("Connected to VNC repeater, using protocol version %d.%d\n", major, minor);
 
+  memset(tmphost, '\0', sizeof(tmphost));
+
   snprintf(tmphost, sizeof(tmphost), "%s:%d", destHost, destPort);
   if (!WriteToRFBServer(client, tmphost, sizeof(tmphost)))
     return FALSE;
@@ -429,7 +431,7 @@ rfbHandleAuthResult(rfbClient* client)
         /* we have an error following */
         if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
         reasonLen = rfbClientSwap32IfLE(reasonLen);
-        reason = malloc(reasonLen+1);
+        reason = malloc((uint64_t)reasonLen + 1);
         if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
         reason[reasonLen]=0;
         rfbClientLog("VNC connection failed: %s\n",reason);
@@ -457,7 +459,7 @@ ReadReason(rfbClient* client)
     /* we have an error following */
     if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return;
     reasonLen = rfbClientSwap32IfLE(reasonLen);
-    reason = malloc(reasonLen+1);
+    reason = malloc((uint64_t)reasonLen + 1);
     if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
     reason[reasonLen]=0;
     rfbClientLog("VNC connection failed: %s\n",reason);
@@ -1641,6 +1643,7 @@ SendKeyEvent(rfbClient* client, uint32_t key, rfbBool down)
 
   ke.type = rfbKeyEvent;
   ke.down = down ? 1 : 0;
+  ke.pad = 0;
   ke.key = rfbClientSwap32IfLE(key);
   return WriteToRFBServer(client, (char *)&ke, sz_rfbKeyEventMsg);
 }
@@ -1657,6 +1660,8 @@ SendClientCutText(rfbClient* client, char *str, int len)
 
   if (!SupportsClient2Server(client, rfbClientCutText)) return TRUE;
 
+  cct.pad1 = 0;
+  cct.pad2 = 0;
   cct.type = rfbClientCutText;
   cct.length = rfbClientSwap32IfLE(len);
   return  (WriteToRFBServer(client, (char *)&cct, sz_rfbClientCutTextMsg) &&
@@ -2181,7 +2186,7 @@ HandleRFBServerMessage(rfbClient* client)
 
     msg.sct.length = rfbClientSwap32IfLE(msg.sct.length);
 
-    buffer = malloc(msg.sct.length+1);
+    buffer = malloc((uint64_t)msg.sct.length + 1);
 
     if (!ReadFromRFBServer(client, buffer, msg.sct.length))
       return FALSE;
@@ -2220,7 +2225,7 @@ HandleRFBServerMessage(rfbClient* client)
               client->HandleTextChat(client, (int)rfbTextChatFinished, NULL);
           break;
       default:
-          buffer=malloc(msg.tc.length+1);
+          buffer=malloc((uint64_t)msg.tc.length + 1);
           if (!ReadFromRFBServer(client, buffer, msg.tc.length))
           {
               free(buffer);

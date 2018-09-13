@@ -23,6 +23,8 @@ int main(int argc,char** argv)
       "Usage: %s <id> <repeater-host> [<repeater-port>]\n", argv[0]);
     exit(1);
   }
+
+  memset(id, '\0', sizeof(id));
   snprintf(id, sizeof(id) - 1, "ID:%s", argv[1]);
   repeaterHost = argv[2];
   repeaterPort = argc < 4 ? 5500 : atoi(argv[3]);
