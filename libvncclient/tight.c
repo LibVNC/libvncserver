@@ -23,6 +23,8 @@
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 
+#include "turbojpeg.h"
+
 /*
  * tight.c - handle ``tight'' encoding.
  *
