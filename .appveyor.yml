@@ -52,6 +52,7 @@ install:
 build_script:
   - mkdir build
   - cd build 
+  - cmake --version
   - cmake .. -DZLIB_INCLUDE_DIR=..\deps\zlib -DZLIB_LIBRARY=..\deps\zlib\debug\zlibstaticd.lib -DPNG_PNG_INCLUDE_DIR=..\deps\libpng -DPNG_LIBRARY=..\deps\libpng\debug\libpng16_staticd.lib -D SASL2_INCLUDE_DIR=c:\cmu\include -D LIBSASL2_LIBRARIES=c:\cmu\lib\libsasl.lib ..
   - cmake --build .
   - ctest -C Debug --output-on-failure
