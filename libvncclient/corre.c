@@ -42,6 +42,8 @@ HandleCoRREBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	return FALSE;
 
     hdr.nSubrects = rfbClientSwap32IfLE(hdr.nSubrects);
+    if (hdr.nSubrects >= RFB_BUFFER_SIZE / (4 + (BPP / 8)))
+	return FALSE;
 
     if (!ReadFromRFBServer(client, (char *)&pix, sizeof(pix)))
 	return FALSE;
