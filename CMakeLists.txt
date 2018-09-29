@@ -458,6 +458,7 @@ set(LIBVNCSERVER_EXAMPLES
     pnmshow
     pnmshow24
     regiontest
+    repeater
     rotate
     simple
     simple15
