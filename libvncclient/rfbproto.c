@@ -433,7 +433,7 @@ rfbHandleAuthResult(rfbClient* client)
         /* we have an error following */
         if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
         reasonLen = rfbClientSwap32IfLE(reasonLen);
-        reason = malloc(reasonLen+1);
+        reason = malloc((uint64_t)reasonLen+1);
         if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
         reason[reasonLen]=0;
         rfbClientLog("VNC connection failed: %s\n",reason);
@@ -461,7 +461,7 @@ ReadReason(rfbClient* client)
     /* we have an error following */
     if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return;
     reasonLen = rfbClientSwap32IfLE(reasonLen);
-    reason = malloc(reasonLen+1);
+    reason = malloc((uint64_t)reasonLen+1);
     if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
     reason[reasonLen]=0;
     rfbClientLog("VNC connection failed: %s\n",reason);
@@ -2187,10 +2187,12 @@ HandleRFBServerMessage(rfbClient* client)
 
     msg.sct.length = rfbClientSwap32IfLE(msg.sct.length);
 
-    buffer = malloc(msg.sct.length+1);
+    buffer = malloc((uint64_t)msg.sct.length+1);
 
-    if (!ReadFromRFBServer(client, buffer, msg.sct.length))
+    if (!ReadFromRFBServer(client, buffer, msg.sct.length)) {
+      free(buffer);
       return FALSE;
+    }
 
     buffer[msg.sct.length] = 0;
 
