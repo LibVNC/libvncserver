@@ -12,6 +12,7 @@ int main(int argc,char** argv)
   char *repeaterHost;
   int repeaterPort, sock;
   char id[250];
+  int idlen;
   rfbClientPtr cl;
 
   int i,j;
@@ -23,7 +24,12 @@ int main(int argc,char** argv)
       "Usage: %s <id> <repeater-host> [<repeater-port>]\n", argv[0]);
     exit(1);
   }
-  snprintf(id, sizeof(id) - 1, "ID:%s", argv[1]);
+  idlen = snprintf(id, sizeof(id) - 1, "ID:%s", argv[1]);
+  if(idlen < 0 || idlen >= (int)sizeof(id)) {
+      fprintf(stderr, "Error, given ID is probably too long.\n");
+      return 1;
+  }
+
   repeaterHost = argv[2];
   repeaterPort = argc < 4 ? 5500 : atoi(argv[3]);
 
@@ -48,7 +54,7 @@ int main(int argc,char** argv)
     perror("connect to repeater");
     return 1;
   }
-  if (write(sock, id, sizeof(id)) != sizeof(id)) {
+  if (write(sock, id, idlen+1) != idlen+1) {
     perror("writing id");
     return 1;
   }
