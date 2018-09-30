@@ -3,6 +3,7 @@ cmake_policy(SET CMP0037 NEW)
 
 project(LibVNCServer)
 include(CheckFunctionExists)
+include(CheckSymbolExists)
 include(CheckIncludeFile)
 include(CheckTypeSize)
 include(TestBigEndian)
@@ -177,6 +178,9 @@ check_function_exists(strdup          LIBVNCSERVER_HAVE_STRDUP)
 check_function_exists(strerror        LIBVNCSERVER_HAVE_STRERROR)
 check_function_exists(strstr          LIBVNCSERVER_HAVE_STRSTR)
 
+check_symbol_exists(htobe64 "endian.h" LIBVNCSERVER_HAVE_HTOBE64)
+check_symbol_exists(OSSwapHostToBigInt64 "libkern/OSByteOrder.h" LIBVNCSERVER_HAVE_OSSWAPHOSTTOBIGINT64)
+
 if(Threads_FOUND)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 endif(Threads_FOUND)
@@ -220,9 +224,9 @@ if(LIBVNCSERVER_HAVE_SYS_UIO_H)
 endif(LIBVNCSERVER_HAVE_SYS_UIO_H)
 
 
-if(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_CRYPTO)
+if(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_CRYPTO AND (LIBVNCSERVER_HAVE_HTOBE64 OR LIBVNCSERVER_HAVE_OSSWAPHOSTTOBIGINT64))
   set(LIBVNCSERVER_WITH_WEBSOCKETS 1)
-endif(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_CRYPTO)
+endif()
 
 if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
   message(STATUS "Found libgcrypt: ${LIBGCRYPT_LIBRARIES}")
