@@ -110,7 +110,7 @@ typedef struct ws_header_data_s {
   unsigned char fin;
 } ws_header_data_t;
 
-typedef struct ws_ctx_s {
+struct ws_ctx_s {
     char codeBufDecode[2048 + WSHLENMAX]; /* base64 + maximum frame header length */
     char codeBufEncode[B64LEN(UPDATE_BUF_SIZE) + WSHLENMAX]; /* base64 + maximum frame header length */
     char *writePos;
@@ -126,7 +126,7 @@ typedef struct ws_ctx_s {
     wsEncodeFunc encode;
     wsDecodeFunc decode;
     ctxInfo_t ctxInfo;
-} ws_ctx_t;
+};
 
 enum
 {
