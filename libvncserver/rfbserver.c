@@ -463,9 +463,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
       /*
-       * Wait a few ms for the client to send one of:
-       * - Flash policy request
-       * - WebSockets connection (TLS/SSL or plain)
+       * Wait a few ms for the client to send WebSockets connection (TLS/SSL or plain)
        */
       if (!webSocketsCheck(cl)) {
         /* Error reporting handled in webSocketsHandshake */

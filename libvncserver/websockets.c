@@ -61,9 +61,6 @@ static int gettid() {
 }
 #endif
 
-#define FLASH_POLICY_RESPONSE "<cross-domain-policy><allow-access-from domain=\"*\" to-ports=\"*\" /></cross-domain-policy>\n"
-#define SZ_FLASH_POLICY_RESPONSE 93
-
 /*
  * draft-ietf-hybi-thewebsocketprotocol-10
  * 5.2.2. Sending the Server's Opening Handshake
@@ -144,13 +141,6 @@ webSocketsCheck (rfbClientPtr cl)
     if (strncmp(bbuf, "RFB ", 4) == 0) {
         rfbLog("Normal socket connection\n");
         return TRUE;
-    } else if (strncmp(bbuf, "<", 1) == 0) {
-        rfbLog("Got Flash policy request, sending response\n");
-        if (rfbWriteExact(cl, FLASH_POLICY_RESPONSE,
-                          SZ_FLASH_POLICY_RESPONSE) < 0) {
-            rfbErr("webSocketsHandshake: failed sending Flash policy response");
-        }
-        return FALSE;
     } else if (strncmp(bbuf, "\x16", 1) == 0 || strncmp(bbuf, "\x80", 1) == 0) {
         rfbLog("Got TLS/SSL WebSockets connection\n");
         if (-1 == rfbssl_init(cl)) {
