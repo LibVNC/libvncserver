@@ -48,7 +48,7 @@ HandleCoRREBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
     client->GotFillRect(client, rx, ry, rw, rh, pix);
 
-    if (hdr.nSubrects * (4 + (BPP / 8)) > RFB_BUFFER_SIZE || !ReadFromRFBServer(client, client->buffer, hdr.nSubrects * (4 + (BPP / 8))))
+    if (hdr.nSubrects > RFB_BUFFER_SIZE / (4 + (BPP / 8)) || !ReadFromRFBServer(client, client->buffer, hdr.nSubrects * (4 + (BPP / 8))))
 	return FALSE;
 
     ptr = (uint8_t *)client->buffer;
