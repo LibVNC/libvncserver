@@ -508,7 +508,6 @@ RunFileDownloadThread(void* client)
 void
 HandleFileDownload(rfbClientPtr cl, rfbTightClientPtr rtcp)
 {
-	pthread_t fileDownloadThread;
 	FileTransferMsg fileDownloadMsg;
 	
 	memset(&fileDownloadMsg, 0, sizeof(FileTransferMsg));
@@ -521,7 +520,7 @@ HandleFileDownload(rfbClientPtr cl, rfbTightClientPtr rtcp)
 	rtcp->rcft.rcfd.downloadInProgress = FALSE;
 	rtcp->rcft.rcfd.downloadFD = -1;
 
-	if(pthread_create(&fileDownloadThread, NULL, RunFileDownloadThread, (void*) 
+	if(pthread_create(&rtcp->rcft.rcfd.downloadThread, NULL, RunFileDownloadThread, (void*)
 	cl) != 0) {
 		FileTransferMsg ftm = GetFileDownLoadErrMsg();
 		
