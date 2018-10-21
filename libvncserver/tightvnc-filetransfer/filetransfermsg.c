@@ -770,6 +770,8 @@ CloseUndoneFileDownload(rfbClientPtr cl, rfbTightClientPtr rtcp)
 	
 	if(rtcp->rcft.rcfd.downloadInProgress == TRUE) {
 		rtcp->rcft.rcfd.downloadInProgress = FALSE;
+		/* the thread will return if downloadInProgress is FALSE */
+		pthread_join(rtcp->rcft.rcfd.downloadThread, NULL);
 
 		if(rtcp->rcft.rcfd.downloadFD != -1) {			
 			close(rtcp->rcft.rcfd.downloadFD);
