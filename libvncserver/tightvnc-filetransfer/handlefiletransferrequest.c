@@ -517,8 +517,7 @@ HandleFileDownload(rfbClientPtr cl, rfbTightClientPtr rtcp)
 		FreeFileTransferMsg(fileDownloadMsg);
 		return;
 	}
-	rtcp->rcft.rcfd.downloadInProgress = FALSE;
-	rtcp->rcft.rcfd.downloadFD = -1;
+	CloseUndoneFileDownload(cl, rtcp);
 
 	if(pthread_create(&rtcp->rcft.rcfd.downloadThread, NULL, RunFileDownloadThread, (void*)
 	cl) != 0) {
