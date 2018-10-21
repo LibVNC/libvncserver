@@ -1465,7 +1465,7 @@ char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length)
     rfbLog("rfbProcessFileTransferReadBuffer(%dlen)\n", length);
     */
     if (length>0) {
-        buffer=malloc(length+1);
+        buffer=malloc((uint64_t)length+1);
         if (buffer!=NULL) {
             if ((n = rfbReadExact(cl, (char *)buffer, length)) <= 0) {
                 if (n != 0)
