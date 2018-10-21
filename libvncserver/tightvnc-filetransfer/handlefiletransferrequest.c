@@ -492,7 +492,7 @@ RunFileDownloadThread(void* client)
 
 				if(cl != NULL) {
 			    	rfbCloseClient(cl);
-				CloseUndoneFileTransfer(cl, rtcp);
+				CloseUndoneFileDownload(cl, rtcp);
 				}
 				
 				FreeFileTransferMsg(fileDownloadMsg);
@@ -592,7 +592,7 @@ HandleFileDownloadCancelRequest(rfbClientPtr cl, rfbTightClientPtr rtcp)
 					" reason <%s>\n", __FILE__, __FUNCTION__, reason);
 	
 	pthread_mutex_lock(&fileDownloadMutex);
-	CloseUndoneFileTransfer(cl, rtcp);
+	CloseUndoneFileDownload(cl, rtcp);
 	pthread_mutex_unlock(&fileDownloadMutex);
 	
 	if(reason != NULL) {
@@ -835,7 +835,7 @@ HandleFileUploadDataRequest(rfbClientPtr cl, rfbTightClientPtr rtcp)
 			FreeFileTransferMsg(ftm);
 		}
 
-		CloseUndoneFileTransfer(cl, rtcp);
+		CloseUndoneFileUpload(cl, rtcp);
 
 	    if(pBuf != NULL) {
 	    	free(pBuf);
@@ -935,7 +935,7 @@ HandleFileUploadFailedRequest(rfbClientPtr cl, rfbTightClientPtr rtcp)
 	rfbLog("File [%s]: Method [%s]: File Upload Failed Request received:"
 				" reason <%s>\n", __FILE__, __FUNCTION__, reason);
 
-	CloseUndoneFileTransfer(cl, rtcp);
+	CloseUndoneFileUpload(cl, rtcp);
 
 	if(reason != NULL) {
 		free(reason);
