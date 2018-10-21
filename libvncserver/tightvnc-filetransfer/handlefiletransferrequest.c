@@ -585,6 +585,8 @@ HandleFileDownloadCancelRequest(rfbClientPtr cl, rfbTightClientPtr rtcp)
 					"FileDownloadCancelMsg\n", __FILE__, __FUNCTION__);
 		
 	    rfbCloseClient(cl);
+	    free(reason);
+	    return;
 	}
 
 	rfbLog("File [%s]: Method [%s]: File Download Cancel Request received:"
