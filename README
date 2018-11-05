@@ -6,7 +6,7 @@ Copyright (C) 2001-2003 Johannes E. Schindelin
 If you already used LibVNCServer, you probably want to read NEWS.
 
 What is it?
------------
+===========
 
 VNC is a set of programs using the RFB (Remote Frame Buffer) protocol. They
 are designed to "export" a frame buffer via net (if you don't know VNC, I
@@ -24,7 +24,7 @@ good starting point.
 
 Try example: it outputs on which port it listens (default: 5900), so it is
 display 0. To view, call
-	vncviewer :0
+	`vncviewer :0`
 You should see a sheet with a gradient and "Hello World!" written on it. Try
 to paint something. Note that every time you click, there is some bigger blot,
 whereas when you drag the mouse while clicked you draw a line. The size of the
@@ -32,7 +32,7 @@ blot depends on the mouse button you click. Open a second vncviewer with
 the same parameters and watch it as you paint in the other window. This also
 works over internet. You just have to know either the name or the IP of your
 machine. Then it is
-	vncviewer machine.where.example.runs.com:0
+	`vncviewer machine.where.example.runs.com:0`
 or similar for the remote client. Now you are ready to type something. Be sure
 that your mouse sits still, because every time the mouse moves, the cursor is
 reset to the position of the pointer! If you are done with that demo, press
@@ -48,7 +48,7 @@ the best starting point if you want to learn how to use LibVNCServer. You
 are confronted with the fact that the bytes per pixel can only be 8, 16 or 32.
 
 Projects using it
-----------------------------------------
+=================
 
 VNC for KDE
 http://www.tjansen.de/krfb
@@ -69,7 +69,7 @@ https://github.com/ocrespo/VNCpp
 Mail me, if your application is missing!
 
 How to build
-------------
+============
 
 LibVNCServer uses CMake, so you can build via:
 
@@ -93,7 +93,7 @@ For instance, building for Android (see https://developer.android.com/ndk/guides
 
 
 How to use
-----------
+==========
 
 To make a server, you just have to initialise a server structure using the
 function rfbDefaultScreenInit, like
@@ -262,7 +262,7 @@ the same format as the frameBuffer (i.e. if the server is 32 bit,
 a 10x4 cursor has 4x10x4 bytes).
 
 History
--------
+=======
 
 LibVNCServer is based on Tridia VNC and OSXvnc, which in turn are based on
 the original code from ORL/AT&T.
@@ -314,7 +314,7 @@ You just change your frame buffer and inform the library about it. Every once
 in a while you call rfbProcessEvents and that's it.
 
 Basics
-------
+======
 
 VNC (Virtual network computing) works like this: You set up a server and can
 connect to it via vncviewers. The communication uses a protocol named RFB
@@ -340,7 +340,7 @@ RFB protocol, but IT IS NOT SECURE. Anybody sniffing your net can get the
 password. You really should tunnel through SSH.
 
 Windows or: why do you do that to me?
---------------------------------------------
+=====================================
 
 If you love products from Redmod, you better skip this paragraph.
 I am always amazed how people react whenever Microsoft(tm) puts in some
@@ -373,7 +373,7 @@ http://www.gimp.org/win32/extralibs-dev-20001007.zip
 Thanks go to all the GIMP team!
 
 What are those other targets in the Makefile?
----------------------------------------------
+=============================================
 
 OSXvnc-server is the original OSXvnc adapted to use the library, which was in
 turn adapted from OSXvnc. As you easily can see, the OSX dependend part is
@@ -400,7 +400,7 @@ console fonts, you can browse them via VNC. Directory browsing not implemented
 yet :-(
 
 Why I don't feel bad about GPL
-------------------------------
+==============================
 
 At the beginning of this projects I would have liked to make it a BSD
 license. However, it is based on plenty of GPL'ed code, so it has to be
@@ -462,7 +462,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.dfdf
 
 Contact
--------
+=======
 
 To contact me, mail me: Johannes dot Schindelin at gmx dot de
 
