@@ -456,10 +456,10 @@ void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor
       fore+=4-bpp;
    }
 
-   background=cursor->backRed<<format->redShift|
-     cursor->backGreen<<format->greenShift|cursor->backBlue<<format->blueShift;
-   foreground=cursor->foreRed<<format->redShift|
-     cursor->foreGreen<<format->greenShift|cursor->foreBlue<<format->blueShift;
+   background=(uint32_t)cursor->backRed<<format->redShift|
+     (uint32_t)cursor->backGreen<<format->greenShift|(uint32_t)cursor->backBlue<<format->blueShift;
+   foreground=(uint32_t)cursor->foreRed<<format->redShift|
+     (uint32_t)cursor->foreGreen<<format->greenShift|(uint32_t)cursor->foreBlue<<format->blueShift;
    
    for(j=0;j<cursor->height;j++)
      for(i=0,bit=0x80;i<cursor->width;i++,bit=(bit&1)?0x80:bit>>1,cp+=bpp)
