@@ -47,6 +47,9 @@ i.e. a truecolour graphics. Only the Escape key is implemented. This may be
 the best starting point if you want to learn how to use LibVNCServer. You
 are confronted with the fact that the bytes per pixel can only be 8, 16 or 32.
 
+If you want to build a VNC client instead, please have a look at the [various
+client examples](./client_examples).
+
 Projects using it
 =================
 
