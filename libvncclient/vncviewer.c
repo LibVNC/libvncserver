@@ -519,6 +519,12 @@ void rfbClientCleanup(rfbClient* client) {
 #endif
 #endif
 
+  if (client->ultra_buffer)
+    free(client->ultra_buffer);
+
+  if (client->raw_buffer)
+    free(client->raw_buffer);
+
   FreeTLS(client);
 
   while (client->clientData) {
