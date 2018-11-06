@@ -474,9 +474,11 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
     uint8_t count=0;
     uint8_t loop=0;
     uint8_t flag=0;
+    rfbBool extAuthHandler;
     uint8_t tAuth[256];
     char buf1[500],buf2[10];
     uint32_t authScheme;
+    rfbClientProtocolExtension* e;
 
     if (!ReadFromRFBServer(client, (char *)&count, 1)) return FALSE;
 
@@ -495,7 +497,18 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
         rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
         if (flag) continue;
+        extAuthHandler=FALSE;
+        for (e = rfbClientExtensions; e; e = e->next) {
+            if (!e->handleAuthentication) continue;
+            uint32_t const* secType;
+            for (secType = e->securityTypes; secType && *secType; secType++) {
+                if (tAuth[loop]==*secType) {
+                    extAuthHandler=TRUE;
+                }
+            }
+        }
         if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth ||
+			extAuthHandler ||
 #if defined(LIBVNCSERVER_HAVE_GNUTLS) || defined(LIBVNCSERVER_HAVE_LIBSSL)
             tAuth[loop]==rfbVeNCrypt ||
 #endif
@@ -1176,6 +1189,22 @@ InitialiseRFBConnection(rfbClient* client)
     break;
 
   default:
+    {
+      rfbBool authHandled=FALSE;
+      rfbClientProtocolExtension* e;
+      for (e = rfbClientExtensions; e; e = e->next) {
+        uint32_t const* secType;
+        if (!e->handleAuthentication) continue;
+        for (secType = e->securityTypes; secType && *secType; secType++) {
+          if (authScheme==*secType) {
+            if (!e->handleAuthentication(client, authScheme)) return FALSE;
+            if (!rfbHandleAuthResult(client)) return FALSE;
+            authHandled=TRUE;
+          }
+        }
+      }
+      if (authHandled) break;
+    }
     rfbClientLog("Unknown authentication scheme from VNC server: %d\n",
 	    (int)authScheme);
     return FALSE;
