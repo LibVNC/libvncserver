@@ -1253,6 +1253,7 @@ SetFormatAndEncodings(rfbClient* client)
   if (!SupportsClient2Server(client, rfbSetEncodings)) return TRUE;
 
   se->type = rfbSetEncodings;
+  se->pad = 0;
   se->nEncodings = 0;
 
   if (client->appData.encodingsString) {
