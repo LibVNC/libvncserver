@@ -589,7 +589,7 @@ ReadFromTLS(rfbClient* client, char *out, unsigned int n)
 }
 
 int
-WriteToTLS(rfbClient* client, char *buf, unsigned int n)
+WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 {
   unsigned int offset = 0;
   ssize_t ret;
