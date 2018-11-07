@@ -28,12 +28,20 @@
 
 #include "d3des.h"
 
+#if defined(__GNUC__)
+#define TLS __thread
+#elif defined(_MSC_VER)
+#define TLS __declspec(thread)
+#else
+#define TLS
+#endif
+
 static void scrunch(unsigned char *, unsigned long *);
 static void unscrun(unsigned long *, unsigned char *);
 static void desfunc(unsigned long *, unsigned long *);
 static void cookey(unsigned long *);
 
-static unsigned long KnL[32] = { 0L };
+static TLS unsigned long KnL[32] = { 0L };
 /*
 static unsigned long KnR[32] = { 0L };
 static unsigned long Kn3[32] = { 0L };
