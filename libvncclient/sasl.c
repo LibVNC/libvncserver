@@ -41,6 +41,9 @@
 #ifdef WIN32
 #undef SOCKET
 #include <winsock2.h>
+#ifdef EWOULDBLOCK
+#undef EWOULDBLOCK
+#endif
 #define EWOULDBLOCK WSAEWOULDBLOCK
 #define socklen_t int
 #define close closesocket
