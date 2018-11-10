@@ -489,12 +489,6 @@ RunFileDownloadThread(void* client)
 			if(rfbWriteExact(cl, fileDownloadMsg.data, fileDownloadMsg.length) < 0)  {
 				rfbLog("File [%s]: Method [%s]: Error while writing to socket \n"
 						, __FILE__, __FUNCTION__);
-
-				if(cl != NULL) {
-			    	rfbCloseClient(cl);
-				CloseUndoneFileDownload(cl, rtcp);
-				}
-				
 				FreeFileTransferMsg(fileDownloadMsg);
 				return NULL;
 			}
