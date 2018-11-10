@@ -672,7 +672,7 @@ ChkFileUploadWriteErr(rfbClientPtr cl, rfbTightClientPtr rtcp, char* pBuf)
 		char reason[] = "Error writing file data";
 		int reasonLen = strlen(reason);
 		ftm = CreateFileUploadErrMsg(reason, reasonLen);
-		CloseUndoneFileTransfer(cl, rtcp);
+		CloseUndoneFileUpload(cl, rtcp);
 	}		
 	return ftm;
 }
@@ -735,7 +735,7 @@ CreateFileUploadErrMsg(char* reason, unsigned int reasonLen)
  ******************************************************************************/
 
 void
-CloseUndoneFileTransfer(rfbClientPtr cl, rfbTightClientPtr rtcp)
+CloseUndoneFileUpload(rfbClientPtr cl, rfbTightClientPtr rtcp)
 {
 	/* TODO :: File Upload case is not handled currently */
 	/* TODO :: In case of concurrency we need to use Critical Section */
@@ -759,9 +759,19 @@ CloseUndoneFileTransfer(rfbClientPtr cl, rfbTightClientPtr rtcp)
 
 		memset(rtcp->rcft.rcfu.fName, 0 , PATH_MAX);
 	}
+}
+
+
+void
+CloseUndoneFileDownload(rfbClientPtr cl, rfbTightClientPtr rtcp)
+{
+	if(cl == NULL)
+		return;
 	
 	if(rtcp->rcft.rcfd.downloadInProgress == TRUE) {
 		rtcp->rcft.rcfd.downloadInProgress = FALSE;
+		/* the thread will return if downloadInProgress is FALSE */
+		pthread_join(rtcp->rcft.rcfd.downloadThread, NULL);
 
 		if(rtcp->rcft.rcfd.downloadFD != -1) {			
 			close(rtcp->rcft.rcfd.downloadFD);
