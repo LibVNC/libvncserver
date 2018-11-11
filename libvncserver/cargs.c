@@ -43,6 +43,10 @@ rfbUsage(void)
                                                              "new non-shared\n"
                     "                       connection comes in (refuse new connection "
                                                                 "instead)\n");
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+    fprintf(stderr, "-sslkeyfile path       set path to private key file for encrypted WebSockets connections\n");
+    fprintf(stderr, "-sslcertfile path      set path to certificate file for encrypted WebSockets connections\n");
+#endif
     fprintf(stderr, "-httpdir dir-path      enable http server using dir-path home\n");
     fprintf(stderr, "-httpport portnum      use portnum for http connection\n");
 #ifdef LIBVNCSERVER_IPv6
