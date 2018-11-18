@@ -620,6 +620,9 @@ typedef struct _rfbClientProtocolExtension {
 	rfbBool (*handleMessage)(rfbClient* cl,
 		 rfbServerToClientMsg* message);
 	struct _rfbClientProtocolExtension* next;
+	uint32_t const* securityTypes;
+	/** returns TRUE if it handled the authentication */
+	rfbBool (*handleAuthentication)(rfbClient* cl, uint32_t authScheme);
 } rfbClientProtocolExtension;
 
 void rfbClientRegisterExtension(rfbClientProtocolExtension* e);
