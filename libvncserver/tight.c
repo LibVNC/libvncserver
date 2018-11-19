@@ -57,10 +57,11 @@
  * that we resort to using thread local storage instead of having
  * per-client data.
  */
-#if LIBVNCSERVER_HAVE_LIBPTHREAD && LIBVNCSERVER_HAVE_TLS && !defined(TLS) && defined(__linux__)
+#if defined(__GNUC__)
 #define TLS __thread
-#endif
-#ifndef TLS
+#elif defined(_MSC_VER)
+#define TLS __declspec(thread)
+#else
 #define TLS
 #endif
 

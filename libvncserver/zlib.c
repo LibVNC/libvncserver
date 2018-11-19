@@ -45,10 +45,11 @@
  * tight.  N.B. ZRLE does it the traditional way with per-client storage
  * (and so at least ZRLE will work threaded on older systems.)
  */
-#if LIBVNCSERVER_HAVE_LIBPTHREAD && LIBVNCSERVER_HAVE_TLS && !defined(TLS) && defined(__linux__)
+#if defined(__GNUC__)
 #define TLS __thread
-#endif
-#ifndef TLS
+#elif defined(_MSC_VER)
+#define TLS __declspec(thread)
+#else
 #define TLS
 #endif
 
