@@ -72,6 +72,9 @@
 /* Define to 1 if you have the `z' library (-lz). */
 #cmakedefine LIBVNCSERVER_HAVE_LIBZ  1 
 
+/* Define to 1 if you have the `lzo2' library (-llzo2). */
+#cmakedefine LIBVNCSERVER_HAVE_LZO  1
+
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_NETINET_IN_H  1 
 

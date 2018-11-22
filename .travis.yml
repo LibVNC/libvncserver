@@ -22,7 +22,7 @@ before_install:
 script:
   - mkdir build
   - cd build
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update; sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update; sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev liblzo2-dev; fi
   - if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then brew update; brew install sdl2; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cmake .. -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl; else cmake ..; fi
   - cmake --build .

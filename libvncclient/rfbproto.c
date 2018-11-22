@@ -61,7 +61,11 @@
 #endif
 
 #include "sasl.h"
+#ifdef LIBVNCSERVER_HAVE_LZO
+#include <lzo/lzo1x.h>
+#else
 #include "minilzo.h"
+#endif
 #include "tls.h"
 
 #ifdef _MSC_VER
