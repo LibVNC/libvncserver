@@ -468,7 +468,8 @@ static tjhandle _tjInitCompress(tjinstance *this)
 	if(setjmp(this->jerr.setjmp_buffer))
 	{
 		/* If we get here, the JPEG code has signaled an error. */
-		if(this) free(this);  return NULL;
+		if(this) free(this);
+		return NULL;
 	}
 
 	jpeg_create_compress(&this->cinfo);
@@ -652,7 +653,8 @@ static tjhandle _tjInitDecompress(tjinstance *this)
 	if(setjmp(this->jerr.setjmp_buffer))
 	{
 		/* If we get here, the JPEG code has signaled an error. */
-		if(this) free(this);  return NULL;
+		if(this) free(this);
+		return NULL;
 	}
 
 	jpeg_create_decompress(&this->dinfo);

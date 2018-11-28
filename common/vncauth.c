@@ -207,8 +207,9 @@ rfbEncryptBytes2(unsigned char *where, const int length, unsigned char *key) {
     where[i] ^= key[i];
   rfbDes(where, where);
   for (i = 8; i < length; i += 8) {
-    for (j = 0; j < 8; j++)
+    for (j = 0; j < 8; j++) {
       where[i + j] ^= where[i + j - 8];
-      rfbDes(where + i, where + i);
+    }
+    rfbDes(where + i, where + i);
   }
 }
