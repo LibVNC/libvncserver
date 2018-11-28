@@ -313,8 +313,8 @@ HandshakeTLS(rfbClient* client)
 static rfbBool
 ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
 {
-    uint8_t count=0;
-    uint8_t loop=0;
+    unsigned int count=0;
+    unsigned int loop=0;
     uint8_t flag=0;
     uint32_t tAuth[256], t;
     char buf1[500],buf2[10];
