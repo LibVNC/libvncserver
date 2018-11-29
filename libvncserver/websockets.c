@@ -198,12 +198,15 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
             if ((n < 0) && (errno == ETIMEDOUT)) {
                 break;
             }
-            if (n == 0)
+            if (n == 0) {
                 rfbLog("webSocketsHandshake: client gone\n");
-            else
+            }
+            else {
                 rfbLogPerror("webSocketsHandshake: read");
-                free(response);
-                free(buf);
+            }
+
+            free(response);
+            free(buf);
             return FALSE;
         }
 

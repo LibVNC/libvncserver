@@ -147,11 +147,12 @@ rfbInitOneRGBTable24 (uint8_t *table, int inMax, int outMax, int outShift,
     for (i = 0; i < nEntries; i++) {
       outValue = ((i * outMax + inMax / 2) / inMax) << outShift;
       *(uint32_t *)&table[3*i] = outValue;
-      if(!rfbEndianTest)
+      if(!rfbEndianTest) {
 	memmove(table+3*i,table+3*i+1,3);
-        if (swap) {
-	  c = table[3*i]; table[3*i] = table[3*i+2];
-	  table[3*i+2] = c;
-        }
+      }
+      if (swap) {
+        c = table[3*i]; table[3*i] = table[3*i+2];
+        table[3*i+2] = c;
+      }
     }
 }
