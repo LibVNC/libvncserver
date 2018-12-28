@@ -37,10 +37,11 @@ install:
   - msbuild /p:Configuration=Release db_dll.vcxproj
   - cd ..\..
   # Cyrus SASL
-  - curl -fsSL -o cyrus-sasl-2.1.27.tar.gz https://github.com/cyrusimap/cyrus-sasl/releases/download/cyrus-sasl-2.1.27/cyrus-sasl-2.1.27.tar.gz
-  - 7z x cyrus-sasl-2.1.27.tar.gz -so | 7z x -si -ttar > nul
-  - move cyrus-sasl-2.1.27 sasl
+  - curl -fsSL -o cyrus-sasl-2.1.26.tar.gz ftp://ftp.cyrusimap.org/cyrus-sasl/cyrus-sasl-2.1.26.tar.gz
+  - 7z x cyrus-sasl-2.1.26.tar.gz -so | 7z x -si -ttar > nul
+  - move cyrus-sasl-2.1.26 sasl
   - cd sasl
+  - patch -p1 -i ..\sasl-fix-snprintf-macro.patch
   - echo using vsdevcmd %VSDEVCMD_BAT%
   - '%VSDEVCMD_BAT%'
   - nmake /f NTMakefile OPENSSL_INCLUDE=c:\OpenSSL-Win32\include OPENSSL_LIBPATH=c:\OpenSSL-Win32\lib DB_INCLUDE=c:\projects\libvncserver\deps\db\build_win32 DB_LIBPATH=c:\projects\libvncserver\deps\db\build_win32\release DB_LIB=libdb41.lib install
