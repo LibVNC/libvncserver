@@ -1,4 +1,6 @@
-[![Build Status](https://travis-ci.org/LibVNC/libvncserver.svg?branch=master)](https://travis-ci.org/LibVNC/libvncserver) [![Build status](https://ci.appveyor.com/api/projects/status/fao6m1md3q4g2bwn/branch/master?svg=true)](https://ci.appveyor.com/project/bk138/libvncserver/branch/master)
+[![Build Status](https://travis-ci.org/LibVNC/libvncserver.svg?branch=master)](https://travis-ci.org/LibVNC/libvncserver)
+[![Build status](https://ci.appveyor.com/api/projects/status/fao6m1md3q4g2bwn/branch/master?svg=true)](https://ci.appveyor.com/project/bk138/libvncserver/branch/master)
+[![Help making this possible](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/LibVNC/donate)
 
 LibVNCServer: A library for easy implementation of a VNC server.
 Copyright (C) 2001-2003 Johannes E. Schindelin
