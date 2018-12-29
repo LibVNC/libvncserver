@@ -412,11 +412,29 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 extern void rfbClientEncryptBytes(unsigned char* bytes, char* passwd);
 extern void rfbClientEncryptBytes2(unsigned char *where, const int length, unsigned char *key);
 
+static void
+ReadReason(rfbClient* client)
+{
+    uint32_t reasonLen;
+    char *reason;
+
+    if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return;
+    reasonLen = rfbClientSwap32IfLE(reasonLen);
+    if(reasonLen > 1<<20) {
+      rfbClientLog("VNC connection failed, but sent reason length of %u exceeds limit of 1MB",(unsigned int)reasonLen);
+      return;
+    }
+    reason = malloc(reasonLen+1);
+    if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
+    reason[reasonLen]=0;
+    rfbClientLog("VNC connection failed: %s\n",reason);
+    free(reason);
+}
+
 rfbBool
 rfbHandleAuthResult(rfbClient* client)
 {
-    uint32_t authResult=0, reasonLen=0;
-    char *reason=NULL;
+    uint32_t authResult=0;
 
     if (!ReadFromRFBServer(client, (char *)&authResult, 4)) return FALSE;
 
@@ -431,13 +449,7 @@ rfbHandleAuthResult(rfbClient* client)
       if (client->major==3 && client->minor>7)
       {
         /* we have an error following */
-        if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
-        reasonLen = rfbClientSwap32IfLE(reasonLen);
-        reason = malloc((uint64_t)reasonLen+1);
-        if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
-        reason[reasonLen]=0;
-        rfbClientLog("VNC connection failed: %s\n",reason);
-        free(reason);
+        ReadReason(client);
         return FALSE;
       }
       rfbClientLog("VNC authentication failed\n");
@@ -452,21 +464,6 @@ rfbHandleAuthResult(rfbClient* client)
     return FALSE;
 }
 
-static void
-ReadReason(rfbClient* client)
-{
-    uint32_t reasonLen;
-    char *reason;
-
-    /* we have an error following */
-    if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return;
-    reasonLen = rfbClientSwap32IfLE(reasonLen);
-    reason = malloc((uint64_t)reasonLen+1);
-    if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
-    reason[reasonLen]=0;
-    rfbClientLog("VNC connection failed: %s\n",reason);
-    free(reason);
-}
 
 static rfbBool
 ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
