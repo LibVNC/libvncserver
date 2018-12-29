@@ -2217,6 +2217,11 @@ HandleRFBServerMessage(rfbClient* client)
 
     msg.sct.length = rfbClientSwap32IfLE(msg.sct.length);
 
+    if (msg.sct.length > 1<<20) {
+	    rfbClientErr("Ignoring too big cut text length sent by server: %u B > 1 MB\n", (unsigned int)msg.sct.length);
+	    return FALSE;
+    }  
+
     buffer = malloc((uint64_t)msg.sct.length+1);
 
     if (!ReadFromRFBServer(client, buffer, msg.sct.length)) {
