@@ -35,6 +35,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CM
 # all the build configuration switches
 option(BUILD_SHARED_LIBS "Build shared libraries" ${UNIX})
 option(WITH_ZLIB "Search for the zlib compression library to support additional encodings" ON)
+option(WITH_LZO "Search for the LZO compression library to omit internal miniLZO implementation" ON)
 option(WITH_JPEG "Search for the libjpeg compression library to support additional encodings" ON)
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
@@ -56,6 +57,9 @@ if(WITH_ZLIB)
   find_package(ZLIB)
 endif(WITH_ZLIB)
 
+if(WITH_LZO)
+  find_package(LZO)
+endif()
 
 if(WITH_JPEG)
   find_package(JPEG)
@@ -189,6 +193,11 @@ if(ZLIB_FOUND)
 else()
   unset(ZLIB_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
 endif(ZLIB_FOUND)
+if(LZO_FOUND)
+  set(LIBVNCSERVER_HAVE_LZO 1)
+else()
+  unset(LZO_LIBRARIES CACHE) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
+endif()
 if(JPEG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBJPEG 1)
 else()
@@ -317,7 +326,6 @@ set(LIBVNCSERVER_SOURCES
     ${COMMON_DIR}/d3des.c
     ${COMMON_DIR}/vncauth.c
     ${LIBVNCSERVER_DIR}/cargs.c
-    ${COMMON_DIR}/minilzo.c
     ${LIBVNCSERVER_DIR}/ultra.c
     ${LIBVNCSERVER_DIR}/scale.c
 )
@@ -328,7 +336,6 @@ set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/rfbproto.c
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
-    ${COMMON_DIR}/minilzo.c
 )
 
 if(JPEG_FOUND)
@@ -388,6 +395,20 @@ if(ZLIB_FOUND)
   )
 endif(ZLIB_FOUND)
 
+if(LZO_FOUND)
+  add_definitions(-DLIBVNCSERVER_HAVE_LZO)
+  include_directories(${LZO_INCLUDE_DIR})
+else()
+  set(LIBVNCSERVER_SOURCES
+    ${LIBVNCSERVER_SOURCES}
+    ${COMMON_DIR}/minilzo.c
+  )
+  set(LIBVNCCLIENT_SOURCES
+    ${LIBVNCCLIENT_SOURCES}
+    ${COMMON_DIR}/minilzo.c
+  )
+endif()
+
 if(JPEG_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBJPEG)
   include_directories(${JPEG_INCLUDE_DIR})
@@ -434,6 +455,7 @@ endif(WIN32)
 target_link_libraries(vncclient
                       ${ADDITIONAL_LIBS}
                       ${ZLIB_LIBRARIES}
+                      ${LZO_LIBRARIES}
                       ${JPEG_LIBRARIES}
                       ${GNUTLS_LIBRARIES}
                       ${OPENSSL_LIBRARIES}
@@ -441,6 +463,7 @@ target_link_libraries(vncclient
 target_link_libraries(vncserver
                       ${ADDITIONAL_LIBS}
                       ${ZLIB_LIBRARIES}
+                      ${LZO_LIBRARIES}
                       ${JPEG_LIBRARIES}
 		      ${PNG_LIBRARIES}
 		      ${CRYPTO_LIBRARIES}
