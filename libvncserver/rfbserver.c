@@ -88,6 +88,10 @@
 #include <errno.h>
 /* strftime() */
 #include <time.h>
+/* INT_MAX */
+#include <limits.h>
+/* SIZE_MAX */
+#include <stdint.h>
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 #include "rfbssl.h"
@@ -1462,10 +1466,16 @@ char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length)
 
     FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN("", cl, NULL);
     /*
-    rfbLog("rfbProcessFileTransferReadBuffer(%dlen)\n", length);
+    rfbLog("rfbProcessFileTransferReadBuffer(%ulen)\n", (unsigned int)length);
     */
     if (length>0) {
-        buffer=malloc((uint64_t)length+1);
+        if (length > SIZE_MAX - 1 || length > INT_MAX) {
+            rfbLog("rfbProcessFileTransferReadBuffer: "
+                    "too big file transfer requested: %u", (unsigned int)length);
+            rfbCloseClient(cl);
+            return NULL;
+        }
+        buffer=malloc((size_t)length+1);
         if (buffer!=NULL) {
             if ((n = rfbReadExact(cl, (char *)buffer, length)) <= 0) {
                 if (n != 0)
