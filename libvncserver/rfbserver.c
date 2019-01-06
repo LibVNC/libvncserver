@@ -619,6 +619,11 @@ rfbClientConnectionGone(rfbClientPtr cl)
     UNLOCK(cl->sendMutex);
     TINI_MUTEX(cl->sendMutex);
 
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+    close(cl->pipe_notify_client_thread[0]);
+    close(cl->pipe_notify_client_thread[1]);
+#endif
+
     rfbPrintStats(cl);
     rfbResetStats(cl);
 
