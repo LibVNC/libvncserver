@@ -2227,7 +2227,7 @@ HandleRFBServerMessage(rfbClient* client)
 	    return FALSE;
     }  
 
-    buffer = malloc((uint64_t)msg.sct.length+1);
+    buffer = malloc(msg.sct.length+1);
 
     if (!ReadFromRFBServer(client, buffer, msg.sct.length)) {
       free(buffer);
