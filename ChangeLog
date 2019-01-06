@@ -1,3 +1,1143 @@
+2019-01-06  Christian Beier <dontmind@freeshell.org>
+
+	* rfb/rfb.h: Move pipe_notify_client_thread to end of rfbClientRec in order to retain ABI compatibility.
+
+2019-01-06  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/main.c: Fix comment style and be a bit more verbose ... explaining cedae6e6f97b14f5df3ea7c5f7efd59f2bc9ad82.
+
+2019-01-06  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #238 from tetrane/pr-fix-use-after-free Fix use-after-free and concurrent access segmentation fault
+
+2019-01-06  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: require stdint.h This is used at quite a few places in the code, so make it
+	mandatory.
+
+2019-01-06  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/rfbserver.c: Error out in
+	rfbProcessFileTransferReadBuffer if length can not be allocated re #273
+
+2019-01-06  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/rfbproto.c: LibVNCClient: remove now-useless cast re #273
+
+2019-01-06  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/rfbproto.c: LibVNCClient: fail on server-sent desktop
+	name lengths longer than 1MB re #273
+
+2019-01-05  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyorCI: update cyrus-sasl URL
+
+2018-12-29  Christian Beier <dontmind@freeshell.org>
+
+	* README.md: README: link LiberaPay team account
+
+2018-12-29  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #267 from veyon/external-lzo Allow to use global LZO library instead of miniLZO
+
+2018-12-29  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/rfbproto.c: LibVNCClient: ignore server-sent cut text
+	longer than 1MB This is in line with how LibVNCServer does it (28afb6c537dc82ba04d5f245b15ca7205c6dbb9c) and fixes part of #273.
+
+2018-12-28  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml, deps/sasl-fix-snprintf-macro.patch: Revert
+	"AppVeyorCI: update cyrus-sasl to 2.1.27, remove patch" This reverts commit bcd3eaeb83181ab5491aa6d641e2a7b8d424d88a.
+
+2018-12-28  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml, deps/sasl-fix-snprintf-macro.patch: AppVeyorCI:
+	update cyrus-sasl to 2.1.27, remove patch
+
+2018-12-28  Christian Beier <dontmind@freeshell.org>
+
+	* .gitignore: .gitignore: remove autotools and x11vnc leftovers
+
+2018-12-28  Christian Beier <dontmind@freeshell.org>
+
+	* .gitignore: .gitignore: fix for in-tree builds, add 'build' dir re #248
+
+2018-12-28  Christian Beier <dontmind@freeshell.org>
+
+	* .gitignore: Revert "Remove .gitignore obsoleted by CMake" This reverts commit d6c907ffbc36f4ad7663a44538b15e650a6ddf40.
+
+2018-12-06  Quentin BUATHIER <qbuathier@tetrane.com>
+
+	* libvncserver/main.c: Check the return code of pipe
+
+2018-11-29  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #269 from rgacogne/fix-misleading-indentation Fix -Wmisleading-indentation warnings
+
+2018-11-22  Tobias Junghans <tobydox@veyon.io>
+
+	* .travis.yml, CMakeLists.txt, cmake/Modules/FindLZO.cmake,
+	libvncclient/rfbproto.c, libvncserver/ultra.c,
+	rfb/rfbconfig.h.cmakein: Allow to use global LZO library instead of
+	miniLZO The complete LZO library nowadays is installed on many systems so we
+	can optionally make use of it and omit internal miniLZO
+	implementation.
+
+2018-11-19  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #259 from veyon/cursor-shift LibVNCClient: fix integer shifts for cursor colors
+
+2018-11-07  Tobias Junghans <tobydox@veyon.io>
+
+	* libvncserver/tight.c, libvncserver/zlib.c: LibVNCServer: properly
+	use thread-local storage The TLS macro never has been defined due to the missing
+	LIBVNCSERVER_HAVE_TLS macro. This revises the macro logic to also
+	cover Win32 builds with MSVC.
+
+2018-11-18  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #263 from veyon/custom-auth-handlers LibVNCClient: add support for custom auth handlers
+
+2018-11-11  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/cargs.c: Add SSL options to rfbUsage  output
+
+2018-11-10  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c: 
+	tightvnc-filetransfer: do not close stuff from within a thread ... as this crashes badly and the client is closed by the main
+	thread machinery afterwards.  re #242
+
+2018-11-09  Christian Beier <dontmind@freeshell.org>
+
+	* README, README.md: README: rename to README.md We had the original name lingering on for the Autotools packaging
+	process, but that is gone since.
+
+2018-11-07  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #261 from veyon/misc-fixes Misc fixes
+
+2018-11-07  Tobias Junghans <tobydox@veyon.io>
+
+	* common/d3des.c: common: d3des: use per-thread key register When encrypting/decrypting from different threads this can race due
+	to the global key register.
+
+2018-11-07  Tobias Junghans <tobydox@veyon.io>
+
+	* common/d3des.c, common/d3des.h, libvncclient/rfbproto.c: common:
+	d3des: drop unused rfbCPKey()
+
+2018-11-07  Tobias Junghans <tobydox@veyon.io>
+
+	* common/d3des.c: common: d3des: make static arrays const
+
+2018-11-06  Tobias Junghans <tobydox@veyon.io>
+
+	* libvncclient/tls.h, libvncclient/tls_gnutls.c,
+	libvncclient/tls_none.c, libvncclient/tls_openssl.c: LibVNCClient:
+	pass buffer as const to WriteToTLS()
+
+2018-11-06  Tobias Junghans <tobydox@veyon.io>
+
+	* rfb/default8x16.h: rfb: add header guard for default8x16
+
+2018-11-06  Tobias Junghans <tobydox@veyon.io>
+
+	* libvncclient/sasl.c, libvncclient/sockets.c,
+	libvncserver/sockets.c: Undef error codes before redefining them for
+	WSA Fixes compiler warnings about redefined macros from errno.h.
+
+2018-11-06  Tobias Junghans <tobydox@veyon.io>
+
+	* libvncclient/rfbproto.c: LibVNCClient: init pad field for set
+	encodings msg
+
+2018-11-06  Tobias Junghans <tobydox@veyon.io>
+
+	* README: README: add Veyon to projects using libvncserver
+
+2018-11-05  Christian Beier <dontmind@freeshell.org>
+
+	* README: README. add a reference to client examples Closes #224
+
+2018-11-05  Christian Beier <dontmind@freeshell.org>
+
+	* README: README: add VirtualBox to projects using us
+
+2018-11-05  Christian Beier <dontmind@freeshell.org>
+
+	* README: README: fix header structure, add some markups for
+	commands
+
+2018-11-05  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #260 from veyon/free-client-buffers LibVNCClient: free buffers in rfbClientCleanup()
+
+2018-11-05  Tobias Junghans <tobydox@veyon.io>
+
+	* libvncserver/cursor.c: LibVNCClient: fix integer shifts for cursor
+	colors Shifting values > 32768 by 16 places can cause undefined results for
+	signed integers. Therefore cast color components to unsigned integer
+	before shifting.
+
+2018-10-22  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c: 
+	tightvnc-filetransfer: when creating a new download thread, make
+	sure the previous one ends re #242
+
+2018-10-21  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/tightvnc-filetransfer/filetransfermsg.c,
+	libvncserver/tightvnc-filetransfer/rfbtightserver.c: 
+	tightvnc-filetransfer: wait for download thread end in
+	CloseUndoneFileDownload() ...and use it when deregistering the file transfer extension.  Closes #242
+
+2018-10-21  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/tightvnc-filetransfer/filetransfermsg.c,
+	libvncserver/tightvnc-filetransfer/filetransfermsg.h,
+	libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c: 
+	tightvnc-filetransfer: refactor CloseUndoneFileTransfer() into two
+	functions ...for closing upload and download separately.  re #242
+
+2018-10-21  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c,
+	libvncserver/tightvnc-filetransfer/rfbtightproto.h: 
+	tightvnc-filetransfer: tie the download thread to the control
+	structure re #242
+
+2018-10-21  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c: 
+	tightvnc-filetransfer: fix heap use-after-free One can only guess what the intended semantics were here, but as
+	every other rfbCloseClient() call in this file is followed by an
+	immediate return, let's assume this was forgotton in this case.  Anyway, don't forget to clean up to not leak memory.  Closes #241
+
+2018-10-21  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/rfbserver.c: LibVNCServer: fix heap out-of-bound
+	write access Closes #243
+
+2018-10-04  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/corre.c: LibVNCClient: really fix #250
+
+2018-10-01  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/rfbserver.c, libvncserver/websockets.c: websockets:
+	remove Flash fallback Closes #162
+
+2018-10-01  Christian Beier <dontmind@freeshell.org>
+
+	* webclients/index.vnc, webclients/novnc/LICENSE.txt,
+	webclients/novnc/README.md, webclients/novnc/app/error-handler.js,
+	webclients/novnc/app/images/alt.svg,
+	webclients/novnc/app/images/clipboard.svg,
+	webclients/novnc/app/images/connect.svg,
+	webclients/novnc/app/images/ctrl.svg,
+	webclients/novnc/app/images/ctrlaltdel.svg,
+	webclients/novnc/app/images/disconnect.svg,
+	webclients/novnc/app/images/drag.svg,
+	webclients/novnc/app/images/error.svg,
+	webclients/novnc/app/images/esc.svg,
+	webclients/novnc/app/images/expander.svg,
+	webclients/novnc/app/images/fullscreen.svg,
+	webclients/novnc/app/images/handle.svg,
+	webclients/novnc/app/images/handle_bg.svg,
+	webclients/novnc/app/images/icons/Makefile,
+	webclients/novnc/app/images/icons/novnc-icon-sm.svg,
+	webclients/novnc/app/images/icons/novnc-icon.svg,
+	webclients/novnc/app/images/info.svg,
+	webclients/novnc/app/images/keyboard.svg,
+	webclients/novnc/app/images/mouse_left.svg,
+	webclients/novnc/app/images/mouse_middle.svg,
+	webclients/novnc/app/images/mouse_none.svg,
+	webclients/novnc/app/images/mouse_right.svg,
+	webclients/novnc/app/images/power.svg,
+	webclients/novnc/app/images/settings.svg,
+	webclients/novnc/app/images/tab.svg,
+	webclients/novnc/app/images/toggleextrakeys.svg,
+	webclients/novnc/app/images/warning.svg,
+	webclients/novnc/app/locale/de.json,
+	webclients/novnc/app/locale/el.json,
+	webclients/novnc/app/locale/es.json,
+	webclients/novnc/app/locale/nl.json,
+	webclients/novnc/app/locale/pl.json,
+	webclients/novnc/app/locale/sv.json,
+	webclients/novnc/app/locale/tr.json,
+	webclients/novnc/app/locale/zh.json,
+	webclients/novnc/app/localization.js,
+	webclients/novnc/app/sounds/CREDITS,
+	webclients/novnc/app/styles/base.css,
+	webclients/novnc/app/styles/lite.css, webclients/novnc/app/ui.js,
+	webclients/novnc/app/webutil.js, webclients/novnc/{include =>
+	core}/base64.js, webclients/novnc/{include => core}/des.js,
+	webclients/novnc/core/display.js,
+	webclients/novnc/core/encodings.js,
+	webclients/novnc/core/inflator.js,
+	webclients/novnc/core/input/domkeytable.js,
+	webclients/novnc/core/input/fixedkeys.js,
+	webclients/novnc/core/input/keyboard.js,
+	webclients/novnc/core/input/keysym.js,
+	webclients/novnc/core/input/keysymdef.js,
+	webclients/novnc/core/input/mouse.js,
+	webclients/novnc/core/input/util.js,
+	webclients/novnc/core/input/vkeys.js,
+	webclients/novnc/core/input/xtscancodes.js,
+	webclients/novnc/core/rfb.js,
+	webclients/novnc/core/util/browser.js,
+	webclients/novnc/core/util/events.js,
+	webclients/novnc/core/util/eventtarget.js,
+	webclients/novnc/core/util/logging.js,
+	webclients/novnc/core/util/polyfill.js,
+	webclients/novnc/core/util/strings.js,
+	webclients/novnc/core/websock.js, webclients/novnc/favicon.ico,
+	webclients/novnc/include/base.css,
+	webclients/novnc/include/black.css,
+	webclients/novnc/include/blue.css,
+	webclients/novnc/include/chrome-app/tcp-client.js,
+	webclients/novnc/include/display.js,
+	webclients/novnc/include/input.js,
+	webclients/novnc/include/jsunzip.js,
+	webclients/novnc/include/keyboard.js,
+	webclients/novnc/include/keysym.js,
+	webclients/novnc/include/keysymdef.js,
+	webclients/novnc/include/logo.js,
+	webclients/novnc/include/playback.js,
+	webclients/novnc/include/rfb.js, webclients/novnc/include/ui.js,
+	webclients/novnc/include/util.js,
+	webclients/novnc/include/web-socket-js/README.txt,
+	webclients/novnc/include/web-socket-js/swfobject.js,
+	webclients/novnc/include/web-socket-js/web_socket.js,
+	webclients/novnc/include/websock.js,
+	webclients/novnc/include/webutil.js,
+	webclients/novnc/vendor/browser-es-module-loader/.npmignore,
+	webclients/novnc/vendor/browser-es-module-loader/README.md,
+	webclients/novnc/vendor/browser-es-module-loader/dist/babel-worker.
+	js,
+	webclients/novnc/vendor/browser-es-module-loader/dist/browser-es-mo
+	dule-loader.js,
+	webclients/novnc/vendor/browser-es-module-loader/dist/browser-es-mo
+	dule-loader.js.map,
+	webclients/novnc/vendor/browser-es-module-loader/rollup.config.js,
+	webclients/novnc/vendor/browser-es-module-loader/src/babel-worker.j
+	s,
+	webclients/novnc/vendor/browser-es-module-loader/src/browser-es-mod
+	ule-loader.js, webclients/novnc/vendor/pako/LICENSE,
+	webclients/novnc/vendor/pako/README.md,
+	webclients/novnc/vendor/pako/lib/utils/common.js,
+	webclients/novnc/vendor/pako/lib/zlib/adler32.js,
+	webclients/novnc/vendor/pako/lib/zlib/constants.js,
+	webclients/novnc/vendor/pako/lib/zlib/crc32.js,
+	webclients/novnc/vendor/pako/lib/zlib/deflate.js,
+	webclients/novnc/vendor/pako/lib/zlib/gzheader.js,
+	webclients/novnc/vendor/pako/lib/zlib/inffast.js,
+	webclients/novnc/vendor/pako/lib/zlib/inflate.js,
+	webclients/novnc/vendor/pako/lib/zlib/inftrees.js,
+	webclients/novnc/vendor/pako/lib/zlib/messages.js,
+	webclients/novnc/vendor/pako/lib/zlib/trees.js,
+	webclients/novnc/vendor/pako/lib/zlib/zstream.js,
+	webclients/novnc/vendor/promise.js,
+	webclients/novnc/vendor/sinon.js, webclients/novnc/vnc.html,
+	webclients/novnc/vnc_auto.html: Update bundled noVNC to latest
+	release 1.0.0 Closes #148
+
+2018-10-01  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/httpd.c: httpd: send proper MIME type for Javascript
+	files re #148
+
+2018-10-01  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/ultra.c: LibVNCClient: make sure Ultra decoding
+	cannot dereference a null pointer Closes #254
+
+2018-09-30  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: require some form of hton64() for
+	websockets Closes #127
+
+2018-09-30  DRC <information@virtualgl.org>
+
+	* libvncserver/ws_decode.h: Fix compilaton with gcc 4.4.x Closes #204 Signed-off-by: Christian Beier <dontmind@freeshell.org>
+
+2018-09-29  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/rfbproto.c: LibVNCClient: fix three possible heap
+	buffer overflows An attacker could feed `0xffffffff`, causing a `malloc(0)` for the
+	buffers which are subsequently written to.  Closes #247
+
+2018-09-29  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/corre.c: LibVNCClient: make sure ReadFromRFBServer()
+	does not write after buffer end in CoRRE decoding Closes #250
+
+2018-09-29  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/rfbproto.c: LibVNCClient: fix possible infinite loop Closes #251
+
+2018-09-29  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/rfbproto.c: LibVNCClient: don't leak uninitialised
+	memory to remote The pad fields of the rfbClientCutTextMsg and rfbKeyEventMsg could
+	contain arbitray memory belonging to the process, don't leak this to
+	the remote.  Closes #252
+
+2018-09-29  Christian Beier <dontmind@freeshell.org>
+
+	* examples/repeater.c, libvncclient/rfbproto.c: When connecting to a
+	repeater, only send initialised string Closes #253
+
+2018-09-29  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: build the repeater example as well
+
+2018-09-27  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/tight.c, rfb/rfbclient.h: Remove the turbojpeg.h
+	dependency from public headers Closes #230
+
+2018-09-27  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: fix build error that occured on Windows
+	with CMake 3.12
+
+2018-09-27  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyorCI: print CMake version
+
+2018-09-26  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: only do jpeg-turbo tests if a libjpeg was
+	found
+
+2018-09-26  Christian Beier <dontmind@freeshell.org>
+
+	* .gitignore: Remove .gitignore obsoleted by CMake re #248
+
+2018-08-10  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: make get_link_libraries() not crash when
+	there are no linked libraries at all
+
+2018-08-09  Quentin BUATHIER <qbuathier@tetrane.com>
+
+	* libvncserver/main.c, libvncserver/rfbserver.c, rfb/rfb.h: Fix the
+	concurrent issue hapenning between the freeing of the client and the
+	clientOutput thread
+
+2018-08-08  Quentin BUATHIER <qbuathier@tetrane.com>
+
+	* libvncserver/main.c: Fix use-after-free
+
+2018-07-30  Christian Beier <dontmind@freeshell.org>
+
+	* client_examples/SDLvncviewer.c: SDLvncviewer: work around
+	SDL_TEXTINPUT not generating chars with CTRL down
+
+2018-07-30  Christian Beier <dontmind@freeshell.org>
+
+	* client_examples/SDLvncviewer.c: SDLvncviewer: handle mouse wheel
+	events
+
+2018-07-28  Christian Beier <dontmind@freeshell.org>
+
+	* client_examples/SDLvncviewer.c: SDLvncviewer: adhere to C89
+
+2018-07-28  Christian Beier <dontmind@freeshell.org>
+
+	* client_examples/SDLvncviewer.c: SDLvncviewer: implement Unicode
+	input handling
+
+2018-07-26  Christian Beier <dontmind@freeshell.org>
+
+	* .travis.yml: TravisCI: install SDL2 dev packages for OSX as well
+
+2018-07-26  Christian Beier <dontmind@freeshell.org>
+
+	* .travis.yml: TravisCI: install SDL2 dev packages
+
+2018-07-26  Christian Beier <dontmind@freeshell.org>
+
+	* client_examples/SDLvncviewer.c: SDLvncviewer: remove obsolete
+	video scaling code
+
+2018-07-26  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, client_examples/SDLvncviewer.c,
+	client_examples/scrap.c, client_examples/scrap.h: SDLvncviewer: use
+	SDL2 for clipboard handling By using this, we can get rid of our own homebrewn solution
+	scrap.[c|h] and drop X11 from the build system.
+
+2018-07-25  Christian Beier <dontmind@freeshell.org>
+
+	* client_examples/SDLvncviewer.c: SDLvncviewer: make input work with
+	SDL2 ... at least somewhat. This is far from perfect but no regression
+	compared to SDL1.2 functionality.
+
+2018-05-16  Christian Beier <dontmind@freeshell.org>
+
+	* client_examples/SDLvncviewer.c, client_examples/scrap.c: 
+	SDLvncviewer: make display work with SDL2
+
+2018-05-12  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, cmake/Modules/FindSDL2.cmake: CMake: look for SDL2
+	instead of SDL FindSDL2.cmake was downloaded from
+
+	https://github.com/tcbrindle/sdl2-cmake-scripts/blob/master/FindSDL2.cmake
+
+2018-07-25  Christian Beier <dontmind@freeshell.org>
+
+	* client_examples/SDLvncviewer.c: SDLvncviewer: add a very simple
+	GetCredentials callback
+
+2018-07-08  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, rfb/rfbconfig.h.cmakein: CMake: add a
+	LIBVNCSERVER_HAVE_GNUTLS #define
+
+2018-07-08  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, rfb/rfb.h: build: decouple GnuTLS|OpenSSL
+	detection from WebSockets support
+
+2018-06-29  Christian Beier <dontmind@freeshell.org>
+
+	* common/rfbcrypto_polarssl.c: crypto: remove polarssl wrapper This is not even in the build system anymore.
+
+2018-06-29  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: declare that websockets depend on crypto
+
+2018-06-29  Christian Beier <dontmind@freeshell.org>
+
+	* rfb/rfbconfig.h.cmakein: build: remove
+	LIBVNCSERVER_WITH_CLIENT_TLS #define It is not used anywhere anymore.
+
+2018-06-29  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, {libvncserver => common}/rfbcrypto.h,
+	{libvncserver => common}/rfbcrypto_gnutls.c, {libvncserver =>
+	common}/rfbcrypto_included.c, {libvncserver =>
+	common}/rfbcrypto_openssl.c, {libvncserver =>
+	common}/rfbcrypto_polarssl.c: crypto: move to common As of now, only LibVNCServer makes uses of these digest functions
+	_and_ they depend on sys/uio.h, but in the future LibVNCClient will
+	need those as well.
+
+2018-06-26  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #235 from eddiejames/master Tight: export SendCompressedData and SendTightHeader functions
+
+2018-06-16  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyorCI: remove unused statements
+
+2018-06-16  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyorCI: remove Visual Studio 2013 as it somehow
+	got broken at AppVeyor's side
+
+2018-06-16  Christian Beier <dontmind@freeshell.org>
+
+	* README: README: remove reference to functions not existing anymore Closes #202.
+
+2018-05-14  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #215 from
+	BastiaanOlij/fix_nozlib_compile_error libvncclient: zrle.c: Move undef of REALBPP down rfbproto.c which includes this file expects an undefined REALBPP
+	after the inclusion. Do this whether or not there is zlib available.
+
+2018-03-24  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml, deps/sasl-fix-snprintf-macro.patch: AppVeyorCI:
+	build with Visual Studio 2017 as well
+
+2018-03-24  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/rfbserver.c: rfbserver: fix a typo
+
+2018-03-24  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/rfbserver.c: rfbserver: get rid of inttypes.h again
+
+2018-03-24  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/sasl.h: libvncclient/sasl: prefix the header guard
+	(again) to fix a warning
+
+2018-03-24  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, client_examples/scrap.c: SDLvncviewer: enable the
+	X11 clipboard if X11 was found
+
+2018-03-13  Christian Beier <dontmind@freeshell.org>
+
+	* examples/androidvncserver.c: androidvncserver: fix print_usage and
+	a compiler warning
+
+2018-03-13  Christian Beier <dontmind@freeshell.org>
+
+	* examples/androidvncserver.c: androidvncserver: add some
+	boilerplate comment that should have been in the 1st code drop
+
+2018-03-13  Christian Beier <dontmind@freeshell.org>
+
+	* examples/androidvncserver.c: androidvncserver: fix a quite serious
+	typo Closes #225.
+
+2018-02-26  Petr Písař <ppisar@redhat.com>
+
+	* libvncserver/rfbserver.c: Limit client cut text length to 1 MB This patch constrains a client cut text length to 1 MB. Otherwise a
+	client could make server allocate 2 GB of memory and that seems to
+	be to much to classify it as a denial of service.  The limit also prevents from an integer overflow followed by copying
+	an uninitilized memory when processing msg.cct.length value larger
+	than SIZE_MAX or INT_MAX - sz_rfbClientCutTextMsg.  This patch also corrects accepting length value of zero (malloc(0)
+	is interpreted on differnet systems differently).  CVE-2018-7225 <https://github.com/LibVNC/libvncserver/issues/218>
+
+2018-02-27  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyorCI: set path to devenv tool based on
+	environment
+
+2018-02-26  Christian Beier <cb@shoutrlabs.com>
+
+	* examples/androidvncserver.c: androidvncserver: remove keycodes not
+	in NDK anymore This makes the android VNC server example build again.
+
+2018-01-27  Bastiaan Olij <mux213@gmail.com>
+
+	* libvncclient/zrle.c: Moved undef of REALBPP down
+
+2018-01-23  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #203 from dcommander/turbovnc-client Include Tight decoding optimizations from TurboVNC
+
+2018-01-22  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #197 from wwqwwqwd/master Add trle decoder
+
+2017-09-02  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, libvncclient/rfbproto.c, libvncclient/{rfbsasl.c
+	=> sasl.c}, libvncclient/{rfbsasl.h => sasl.h},
+	libvncclient/sockets.c: libvncclient: rename rfbsasl.[c|h] to
+	sasl.[c|h] to be in line with naming of other files
+
+2017-09-02  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/rfbproto.c, libvncclient/rfbsasl.h,
+	libvncclient/sockets.c, rfb/rfbproto.h: Move HAVE_SASL #ifdefs into
+	header file to have less LOC
+
+2017-09-02  Christian Beier <dontmind@freeshell.org>
+
+	* client_examples/ppmtest.c: Fix building whithout SASL
+
+2017-07-07  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #188 from Cordius/master fix: the function should not return a value
+
+2017-04-21  simon <root@simon.home>
+
+	* .appveyor.yml, CMakeLists.txt, client_examples/ppmtest.c,
+	libvncclient/rfbproto.c, libvncclient/rfbsasl.c,
+	libvncclient/rfbsasl.h, libvncclient/sockets.c, libvncclient/tls.h,
+	libvncclient/tls_gnutls.c, libvncclient/tls_none.c,
+	libvncclient/tls_openssl.c, libvncclient/vncviewer.c,
+	rfb/rfbclient.h, rfb/rfbconfig.h.cmakein, rfb/rfbproto.h: Added SASL
+	authentication support Added SASL support to OpenSSL
+
+2017-06-20  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #161 from jlesage/master-base64-compat websockets: Fixed compilation of websockets on systems where there
+	is no implementation of base64 functions.
+
+2017-05-15  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #158 from kempniu/gtk-vnc-0.7.0-compat websockets: Ensure compatibility with gtk-vnc 0.7.0+
+
+2017-05-14  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: websockets: only build tests for a
+	websockets-enabled build
+
+2017-05-14  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/websockets.c, rfb/rfb.h: websockets: restore
+	webSocketCheckDisconnect() to keep API compatibility
+
+2017-02-27  Andreas Weigel <andreaswe@securepoint.de>
+
+	* libvncserver/ws_decode.c, libvncserver/ws_decode.h: remove
+	potential 64 bit len overflow calculation
+
+2017-02-27  Andreas Weigel <andreaswe@securepoint.de>
+
+	* libvncserver/websockets.c, libvncserver/ws_decode.c,
+	libvncserver/ws_decode.h, test/wsmaketestframe.py, test/wstest.c,
+	test/wstestdata.inc: add decode support for continuation frames use FIN bit and implement opcode 0x00 make consistent use of uint64_t for big frame sizes
+
+2017-02-23  Andreas Weigel <andreaswe@securepoint.de>
+
+	* CMakeLists.txt, test/wsmaketestframe.py, test/wstest.c,
+	test/{wstestdata.c => wstestdata.inc}: fix problems in test and
+	requests for cmake build add missing stdarg header fix hardcoded errno integer values in tests add dependency to wstestdata and rename to prevent building it as c
+	source
+
+2017-02-23  Andreas Weigel <andreaswe@securepoint.de>
+
+	* libvncserver/rfbserver.c, libvncserver/websockets.c, rfb/rfb.h: 
+	remove Hixie-specific MD5 and check functions
+
+2017-02-20  Andreas Weigel <andreaswe@securepoint.de>
+
+	* .gitignore, CMakeLists.txt, libvncserver/ws_decode.c,
+	libvncserver/ws_decode.h, test/wsmaketestframe.py, test/wstest.c,
+	test/wstestdata.c: add generation wstest to cmake add wstestdata.c, because the python data generation script has too
+	many dependencies remove some redundance from jpeg test creation add support for decoding close messages
+
+2017-02-20  Andreas Weigel <andreaswe@securepoint.de>
+
+	* .gitignore, libvncserver/websockets.c, libvncserver/ws_decode.c,
+	libvncserver/ws_decode.h, test/wsmaketestframe.py, test/wstest.c: 
+	add ws_decode tests modify automake to include ws_decode test add python frame generator for decode tests modify configure to only include ws_decode test if preconditions are
+	fulfilled
+
+2017-02-16  Andreas Weigel <andreaswe@securepoint.de>
+
+	* libvncserver/websockets.c: remove obsolete hixie protocol support
+
+2017-02-16  Andreas Weigel <andreaswe@securepoint.de>
+
+	* libvncserver/websockets.c, libvncserver/ws_decode.c,
+	libvncserver/ws_decode.h: factor out hybi decode part to make it
+	testable remove direct dependency on rfbClientPtr structure in hybi decode
+	function(s)
+
+2017-02-15  Andreas Weigel <andreaswe@securepoint.de>
+
+	* libvncserver/websockets.c: fix overflow and refactor websockets
+	decode (Hybi) fix critical heap-based buffer overflow which allowed easy
+	modification of a return address via an overwritten function pointer fix bug causing connections to fail due a "one websocket frame = one
+	ws_read" assumption, which failed with LibVNCServer-0.9.11 refactor websocket Hybi decode to use a simple state machine for
+	decoding of websocket frames
+
+2017-05-14  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #175 from simonwaterman/x509verify Added support for X509 server certificate verification
+
+2017-05-12  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #178 from lioncash/leak font: Fix a small resource leak in a failure case in
+	rfbLoadConsoleFont()
+
+2017-05-05  simon <root@simon.home>
+
+	* libvncclient/tls_openssl.c, rfb/rfbclient.h: X509 certificate
+	verification for OpenSSL
+
+2017-04-25  simon <root@simon.home>
+
+	* libvncclient/tls_gnutls.c: Removed comment left over from
+	development
+
+2017-04-25  simon <root@simon.home>
+
+	* libvncclient/tls_gnutls.c: Modified certificate verification for
+	compatibility with GnuTLS 2.12.23
+
+2017-04-21  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, rfb/rfbconfig.h.cmakein: CMake: add all function
+	checks that used to be in configure.ac Fixes #174
+
+2017-04-21  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, rfb/{rfbconfig.h.cmake => rfbconfig.h.cmakein}: 
+	CMake: properly name rfbconfig.h cmake template
+
+2017-04-21  Christian Beier <dontmind@freeshell.org>
+
+	* .travis.yml: TravisCI: point OSX CMake to OpenSSL root dir
+
+2017-04-21  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, cmake/Modules/FindFFMPEG.cmake: CMake: include a
+	FindFFMPEG module and use it Thankfully taken from
+
+	https://github.com/robotology/ycm/blob/master/find-modules/FindFFMPEG.cmake
+
+2017-04-20  tmcqueen-materials <tmcqueen-materials@users.noreply.github.com>
+
+	* client_examples/vnc2mpg.c: Update vnc2mpg.c correct mistaken references to update_time...
+
+2017-04-20  simon <root@simon.home>
+
+	* libvncclient/tls_gnutls.c: Added support for X509 server
+	certificate verification as part of the handshake process.
+
+2017-04-18  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, rfb/rfbconfig.h.cmake: CMake: set
+	LIBVNCSERVER_HAVE_FORK in rfbconfig.h if fork() found
+
+2017-04-18  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, rfb/rfbconfig.h.cmake: CMake: set
+	LIBVNCSERVER_HAVE_LIBSSL in rfbconfig.h if OpenSSL found
+
+2017-04-18  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, rfb/rfbconfig.h.cmake: CMake: detect mmap() and
+	write result to rfbconfig.h
+
+2017-04-13  tmcqueen-materials <tmcqueen-materials@users.noreply.github.com>
+
+	* client_examples/vnc2mpg.c: Update vnc2mpg.c This update makes the example work on versions of ffmpeg newer than
+	"ancient," fixes a bunch of bugs in the process, and with better
+	documentation of the pitfalls.
+
+2017-04-03  dborth <dborth@gmail.com>
+
+	* libvncclient/vncviewer.c: Set trueColour flag to 1 instead of 255 It turns out some server implementations (namely VMware ESXi 6.5)
+	expect 1 as the only non-zero value for the SetPixelFormat message
+	whereas the protocol states every non-zero value is valid
+
+	(https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#setpixelformat).Anyway, setting this to 1 shouldn't hurt.  Fixes #141
+
+2017-03-26  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, examples/android/README,
+	examples/android/jni/Android.mk,
+	examples/{android/jni/fbvncserver.c => androidvncserver.c}: CMake:
+	automatically build androidvncserver when crosscompiling for Android
+
+2017-03-26  Christian Beier <dontmind@freeshell.org>
+
+	* README, libvncclient/listen.c, rfb/rfbclient.h: Fix building for
+	Android and add build instructions to README
+
+2017-03-26  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: when crosscompiling for Android, don't look
+	for systemd
+
+2017-03-26  Christian Beier <dontmind@freeshell.org>
+
+	* libvncclient/vncviewer.c: Fix a compiler warning
+
+2017-03-26  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: only build TurboJPEG unit tests if lib has
+	jpeg support
+
+2017-03-26  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyorCI: change libpng download link to sth that
+	works
+
+2017-02-22  Christian Beier <dontmind@freeshell.org>
+
+	* TODO: Update TODO, at least a bit
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyorCI: use static zlib and libpng
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: remove check for C++ compiler We don't have any C++ sources.
+
+2017-02-21  Christian Beier <cb@shoutrlabs.com>
+
+	* .appveyor.yml, .travis.yml: CI: let tests output to console on
+	failure
+
+2017-02-21  Christian Beier <cb@shoutrlabs.com>
+
+	* rfb/rfbproto.h: rfbproto: re-add erroneously removed SOCKET
+	definition
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyorCI: make ctest more verbose
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/main.c: rfbInitServer: only init Winsock once
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* rfb/rfbproto.h: rfbproto: remove SOCKET redefinitions
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/main.c: Add an rfbLogPError that shows something on
+	WIN32
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* rfb/rfbproto.h: Fix "rfbBool's size is not 1" runtime error with
+	MSVC
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: only add tjunittest if turbojpeg found
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyorCI: really add the test config to AppVeyor
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* .travis.yml: Revert "AppVeyorCI: supply a test config aka build
+	type" This reverts commit e18ec43c2df1a91911f8fd98bff52a232b6f757c.
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* .travis.yml: AppVeyorCI: supply a test config aka build type
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* README: README: add build instructions
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyorCI: run them tests
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* test/copyrecttest.c: test: tell MSVC to use math defines
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #156 from The-42/drop-autotools drop autotools
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: enable the tests that succeed
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: add libm to tests only on Unix
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: build the tests
+
+2017-02-21  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: properly name examples as examples, not
+	tests
+
+2017-02-20  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/scale.c: Fix building in C89 mode FIXME: this should probably be refactored into a common header.
+
+2017-02-20  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: make shared-lib build configurable and
+	choose sensible platform defaults
+
+2017-02-20  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: set examples's output dirs in a
+	cross-platform way
+
+2017-02-14  Michał Kępień <github@kempniu.pl>
+
+	* libvncserver/websockets.c: Ensure compatibility with gtk-vnc
+	0.7.0+
+
+2017-02-08  Bert van Hall <bert.vanhall@gmx.de>
+
+	* LibVNCServer.spec.in, Makefile.am, autogen.sh,
+	client_examples/Makefile.am, configure.ac, examples/Makefile.am,
+	examples/android/Makefile.am, libvncclient.pc.in,
+	libvncclient/Makefile.am, libvncserver-config.in,
+	libvncserver.pc.in, libvncserver/Makefile.am, m4/.gitignore,
+	m4/ax_prefix_config_h.m4, m4/ax_type_socklen_t.m4, m4/libgcrypt.m4,
+	test/Makefile.am, webclients/Makefile.am,
+	webclients/java-applet/Makefile.am,
+	webclients/java-applet/ssl/Makefile.am: drop autotools Since autotools officially is no longer supported (see various
+	github issues), drop the related infrastructure to stop tempting
+	people to use it for building.  Signed-off-by: Bert van Hall <bert.vanhall@gmx.de>
+
+2017-01-31  Christian Beier <dontmind@freeshell.org>
+
+	* : Merge pull request #153 from The-42/openssl-1.1.x-support Openssl 1.1.x support
+
+2017-01-31  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: set OpenSSL include dir regardless of
+	websockets being enabled or not
+
+2017-01-31  Christian Beier <dontmind@freeshell.org>
+
+	* rfb/rfbint.h.cmake: CMake: that file ain't used no more
+
+2017-01-29  Christian Beier <dontmind@freeshell.org>
+
+	* examples/vncev.c: Fix vncev example compilation on Windows
+
+2017-01-29  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: the blooptest example needs pthreads
+
+2017-01-29  Christian Beier <dontmind@freeshell.org>
+
+	* .travis.yml: TravisCI: install a newer CMake on Linux
+
+2017-01-29  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: fix examples linking when building with
+	MSVC
+
+2017-01-29  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: as of now, the tight sources need libjpeg,
+	libpng alone is not enough
+
+2017-01-29  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyor: detect libpng for main build
+
+2017-01-29  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyor: more libpng build tuning
+
+2016-11-18  Christian Beier <dontmind@freeshell.org>
+
+	* README: AppveyorCI: add badge.
+
+2017-01-29  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyor: fix libpng download cmd
+
+2017-01-28  Christian Beier <dontmind@freeshell.org>
+
+	* .appveyor.yml: AppVeyor: add appveyor.yml from ci branch.
+
+2017-01-28  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/rfbcrypto.h: Fix building websockets with GnuTLS.
+
+2017-01-28  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/rfbcrypto.h: Fix typo
+
+2017-01-28  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/rfbcrypto.h: Fix websockets building
+
+2017-01-28  Christian Beier <dontmind@freeshell.org>
+
+	* common/md5.h, libvncserver/httpd.c, libvncserver/rfbcrypto.h,
+	libvncserver/rfbserver.c,
+	libvncserver/tightvnc-filetransfer/filetransfermsg.c,
+	libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c,
+	libvncserver/websockets.c, rfb/rfb.h: Various #ifdef fixes to allow
+	building with MSVC2014
+
+2017-01-28  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: as of now, websockets support requires
+	sys/uio.h
+
+2017-01-28  Christian Beier <dontmind@freeshell.org>
+
+	* rfb/rfbconfig.h.cmake: CMake: add a HAVE_SYS_UIO_H flag to
+	rfbconfig.h
+
+2017-01-28  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: TightVNC-filetransfer requires pthreads as
+	of now
+
+2017-01-28  Christian Beier <dontmind@freeshell.org>
+
+	* common/vncauth.c, libvncclient/listen.c, libvncclient/sockets.c,
+	rfb/rfbclient.h: Fix LibVNCClient compilation with MSVC 2014
+
+2017-01-28  CHris B <cb@shoutr.net>
+
+	* CMakeLists.txt: CMake: fix build system generation when zlib or
+	OpenSSL not found
+
+2017-01-28  CHris B <cb@shoutr.net>
+
+	* CMakeLists.txt: CMake: do not include NOTFOUND libs in pkg-config
+	snippets
+
+2017-01-22  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: make the build configurable.
+
+2016-11-18  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: remove platform-specific flags.
+
+2017-01-02  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: bump version.
+
+2017-01-02  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, libvncclient.pc.cmakein: CMake: generate and
+	install pkgconfig files.
+
+2017-01-02  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt, libvncclient.pc.cmakein, libvncserver.pc.cmakein: 
+	CMake: bump SOVERSION to 1.  Fixes https://github.com/LibVNC/libvncserver/issues/149
+
+2017-01-02  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: update bugreport path
+
+2016-12-30  Christian Beier <cb@shoutrlabs.com>
+
+	* libvncserver/websockets.c: Make websockets code build on OSX
+	without SSL.
+
+2016-12-30  Christian Beier <cb@shoutrlabs.com>
+
+	* CMakeLists.txt: Fix some OSX linker problems.
+
+2016-12-30  Christian Beier <dontmind@freeshell.org>
+
+	* libvncserver/websockets.c: Use unprefixed b64_* functions in
+	websockets code.
+
+2016-12-30  Christian Beier <dontmind@freeshell.org>
+
+	* common/md5.c, common/md5.h: Fix building on OSX without SSL.
+
+2016-12-30  Christian Beier <dontmind@freeshell.org>
+
+	* .travis.yml: TravisCI: use newer dist.
+
+2016-12-30  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: CMP0037 requires CMake 3.0.
+
+2016-12-30  Christian Beier <dontmind@freeshell.org>
+
+	* CMakeLists.txt: CMake: output examples to respective directories.
+
+2016-11-18  Christian Beier <dontmind@freeshell.org>
+
+	* .travis.yml: TravisCI: switch to CMake.  Conflicts:         .travis.yml
+
+2016-12-30  Christian Beier <dontmind@freeshell.org>
+
+	* ChangeLog: Update ChangeLog.
+
 2016-12-29  Christian Beier <dontmind@freeshell.org>
 
 	* README: Fix README markdown.
@@ -102,6 +1242,14 @@
 	disabled, by setting rfbScreen->ipv6port or rfbScreen->port to a
 	negative number. This will make it possible for x11vnc to enforce
 	its -noipv6 option, as discussed in the following bug report: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=672449
+
+2016-06-21  Balazs Ludmany <ludmany.balazs@cloud.bme.hu>
+
+	* libvncclient/corre.c, libvncclient/hextile.c,
+	libvncclient/rfbproto.c, libvncclient/rre.c, libvncclient/tight.c,
+	libvncclient/ultra.c, libvncclient/vncviewer.c,
+	libvncclient/zlib.c, libvncclient/zrle.c, rfb/rfbclient.h: Add
+	function pointers for every type of rectangle
 
 2016-06-05  Christian Beier <dontmind@freeshell.org>
 
@@ -210,18 +1358,18 @@
 
 	* examples/camera.c: Fix memory access error in camera.c example
 
-2016-03-05  Cédric Georges <cgeorges@edge-airport.com>
+2016-03-05  C�dric Georges <cgeorges@edge-airport.com>
 
 	* CMakeLists.txt, libvncclient/tls_gnutls.c: Append missing include
 	directory for GNUTLS and OPENSSL in CMake project Append support of
 	gnutls > v 2.99.01 (gnutls_transport_set_global_errno have a
 	different signature)
 
-2016-03-05  Cédric Georges <cgeorges@edge-airport.com>
+2016-03-05  C�dric Georges <cgeorges@edge-airport.com>
 
 	* CMakeLists.txt: re-up comment
 
-2016-03-05  Cédric Georges <cgeorges@edge-airport.com>
+2016-03-05  C�dric Georges <cgeorges@edge-airport.com>
 
 	* CMakeLists.txt, rfb/rfbconfig.h.cmake: Append IPv6 option in CMake
 	Project
@@ -322,7 +1470,7 @@
 	* client_examples/gtkvncviewer.c, configure.ac,
 	libvncclient/Makefile.am, libvncclient/h264.c,
 	libvncclient/rfbproto.c, libvncclient/vncviewer.c, rfb/rfbproto.h: 
-	Revert "LibVNCClient: Add H.264 encoding for framebuffer updates" This reverts commit d891478ec985660c03f95cffda0e6a1ad4ba350c.  Conflicts: 	configure.ac 	libvncclient/h264.c
+	Revert "LibVNCClient: Add H.264 encoding for framebuffer updates" This reverts commit d891478ec985660c03f95cffda0e6a1ad4ba350c.  Conflicts:         configure.ac         libvncclient/h264.c
 
 2015-04-17  Christian Beier <dontmind@freeshell.org>
 
@@ -339,12 +1487,12 @@
 	prepended.  Respect that here and have autotools autodetect the
 	appropriate tool.
 
-2015-04-13  Benjamin Dürholt <b.duerholt@portunity.de>
+2015-04-13  Benjamin D�rholt <b.duerholt@portunity.de>
 
 	* libvncserver/rfbssl_gnutls.c, libvncserver/tight.c: Changed C++
 	style comments to C ones
 
-2015-04-10  Benjamin Dürholt <b.duerholt@portunity.de>
+2015-04-10  Benjamin D�rholt <b.duerholt@portunity.de>
 
 	* libvncserver/rfbssl_gnutls.c, libvncserver/tight.c: prevent
 	segfault
@@ -525,7 +1673,7 @@
 	([oCERT-2014-008]): LibVNCServer HandleRFBServerMessage rfbServerCutText malicious
 	msg.sct.length It looks like there may be a chance for potential memory corruption
 	when a LibVNCServer client attempts to process a Server Cut Text
-	message.    case rfbServerCutText:   {     char *buffer;     if (!ReadFromRFBServer(client, ((char *)&msg) + 1, 			   sz_rfbServerCutTextMsg - 1))       return FALSE;     msg.sct.length = rfbClientSwap32IfLE(msg.sct.length); <<
+	message.    case rfbServerCutText:   {     char *buffer;     if (!ReadFromRFBServer(client, ((char *)&msg) + 1,                            sz_rfbServerCutTextMsg - 1))       return FALSE;     msg.sct.length = rfbClientSwap32IfLE(msg.sct.length); <<
 	    Retrieve malicious length     buffer = malloc(msg.sct.length+1); << Allocate buffer. Can
 	    return 0x0     if (!ReadFromRFBServer(client, buffer, msg.sct.length)) <<
 	      Attempt to write to buffer return FALSE;     buffer[msg.sct.length] = 0; << Attempt to write to buffer     if (client->GotXCutText)       client->GotXCutText(client, buffer, msg.sct.length); <<
@@ -1036,7 +2184,7 @@
 
 2014-04-05  Johannes Schindelin <johannes.schindelin@gmx.de>
 
-	* .gitignore: Ignore the vencrypt document 	https://www.berrange.com/~dan/vencrypt.txt Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
+	* .gitignore: Ignore the vencrypt document         https://www.berrange.com/~dan/vencrypt.txt Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
 
 2014-04-05  Johannes Schindelin <johannes.schindelin@gmx.de>
 
@@ -1055,7 +2203,7 @@
 	* .gitignore, examples/Makefile.am, examples/repeater.c: Add an
 	example how to connect to an UltraVNC-style repeater UltraVNC offers an add-on to connect clients and servers via IDs
 	with a so-called repeater (e.g. to bridge firewalled clients and
-	servers): 	http://www.uvnc.com/products/uvnc-repeater.html This example demonstrates how to use that feature with a
+	servers):         http://www.uvnc.com/products/uvnc-repeater.html This example demonstrates how to use that feature with a
 	LibVNCServer-based server.  Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
 
 2014-04-05  Christian Beier <dontmind@freeshell.org>
@@ -1071,7 +2219,7 @@
 2014-03-30  Johannes Schindelin <johannes.schindelin@gmx.de>
 
 	* .gitignore: Ignore more generated files While at it, also ignore the documentation of the RFB protocol best
-	downloaded manually from 	http://www.realvnc.com/docs/rfbproto.pdf Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
+	downloaded manually from         http://www.realvnc.com/docs/rfbproto.pdf Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
 
 2014-03-30  Robbert Klarenbeek <robbertkl@users.sourceforge.net>
 
@@ -1415,10 +2563,9 @@
 
 2012-04-14  Christian Beier <dontmind@freeshell.org>
 
-	* libvncclient/Makefile.am, libvncclient/tls.c,
-	libvncclient/tls_gnutls.c, libvncclient/tls_none.c,
-	libvncclient/tls_openssl.c: Add the OpenSSL libvncclient TLS version
-	to the build system.
+	* libvncclient/Makefile.am, libvncclient/{tls.c => tls_gnutls.c},
+	libvncclient/tls_none.c, libvncclient/tls_openssl.c: Add the OpenSSL
+	libvncclient TLS version to the build system.
 
 2012-04-12  Christian Beier <dontmind@freeshell.org>
 
@@ -1818,88 +2965,64 @@
 2011-11-09  Christian Beier <dontmind@freeshell.org>
 
 	* configure.ac, webclients/Makefile.am, webclients/index.vnc,
-	webclients/java-applet/Makefile.am,
-	webclients/java-applet/javaviewer.pseudo_proxy.patch,
-	webclients/java-applet/ssl/Makefile.am,
-	webclients/java-applet/ssl/README,
-	webclients/java-applet/ssl/index.vnc,
-	webclients/java-applet/ssl/onetimekey,
-	webclients/java-applet/ssl/proxy.vnc,
-	webclients/java-applet/ssl/ss_vncviewer,
-	webclients/java-applet/ssl/tightvnc-1.3dev7_javasrc-vncviewer-curso
-	r-colors+no-tab-traversal.patch,
-	webclients/java-applet/ssl/tightvnc-1.3dev7_javasrc-vncviewer-ssl.p
-	atch, webclients/java-applet/ssl/ultra.vnc,
-	webclients/java-applet/ssl/ultraproxy.vnc,
-	webclients/java-applet/ssl/ultrasigned.vnc,
-	webclients/java-applet/ssl/ultravnc-102-JavaViewer-ssl-etc.patch,
-	webclients/javaviewer.pseudo_proxy.patch,
-	webclients/ssl/Makefile.am, webclients/ssl/README,
-	webclients/ssl/index.vnc, webclients/ssl/onetimekey,
-	webclients/ssl/proxy.vnc, webclients/ssl/ss_vncviewer,
-	webclients/ssl/tightvnc-1.3dev7_javasrc-vncviewer-cursor-colors+no-
-	tab-traversal.patch,
-	webclients/ssl/tightvnc-1.3dev7_javasrc-vncviewer-ssl.patch,
-	webclients/ssl/ultra.vnc, webclients/ssl/ultraproxy.vnc,
-	webclients/ssl/ultrasigned.vnc,
-	webclients/ssl/ultravnc-102-JavaViewer-ssl-etc.patch: Move the java
-	stuff into webclients/java-applet.
+	webclients/java-applet/Makefile.am, webclients/{ =>
+	java-applet}/javaviewer.pseudo_proxy.patch, webclients/{ =>
+	java-applet}/ssl/Makefile.am, webclients/{ =>
+	java-applet}/ssl/README, webclients/{ =>
+	java-applet}/ssl/index.vnc, webclients/{ =>
+	java-applet}/ssl/onetimekey, webclients/{ =>
+	java-applet}/ssl/proxy.vnc, webclients/{ =>
+	java-applet}/ssl/ss_vncviewer, webclients/{ =>
+	java-applet}/ssl/tightvnc-1.3dev7_javasrc-vncviewer-cursor-colors+n
+	o-tab-traversal.patch, webclients/{ =>
+	java-applet}/ssl/tightvnc-1.3dev7_javasrc-vncviewer-ssl.patch,
+	webclients/{ => java-applet}/ssl/ultra.vnc, webclients/{ =>
+	java-applet}/ssl/ultraproxy.vnc, webclients/{ =>
+	java-applet}/ssl/ultrasigned.vnc, webclients/{ =>
+	java-applet}/ssl/ultravnc-102-JavaViewer-ssl-etc.patch: Move the
+	java stuff into webclients/java-applet.
 
 2011-11-09  Christian Beier <dontmind@freeshell.org>
 
-	* LibVNCServer.spec.in, Makefile.am, README, classes/Makefile.am,
-	classes/index.vnc, classes/javaviewer.pseudo_proxy.patch,
-	classes/novnc/LICENSE.txt, classes/novnc/README.md,
-	classes/novnc/favicon.ico, classes/novnc/include/base.css,
-	classes/novnc/include/base64.js, classes/novnc/include/black.css,
-	classes/novnc/include/blue.css, classes/novnc/include/des.js,
-	classes/novnc/include/display.js, classes/novnc/include/input.js,
-	classes/novnc/include/logo.js, classes/novnc/include/playback.js,
-	classes/novnc/include/rfb.js, classes/novnc/include/ui.js,
-	classes/novnc/include/util.js, classes/novnc/include/vnc.js,
-	classes/novnc/include/web-socket-js/README.txt,
-	classes/novnc/include/web-socket-js/swfobject.js,
-	classes/novnc/include/web-socket-js/web_socket.js,
-	classes/novnc/include/websock.js, classes/novnc/include/webutil.js,
-	classes/novnc/vnc.html, classes/novnc/vnc_auto.html,
-	classes/ssl/Makefile.am, classes/ssl/README, classes/ssl/index.vnc,
-	classes/ssl/onetimekey, classes/ssl/proxy.vnc,
-	classes/ssl/ss_vncviewer,
-	classes/ssl/tightvnc-1.3dev7_javasrc-vncviewer-cursor-colors+no-tab
-	-traversal.patch,
-	classes/ssl/tightvnc-1.3dev7_javasrc-vncviewer-ssl.patch,
-	classes/ssl/ultra.vnc, classes/ssl/ultraproxy.vnc,
-	classes/ssl/ultrasigned.vnc,
-	classes/ssl/ultravnc-102-JavaViewer-ssl-etc.patch, configure.ac,
+	* LibVNCServer.spec.in, Makefile.am, README, configure.ac,
 	examples/example.c, examples/pnmshow.c, examples/pnmshow24.c,
-	rfb/rfb.h, webclients/Makefile.am, webclients/index.vnc,
-	webclients/javaviewer.pseudo_proxy.patch,
-	webclients/novnc/LICENSE.txt, webclients/novnc/README.md,
-	webclients/novnc/favicon.ico, webclients/novnc/include/base.css,
-	webclients/novnc/include/base64.js,
-	webclients/novnc/include/black.css,
-	webclients/novnc/include/blue.css, webclients/novnc/include/des.js,
-	webclients/novnc/include/display.js,
-	webclients/novnc/include/input.js,
-	webclients/novnc/include/logo.js,
-	webclients/novnc/include/playback.js,
-	webclients/novnc/include/rfb.js, webclients/novnc/include/ui.js,
-	webclients/novnc/include/util.js, webclients/novnc/include/vnc.js,
-	webclients/novnc/include/web-socket-js/README.txt,
-	webclients/novnc/include/web-socket-js/swfobject.js,
-	webclients/novnc/include/web-socket-js/web_socket.js,
-	webclients/novnc/include/websock.js,
-	webclients/novnc/include/webutil.js, webclients/novnc/vnc.html,
-	webclients/novnc/vnc_auto.html, webclients/ssl/Makefile.am,
-	webclients/ssl/README, webclients/ssl/index.vnc,
-	webclients/ssl/onetimekey, webclients/ssl/proxy.vnc,
-	webclients/ssl/ss_vncviewer,
-	webclients/ssl/tightvnc-1.3dev7_javasrc-vncviewer-cursor-colors+no-
-	tab-traversal.patch,
-	webclients/ssl/tightvnc-1.3dev7_javasrc-vncviewer-ssl.patch,
-	webclients/ssl/ultra.vnc, webclients/ssl/ultraproxy.vnc,
-	webclients/ssl/ultrasigned.vnc,
-	webclients/ssl/ultravnc-102-JavaViewer-ssl-etc.patch: Rename
+	rfb/rfb.h, {classes => webclients}/Makefile.am, {classes =>
+	webclients}/index.vnc, {classes =>
+	webclients}/javaviewer.pseudo_proxy.patch, {classes =>
+	webclients}/novnc/LICENSE.txt, {classes =>
+	webclients}/novnc/README.md, {classes =>
+	webclients}/novnc/favicon.ico, {classes =>
+	webclients}/novnc/include/base.css, {classes =>
+	webclients}/novnc/include/base64.js, {classes =>
+	webclients}/novnc/include/black.css, {classes =>
+	webclients}/novnc/include/blue.css, {classes =>
+	webclients}/novnc/include/des.js, {classes =>
+	webclients}/novnc/include/display.js, {classes =>
+	webclients}/novnc/include/input.js, {classes =>
+	webclients}/novnc/include/logo.js, {classes =>
+	webclients}/novnc/include/playback.js, {classes =>
+	webclients}/novnc/include/rfb.js, {classes =>
+	webclients}/novnc/include/ui.js, {classes =>
+	webclients}/novnc/include/util.js, {classes =>
+	webclients}/novnc/include/vnc.js, {classes =>
+	webclients}/novnc/include/web-socket-js/README.txt, {classes =>
+	webclients}/novnc/include/web-socket-js/swfobject.js, {classes =>
+	webclients}/novnc/include/web-socket-js/web_socket.js, {classes =>
+	webclients}/novnc/include/websock.js, {classes =>
+	webclients}/novnc/include/webutil.js, {classes =>
+	webclients}/novnc/vnc.html, {classes =>
+	webclients}/novnc/vnc_auto.html, {classes =>
+	webclients}/ssl/Makefile.am, {classes => webclients}/ssl/README,
+	{classes => webclients}/ssl/index.vnc, {classes =>
+	webclients}/ssl/onetimekey, {classes => webclients}/ssl/proxy.vnc,
+	{classes => webclients}/ssl/ss_vncviewer, {classes =>
+	webclients}/ssl/tightvnc-1.3dev7_javasrc-vncviewer-cursor-colors+no
+	-tab-traversal.patch, {classes =>
+	webclients}/ssl/tightvnc-1.3dev7_javasrc-vncviewer-ssl.patch,
+	{classes => webclients}/ssl/ultra.vnc, {classes =>
+	webclients}/ssl/ultraproxy.vnc, {classes =>
+	webclients}/ssl/ultrasigned.vnc, {classes =>
+	webclients}/ssl/ultravnc-102-JavaViewer-ssl-etc.patch: Rename
 	'classes' dir to 'webclients'.
 
 2011-11-09  Christian Beier <dontmind@freeshell.org>
@@ -1972,7 +3095,7 @@
 2011-10-16  George Fleury <gfleury@gmail.com>
 
 	* libvncserver/rfbserver.c: Fix memory leak I was debbuging some code tonight and i found a pointer that is not
-	been freed, so i think there is maybe a memory leak, so it is...  there is the malloc caller reverse order: ( malloc cl->statEncList ) 	<- rfbStatLookupEncoding 	<- rfbStatRecordEncodingSent 	<- rfbSendCursorPos 	<- rfbSendFramebufferUpdate 	<- rfbProcessEvents I didnt look the whole libvncserver api, but i am using
+	been freed, so i think there is maybe a memory leak, so it is...  there is the malloc caller reverse order: ( malloc cl->statEncList )         <- rfbStatLookupEncoding         <- rfbStatRecordEncodingSent         <- rfbSendCursorPos         <- rfbSendFramebufferUpdate         <- rfbProcessEvents I didnt look the whole libvncserver api, but i am using
 	rfbReverseConnection with rfbProcessEvents, and then when the client
 	connection dies, i am calling a rfbShutdownServer and
 	rfbScreenCleanup, but the malloc at rfbStatLookupEncoding isnt been
@@ -2190,9 +3313,9 @@
 
 2011-08-16  Gernot Tenchio <gernot.tenchio@securepoint.de>
 
-	* CMakeLists.txt, common/md5.c, common/md5.h,
-	libvncserver/Makefile.am, libvncserver/md5.c, libvncserver/md5.h: 
-	Move libvncserver/md5* to common Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
+	* CMakeLists.txt, {libvncserver => common}/md5.c, {libvncserver =>
+	common}/md5.h, libvncserver/Makefile.am: Move libvncserver/md5* to
+	common Signed-off-by: Johannes Schindelin <johannes.schindelin@gmx.de>
 
 2011-08-16  Gernot Tenchio <gernot.tenchio@securepoint.de>
 
@@ -2325,7 +3448,7 @@
 	mechanism.  This is required to be able to do proper event loop integration with
 	Qt.  Idea was taken from vino's libvncserver fork.  Signed-off-by: Christian Beier <dontmind@freeshell.org>
 
-2011-05-06  Cristian Rodríguez <crrodriguez@opensuse.org>
+2011-05-06  Cristian Rodr�guez <crrodriguez@opensuse.org>
 
 	* libvncserver/tightvnc-filetransfer/filetransfermsg.c: Fix buffer
 	overflow Signed-off-by: Cristian Rodríguez <crrodriguez@opensuse.org>
@@ -2381,7 +3504,7 @@
 
 2011-03-29  Christian Beier <dontmind@freeshell.org>
 
-	* bdf2c.pl, consolefont2c.pl, utils/bdf2c.pl,
+	* bdf2c.pl => utils/bdf2c.pl, consolefont2c.pl =>
 	utils/consolefont2c.pl, utils/git2cl.pl: Add a git-log to GNU-Style
 	ChangeLog converter script.  Also put all helper scripts into a utils directory.
 
@@ -2499,8 +3622,9 @@
 
 2011-03-10  Christian Beier <dontmind@freeshell.org>
 
-	* Makefile.am, configure.ac, contrib/Makefile.am, contrib/zippy.c,
-	examples/Makefile.am, examples/zippy.c: Move zippy.c to examples.
+	* Makefile.am, configure.ac, contrib/Makefile.am,
+	examples/Makefile.am, {contrib => examples}/zippy.c: Move zippy.c to
+	examples.
 
 2011-03-03  Christian Beier <dontmind@freeshell.org>
 
@@ -2560,16 +3684,16 @@
 
 2011-01-25  Christian Beier <dontmind@freeshell.org>
 
-	* CMakeLists.txt, common/d3des.c, common/d3des.h, common/lzoconf.h,
-	common/minilzo.c, common/minilzo.h, common/vncauth.c,
-	common/zywrletemplate.c, libvncclient/Makefile.am,
-	libvncclient/lzoconf.h, libvncclient/minilzo.c,
+	* CMakeLists.txt, {libvncserver => common}/d3des.c, {libvncserver
+	=> common}/d3des.h, {libvncclient => common}/lzoconf.h,
+	{libvncserver => common}/minilzo.c, {libvncserver =>
+	common}/minilzo.h, {libvncserver => common}/vncauth.c,
+	{libvncserver => common}/zywrletemplate.c,
+	libvncclient/Makefile.am, libvncclient/minilzo.c,
 	libvncclient/minilzo.h, libvncclient/rfbproto.c,
 	libvncclient/zrle.c, libvncserver/Makefile.am,
-	libvncserver/d3des.c, libvncserver/d3des.h, libvncserver/lzoconf.h,
-	libvncserver/minilzo.c, libvncserver/minilzo.h,
-	libvncserver/vncauth.c, libvncserver/zywrletemplate.c: Put files
-	used by both libs into a 'common' dir.  No functional changes. All files used by _both_ libvncserver and
+	libvncserver/lzoconf.h: Put files used by both libs into a 'common'
+	dir.  No functional changes. All files used by _both_ libvncserver and
 	libvncclient are put into a 'common' directory and references from
 	other files as well as Autotools and CMake build systems are
 	updated.  Signed-off-by: Christian Beier <dontmind@freeshell.org>
@@ -7227,7 +8351,7 @@
 
 2004-10-16  dscho <dscho>
 
-	* test/Makefile.am, test/encodingstest.c, test/tight-1.c: rename
+	* test/Makefile.am, test/{tight-1.c => encodingstest.c}: rename
 	tight-1.c into encodingstest.c, fixing it in the process. It now
 	passes all encodings except corre (broken) and zrle (not yet
 	implemented in libvncclient)
@@ -7505,7 +8629,7 @@
 
 2004-06-07  dscho <dscho>
 
-	* LibVNCServer.spec.in, Makefile.am, libvncserver.spec.in,
+	* libvncserver.spec.in => LibVNCServer.spec.in, Makefile.am,
 	prepare_x11vnc_dist.sh: fix bug 968264: make rpm did not work with
 	x11vnc package
 
@@ -7535,11 +8659,11 @@
 	* ChangeLog, Makefile.am, TODO, client_examples/Makefile.am,
 	client_examples/SDLvncviewer.c, client_examples/ppmtest.c,
 	configure.ac, contrib/Makefile.am, examples/Makefile.am,
-	examples/blooptest.c, examples/copyrecttest.c,
-	libvncclient/Makefile.am, libvncclient/client_test.c,
-	libvncclient/sockets.c, libvncclient/vncviewer.c,
-	libvncserver/Makefile.am, prepare_x11vnc_dist.sh, rfb/rfbclient.h,
-	test/Makefile.am, test/blooptest.c, test/copyrecttest.c,
+	examples/blooptest.c, libvncclient/Makefile.am,
+	libvncclient/client_test.c, libvncclient/sockets.c,
+	libvncclient/vncviewer.c, libvncserver/Makefile.am,
+	prepare_x11vnc_dist.sh, rfb/rfbclient.h, test/Makefile.am,
+	test/blooptest.c, {examples => test}/copyrecttest.c,
 	test/tight-1.c, x11vnc/Makefile.am: add client_examples/, add
 	SDLvncviewer, libvncclient API changes, suppress automake CFLAGS
 	nagging
@@ -7570,37 +8694,37 @@
 
 2004-05-25  dscho <dscho>
 
-	* ChangeLog, Makefile.am, auth.c, cargs.c, configure.ac,
-	contrib/ChangeLog, contrib/Makefile.am, contrib/x11vnc.c, corre.c,
-	cursor.c, cutpaste.c, d3des.c, d3des.h, draw.c,
-	examples/Makefile.am, examples/regiontest.c, font.c, hextile.c,
-	httpd.c, libvncclient/rfbproto.c, libvncserver/Makefile.am,
-	libvncserver/auth.c, libvncserver/cargs.c, libvncserver/config.h,
-	libvncserver/corre.c, libvncserver/cursor.c,
-	libvncserver/cutpaste.c, libvncserver/d3des.c,
-	libvncserver/d3des.h, libvncserver/draw.c, libvncserver/font.c,
-	libvncserver/hextile.c, libvncserver/httpd.c, libvncserver/main.c,
-	libvncserver/rfbconfig.h, libvncserver/rfbregion.c,
-	libvncserver/rfbserver.c, libvncserver/rre.c,
-	libvncserver/selbox.c, libvncserver/sockets.c,
-	libvncserver/stats.c, libvncserver/tableinit24.c,
-	libvncserver/tableinitcmtemplate.c,
-	libvncserver/tableinittctemplate.c,
-	libvncserver/tabletrans24template.c,
-	libvncserver/tabletranstemplate.c, libvncserver/tight.c,
-	libvncserver/translate.c, libvncserver/vncauth.c,
-	libvncserver/zlib.c, libvncserver/zrle.c,
-	libvncserver/zrleencodetemplate.c, libvncserver/zrleoutstream.c,
-	libvncserver/zrleoutstream.h, libvncserver/zrlepalettehelper.c,
-	libvncserver/zrlepalettehelper.h, libvncserver/zrletypes.h, main.c,
-	rfbregion.c, rfbserver.c, rre.c, selbox.c, sockets.c, stats.c,
-	tableinit24.c, tableinitcmtemplate.c, tableinittctemplate.c,
-	tabletrans24template.c, tabletranstemplate.c, test/Makefile.am,
-	tight.c, translate.c, vncauth.c, vncterm/Makefile.am,
-	x11vnc/ChangeLog, x11vnc/Makefile.am, x11vnc/x11vnc.c, zlib.c,
-	zrle.c, zrleencodetemplate.c, zrleoutstream.c, zrleoutstream.h,
-	zrlepalettehelper.c, zrlepalettehelper.h, zrletypes.h: move the
-	library into libvncserver/, x11vnc into x11vnc/
+	* ChangeLog, Makefile.am, configure.ac, contrib/Makefile.am,
+	examples/Makefile.am, examples/regiontest.c,
+	libvncclient/rfbproto.c, libvncserver/Makefile.am, auth.c =>
+	libvncserver/auth.c, cargs.c => libvncserver/cargs.c,
+	libvncserver/config.h, corre.c => libvncserver/corre.c, cursor.c =>
+	libvncserver/cursor.c, cutpaste.c => libvncserver/cutpaste.c,
+	d3des.c => libvncserver/d3des.c, d3des.h => libvncserver/d3des.h,
+	draw.c => libvncserver/draw.c, font.c => libvncserver/font.c,
+	hextile.c => libvncserver/hextile.c, httpd.c =>
+	libvncserver/httpd.c, main.c => libvncserver/main.c,
+	libvncserver/rfbconfig.h, rfbregion.c => libvncserver/rfbregion.c,
+	rfbserver.c => libvncserver/rfbserver.c, rre.c =>
+	libvncserver/rre.c, selbox.c => libvncserver/selbox.c, sockets.c =>
+	libvncserver/sockets.c, stats.c => libvncserver/stats.c,
+	tableinit24.c => libvncserver/tableinit24.c, tableinitcmtemplate.c
+	=> libvncserver/tableinitcmtemplate.c, tableinittctemplate.c =>
+	libvncserver/tableinittctemplate.c, tabletrans24template.c =>
+	libvncserver/tabletrans24template.c, tabletranstemplate.c =>
+	libvncserver/tabletranstemplate.c, tight.c => libvncserver/tight.c,
+	translate.c => libvncserver/translate.c, vncauth.c =>
+	libvncserver/vncauth.c, zlib.c => libvncserver/zlib.c, zrle.c =>
+	libvncserver/zrle.c, zrleencodetemplate.c =>
+	libvncserver/zrleencodetemplate.c, zrleoutstream.c =>
+	libvncserver/zrleoutstream.c, zrleoutstream.h =>
+	libvncserver/zrleoutstream.h, zrlepalettehelper.c =>
+	libvncserver/zrlepalettehelper.c, zrlepalettehelper.h =>
+	libvncserver/zrlepalettehelper.h, zrletypes.h =>
+	libvncserver/zrletypes.h, test/Makefile.am, vncterm/Makefile.am,
+	{contrib => x11vnc}/ChangeLog, x11vnc/Makefile.am, {contrib =>
+	x11vnc}/x11vnc.c: move the library into libvncserver/, x11vnc into
+	x11vnc/
 
 2004-05-22  runge <runge>
 
@@ -8106,11 +9230,10 @@
 
 2003-02-18  dscho <dscho>
 
-	* Makefile.am, configure.ac, include/.cvsignore,
-	include/default8x16.h, include/keysym.h, include/rfb.h,
-	include/rfbproto.h, include/rfbregion.h, rfb/default8x16.h,
-	rfb/keysym.h, rfb/rfb.h, rfb/rfbproto.h, rfb/rfbregion.h: moved
-	include/ to rfb/
+	* Makefile.am, configure.ac, include/.cvsignore, {include =>
+	rfb}/default8x16.h, {include => rfb}/keysym.h, {include =>
+	rfb}/rfb.h, {include => rfb}/rfbproto.h, {include =>
+	rfb}/rfbregion.h: moved include/ to rfb/
 
 2003-02-18  dscho <dscho>
 
@@ -8198,15 +9321,15 @@
 
 2003-02-09  dscho <dscho>
 
-	* .cvsignore, configure.ac, examples/mac.c, mac.c: moved the
+	* .cvsignore, configure.ac, mac.c => examples/mac.c: moved the
 	OSXvnc-server to examples; IRIX fixes (not really IRIX, but shows
 	there)
 
 2003-02-09  dscho <dscho>
 
 	* Makefile.am, examples/Makefile.am, examples/regiontest.c,
-	examples/sratest.c, include/rfbregion.h, main.c, rfbregion.c,
-	rfbserver.c, sraRegion.c, sraRegion.h, translate.c: renamed
+	examples/sratest.c, sraRegion.h => include/rfbregion.h, main.c,
+	sraRegion.c => rfbregion.c, rfbserver.c, translate.c: renamed
 	sraRegion to rfbregion and put it in include/; will be installed now
 
 2003-02-09  dscho <dscho>
@@ -8289,7 +9412,7 @@
 
 2003-02-08  dscho <dscho>
 
-	* AUTHORS, CHANGES, ChangeLog, NEWS, TODO: further autoconf'ing
+	* AUTHORS, CHANGES => ChangeLog, NEWS, TODO: further autoconf'ing
 
 2003-02-08  dscho <dscho>
 
@@ -8297,7 +9420,7 @@
 	contrib/Makefile, contrib/Makefile.am, examples/Makefile,
 	examples/Makefile.am, examples/example.c, include/rfb.h,
 	include/rfbproto.h, main.c, rfbserver.c, sockets.c, tight.c,
-	zlib.c, zrle.cc, zrle.cxx: autoconf'ed everything
+	zlib.c, zrle.cc => zrle.cxx: autoconf'ed everything
 
 2003-02-07  dscho <dscho>
 
@@ -8310,19 +9433,19 @@
 
 2003-02-07  dscho <dscho>
 
-	* 1instance.c, Makefile, contrib/Makefile, contrib/zippy.c,
-	default8x16.h, examples/1instance.c, examples/pnmshow24.c,
-	include/default8x16.h, include/keysym.h, include/rfb.h,
-	include/rfbproto.h, keysym.h, main.c, radon.h, rfb.h, rfbproto.h: 
+	* Makefile, contrib/Makefile, contrib/zippy.c, 1instance.c =>
+	examples/1instance.c, examples/pnmshow24.c, default8x16.h =>
+	include/default8x16.h, keysym.h => include/keysym.h, rfb.h =>
+	include/rfb.h, rfbproto.h => include/rfbproto.h, main.c, radon.h: 
 	moved files to include; moved a file to examples/
 
 2003-02-07  dscho <dscho>
 
-	* CHANGES, example.c, example.dsp, examples/example.c,
-	examples/example.dsp, examples/fontsel.c, examples/pnmshow.c,
-	examples/pnmshow24.c, examples/storepasswd.c, examples/vncev.c,
-	fontsel.c, pnmshow.c, pnmshow24.c, storepasswd.c, vncev.c: moved
-	files to contrib/ and examples/
+	* CHANGES, example.c => examples/example.c, example.dsp =>
+	examples/example.dsp, fontsel.c => examples/fontsel.c, pnmshow.c =>
+	examples/pnmshow.c, pnmshow24.c => examples/pnmshow24.c,
+	storepasswd.c => examples/storepasswd.c, vncev.c =>
+	examples/vncev.c: moved files to contrib/ and examples/
 
 2002-12-30  dscho <dscho>
 
@@ -8367,8 +9490,8 @@
 
 2002-12-06  dscho <dscho>
 
-	* CHANGES, Makefile, contrib/x11vnc.c, contrib/zippy.c, httpd.c,
-	main.c, rfb.h, x11vnc.c, zippy.c: compiler warnings, contrib
+	* CHANGES, Makefile, contrib/x11vnc.c, zippy.c => contrib/zippy.c,
+	httpd.c, main.c, rfb.h, x11vnc.c: compiler warnings, contrib
 	directory, new x11vnc from Karl Runge
 
 2002-10-29  dscho <dscho>
@@ -8971,9 +10094,9 @@
 
 2001-09-25  dscho <dscho>
 
-	* d3des.c, d3des.h, libvncauth/Imakefile, libvncauth/Makefile,
-	libvncauth/d3des.c, libvncauth/d3des.h, libvncauth/vncauth.c,
-	libvncauth/vncauth.h, vncauth.c: permanently moved authorization
+	* libvncauth/d3des.c => d3des.c, libvncauth/d3des.h => d3des.h,
+	libvncauth/Imakefile, libvncauth/Makefile, libvncauth/vncauth.h,
+	libvncauth/vncauth.c => vncauth.c: permanently moved authorization
 
 2001-09-25  dscho <dscho>
 
