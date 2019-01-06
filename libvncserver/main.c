@@ -566,7 +566,7 @@ clientInput(void *data)
 
 	if (FD_ISSET(cl->pipe_notify_client_thread[0], &rfds))
 	{
-	    // Reset the pipe
+	    /* Reset the pipe */
 	    char buf;
 	    while (read(cl->pipe_notify_client_thread[0], &buf, sizeof(buf)) == sizeof(buf));
 	}
@@ -1112,8 +1112,13 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
       }
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-      // Notify the thread and join it
+      /*
+	Notify the thread. This simply writes a NULL byte to the notify pipe in order to get past the select()
+	in clientInput(), the loop in there will then break because the rfbCloseClient() above has set
+	currentCl->sock to -1.
+      */
       write(currentCl->pipe_notify_client_thread[1], "\x00", 1);
+      /* And wait for it to finish. */
       pthread_join(currentCl->client_thread, NULL);
 #else
       rfbClientConnectionGone(currentCl);
