@@ -162,6 +162,11 @@ check_include_file("stdint.h"      HAVE_STDINT_H)
 check_include_file("stddef.h"      HAVE_STDDEF_H)
 check_include_file("sys/types.h"   HAVE_SYS_TYPES_H)
 
+# error out if required headers not found
+if(NOT HAVE_STDINT_H)
+  message(FATAL_ERROR "Could NOT find required header stdint.h")
+endif()
+
 check_function_exists(gettimeofday    LIBVNCSERVER_HAVE_GETTIMEOFDAY)
 check_function_exists(vfork           LIBVNCSERVER_HAVE_VFORK)
 check_function_exists(vprintf         LIBVNCSERVER_HAVE_VPRINTF)
