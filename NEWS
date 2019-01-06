@@ -1,3 +1,38 @@
+0.9.12
+   - Overall changes:
+     * CMake now is the default build system, Autotools were removed.
+     * In addition to TravisCI, all commits are now build-tested by AppVeyorCI.
+
+   - LibVNCServer/LibVNCClient:
+     * Numerous build fixes for Visual Studio compilers to the extent that
+       one can now _build_ the project with these. The needed changes for
+       successfully _running_ stuff will be implemented in 0.9.13.
+     * Fixed building for Android and added build instructions.
+     * Removed the unused PolarSSL wrapper.
+     * Updated the bundled noVNC to latest release 1.0.0.
+     * Allowed to use global LZO library instead of miniLZO.
+
+   - LibVNCClient:
+     * Support for OpenSSL 1.1.x.
+     * Support for overriding the default rectangle decode handlers (with
+       hardware-accelerated ones for instance) thanks to Balazs Ludmany.
+     * vnc2mpg updated.
+     * Added support for X509 server certificate verification as part of the
+       handshake process thanks to Simon Waterman.
+     * Added a TRLE decoder thanks to Wiki Wang.
+     * Included Tight decoding optimizations from TurboVNC thanks to DRC.
+     * Ported the SDL viewer from SDL 1.2 to SDL 2.0.
+     * Numerous security fixes.
+     * Added support for custom auth handlers in order to support additional
+       security types.
+
+   - LibVNCServer:
+     * Websockets rework to remove obsolete code thanks to Andreas Weigel.
+     * Ensured compatibility with gtk-vnc 0.7.0+ thanks to Michał Kępień.
+     * The built-in webserver now sends correct MIME type for Javascript.
+     * Numerous memory management issues fixed.
+     * Made the TightVNC-style file transfer more stable.
+
 0.9.11
    - Overall changes:
      * LibVNCServer/LibVNCClient development now uses continous intregration,
