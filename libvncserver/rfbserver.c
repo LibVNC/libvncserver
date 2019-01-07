@@ -88,6 +88,8 @@
 #include <errno.h>
 /* strftime() */
 #include <time.h>
+/* INT_MAX */
+#include <limits.h>
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 #include "rfbssl.h"
@@ -1472,8 +1474,11 @@ char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length)
        0XFFFFFFFF, i.e. SIZE_MAX for 32-bit systems. On 64-bit systems, a length of 0XFFFFFFFF
        will safely be allocated since this check will never trigger and malloc() can digest length+1
        without problems as length is a uint32_t.
+       We also later pass length to rfbReadExact() that expects a signed int type and
+       that might wrap on platforms with a 32-bit int type if length is bigger
+       than 0X7FFFFFFF.
     */
-    if(length == SIZE_MAX) {
+    if(length == SIZE_MAX || length > INT_MAX) {
 	rfbErr("rfbProcessFileTransferReadBuffer: too big file transfer length requested: %u", (unsigned int)length);
 	rfbCloseClient(cl);
 	return NULL;
