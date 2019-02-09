@@ -9,6 +9,7 @@ include(CheckTypeSize)
 include(TestBigEndian)
 include(CheckCSourceCompiles)
 include(CheckCSourceRuns)
+include(GNUInstallDirs)
 
 enable_testing()
 
@@ -666,8 +667,8 @@ get_link_libraries(PRIVATE_LIBS vncclient)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
 
 
-install_targets(/lib vncserver)
-install_targets(/lib vncclient)
+install_targets(/${CMAKE_INSTALL_LIBDIR} vncserver)
+install_targets(/${CMAKE_INSTALL_LIBDIR} vncclient)
 install_files(/include/rfb FILES
     rfb/keysym.h
     rfb/rfb.h
@@ -677,7 +678,7 @@ install_files(/include/rfb FILES
     rfb/rfbregion.h
 )
 
-install_files(/lib/pkgconfig FILES
+install_files(/${CMAKE_INSTALL_LIBDIR}/pkgconfig FILES
     libvncserver.pc
     libvncclient.pc
 )
