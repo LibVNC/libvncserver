@@ -461,7 +461,7 @@ ConnectClientToUnixSock(const char *sockFile)
   int sock;
   struct sockaddr_un addr;
   addr.sun_family = AF_UNIX;
-  strncpy(addr.sun_path, sockFile, sizeof(addr.sun_path) - 1);
+  strncpy(addr.sun_path, sockFile, sizeof(addr.sun_path));
 
   sock = socket(AF_UNIX, SOCK_STREAM, 0);
   if (sock < 0) {
