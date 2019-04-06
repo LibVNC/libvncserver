@@ -461,6 +461,10 @@ ConnectClientToUnixSock(const char *sockFile)
   int sock;
   struct sockaddr_un addr;
   addr.sun_family = AF_UNIX;
+  if(strlen(sockFile) + 1 > sizeof(addr.sun_path)) {
+      rfbClientErr("ConnectToUnixSock: socket file name too long\n");
+      return -1;
+  }
   strcpy(addr.sun_path, sockFile);
 
   sock = socket(AF_UNIX, SOCK_STREAM, 0);
