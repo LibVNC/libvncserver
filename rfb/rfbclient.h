@@ -188,7 +188,23 @@ typedef void (*HandleKeyboardLedStateProc)(struct _rfbClient* client, int value,
 typedef rfbBool (*HandleCursorPosProc)(struct _rfbClient* client, int x, int y);
 typedef void (*SoftCursorLockAreaProc)(struct _rfbClient* client, int x, int y, int w, int h);
 typedef void (*SoftCursorUnlockScreenProc)(struct _rfbClient* client);
+/**
+   Callback indicating that a rectangular area of the client's framebuffer was updated.
+   As a server will usually send several rects per rfbFramebufferUpdate message, this
+   callback is usually called multiple times per rfbFramebufferUpdate message.
+   @param client The client whose framebuffer was (partially) updated
+   @param x The x-coordinate of the upper left corner of the updated rectangle
+   @param y The y-coordinate of the upper left corner of the updated rectangle
+   @param w The width of the updated rectangle
+   @param h The heigth of the updated rectangle
+ */
 typedef void (*GotFrameBufferUpdateProc)(struct _rfbClient* client, int x, int y, int w, int h);
+/**
+   Callback indicating that a client has completely processed an rfbFramebufferUpdate
+   message sent by a server.
+   This is called exactly once per each handled rfbFramebufferUpdate message.
+   @param client The client which finished processing an rfbFramebufferUpdate
+ */
 typedef void (*FinishedFrameBufferUpdateProc)(struct _rfbClient* client);
 typedef char* (*GetPasswordProc)(struct _rfbClient* client);
 typedef rfbCredential* (*GetCredentialProc)(struct _rfbClient* client, int credentialType);
