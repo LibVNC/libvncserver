@@ -42,6 +42,10 @@
 #undef SOCKET
 #undef socklen_t
 #endif
+#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
+#undef socklen_t
+#include <ws2tcpip.h>
+#endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
 #ifdef __CHECKER__

@@ -52,11 +52,6 @@
 #endif
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
-#ifdef __MINGW32__
-#undef SOCKET
-#undef socklen_t
-#include <ws2tcpip.h>
-#endif
 
 #ifdef LIBVNCSERVER_HAVE_SASL
 #include <sasl/sasl.h>
