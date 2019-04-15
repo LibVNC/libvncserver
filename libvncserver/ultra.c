@@ -8,7 +8,11 @@
  */
 
 #include <rfb/rfb.h>
+#ifdef LIBVNCSERVER_HAVE_LZO
+#include <lzo/lzo1x.h>
+#else
 #include "minilzo.h"
+#endif
 
 /*
  * cl->beforeEncBuf contains pixel data in the client's format.

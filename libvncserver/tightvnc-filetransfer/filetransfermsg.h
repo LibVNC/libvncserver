@@ -51,7 +51,8 @@ FileTransferMsg ChkFileUploadWriteErr(rfbClientPtr cl, rfbTightClientPtr data, c
 
 void CreateDirectory(char* dirName);
 void FileUpdateComplete(rfbClientPtr cl, rfbTightClientPtr data);
-void CloseUndoneFileTransfer(rfbClientPtr cl, rfbTightClientPtr data);
+void CloseUndoneFileUpload(rfbClientPtr cl, rfbTightClientPtr data);
+void CloseUndoneFileDownload(rfbClientPtr cl, rfbTightClientPtr data);
 
 void FreeFileTransferMsg(FileTransferMsg ftm);
 

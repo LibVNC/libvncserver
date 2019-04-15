@@ -5,10 +5,11 @@
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #endif
+#include <rfb/rfbconfig.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-#ifndef __MINGW32__
+#if LIBVNCSERVER_HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
 #include <rfb/rfb.h>

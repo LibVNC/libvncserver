@@ -18,6 +18,7 @@
  */
 
 #include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
 #include <rfb/rfbclient.h>
 #include <errno.h>
 #ifdef WIN32
@@ -39,6 +40,98 @@ static gnutls_dh_params_t rfbDHParams;
 
 static rfbBool rfbTLSInitialized = FALSE;
 
+static int
+verify_certificate_callback (gnutls_session_t session)
+{
+  unsigned int status;
+  const gnutls_datum_t *cert_list;
+  unsigned int cert_list_size;
+  int ret;
+  gnutls_x509_crt_t cert;
+  rfbClient *sptr;
+  char *hostname;
+
+  sptr = (rfbClient *)gnutls_session_get_ptr(session);
+  if (!sptr) {
+    rfbClientLog("Failed to validate certificate - missing client data\n");
+    return GNUTLS_E_CERTIFICATE_ERROR;
+  }
+
+  hostname = sptr->serverHost;
+  if (!hostname) {
+      rfbClientLog("No server hostname found for client\n");
+      return GNUTLS_E_CERTIFICATE_ERROR;
+  }
+
+  /* This verification function uses the trusted CAs in the credentials
+   * structure. So you must have installed one or more CA certificates.
+   */
+  ret = gnutls_certificate_verify_peers2 (session, &status);
+  if (ret < 0)
+    {
+      rfbClientLog ("Certificate validation call failed\n");
+      return GNUTLS_E_CERTIFICATE_ERROR;
+    }
+
+  if (status & GNUTLS_CERT_INVALID)
+    rfbClientLog("The certificate is not trusted.\n");
+
+  if (status & GNUTLS_CERT_SIGNER_NOT_FOUND)
+    rfbClientLog("The certificate hasn't got a known issuer.\n");
+
+  if (status & GNUTLS_CERT_REVOKED)
+    rfbClientLog("The certificate has been revoked.\n");
+
+  if (status & GNUTLS_CERT_EXPIRED)
+    rfbClientLog("The certificate has expired\n");
+
+  if (status & GNUTLS_CERT_NOT_ACTIVATED)
+    rfbClientLog("The certificate is not yet activated\n");
+
+  if (status)
+    return GNUTLS_E_CERTIFICATE_ERROR;
+
+  /* Up to here the process is the same for X.509 certificates and
+   * OpenPGP keys. From now on X.509 certificates are assumed. This can
+   * be easily extended to work with openpgp keys as well.
+   */
+  if (gnutls_certificate_type_get (session) != GNUTLS_CRT_X509) {
+    rfbClientLog("The certificate was not X509\n");
+    return GNUTLS_E_CERTIFICATE_ERROR;
+  }
+
+  if (gnutls_x509_crt_init (&cert) < 0)
+    {
+      rfbClientLog("Error initialising certificate structure\n");
+      return GNUTLS_E_CERTIFICATE_ERROR;
+    }
+
+  cert_list = gnutls_certificate_get_peers (session, &cert_list_size);
+  if (cert_list == NULL)
+    {
+      rfbClientLog("No certificate was found!\n");
+      return GNUTLS_E_CERTIFICATE_ERROR;
+    }
+
+  if (gnutls_x509_crt_import (cert, &cert_list[0], GNUTLS_X509_FMT_DER) < 0)
+    {
+      rfbClientLog("Error parsing certificate\n");
+      return GNUTLS_E_CERTIFICATE_ERROR;
+    }
+
+  if (!gnutls_x509_crt_check_hostname (cert, hostname))
+    {
+      rfbClientLog("The certificate's owner does not match hostname '%s'\n",
+              hostname);
+      return GNUTLS_E_CERTIFICATE_ERROR;
+    }
+
+  gnutls_x509_crt_deinit (cert);
+
+  /* notify gnutls to continue handshake normally */
+  return 0;
+}
+
 static rfbBool
 InitializeTLS(void)
 {
@@ -52,7 +145,7 @@ InitializeTLS(void)
     rfbClientLog("Failed to initialized GnuTLS: %s.\n", gnutls_strerror(ret));
     return FALSE;
   }
-  rfbClientLog("GnuTLS initialized.\n");
+  rfbClientLog("GnuTLS version %s initialized.\n", gnutls_check_version(NULL));
   rfbTLSInitialized = TRUE;
   return TRUE;
 }
@@ -170,7 +263,7 @@ InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
 static rfbBool
 SetTLSAnonCredential(rfbClient* client)
 {
-  gnutls_anon_client_credentials anonCred;
+  gnutls_anon_client_credentials_t anonCred;
   int ret;
 
   if ((ret = gnutls_anon_allocate_client_credentials(&anonCred)) < 0 ||
@@ -200,6 +293,7 @@ HandshakeTLS(rfbClient* client)
       continue;
     }
     rfbClientLog("TLS handshake failed: %s.\n", gnutls_strerror(ret));
+
     FreeTLS(client);
     return FALSE;
   }
@@ -252,6 +346,10 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
         if (t==rfbVeNCryptTLSNone ||
             t==rfbVeNCryptTLSVNC ||
             t==rfbVeNCryptTLSPlain ||
+#ifdef LIBVNCSERVER_HAVE_SASL
+            t==rfbVeNCryptTLSSASL ||
+            t==rfbVeNCryptX509SASL ||
+#endif /*LIBVNCSERVER_HAVE_SASL */
             t==rfbVeNCryptX509None ||
             t==rfbVeNCryptX509VNC ||
             t==rfbVeNCryptX509Plain)
@@ -411,6 +509,9 @@ HandleVeNCryptAuth(rfbClient* client)
     case rfbVeNCryptTLSNone:
     case rfbVeNCryptTLSVNC:
     case rfbVeNCryptTLSPlain:
+#ifdef LIBVNCSERVER_HAVE_SASL
+    case rfbVeNCryptTLSSASL:
+#endif /* LIBVNCSERVER_HAVE_SASL */
       anonTLS = TRUE;
       break;
     default:
@@ -449,6 +550,10 @@ HandleVeNCryptAuth(rfbClient* client)
   }
   else
   {
+    /* Set the certificate verification callback. */
+    gnutls_certificate_set_verify_function (x509_cred, verify_certificate_callback);
+    gnutls_session_set_ptr ((gnutls_session_t)client->tlsSession, (void *)client);
+
     if ((ret = gnutls_credentials_set((gnutls_session_t)client->tlsSession, GNUTLS_CRD_CERTIFICATE, x509_cred)) < 0)
     {
       rfbClientLog("Cannot set x509 credential: %s.\n", gnutls_strerror(ret));
@@ -458,8 +563,6 @@ HandleVeNCryptAuth(rfbClient* client)
   }
 
   if (!HandshakeTLS(client)) return FALSE;
-
-  /* TODO: validate certificate */
 
   /* We are done here. The caller should continue with client->subAuthScheme
    * to do actual sub authentication.
@@ -486,7 +589,7 @@ ReadFromTLS(rfbClient* client, char *out, unsigned int n)
 }
 
 int
-WriteToTLS(rfbClient* client, char *buf, unsigned int n)
+WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 {
   unsigned int offset = 0;
   ssize_t ret;
@@ -535,3 +638,14 @@ void FreeTLS(rfbClient* client)
     client->tlsSession = NULL;
   }
 }
+
+#ifdef LIBVNCSERVER_HAVE_SASL
+int
+GetTLSCipherBits(rfbClient* client)
+{
+    gnutls_cipher_algorithm_t cipher = gnutls_cipher_get((gnutls_session_t)client->tlsSession);
+
+    return gnutls_cipher_get_key_size(cipher) * 8;
+}
+#endif /* LIBVNCSERVER_HAVE_SASL */
+

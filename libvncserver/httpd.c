@@ -47,6 +47,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #define close closesocket
+#define strcasecmp _stricmp 
 #if defined(_MSC_VER)
 #include <BaseTsd.h> /* For the missing ssize_t */
 #define ssize_t SSIZE_T
@@ -461,6 +462,8 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	contentType = "Content-Type: text/css\r\n";
     else if(ext && strcasecmp(ext, ".svg") == 0)
 	contentType = "Content-Type: image/svg+xml\r\n";
+    else if(ext && strcasecmp(ext, ".js") == 0)
+	contentType = "Content-Type: application/javascript\r\n";
     rfbWriteExact(&cl, contentType, strlen(contentType));
     /* end the header */
     rfbWriteExact(&cl, "\r\n", 2);

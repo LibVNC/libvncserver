@@ -26,6 +26,7 @@
 #include <rfb/rfb.h>
 #include "rfbtightproto.h"
 #include "handlefiletransferrequest.h"
+#include "filetransfermsg.h"
 
 /*
  * Get my data!
@@ -448,9 +449,11 @@ rfbTightExtensionMsgHandler(struct _rfbClientRec* cl, void* data,
 void
 rfbTightExtensionClientClose(rfbClientPtr cl, void* data) {
 
-	if(data != NULL)
+	if(data != NULL) {
+		CloseUndoneFileUpload(cl, data);
+		CloseUndoneFileDownload(cl, data);
 		free(data);
-
+	}
 }
 
 void

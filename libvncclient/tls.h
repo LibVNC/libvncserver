@@ -43,9 +43,14 @@ int ReadFromTLS(rfbClient* client, char *out, unsigned int n);
  * It's a wrapper function over gnutls_record_send() and it will be
  * blocking call, until all bytes are written or error returned.
  */
-int WriteToTLS(rfbClient* client, char *buf, unsigned int n);
+int WriteToTLS(rfbClient* client, const char *buf, unsigned int n);
 
 /* Free TLS resources */
 void FreeTLS(rfbClient* client);
+
+#ifdef LIBVNCSERVER_HAVE_SASL
+/* Get the number of bits in the current cipher */
+int GetTLSCipherBits(rfbClient* client);
+#endif /* LIBVNCSERVER_HAVE_SASL */
 
 #endif /* TLS_H */

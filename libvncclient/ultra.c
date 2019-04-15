@@ -72,6 +72,8 @@ HandleUltraBPP (rfbClient* client, rfbBool multicast, int rx, int ry, int rw, in
     if ((client->raw_buffer_size % 4)!=0)
       client->raw_buffer_size += (4-(client->raw_buffer_size % 4));
     client->raw_buffer = (char*) malloc( client->raw_buffer_size );
+    if(client->raw_buffer == NULL)
+      return FALSE;
   }
   
   /* allocate enough space to store the incoming compressed packet */
@@ -110,7 +112,7 @@ HandleUltraBPP (rfbClient* client, rfbBool multicast, int rx, int ry, int rw, in
   /* Put the uncompressed contents of the update on the screen. */
   if ( inflateResult == LZO_E_OK ) 
   {
-    CopyRectangle(client, (unsigned char *)client->raw_buffer, rx, ry, rw, rh);
+    client->GotBitmap(client, (unsigned char *)client->raw_buffer, rx, ry, rw, rh);
   }
   else
   {
@@ -162,6 +164,8 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     if ((client->raw_buffer_size % 4)!=0)
       client->raw_buffer_size += (4-(client->raw_buffer_size % 4));
     client->raw_buffer = (char*) malloc( client->raw_buffer_size );
+    if(client->raw_buffer == NULL)
+	return FALSE;
   }
 
  
@@ -211,7 +215,7 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
     if (se == rfbEncodingRaw)
     {
-        CopyRectangle(client, (unsigned char *)ptr, sx, sy, sw, sh);
+        client->GotBitmap(client, (unsigned char *)ptr, sx, sy, sw, sh);
         ptr += ((sw * sh) * (BPP / 8));
     }
   }  

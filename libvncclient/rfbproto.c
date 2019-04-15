@@ -49,12 +49,6 @@
 #define Z_NULL NULL
 #endif
 #endif
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-#ifdef _RPCNDR_H /* This Windows header typedefs 'boolean', jpeglib has to know */
-#define HAVE_BOOLEAN
-#endif
-#include <jpeglib.h>
-#endif
 
 #ifndef _MSC_VER
 /* Strings.h is not available in MSVC */
@@ -68,7 +62,12 @@
 #include <gcrypt.h>
 #endif
 
+#include "sasl.h"
+#ifdef LIBVNCSERVER_HAVE_LZO
+#include <lzo/lzo1x.h>
+#else
 #include "minilzo.h"
+#endif
 #include "tls.h"
 #include "ghpringbuf.h"
 #include "packet.h"
@@ -149,125 +148,6 @@ void* rfbClientGetClientData(rfbClient* client, void* tag)
 	return NULL;
 }
 
-/* messages */
-
-static rfbBool CheckRect(rfbClient* client, int x, int y, int w, int h) {
-  return x + w <= client->width && y + h <= client->height;
-}
-
-static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_t colour) {
-  int i,j;
-
-  if (client->frameBuffer == NULL) {
-      return;
-  }
-
-  if (!CheckRect(client, x, y, w, h)) {
-    rfbClientLog("Rect out of bounds: %dx%d at (%d, %d)\n", x, y, w, h);
-    return;
-  }
-
-#define FILL_RECT(BPP) \
-    for(j=y*client->width;j<(y+h)*client->width;j+=client->width) \
-      for(i=x;i<x+w;i++) \
-	((uint##BPP##_t*)client->frameBuffer)[j+i]=colour;
-
-  switch(client->format.bitsPerPixel) {
-  case  8: FILL_RECT(8);  break;
-  case 16: FILL_RECT(16); break;
-  case 32: FILL_RECT(32); break;
-  default:
-    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
-  }
-}
-
-static void CopyRectangle(rfbClient* client, uint8_t* buffer, int x, int y, int w, int h) {
-  int j;
-
-  if (client->frameBuffer == NULL) {
-      return;
-  }
-
-  if (!CheckRect(client, x, y, w, h)) {
-    rfbClientLog("Rect out of bounds: %dx%d at (%d, %d)\n", x, y, w, h);
-    return;
-  }
-
-#define COPY_RECT(BPP) \
-  { \
-    int rs = w * BPP / 8, rs2 = client->width * BPP / 8; \
-    for (j = ((x * (BPP / 8)) + (y * rs2)); j < (y + h) * rs2; j += rs2) { \
-      memcpy(client->frameBuffer + j, buffer, rs); \
-      buffer += rs; \
-    } \
-  }
-
-  switch(client->format.bitsPerPixel) {
-  case  8: COPY_RECT(8);  break;
-  case 16: COPY_RECT(16); break;
-  case 32: COPY_RECT(32); break;
-  default:
-    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
-  }
-}
-
-/* TODO: test */
-static void CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y) {
-  int i,j;
-
-  if (client->frameBuffer == NULL) {
-      return;
-  }
-
-  if (!CheckRect(client, src_x, src_y, w, h)) {
-    rfbClientLog("Source rect out of bounds: %dx%d at (%d, %d)\n", src_x, src_y, w, h);
-    return;
-  }
-
-  if (!CheckRect(client, dest_x, dest_y, w, h)) {
-    rfbClientLog("Dest rect out of bounds: %dx%d at (%d, %d)\n", dest_x, dest_y, w, h);
-    return;
-  }
-
-#define COPY_RECT_FROM_RECT(BPP) \
-  { \
-    uint##BPP##_t* _buffer=((uint##BPP##_t*)client->frameBuffer)+(src_y-dest_y)*client->width+src_x-dest_x; \
-    if (dest_y < src_y) { \
-      for(j = dest_y*client->width; j < (dest_y+h)*client->width; j += client->width) { \
-        if (dest_x < src_x) { \
-          for(i = dest_x; i < dest_x+w; i++) { \
-            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
-          } \
-        } else { \
-          for(i = dest_x+w-1; i >= dest_x; i--) { \
-            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
-          } \
-        } \
-      } \
-    } else { \
-      for(j = (dest_y+h-1)*client->width; j >= dest_y*client->width; j-=client->width) { \
-        if (dest_x < src_x) { \
-          for(i = dest_x; i < dest_x+w; i++) { \
-            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
-          } \
-        } else { \
-          for(i = dest_x+w-1; i >= dest_x; i--) { \
-            ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
-          } \
-        } \
-      } \
-    } \
-  }
-
-  switch(client->format.bitsPerPixel) {
-  case  8: COPY_RECT_FROM_RECT(8);  break;
-  case 16: COPY_RECT_FROM_RECT(16); break;
-  case 32: COPY_RECT_FROM_RECT(32); break;
-  default:
-    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
-  }
-}
-
 static rfbBool HandleRRE8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleRRE16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
@@ -283,6 +163,13 @@ static rfbBool HandleUltra32(rfbClient* client, rfbBool multicast, int rx, int r
 static rfbBool HandleUltraZip8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleUltraZip16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleUltraZip32(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleTRLE8(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleTRLE15(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleTRLE16(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleTRLE24(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleTRLE24Up(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleTRLE24Down(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleTRLE32(rfbClient* client, int rx, int ry, int rw, int rh);
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 static rfbBool HandleZlib8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZlib16(rfbClient* client, int rx, int ry, int rw, int rh);
@@ -293,13 +180,6 @@ static rfbBool HandleTight16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleTight32(rfbClient* client, int rx, int ry, int rw, int rh);
 
 static long ReadCompactLen (rfbClient* client);
-
-static void JpegInitSource(j_decompress_ptr cinfo);
-static boolean JpegFillInputBuffer(j_decompress_ptr cinfo);
-static void JpegSkipInputData(j_decompress_ptr cinfo, long num_bytes);
-static void JpegTermSource(j_decompress_ptr cinfo);
-static void JpegSetSrcManager(j_decompress_ptr cinfo, uint8_t *compressedData,
-                              int compressedLen);
 #endif
 static rfbBool HandleZRLE8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleZRLE15(rfbClient* client, int rx, int ry, int rw, int rh);
@@ -495,6 +375,7 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
   rfbProtocolVersionMsg pv;
   int major,minor;
   char tmphost[250];
+  int tmphostlen;
 
 #ifdef LIBVNCSERVER_IPv6
   client->sock = ConnectClientToTcpAddr6(repeaterHost, repeaterPort);
@@ -530,8 +411,11 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 
   rfbClientLog("Connected to VNC repeater, using protocol version %d.%d\n", major, minor);
 
-  snprintf(tmphost, sizeof(tmphost), "%s:%d", destHost, destPort);
-  if (!WriteToRFBServer(client, tmphost, sizeof(tmphost)))
+  tmphostlen = snprintf(tmphost, sizeof(tmphost), "%s:%d", destHost, destPort);
+  if(tmphostlen < 0 || tmphostlen >= (int)sizeof(tmphost))
+    return FALSE; /* snprintf error or output truncated */
+
+  if (!WriteToRFBServer(client, tmphost, tmphostlen + 1))
     return FALSE;
 
   return TRUE;
@@ -540,11 +424,29 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 extern void rfbClientEncryptBytes(unsigned char* bytes, char* passwd);
 extern void rfbClientEncryptBytes2(unsigned char *where, const int length, unsigned char *key);
 
+static void
+ReadReason(rfbClient* client)
+{
+    uint32_t reasonLen;
+    char *reason;
+
+    if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return;
+    reasonLen = rfbClientSwap32IfLE(reasonLen);
+    if(reasonLen > 1<<20) {
+      rfbClientLog("VNC connection failed, but sent reason length of %u exceeds limit of 1MB",(unsigned int)reasonLen);
+      return;
+    }
+    reason = malloc(reasonLen+1);
+    if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
+    reason[reasonLen]=0;
+    rfbClientLog("VNC connection failed: %s\n",reason);
+    free(reason);
+}
+
 rfbBool
 rfbHandleAuthResult(rfbClient* client)
 {
-    uint32_t authResult=0, reasonLen=0;
-    char *reason=NULL;
+    uint32_t authResult=0;
 
     if (!ReadFromRFBServer(client, (char *)&authResult, 4)) return FALSE;
 
@@ -559,13 +461,7 @@ rfbHandleAuthResult(rfbClient* client)
       if (client->major==3 && client->minor>7)
       {
         /* we have an error following */
-        if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return FALSE;
-        reasonLen = rfbClientSwap32IfLE(reasonLen);
-        reason = malloc(reasonLen+1);
-        if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return FALSE; }
-        reason[reasonLen]=0;
-        rfbClientLog("VNC connection failed: %s\n",reason);
-        free(reason);
+        ReadReason(client);
         return FALSE;
       }
       rfbClientLog("VNC authentication failed\n");
@@ -580,21 +476,6 @@ rfbHandleAuthResult(rfbClient* client)
     return FALSE;
 }
 
-static void
-ReadReason(rfbClient* client)
-{
-    uint32_t reasonLen;
-    char *reason;
-
-    /* we have an error following */
-    if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return;
-    reasonLen = rfbClientSwap32IfLE(reasonLen);
-    reason = malloc(reasonLen+1);
-    if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
-    reason[reasonLen]=0;
-    rfbClientLog("VNC connection failed: %s\n",reason);
-    free(reason);
-}
 
 static rfbBool
 ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
@@ -602,9 +483,11 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
     uint8_t count=0;
     uint8_t loop=0;
     uint8_t flag=0;
+    rfbBool extAuthHandler;
     uint8_t tAuth[256];
     char buf1[500],buf2[10];
     uint32_t authScheme;
+    rfbClientProtocolExtension* e;
 
     if (!ReadFromRFBServer(client, (char *)&count, 1)) return FALSE;
 
@@ -623,10 +506,24 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
         rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
         if (flag) continue;
+        extAuthHandler=FALSE;
+        for (e = rfbClientExtensions; e; e = e->next) {
+            if (!e->handleAuthentication) continue;
+            uint32_t const* secType;
+            for (secType = e->securityTypes; secType && *secType; secType++) {
+                if (tAuth[loop]==*secType) {
+                    extAuthHandler=TRUE;
+                }
+            }
+        }
         if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth ||
+			extAuthHandler ||
 #if defined(LIBVNCSERVER_HAVE_GNUTLS) || defined(LIBVNCSERVER_HAVE_LIBSSL)
             tAuth[loop]==rfbVeNCrypt ||
 #endif
+#ifdef LIBVNCSERVER_HAVE_SASL
+            tAuth[loop]==rfbSASL ||
+#endif /* LIBVNCSERVER_HAVE_SASL */
             (tAuth[loop]==rfbARD && client->GetCredential) ||
             (!subAuth && (tAuth[loop]==rfbTLS || (tAuth[loop]==rfbVeNCrypt && client->GetCredential))))
         {
@@ -1206,6 +1103,12 @@ InitialiseRFBConnection(rfbClient* client)
     if (!HandleVncAuth(client)) return FALSE;
     break;
 
+#ifdef LIBVNCSERVER_HAVE_SASL
+  case rfbSASL:
+    if (!HandleSASLAuth(client)) return FALSE;
+    break;
+#endif /* LIBVNCSERVER_HAVE_SASL */
+
   case rfbMSLogon:
     if (!HandleMSLogonAuth(client)) return FALSE;
     break;
@@ -1244,6 +1147,12 @@ InitialiseRFBConnection(rfbClient* client)
         if (!HandleVncAuth(client)) return FALSE;
         break;
 
+#ifdef LIBVNCSERVER_HAVE_SASL
+      case rfbSASL:
+        if (!HandleSASLAuth(client)) return FALSE;
+        break;
+#endif /* LIBVNCSERVER_HAVE_SASL */
+
       default:
         rfbClientLog("Unknown sub authentication scheme from VNC server: %d\n",
             (int)subAuthScheme);
@@ -1273,6 +1182,13 @@ InitialiseRFBConnection(rfbClient* client)
         if (!HandlePlainAuth(client)) return FALSE;
         break;
 
+#ifdef LIBVNCSERVER_HAVE_SASL
+      case rfbVeNCryptX509SASL:
+      case rfbVeNCryptTLSSASL:
+        if (!HandleSASLAuth(client)) return FALSE;
+        break;
+#endif /* LIBVNCSERVER_HAVE_SASL */
+
       default:
         rfbClientLog("Unknown sub authentication scheme from VNC server: %d\n",
             client->subAuthScheme);
@@ -1282,6 +1198,22 @@ InitialiseRFBConnection(rfbClient* client)
     break;
 
   default:
+    {
+      rfbBool authHandled=FALSE;
+      rfbClientProtocolExtension* e;
+      for (e = rfbClientExtensions; e; e = e->next) {
+        uint32_t const* secType;
+        if (!e->handleAuthentication) continue;
+        for (secType = e->securityTypes; secType && *secType; secType++) {
+          if (authScheme==*secType) {
+            if (!e->handleAuthentication(client, authScheme)) return FALSE;
+            if (!rfbHandleAuthResult(client)) return FALSE;
+            authHandled=TRUE;
+          }
+        }
+      }
+      if (authHandled) break;
+    }
     rfbClientLog("Unknown authentication scheme from VNC server: %d\n",
 	    (int)authScheme);
     return FALSE;
@@ -1300,8 +1232,12 @@ InitialiseRFBConnection(rfbClient* client)
   client->si.format.blueMax = rfbClientSwap16IfLE(client->si.format.blueMax);
   client->si.nameLength = rfbClientSwap32IfLE(client->si.nameLength);
 
-  /* To guard against integer wrap-around, si.nameLength is cast to 64 bit */
-  client->desktopName = malloc((uint64_t)client->si.nameLength + 1);
+  if (client->si.nameLength > 1<<20) {
+      rfbClientErr("Too big desktop name length sent by server: %u B > 1 MB\n", (unsigned int)client->si.nameLength);
+      return FALSE;
+  }
+
+  client->desktopName = malloc(client->si.nameLength + 1);
   if (!client->desktopName) {
     rfbClientLog("Error allocating memory for desktop name, %lu bytes\n",
             (unsigned long)client->si.nameLength);
@@ -1359,6 +1295,7 @@ SetFormatAndEncodings(rfbClient* client)
   if (!SupportsClient2Server(client, rfbSetEncodings)) return TRUE;
 
   se->type = rfbSetEncodings;
+  se->pad = 0;
   se->nEncodings = 0;
 
   if (client->appData.encodingsString) {
@@ -1399,6 +1336,8 @@ SetFormatAndEncodings(rfbClient* client)
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZlibHex);
 	if (client->appData.compressLevel >= 0 && client->appData.compressLevel <= 9)
 	  requestCompressLevel = TRUE;
+      } else if (strncasecmp(encStr,"trle",encStrLen) == 0) {
+	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingTRLE);
       } else if (strncasecmp(encStr,"zrle",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZRLE);
       } else if (strncasecmp(encStr,"zywrle",encStrLen) == 0) {
@@ -1804,6 +1743,7 @@ SendKeyEvent(rfbClient* client, uint32_t key, rfbBool down)
 
   if (!SupportsClient2Server(client, rfbKeyEvent)) return TRUE;
 
+  memset(&ke, 0, sizeof(ke));
   ke.type = rfbKeyEvent;
   ke.down = down ? 1 : 0;
   ke.key = rfbClientSwap32IfLE(key);
@@ -1822,6 +1762,7 @@ SendClientCutText(rfbClient* client, char *str, int len)
 
   if (!SupportsClient2Server(client, rfbClientCutText)) return TRUE;
 
+  memset(&cct, 0, sizeof(cct));
   cct.type = rfbClientCutText;
   cct.length = rfbClientSwap32IfLE(len);
   return  (WriteToRFBServer(client, (char *)&cct, sz_rfbClientCutTextMsg) &&
@@ -1962,7 +1903,7 @@ HandleRFBServerMessage(rfbClient* client)
 			  if (!ReadFromRFBServerMulticast(client, client->buffer,bytesPerLine * linesToRead))
 			    return FALSE;
 		      
-			  CopyRectangle(client, (uint8_t *)client->buffer,
+			  client->GotBitmap(client, (uint8_t *)client->buffer,
 					rect.r.x, y, rect.r.w,linesToRead);
 		      
 			  h -= linesToRead;
@@ -2294,14 +2235,14 @@ HandleRFBServerMessage(rfbClient* client)
 	/* Regardless of cause, do not divide by zero. */
 	linesToRead = bytesPerLine ? (RFB_BUFFER_SIZE / bytesPerLine) : 0;
 
-	while (h > 0) {
+	while (linesToRead && h > 0) {
 	  if (linesToRead > h)
 	    linesToRead = h;
 
 	  if (!ReadFromRFBServer(client, client->buffer,bytesPerLine * linesToRead))
 	    return FALSE;
 
-	  CopyRectangle(client, (uint8_t *)client->buffer,
+	  client->GotBitmap(client, (uint8_t *)client->buffer,
 			   rect.r.x, y, rect.r.w,linesToRead);
 
 	  h -= linesToRead;
@@ -2327,13 +2268,8 @@ HandleRFBServerMessage(rfbClient* client)
 	client->SoftCursorLockArea(client,
 				   cr.srcX, cr.srcY, rect.r.w, rect.r.h);
 
-        if (client->GotCopyRect != NULL) {
-          client->GotCopyRect(client, cr.srcX, cr.srcY, rect.r.w, rect.r.h,
-              rect.r.x, rect.r.y);
-        } else
-		CopyRectangleFromRectangle(client,
-				   cr.srcX, cr.srcY, rect.r.w, rect.r.h,
-				   rect.r.x, rect.r.y);
+        client->GotCopyRect(client, cr.srcX, cr.srcY, rect.r.w, rect.r.h,
+                            rect.r.x, rect.r.y);
 
 	break;
       }
@@ -2428,6 +2364,47 @@ HandleRFBServerMessage(rfbClient* client)
           if (!HandleUltraZip32(client, rect.r.x,rect.r.y,rect.r.w,rect.r.h))
             return FALSE;
           break;
+        }
+        break;
+      }
+
+      case rfbEncodingTRLE:
+	  {
+        switch (client->format.bitsPerPixel) {
+        case 8:
+          if (!HandleTRLE8(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h))
+            return FALSE;
+          break;
+        case 16:
+          if (client->si.format.greenMax > 0x1F) {
+            if (!HandleTRLE16(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h))
+              return FALSE;
+          } else {
+            if (!HandleTRLE15(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h))
+              return FALSE;
+          }
+          break;
+        case 32: {
+          uint32_t maxColor =
+              (client->format.redMax << client->format.redShift) |
+              (client->format.greenMax << client->format.greenShift) |
+              (client->format.blueMax << client->format.blueShift);
+          if ((client->format.bigEndian && (maxColor & 0xff) == 0) ||
+              (!client->format.bigEndian && (maxColor & 0xff000000) == 0)) {
+            if (!HandleTRLE24(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h))
+              return FALSE;
+          } else if (!client->format.bigEndian && (maxColor & 0xff) == 0) {
+            if (!HandleTRLE24Up(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h))
+              return FALSE;
+          } else if (client->format.bigEndian && (maxColor & 0xff000000) == 0) {
+            if (!HandleTRLE24Down(client, rect.r.x, rect.r.y, rect.r.w,
+                                  rect.r.h))
+              return FALSE;
+          } else if (!HandleTRLE32(client, rect.r.x, rect.r.y, rect.r.w,
+                                   rect.r.h))
+            return FALSE;
+          break;
+        }
         }
         break;
       }
@@ -2574,10 +2551,17 @@ HandleRFBServerMessage(rfbClient* client)
 
     msg.sct.length = rfbClientSwap32IfLE(msg.sct.length);
 
+    if (msg.sct.length > 1<<20) {
+	    rfbClientErr("Ignoring too big cut text length sent by server: %u B > 1 MB\n", (unsigned int)msg.sct.length);
+	    return FALSE;
+    }  
+
     buffer = malloc(msg.sct.length+1);
 
-    if (!ReadFromRFBServer(client, buffer, msg.sct.length))
+    if (!ReadFromRFBServer(client, buffer, msg.sct.length)) {
+      free(buffer);
       return FALSE;
+    }
 
     buffer[msg.sct.length] = 0;
 
@@ -2730,6 +2714,7 @@ HandleRFBServerMessage(rfbClient* client)
 #include "ultra.c"
 #include "zlib.c"
 #include "tight.c"
+#include "trle.c"
 #include "zrle.c"
 #undef BPP
 #define BPP 16
@@ -2739,7 +2724,10 @@ HandleRFBServerMessage(rfbClient* client)
 #include "ultra.c"
 #include "zlib.c"
 #include "tight.c"
+#include "trle.c"
 #include "zrle.c"
+#define REALBPP 15
+#include "trle.c"
 #define REALBPP 15
 #include "zrle.c"
 #undef BPP
@@ -2750,12 +2738,21 @@ HandleRFBServerMessage(rfbClient* client)
 #include "ultra.c"
 #include "zlib.c"
 #include "tight.c"
+#include "trle.c"
 #include "zrle.c"
+#define REALBPP 24
+#include "trle.c"
 #define REALBPP 24
 #include "zrle.c"
 #define REALBPP 24
 #define UNCOMP 8
+#include "trle.c"
+#define REALBPP 24
+#define UNCOMP 8
 #include "zrle.c"
+#define REALBPP 24
+#define UNCOMP -8
+#include "trle.c"
 #define REALBPP 24
 #define UNCOMP -8
 #include "zrle.c"
@@ -2798,7 +2795,6 @@ PrintPixelFormat(rfbPixelFormat *format)
 #define rfbDes rfbClientDes
 #define rfbDesKey rfbClientDesKey
 #define rfbUseKey rfbClientUseKey
-#define rfbCPKey rfbClientCPKey
 
 #include "vncauth.c"
 #include "d3des.c"

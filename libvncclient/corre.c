@@ -46,9 +46,9 @@ HandleCoRREBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     if (!ReadFromRFBServer(client, (char *)&pix, sizeof(pix)))
 	return FALSE;
 
-    FillRectangle(client, rx, ry, rw, rh, pix);
+    client->GotFillRect(client, rx, ry, rw, rh, pix);
 
-    if (!ReadFromRFBServer(client, client->buffer, hdr.nSubrects * (4 + (BPP / 8))))
+    if (hdr.nSubrects > RFB_BUFFER_SIZE / (4 + (BPP / 8)) || !ReadFromRFBServer(client, client->buffer, hdr.nSubrects * (4 + (BPP / 8))))
 	return FALSE;
 
     ptr = (uint8_t *)client->buffer;
@@ -61,7 +61,7 @@ HandleCoRREBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	w = *ptr++;
 	h = *ptr++;
 
-	FillRectangle(client, rx+x, ry+y, w, h, pix);
+	client->GotFillRect(client, rx+x, ry+y, w, h, pix);
     }
 
     return TRUE;

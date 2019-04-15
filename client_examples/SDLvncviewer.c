@@ -5,7 +5,6 @@
 #include <SDL.h>
 #include <signal.h>
 #include <rfb/rfbclient.h>
-#include "scrap.h"
 
 struct { int sdl; int rfb; } buttonMapping[]={
 	{1, rfbButton1Mask},
@@ -16,14 +15,22 @@ struct { int sdl; int rfb; } buttonMapping[]={
 	{0,0}
 };
 
+struct { char mask; int bits_stored; } utf8Mapping[]= {
+	{0b00111111, 6},
+	{0b01111111, 7},
+	{0b00011111, 5},
+	{0b00001111, 4},
+	{0b00000111, 3},
+	{0,0}
+};
+
 static int enableResizable = 1, viewOnly, listenLoop, buttonMask;
-#ifdef SDL_ASYNCBLIT
-	int sdlFlags = SDL_HWSURFACE | SDL_ASYNCBLIT | SDL_HWACCEL;
-#else
-	int sdlFlags = SDL_HWSURFACE | SDL_HWACCEL;
-#endif
-static int realWidth, realHeight, bytesPerPixel, rowStride;
-static char *sdlPixels;
+int sdlFlags;
+SDL_Texture *sdlTexture;
+SDL_Renderer *sdlRenderer;
+SDL_Window *sdlWindow;
+/* client's pointer position */
+int x,y;
 
 static int rightAltKeyDown, leftAltKeyDown;
 
@@ -32,53 +39,72 @@ static rfbBool resize(rfbClient* client) {
 		depth=client->format.bitsPerPixel;
 
 	if (enableResizable)
-		sdlFlags |= SDL_RESIZABLE;
+		sdlFlags |= SDL_WINDOW_RESIZABLE;
 
 	client->updateRect.x = client->updateRect.y = 0;
 	client->updateRect.w = width; client->updateRect.h = height;
-	rfbBool okay=SDL_VideoModeOK(width,height,depth,sdlFlags);
-	if(!okay)
-		for(depth=24;!okay && depth>4;depth/=2)
-			okay=SDL_VideoModeOK(width,height,depth,sdlFlags);
-	if(okay) {
-		SDL_Surface* sdl=SDL_SetVideoMode(width,height,depth,sdlFlags);
-		rfbClientSetClientData(client, SDL_Init, sdl);
-		client->width = sdl->pitch / (depth / 8);
-		if (sdlPixels) {
-			free(client->frameBuffer);
-			sdlPixels = NULL;
-		}
-		client->frameBuffer=sdl->pixels;
 
-		client->format.bitsPerPixel=depth;
-		client->format.redShift=sdl->format->Rshift;
-		client->format.greenShift=sdl->format->Gshift;
-		client->format.blueShift=sdl->format->Bshift;
-		client->format.redMax=sdl->format->Rmask>>client->format.redShift;
-		client->format.greenMax=sdl->format->Gmask>>client->format.greenShift;
-		client->format.blueMax=sdl->format->Bmask>>client->format.blueShift;
-		SetFormatAndEncodings(client);
+	/* (re)create the surface used as the client's framebuffer */
+	SDL_FreeSurface(rfbClientGetClientData(client, SDL_Init));
+	SDL_Surface* sdl=SDL_CreateRGBSurface(0,
+					      width,
+					      height,
+					      depth,
+					      0,0,0,0);
+	if(!sdl)
+	    rfbClientErr("resize: error creating surface: %s\n", SDL_GetError());
 
+	rfbClientSetClientData(client, SDL_Init, sdl);
+	client->width = sdl->pitch / (depth / 8);
+	client->frameBuffer=sdl->pixels;
+
+	client->format.bitsPerPixel=depth;
+	client->format.redShift=sdl->format->Rshift;
+	client->format.greenShift=sdl->format->Gshift;
+	client->format.blueShift=sdl->format->Bshift;
+	client->format.redMax=sdl->format->Rmask>>client->format.redShift;
+	client->format.greenMax=sdl->format->Gmask>>client->format.greenShift;
+	client->format.blueMax=sdl->format->Bmask>>client->format.blueShift;
+	SetFormatAndEncodings(client);
+
+	/* create or resize the window */
+	if(!sdlWindow) {
+	    sdlWindow = SDL_CreateWindow(client->desktopName,
+					 SDL_WINDOWPOS_UNDEFINED,
+					 SDL_WINDOWPOS_UNDEFINED,
+					 width,
+					 height,
+					 sdlFlags);
+	    if(!sdlWindow)
+		rfbClientErr("resize: error creating window: %s\n", SDL_GetError());
 	} else {
-		SDL_Surface* sdl=rfbClientGetClientData(client, SDL_Init);
-		rfbClientLog("Could not set resolution %dx%d!\n",
-				client->width,client->height);
-		if(sdl) {
-			client->width=sdl->pitch / (depth / 8);
-			client->height=sdl->h;
-		} else {
-			client->width=0;
-			client->height=0;
-		}
-		return FALSE;
+	    SDL_SetWindowSize(sdlWindow, width, height);
 	}
-	SDL_WM_SetCaption(client->desktopName, "SDL");
+
+	/* create the renderer if it does not already exist */
+	if(!sdlRenderer) {
+	    sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
+	    if(!sdlRenderer)
+		rfbClientErr("resize: error creating renderer: %s\n", SDL_GetError());
+	    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  /* make the scaled rendering look smoother. */
+	}
+	SDL_RenderSetLogicalSize(sdlRenderer, width, height);  /* this is a departure from the SDL1.2-based version, but more in the sense of a VNC viewer in keeeping aspect ratio */
+
+	/* (re)create the texture that sits in between the surface->pixels and the renderer */
+	if(sdlTexture)
+	    SDL_DestroyTexture(sdlTexture);
+	sdlTexture = SDL_CreateTexture(sdlRenderer,
+				       SDL_PIXELFORMAT_ARGB8888,
+				       SDL_TEXTUREACCESS_STREAMING,
+				       width, height);
+	if(!sdlTexture)
+	    rfbClientErr("resize: error creating texture: %s\n", SDL_GetError());
 	return TRUE;
 }
 
 static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	rfbKeySym k = 0;
-	SDLKey sym = e->keysym.sym;
+	SDL_Keycode sym = e->keysym.sym;
 
 	switch (sym) {
 	case SDLK_BACKSPACE: k = XK_BackSpace; break;
@@ -87,18 +113,17 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_RETURN: k = XK_Return; break;
 	case SDLK_PAUSE: k = XK_Pause; break;
 	case SDLK_ESCAPE: k = XK_Escape; break;
-	case SDLK_SPACE: k = XK_space; break;
 	case SDLK_DELETE: k = XK_Delete; break;
-	case SDLK_KP0: k = XK_KP_0; break;
-	case SDLK_KP1: k = XK_KP_1; break;
-	case SDLK_KP2: k = XK_KP_2; break;
-	case SDLK_KP3: k = XK_KP_3; break;
-	case SDLK_KP4: k = XK_KP_4; break;
-	case SDLK_KP5: k = XK_KP_5; break;
-	case SDLK_KP6: k = XK_KP_6; break;
-	case SDLK_KP7: k = XK_KP_7; break;
-	case SDLK_KP8: k = XK_KP_8; break;
-	case SDLK_KP9: k = XK_KP_9; break;
+	case SDLK_KP_0: k = XK_KP_0; break;
+	case SDLK_KP_1: k = XK_KP_1; break;
+	case SDLK_KP_2: k = XK_KP_2; break;
+	case SDLK_KP_3: k = XK_KP_3; break;
+	case SDLK_KP_4: k = XK_KP_4; break;
+	case SDLK_KP_5: k = XK_KP_5; break;
+	case SDLK_KP_6: k = XK_KP_6; break;
+	case SDLK_KP_7: k = XK_KP_7; break;
+	case SDLK_KP_8: k = XK_KP_8; break;
+	case SDLK_KP_9: k = XK_KP_9; break;
 	case SDLK_KP_PERIOD: k = XK_KP_Decimal; break;
 	case SDLK_KP_DIVIDE: k = XK_KP_Divide; break;
 	case SDLK_KP_MULTIPLY: k = XK_KP_Multiply; break;
@@ -130,165 +155,58 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_F13: k = XK_F13; break;
 	case SDLK_F14: k = XK_F14; break;
 	case SDLK_F15: k = XK_F15; break;
-	case SDLK_NUMLOCK: k = XK_Num_Lock; break;
+	case SDLK_NUMLOCKCLEAR: k = XK_Num_Lock; break;
 	case SDLK_CAPSLOCK: k = XK_Caps_Lock; break;
-	case SDLK_SCROLLOCK: k = XK_Scroll_Lock; break;
+	case SDLK_SCROLLLOCK: k = XK_Scroll_Lock; break;
 	case SDLK_RSHIFT: k = XK_Shift_R; break;
 	case SDLK_LSHIFT: k = XK_Shift_L; break;
 	case SDLK_RCTRL: k = XK_Control_R; break;
 	case SDLK_LCTRL: k = XK_Control_L; break;
 	case SDLK_RALT: k = XK_Alt_R; break;
 	case SDLK_LALT: k = XK_Alt_L; break;
-	case SDLK_RMETA: k = XK_Meta_R; break;
-	case SDLK_LMETA: k = XK_Meta_L; break;
-	case SDLK_LSUPER: k = XK_Super_L; break;
-	case SDLK_RSUPER: k = XK_Super_R; break;
+	case SDLK_LGUI: k = XK_Super_L; break;
+	case SDLK_RGUI: k = XK_Super_R; break;
 #if 0
 	case SDLK_COMPOSE: k = XK_Compose; break;
 #endif
 	case SDLK_MODE: k = XK_Mode_switch; break;
 	case SDLK_HELP: k = XK_Help; break;
-	case SDLK_PRINT: k = XK_Print; break;
+	case SDLK_PRINTSCREEN: k = XK_Print; break;
 	case SDLK_SYSREQ: k = XK_Sys_Req; break;
-	case SDLK_BREAK: k = XK_Break; break;
 	default: break;
 	}
-	/* both SDL and X11 keysyms match ASCII in the range 0x01-0x7f */
-	if (k == 0 && sym > 0x0 && sym < 0x100) {
-		k = sym;
-		if (e->keysym.mod & (KMOD_LSHIFT | KMOD_RSHIFT)) {
-			if (k >= '1' && k <= '9')
-				k &= ~0x10;
-			else if (k >= 'a' && k <= 'f')
-				k &= ~0x20;
-		}
-	}
-	if (k == 0) {
-		if (e->keysym.unicode < 0x100)
-			k = e->keysym.unicode;
-		else
-			rfbClientLog("Unknown keysym: %d\n", sym);
-	}
+	/* SDL_TEXTINPUT does not generate characters if ctrl is down, so handle those here */
+        if (k == 0 && sym > 0x0 && sym < 0x100 && e->keysym.mod & KMOD_CTRL)
+               k = sym;
 
 	return k;
 }
 
-static uint32_t get(rfbClient *cl, int x, int y)
-{
-	switch (bytesPerPixel) {
-	case 1: return ((uint8_t *)cl->frameBuffer)[x + y * cl->width];
-	case 2: return ((uint16_t *)cl->frameBuffer)[x + y * cl->width];
-	case 4: return ((uint32_t *)cl->frameBuffer)[x + y * cl->width];
-	default:
-		rfbClientErr("Unknown bytes/pixel: %d", bytesPerPixel);
-		exit(1);
+/* UTF-8 decoding is from https://rosettacode.org/wiki/UTF-8_encode_and_decode which is under GFDL 1.2 */
+static rfbKeySym utf8char2rfbKeySym(const char chr[4]) {
+	int bytes = strlen(chr);
+	int shift = utf8Mapping[0].bits_stored * (bytes - 1);
+	rfbKeySym codep = (*chr++ & utf8Mapping[bytes].mask) << shift;
+	int i;
+	for(i = 1; i < bytes; ++i, ++chr) {
+		shift -= utf8Mapping[0].bits_stored;
+		codep |= ((char)*chr & utf8Mapping[0].mask) << shift;
 	}
-}
-
-static void put(int x, int y, uint32_t v)
-{
-	switch (bytesPerPixel) {
-	case 1: ((uint8_t *)sdlPixels)[x + y * rowStride] = v; break;
-	case 2: ((uint16_t *)sdlPixels)[x + y * rowStride] = v; break;
-	case 4: ((uint32_t *)sdlPixels)[x + y * rowStride] = v; break;
-	default:
-		rfbClientErr("Unknown bytes/pixel: %d", bytesPerPixel);
-		exit(1);
-	}
-}
-
-static void resizeRectangleToReal(rfbClient *cl, int x, int y, int w, int h)
-{
-	int i0 = x * realWidth / cl->width;
-	int i1 = ((x + w) * realWidth - 1) / cl->width + 1;
-	int j0 = y * realHeight / cl->height;
-	int j1 = ((y + h) * realHeight - 1) / cl->height + 1;
-	int i, j;
-
-	for (j = j0; j < j1; j++)
-		for (i = i0; i < i1; i++) {
-			int x0 = i * cl->width / realWidth;
-			int x1 = ((i + 1) * cl->width - 1) / realWidth + 1;
-			int y0 = j * cl->height / realHeight;
-			int y1 = ((j + 1) * cl->height - 1) / realHeight + 1;
-			uint32_t r = 0, g = 0, b = 0;
-
-			for (y = y0; y < y1; y++)
-				for (x = x0; x < x1; x++) {
-					uint32_t v = get(cl, x, y);
-#define REDSHIFT cl->format.redShift
-#define REDMAX cl->format.redMax
-#define GREENSHIFT cl->format.greenShift
-#define GREENMAX cl->format.greenMax
-#define BLUESHIFT cl->format.blueShift
-#define BLUEMAX cl->format.blueMax
-					r += (v >> REDSHIFT) & REDMAX;
-					g += (v >> GREENSHIFT) & GREENMAX;
-					b += (v >> BLUESHIFT) & BLUEMAX;
-				}
-			r /= (x1 - x0) * (y1 - y0);
-			g /= (x1 - x0) * (y1 - y0);
-			b /= (x1 - x0) * (y1 - y0);
-
-			put(i, j, (r << REDSHIFT) | (g << GREENSHIFT) |
-				(b << BLUESHIFT));
-		}
+	return codep;
 }
 
 static void update(rfbClient* cl,int x,int y,int w,int h) {
-	if (sdlPixels) {
-		resizeRectangleToReal(cl, x, y, w, h);
-		w = ((x + w) * realWidth - 1) / cl->width + 1;
-		h = ((y + h) * realHeight - 1) / cl->height + 1;
-		x = x * realWidth / cl->width;
-		y = y * realHeight / cl->height;
-		w -= x;
-		h -= y;
-	}
-	SDL_UpdateRect(rfbClientGetClientData(cl, SDL_Init), x, y, w, h);
-}
-
-static void setRealDimension(rfbClient *client, int w, int h)
-{
-	SDL_Surface* sdl;
-
-	if (w < 0) {
-		const SDL_VideoInfo *info = SDL_GetVideoInfo();
-		w = info->current_h;
-		h = info->current_w;
-	}
-
-	if (w == realWidth && h == realHeight)
-		return;
-
-	if (!sdlPixels) {
-		int size;
-
-		sdlPixels = (char *)client->frameBuffer;
-		rowStride = client->width;
-
-		bytesPerPixel = client->format.bitsPerPixel / 8;
-		size = client->width * bytesPerPixel * client->height;
-		client->frameBuffer = malloc(size);
-		if (!client->frameBuffer) {
-			rfbClientErr("Could not allocate %d bytes", size);
-			exit(1);
-		}
-		memcpy(client->frameBuffer, sdlPixels, size);
-	}
-
-	sdl = rfbClientGetClientData(client, SDL_Init);
-	if (sdl->w != w || sdl->h != h) {
-		int depth = sdl->format->BitsPerPixel;
-		sdl = SDL_SetVideoMode(w, h, depth, sdlFlags);
-		rfbClientSetClientData(client, SDL_Init, sdl);
-		sdlPixels = sdl->pixels;
-		rowStride = sdl->pitch / (depth / 8);
-	}
-
-	realWidth = w;
-	realHeight = h;
-	update(client, 0, 0, client->width, client->height);
+	SDL_Surface *sdl = rfbClientGetClientData(cl, SDL_Init);
+	/* update texture from surface->pixels */
+	SDL_Rect r = {x,y,w,h};
+ 	if(SDL_UpdateTexture(sdlTexture, &r, sdl->pixels + y*sdl->pitch + x*4, sdl->pitch) < 0)
+	    rfbClientErr("update: failed to update texture: %s\n", SDL_GetError());
+	/* copy texture to renderer and show */
+	if(SDL_RenderClear(sdlRenderer) < 0)
+	    rfbClientErr("update: failed to clear renderer: %s\n", SDL_GetError());
+	if(SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL) < 0)
+	    rfbClientErr("update: failed to copy texture to renderer: %s\n", SDL_GetError());
+	SDL_RenderPresent(sdlRenderer);
 }
 
 static void kbd_leds(rfbClient* cl, int value, int pad) {
@@ -374,17 +292,69 @@ static void cleanup(rfbClient* cl)
 static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 {
 	switch(e->type) {
-#if SDL_MAJOR_VERSION > 1 || SDL_MINOR_VERSION >= 2
-	case SDL_VIDEOEXPOSE:
+	case SDL_WINDOWEVENT:
+	    switch (e->window.event) {
+	    case SDL_WINDOWEVENT_EXPOSED:
 		SendFramebufferUpdateRequest(cl, 0, 0,
 					cl->width, cl->height, FALSE);
 		break;
-#endif
+	    case SDL_WINDOWEVENT_FOCUS_GAINED:
+                if (SDL_HasClipboardText()) {
+		        char *text = SDL_GetClipboardText();
+			if(text) {
+			    rfbClientLog("sending clipboard text '%s'\n", text);
+			    SendClientCutText(cl, text, strlen(text));
+			}
+		}
+
+		break;
+	    case SDL_WINDOWEVENT_FOCUS_LOST:
+		if (rightAltKeyDown) {
+			SendKeyEvent(cl, XK_Alt_R, FALSE);
+			rightAltKeyDown = FALSE;
+			rfbClientLog("released right Alt key\n");
+		}
+		if (leftAltKeyDown) {
+			SendKeyEvent(cl, XK_Alt_L, FALSE);
+			leftAltKeyDown = FALSE;
+			rfbClientLog("released left Alt key\n");
+		}
+		break;
+	    }
+	    break;
+	case SDL_MOUSEWHEEL:
+	{
+	        int steps;
+	        if (viewOnly)
+			break;
+
+		if(e->wheel.y > 0)
+		    for(steps = 0; steps < e->wheel.y; ++steps) {
+			SendPointerEvent(cl, x, y, rfbButton4Mask);
+			SendPointerEvent(cl, x, y, 0);
+		    }
+		if(e->wheel.y < 0)
+		    for(steps = 0; steps > e->wheel.y; --steps) {
+			SendPointerEvent(cl, x, y, rfbButton5Mask);
+			SendPointerEvent(cl, x, y, 0);
+		    }
+		if(e->wheel.x > 0)
+		    for(steps = 0; steps < e->wheel.x; ++steps) {
+			SendPointerEvent(cl, x, y, 0b01000000);
+			SendPointerEvent(cl, x, y, 0);
+		    }
+		if(e->wheel.x < 0)
+		    for(steps = 0; steps > e->wheel.x; --steps) {
+			SendPointerEvent(cl, x, y, 0b00100000);
+			SendPointerEvent(cl, x, y, 0);
+		    }
+		break;
+	}
 	case SDL_MOUSEBUTTONUP:
 	case SDL_MOUSEBUTTONDOWN:
 	case SDL_MOUSEMOTION:
 	{
-		int x, y, state, i;
+		int state, i;
 		if (viewOnly)
 			break;
 
@@ -407,10 +377,6 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 					break;
 				}
 		}
-		if (sdlPixels) {
-			x = x * cl->width / realWidth;
-			y = y * cl->height / realHeight;
-		}
 		SendPointerEvent(cl, x, y, buttonMask);
 		buttonMask &= ~(rfbButton4Mask | rfbButton5Mask);
 		break;
@@ -426,6 +392,13 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		if (e->key.keysym.sym == SDLK_LALT)
 			leftAltKeyDown = e->type == SDL_KEYDOWN;
 		break;
+	case SDL_TEXTINPUT:
+                if (viewOnly)
+			break;
+		rfbKeySym sym = utf8char2rfbKeySym(e->text.text);
+		SendKeyEvent(cl, sym, TRUE);
+		SendKeyEvent(cl, sym, FALSE);
+                break;
 	case SDL_QUIT:
                 if(listenLoop)
 		  {
@@ -437,32 +410,6 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		    rfbClientCleanup(cl);
 		    exit(0);
 		  }
-	case SDL_ACTIVEEVENT:
-		if (!e->active.gain && rightAltKeyDown) {
-			SendKeyEvent(cl, XK_Alt_R, FALSE);
-			rightAltKeyDown = FALSE;
-			rfbClientLog("released right Alt key\n");
-		}
-		if (!e->active.gain && leftAltKeyDown) {
-			SendKeyEvent(cl, XK_Alt_L, FALSE);
-			leftAltKeyDown = FALSE;
-			rfbClientLog("released left Alt key\n");
-		}
-
-		if (e->active.gain && lost_scrap()) {
-			static char *data = NULL;
-			static int len = 0;
-			get_scrap(T('T', 'E', 'X', 'T'), &len, &data);
-			if (len)
-				SendClientCutText(cl, data, len);
-		}
-		break;
-	case SDL_SYSWMEVENT:
-		clipboard_filter(e);
-		break;
-	case SDL_VIDEORESIZE:
-		setRealDimension(cl, e->resize.w, e->resize.h);
-		break;
 	default:
 		rfbClientLog("ignore SDL event: 0x%x\n", e->type);
 	}
@@ -471,7 +418,33 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 
 static void got_selection(rfbClient *cl, const char *text, int len)
 {
-	put_scrap(T('T', 'E', 'X', 'T'), len, text);
+        rfbClientLog("received clipboard text '%s'\n", text);
+        if(SDL_SetClipboardText(text) != 0)
+	    rfbClientErr("could not set received clipboard text: %s\n", SDL_GetError());
+}
+
+
+static rfbCredential* get_credential(rfbClient* cl, int credentialType){
+        rfbCredential *c = malloc(sizeof(rfbCredential));
+	c->userCredential.username = malloc(RFB_BUF_SIZE);
+	c->userCredential.password = malloc(RFB_BUF_SIZE);
+
+	if(credentialType != rfbCredentialTypeUser) {
+	    rfbClientErr("something else than username and password required for authentication\n");
+	    return NULL;
+	}
+
+	rfbClientLog("username and password required for authentication!\n");
+	printf("user: ");
+	fgets(c->userCredential.username, RFB_BUF_SIZE, stdin);
+	printf("pass: ");
+	fgets(c->userCredential.password, RFB_BUF_SIZE, stdin);
+
+	/* remove trailing newlines */
+	c->userCredential.username[strcspn(c->userCredential.username, "\n")] = 0;
+	c->userCredential.password[strcspn(c->userCredential.password, "\n")] = 0;
+
+	return c;
 }
 
 
@@ -508,9 +481,6 @@ int main(int argc,char** argv) {
 	argc = j;
 
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
-	SDL_EnableUNICODE(1);
-	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY,
-			SDL_DEFAULT_REPEAT_INTERVAL);
 	atexit(SDL_Quit);
 	signal(SIGINT, exit);
 
@@ -523,6 +493,7 @@ int main(int argc,char** argv) {
 	  cl->HandleKeyboardLedState=kbd_leds;
 	  cl->HandleTextChat=text_chat;
 	  cl->GotXCutText = got_selection;
+	  cl->GetCredential = get_credential;
 	  cl->listenPort = LISTEN_PORT_OFFSET;
 	  cl->listen6Port = LISTEN_PORT_OFFSET;
 	  if(!rfbInitClient(cl,&argc,argv))
@@ -531,8 +502,6 @@ int main(int argc,char** argv) {
 	      cleanup(cl);
 	      break;
 	    }
-
-	  init_scrap();
 
 	  while(1) {
 	    if(SDL_PollEvent(&e)) {

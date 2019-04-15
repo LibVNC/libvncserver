@@ -33,6 +33,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <fcntl.h>
 #endif
 
 #include <signal.h>
@@ -261,7 +262,16 @@ rfbLogProc rfbErr=rfbDefaultLog;
 
 void rfbLogPerror(const char *str)
 {
+#ifdef WIN32
+    wchar_t *s = NULL;
+    FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, 
+                   NULL, errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                   (LPWSTR)&s, 0, NULL);
+    rfbErr("%s: %S\n", str, s);
+    LocalFree(s);
+#else
     rfbErr("%s: %s\n", str, strerror(errno));
+#endif
 }
 
 void rfbScheduleCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,int dy)
@@ -600,6 +610,7 @@ clientInput(void *data)
 
 	FD_ZERO(&rfds);
 	FD_SET(cl->sock, &rfds);
+	FD_SET(cl->pipe_notify_client_thread[0], &rfds);
 	FD_ZERO(&efds);
 	FD_SET(cl->sock, &efds);
 
@@ -608,9 +619,13 @@ clientInput(void *data)
 	if ((cl->fileTransfer.fd!=-1) && (cl->fileTransfer.sending==1))
 	    FD_SET(cl->sock, &wfds);
 
+	int nfds = cl->pipe_notify_client_thread[0] > cl->sock ? cl->pipe_notify_client_thread[0] : cl->sock;
+	
 	tv.tv_sec = 60; /* 1 minute */
 	tv.tv_usec = 0;
-	n = select(cl->sock + 1, &rfds, &wfds, &efds, &tv);
+
+	n = select(nfds + 1, &rfds, &wfds, &efds, &tv);
+
 	if (n < 0) {
 	    rfbLogPerror("ReadExact: select");
 	    break;
@@ -624,6 +639,13 @@ clientInput(void *data)
         /* We have some space on the transmit queue, send some data */
         if (FD_ISSET(cl->sock, &wfds))
             rfbSendFileTransferChunk(cl);
+
+	if (FD_ISSET(cl->pipe_notify_client_thread[0], &rfds))
+	{
+	    /* Reset the pipe */
+	    char buf;
+	    while (read(cl->pipe_notify_client_thread[0], &buf, sizeof(buf)) == sizeof(buf));
+	}
 
         if (FD_ISSET(cl->sock, &rfds) || FD_ISSET(cl->sock, &efds))
         {
@@ -688,21 +710,25 @@ listenerRun(void *data)
     return(NULL);
 }
 
-void 
-rfbStartOnHoldClient(rfbClientPtr cl)
-{
-    pthread_create(&cl->client_thread, NULL, clientInput, (void *)cl);
-}
-
-#else
-
-void 
-rfbStartOnHoldClient(rfbClientPtr cl)
-{
-	cl->onHold = FALSE;
-}
-
 #endif
+
+void 
+rfbStartOnHoldClient(rfbClientPtr cl)
+{
+    cl->onHold = FALSE;
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+    if(cl->screen->backgroundLoop) {
+        if (pipe(cl->pipe_notify_client_thread) == -1) {
+            cl->pipe_notify_client_thread[0] = -1;
+            cl->pipe_notify_client_thread[1] = -1;
+        }
+        fcntl(cl->pipe_notify_client_thread[0], F_SETFL, O_NONBLOCK);
+
+        pthread_create(&cl->client_thread, NULL, clientInput, (void *)cl);
+    }
+#endif
+}
+
 
 void 
 rfbRefuseOnHoldClient(rfbClientPtr cl)
@@ -1180,7 +1206,15 @@ void rfbInitServer(rfbScreenInfoPtr screen)
   }
 #ifdef WIN32
   WSADATA trash;
-  WSAStartup(MAKEWORD(2,2),&trash);
+  static rfbBool WSAinitted=FALSE;
+  if(!WSAinitted) {
+    int i=WSAStartup(MAKEWORD(2,0),&trash);
+    if(i!=0) {
+      rfbErr("Couldn't init Windows Sockets\n");
+      return;
+    }
+    WSAinitted=TRUE;
+  }
 #endif
   rfbInitSockets(screen);
   rfbHttpInitSockets(screen);
@@ -1192,15 +1226,32 @@ void rfbInitServer(rfbScreenInfoPtr screen)
 
 void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
   if(disconnectClients) {
-    rfbClientPtr cl;
     rfbClientIteratorPtr iter = rfbGetClientIterator(screen);
-    while( (cl = rfbClientIteratorNext(iter)) ) {
-      if (cl->sock > -1) {
-       /* we don't care about maxfd here, because the server goes away */
-       rfbCloseClient(cl);
-       rfbClientConnectionGone(cl);
+    rfbClientPtr nextCl, currentCl = rfbClientIteratorNext(iter);
+
+    while(currentCl) {
+      nextCl = rfbClientIteratorNext(iter);
+      if (currentCl->sock > -1) {
+        /* we don't care about maxfd here, because the server goes away */
+        rfbCloseClient(currentCl);
       }
+
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+      /*
+	Notify the thread. This simply writes a NULL byte to the notify pipe in order to get past the select()
+	in clientInput(), the loop in there will then break because the rfbCloseClient() above has set
+	currentCl->sock to -1.
+      */
+      write(currentCl->pipe_notify_client_thread[1], "\x00", 1);
+      /* And wait for it to finish. */
+      pthread_join(currentCl->client_thread, NULL);
+#else
+      rfbClientConnectionGone(currentCl);
+#endif
+
+      currentCl = nextCl;
     }
+
     rfbReleaseClientIterator(iter);
   }
 

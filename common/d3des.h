@@ -37,12 +37,6 @@ extern void rfbUseKey(unsigned long *);
  * Loads the internal key register with the data in cookedkey.
  */
 
-extern void rfbCPKey(unsigned long *);
-/*		   cookedkey[32]
- * Copies the contents of the internal key register into the storage
- * located at &cookedkey[0].
- */
-
 extern void rfbDes(unsigned char *, unsigned char *);
 /*		    from[8]	      to[8]
  * Encrypts/Decrypts (according to the key currently loaded in the

@@ -25,7 +25,9 @@
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #endif
+#if LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 #ifdef WIN32
 #define close closesocket
@@ -34,7 +36,9 @@
 #include <sys/wait.h>
 #include <sys/utsname.h>
 #endif
+#if LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
+#endif
 #include <rfb/rfbclient.h>
 
 /*
@@ -85,7 +89,7 @@ listenForIncomingConnections(rfbClient* client)
     int r;
     /* reap any zombies */
     int status, pid;
-    while ((pid= wait3(&status, WNOHANG, (struct rusage *)0))>0);
+    while ((pid= wait4(-1, &status, WNOHANG, (struct rusage *)0))>0);
 
     /* TODO: callback for discard any events (like X11 events) */
 

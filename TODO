@@ -1,8 +1,18 @@
-immediate:
+high-prio:
 ----------
 - Add sources for the java stuff.
 - Implement encryption in libvncserver.
-- Add a libvncclient-config script.
+- Get rid of compat dir
+- Fix encodingstest
+
+
+maybe-later:
+------------
+
+selectbox: scroll bars
+authentification schemes (secure vnc)
+	IO function ptr exists; now explain how to tunnel and implement a
+	client address restriction scheme.
 
 make SDLvncviewer more versatile
 	- test for missing keys (especially "[]{}" with ./examples/mac),
@@ -18,12 +28,3 @@ make corre work again (libvncclient or libvncserver?)
 teach SDLvncviewer about CopyRect...
 implement "-record" in libvncclient
 implement QoS for Windows in libvncclient
-
-later:
-------
-
-selectbox: scroll bars
-authentification schemes (secure vnc)
-	IO function ptr exists; now explain how to tunnel and implement a
-	client address restriction scheme.
-VisualNaCro testing

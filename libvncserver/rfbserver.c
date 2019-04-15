@@ -39,6 +39,7 @@
 #include "ghpringbuf.h"
 #include "partialupdateregion.h"
 #include "private.h"
+#include "rfb/rfbconfig.h"
 
 
 #ifdef LIBVNCSERVER_HAVE_FCNTL_H
@@ -77,7 +78,9 @@
 /* stst() */
 #include <sys/types.h>
 #include <sys/stat.h>
+#if LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 
 #ifndef WIN32
 /* readdir() */
@@ -88,6 +91,8 @@
 #include <errno.h>
 /* strftime() */
 #include <time.h>
+/* INT_MAX */
+#include <limits.h>
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 #include "rfbssl.h"
@@ -475,9 +480,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
       /*
-       * Wait a few ms for the client to send one of:
-       * - Flash policy request
-       * - WebSockets connection (TLS/SSL or plain)
+       * Wait a few ms for the client to send WebSockets connection (TLS/SSL or plain)
        */
       if (!webSocketsCheck(cl)) {
         /* Error reporting handled in webSocketsHandshake */
@@ -652,6 +655,11 @@ rfbClientConnectionGone(rfbClientPtr cl)
     LOCK(cl->sendMutex);
     UNLOCK(cl->sendMutex);
     TINI_MUTEX(cl->sendMutex);
+
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+    close(cl->pipe_notify_client_thread[0]);
+    close(cl->pipe_notify_client_thread[1]);
+#endif
 
     rfbPrintStats(cl);
     rfbResetStats(cl);
@@ -1569,11 +1577,24 @@ char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length)
     int   n=0;
 
     FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN("", cl, NULL);
+
     /*
-    rfbLog("rfbProcessFileTransferReadBuffer(%dlen)\n", length);
+       We later alloc length+1, which might wrap around on 32-bit systems if length equals
+       0XFFFFFFFF, i.e. SIZE_MAX for 32-bit systems. On 64-bit systems, a length of 0XFFFFFFFF
+       will safely be allocated since this check will never trigger and malloc() can digest length+1
+       without problems as length is a uint32_t.
+       We also later pass length to rfbReadExact() that expects a signed int type and
+       that might wrap on platforms with a 32-bit int type if length is bigger
+       than 0X7FFFFFFF.
     */
+    if(length == SIZE_MAX || length > INT_MAX) {
+	rfbErr("rfbProcessFileTransferReadBuffer: too big file transfer length requested: %u", (unsigned int)length);
+	rfbCloseClient(cl);
+	return NULL;
+    }
+
     if (length>0) {
-        buffer=malloc(length+1);
+        buffer=malloc((size_t)length+1);
         if (buffer!=NULL) {
             if ((n = rfbReadExact(cl, (char *)buffer, length)) <= 0) {
                 if (n != 0)
@@ -2105,11 +2126,6 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     uint32_t lastPreferredMulticastEncoding = -1;
     char encBuf[64];
     char encBuf2[64];
-
-#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-    if (cl->wsctx && webSocketCheckDisconnect(cl))
-      return;
-#endif
 
     if ((n = rfbReadExact(cl, (char *)&msg, 1)) <= 0) {
         if (n != 0)
@@ -2917,7 +2933,22 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	msg.cct.length = Swap32IfLE(msg.cct.length);
 
-	str = (char *)malloc(msg.cct.length);
+	/* uint32_t input is passed to malloc()'s size_t argument,
+	 * to rfbReadExact()'s int argument, to rfbStatRecordMessageRcvd()'s int
+	 * argument increased of sz_rfbClientCutTextMsg, and to setXCutText()'s int
+	 * argument. Here we impose a limit of 1 MB so that the value fits
+	 * into all of the types to prevent from misinterpretation and thus
+	 * from accessing uninitialized memory (CVE-2018-7225) and also to
+	 * prevent from a denial-of-service by allocating too much memory in
+	 * the server. */
+	if (msg.cct.length > 1<<20) {
+	    rfbLog("rfbClientCutText: too big cut text length requested: %u B > 1 MB\n", (unsigned int)msg.cct.length);
+	    rfbCloseClient(cl);
+	    return;
+	}
+
+	/* Allow zero-length client cut text. */
+	str = (char *)calloc(msg.cct.length ? msg.cct.length : 1, 1);
 	if (str == NULL) {
 		rfbLogPerror("rfbProcessClientNormalMessage: not enough memory");
 		rfbCloseClient(cl);

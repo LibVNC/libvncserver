@@ -43,7 +43,7 @@ int ReadFromTLS(rfbClient* client, char *out, unsigned int n)
 }
 
 
-int WriteToTLS(rfbClient* client, char *buf, unsigned int n)
+int WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 {
   rfbClientLog("TLS is not supported.\n");
   errno = EINTR;
@@ -55,4 +55,13 @@ void FreeTLS(rfbClient* client)
 {
 
 }
+
+#ifdef LIBVNCSERVER_HAVE_SASL
+int
+GetTLSCipherBits(rfbClient* client)
+{
+  rfbClientLog("TLS is not supported.\n");
+  return 0;
+}
+#endif /* LIBVNCSERVER_HAVE_SASL */
 

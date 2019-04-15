@@ -71,7 +71,9 @@ static rfbClientProtocolExtension backChannel = {
 	backChannelEncodings,		/* encodings */
 	NULL,				/* handleEncoding */
 	handleBackChannelMessage,	/* handleMessage */
-	NULL				/* next extension */
+	NULL,				/* next extension */
+	NULL,				/* securityTypes */
+	NULL				/* handleAuthentication */
 };
 
 int

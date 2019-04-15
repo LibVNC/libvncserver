@@ -64,14 +64,11 @@
 
 #if defined(WIN32) && !defined(__MINGW32__)
 #define LIBVNCSERVER_WORDS_BIGENDIAN
-#define rfbBool int
+typedef int8_t rfbBool;
 #include <sys/timeb.h>
 #include <winsock2.h>
-#undef SOCKET
-#define SOCKET int
-#else
-#include <rfb/rfbconfig.h>
 #endif
+#include <rfb/rfbconfig.h>
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
@@ -290,6 +287,7 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 #define rfbUltra 17
 #define rfbTLS 18
 #define rfbVeNCrypt 19
+#define rfbSASL 20
 #define rfbARD 30
 #define rfbMSLogon 0xfffffffa
 
@@ -445,6 +443,7 @@ typedef struct {
 #define rfbEncodingTightPng 0xFFFFFEFC /* -260 */
 #define rfbEncodingZlibHex 8
 #define rfbEncodingUltra 9
+#define rfbEncodingTRLE 15
 #define rfbEncodingZRLE 16
 #define rfbEncodingZYWRLE 17
 
