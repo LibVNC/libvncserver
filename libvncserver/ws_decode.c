@@ -131,7 +131,7 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet, int *nPayload)
 {
   int ret;
   char *headerDst = wsctx->codeBufDecode + wsctx->header.nRead;
-  int n = ((uint64_t)WSHLENMAX) - wsctx->header.nRead;
+  int n = ((uint64_t)WS_HYBI_HEADER_LEN_SHORT) - wsctx->header.nRead;
 
 
   ws_dbg("header_read to %p with len=%d\n", headerDst, n);
