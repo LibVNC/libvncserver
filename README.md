@@ -484,5 +484,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.dfdf
 Contact
 =======
 
-To contact me, mail me: Johannes dot Schindelin at gmx dot de
+* To file an issue, go to https://github.com/LibVNC/libvncserver/issues
+* For non-public contact mail dontmind at sdf dot org
 
