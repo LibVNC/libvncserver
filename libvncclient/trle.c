@@ -92,7 +92,6 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
       buffer = client->raw_buffer;
 
       switch (type) {
-      case_0:
       case 0: {
         if (!ReadFromRFBServer(client, buffer, w * h * REALBPP / 8))
           return FALSE;
