@@ -1,5 +1,5 @@
 language: c
-dist: trusty
+dist: xenial
 sudo: required
 
 os:
@@ -9,14 +9,6 @@ os:
 compiler:
   - gcc
   - clang
-
-before_install:
-- |
-  if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then
-    CMAKE_URL="http://www.cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz"
-    mkdir -p ${TRAVIS_BUILD_DIR}/deps/cmake && travis_retry wget --quiet -O - ${CMAKE_URL} | tar --strip-components=1 -xz -C ${TRAVIS_BUILD_DIR}/deps/cmake
-    export PATH=${TRAVIS_BUILD_DIR}/deps/cmake/bin:${PATH}
-  fi
 
 # Build steps
 script:
