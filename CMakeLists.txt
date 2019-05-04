@@ -35,6 +35,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver ${CMAKE_CURRENT_SOURCE_DIR}/common)
 
 # all the build configuration switches
+option(LIBVNCSERVER_INSTALL "Generate installation target" ON)
 option(BUILD_SHARED_LIBS "Build shared libraries" ${UNIX})
 option(WITH_ZLIB "Search for the zlib compression library to support additional encodings" ON)
 option(WITH_LZO "Search for the LZO compression library to omit internal miniLZO implementation" ON)
@@ -669,19 +670,20 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver.pc.cmakein ${CMAKE_CURRE
 get_link_libraries(PRIVATE_LIBS vncclient)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
 
-
-install_targets(/${CMAKE_INSTALL_LIBDIR} vncserver)
-install_targets(/${CMAKE_INSTALL_LIBDIR} vncclient)
-install_files(/include/rfb FILES
+if(LIBVNCSERVER_INSTALL)
+  install_targets(/${CMAKE_INSTALL_LIBDIR} vncserver)
+  install_targets(/${CMAKE_INSTALL_LIBDIR} vncclient)
+  install_files(/include/rfb FILES
     rfb/keysym.h
     rfb/rfb.h
     rfb/rfbclient.h
     rfb/rfbconfig.h
     rfb/rfbproto.h
     rfb/rfbregion.h
-)
+    )
 
-install_files(/${CMAKE_INSTALL_LIBDIR}/pkgconfig FILES
+  install_files(/${CMAKE_INSTALL_LIBDIR}/pkgconfig FILES
     libvncserver.pc
     libvncclient.pc
-)
+    )
+endif()
