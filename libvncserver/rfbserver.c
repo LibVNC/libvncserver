@@ -341,6 +341,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 		char host[1024];
 #endif
       int one=1;
+      size_t otherClientsCount = 0;
 
       getpeername(sock, (struct sockaddr *)&addr, &addrlen);
 #ifdef LIBVNCSERVER_IPv6
@@ -354,12 +355,11 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->host = strdup(inet_ntoa(addr.sin_addr));
 #endif
 
-      rfbLog("  other clients:\n");
       iterator = rfbGetClientIterator(rfbScreen);
-      while ((cl_ = rfbClientIteratorNext(iterator)) != NULL) {
-        rfbLog("     %s\n",cl_->host);
-      }
+      while ((cl_ = rfbClientIteratorNext(iterator)) != NULL)
+	  ++otherClientsCount;
       rfbReleaseClientIterator(iterator);
+      rfbLog("  %lu other clients\n", (unsigned long) otherClientsCount);
 
       if(!rfbSetNonBlocking(sock)) {
 	close(sock);
