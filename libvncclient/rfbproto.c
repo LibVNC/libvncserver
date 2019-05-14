@@ -719,9 +719,9 @@ HandleMSLogonAuth(rfbClient *client)
   }
 
   memset(username, 0, sizeof(username));
-  strncpy((char *)username, cred->userCredential.username, sizeof(username));
+  strncpy((char *)username, cred->userCredential.username, sizeof(username)-1);
   memset(password, 0, sizeof(password));
-  strncpy((char *)password, cred->userCredential.password, sizeof(password));
+  strncpy((char *)password, cred->userCredential.password, sizeof(password)-1);
   FreeUserCredential(cred);
 
   srand(time(NULL));
