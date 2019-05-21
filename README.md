@@ -76,7 +76,7 @@ https://www.virtualbox.org/
 Veyon
 https://veyon.io
 
-Mail me, if your application is missing!
+Mail us if your application is missing!
 
 How to build
 ============
