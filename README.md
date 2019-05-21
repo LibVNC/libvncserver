@@ -419,18 +419,12 @@ fontsel is a test for rfbSelectBox and rfbLoadConsoleFont. If you have Linux
 console fonts, you can browse them via VNC. Directory browsing not implemented
 yet :-(
 
-Why I don't feel bad about GPL
-==============================
+Commercial Use
+==============
 
-At the beginning of this projects I would have liked to make it a BSD
-license. However, it is based on plenty of GPL'ed code, so it has to be
-a GPL. I hear BeeGee complaining: "but that's invasive, every derivative
-work, even just linking, makes my software GPL!"
-
-Yeah. That's right. It is because there are nasty jarheads out there who
-would take anybody's work and claim it their own, selling it for much too
-much money, stealing freedom and innovation from others, saying they were
-the maintainers of innovation, lying, making money with that.
+At the beginning of this project Dscho, the original author, would have
+liked to make it a BSD license. However, it is based on plenty of GPL'ed
+code, so it has to be a GPL.
 
 The people at AT&T worked really well to produce something as clean and lean
 as VNC. The managers decided that for their fame, they would release the
@@ -449,20 +443,12 @@ What reason do you have now to use this library commercially?
 
 Several: You don't have to give away your product. Then you have effectively
 circumvented the GPL, because you have the benefits of other's work and you
-don't give back anything and you will be in hell for that. In fact, this
-library, as my other projects, is a payback for all the free software I can
-use (and sometimes, make better). For example, just now, I am using XEmacs
-on top of XFree86, all running under Linux.
+don't give back anything. Not good.
 
 Better: Use a concept like MySQL. This is free software, however, they make
 money with it. If you want something implemented, you have the choice:
 Ask them to do it (and pay a fair price), or do it yourself, normally giving
 back your enhancements to the free world of computing.
-
-Learn from it: If you like the style this is written, learn how to imitate
-it. If you don't like the style, learn how to avoid those things you don't
-like. I learnt so much, just from looking at code like Linux, XEmacs,
-LilyPond, STL, etc.
 
 License
 -------
