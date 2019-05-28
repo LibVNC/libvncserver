@@ -250,11 +250,10 @@ endif()
 # common crypto used by both libvncserver and libvncclient
 if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
   message(STATUS "Building crypto with Libgcrypt")
-  set(CRYPTO_LIBRARIES ${LIBGCRYPT_LIBRARIES})
   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt.c)
+  list(APPEND ADDITIONAL_LIBS "${LIBGCRYPT_LIBRARIES}")
 elseif(OPENSSL_FOUND)
   message(STATUS "Building crypto with OpenSSL")
-  set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl.c)
 else()
   message(STATUS "Building crypto with builtin functions, only including SHA1 and D3DES")
@@ -519,7 +518,6 @@ target_link_libraries(vncserver
                       ${LZO_LIBRARIES}
                       ${JPEG_LIBRARIES}
 		      ${PNG_LIBRARIES}
-		      ${CRYPTO_LIBRARIES}
                       ${GNUTLS_LIBRARIES}
                       ${OPENSSL_LIBRARIES}
 )
