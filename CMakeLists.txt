@@ -690,30 +690,26 @@ endif()
 #
 # this gets the libraries needed by TARGET in "-libx -liby ..." form
 #
-function(get_link_libraries OUT TARGET)
+function(get_link_libraries OUT EXTRA_LIBS)
     set(RESULT "")
-    get_target_property(LIBRARIES ${TARGET} INTERFACE_LINK_LIBRARIES)
-    foreach(LIB ${LIBRARIES})
-	if(NOT LIB)
-	    continue()
+    foreach(LIB ${ADDITIONAL_LIBS} ${EXTRA_LIBS})
+	if(LIB MATCHES "^-")
+		list(APPEND RESULT " ${LIB}")
+	else()
+		get_filename_component(FNAME "${LIB}" NAME)
+		string(REGEX REPLACE "^${CMAKE_SHARED_LIBRARY_PREFIX}(.+)${CMAKE_SHARED_LIBRARY_SUFFIX}$" "\\1" LIB "${FNAME}")
+		list(APPEND RESULT " -l${LIB}")
 	endif()
-	string(REGEX REPLACE "^.*/lib" "" LIB ${LIB}) # remove leading path and "lib" name prefix
-	string(REGEX REPLACE "-l" "" LIB ${LIB}) # remove leading -l
-	string(REGEX REPLACE "\\.so$" "" LIB ${LIB}) # remove trailing .so
-	list(APPEND RESULT "-l${LIB}")
     endforeach()
     list(REMOVE_DUPLICATES RESULT)
     string(CONCAT RESULT ${RESULT}) # back to string
-    if(RESULT)
-	string(REPLACE "-l" " -l" RESULT ${RESULT}) # re-add separators
-    endif()
     set(${OUT} ${RESULT} PARENT_SCOPE)
 endfunction()
 
 if(NOT WIN32)
-  get_link_libraries(PRIVATE_LIBS vncserver)
+  get_link_libraries(PRIVATE_LIBS "${PNG_LIBRARIES}")
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
-  get_link_libraries(PRIVATE_LIBS vncclient)
+  get_link_libraries(PRIVATE_LIBS "")
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
 endif()
 
