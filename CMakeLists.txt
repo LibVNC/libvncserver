@@ -723,10 +723,12 @@ function(get_link_libraries OUT TARGET)
     set(${OUT} ${RESULT} PARENT_SCOPE)
 endfunction()
 
-get_link_libraries(PRIVATE_LIBS vncserver)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
-get_link_libraries(PRIVATE_LIBS vncclient)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
+if(NOT WIN32)
+  get_link_libraries(PRIVATE_LIBS vncserver)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
+  get_link_libraries(PRIVATE_LIBS vncclient)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
+endif()
 
 if(LIBVNCSERVER_INSTALL)
     set(INSTALL_HEADER_FILES
@@ -784,10 +786,11 @@ if(LIBVNCSERVER_INSTALL)
         "${CMAKE_BINARY_DIR}/LibVNCServerConfig.cmake"
         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibVNCServer")
     
-  
-    install(FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc
-        ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
-        )
+    if(NOT WIN32)
+        install(FILES
+            ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc
+            ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+            )
+    endif()
 endif()
