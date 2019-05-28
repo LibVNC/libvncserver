@@ -65,7 +65,11 @@ if(WITH_JPEG)
     # Check whether the version of libjpeg we found was libjpeg-turbo and print a
     # warning if not.
     set(CMAKE_REQUIRED_LIBRARIES ${JPEG_LIBRARIES})
-    set(CMAKE_REQUIRED_FLAGS -I${JPEG_INCLUDE_DIR})
+    if(JPEG_INCLUDE_DIRS) # this was not present in 3.4
+      set(CMAKE_REQUIRED_INCLUDES ${JPEG_INCLUDE_DIRS})
+    else()
+      set(CMAKE_REQUIRED_INCLUDES ${JPEG_INCLUDE_DIR})
+    endif()
 
     set(JPEG_TEST_SOURCE "\n
     #include <stdio.h>\n
@@ -89,7 +93,7 @@ if(WITH_JPEG)
     endif()
 
     set(CMAKE_REQUIRED_LIBRARIES)
-    set(CMAKE_REQUIRED_FLAGS)
+    set(CMAKE_REQUIRED_INCLUDES)
     set(CMAKE_REQUIRED_DEFINITIONS)
 
     if(NOT FOUND_LIBJPEG_TURBO)
