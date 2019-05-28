@@ -327,7 +327,6 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
   int bufsize;
   int nextRead;
   unsigned char *data;
-  uint32_t *data32;
 
   /* if data was carried over, copy to start of buffer */
   memcpy(wsctx->writePos, wsctx->carryBuf, wsctx->carrylen);
@@ -383,10 +382,12 @@ hybiReadAndDecode(ws_ctx_t *wsctx, char *dst, int len, int *sockRet, int nInBuf)
   /* for a possible base64 decoding, we decode multiples of 4 bytes until
    * the whole frame is received and carry over any remaining bytes in the carry buf*/
   data = (unsigned char *)(wsctx->writePos - toDecode);
-  data32= (uint32_t *)data;
 
   for (i = 0; i < (toDecode >> 2); i++) {
-    data32[i] ^= wsctx->header.mask.u;
+    uint32_t tmp;
+    memcpy(&tmp, data + i * sizeof(tmp), sizeof(tmp));
+    tmp ^= wsctx->header.mask.u;
+    memcpy(data + i * sizeof(tmp), &tmp, sizeof(tmp));
   }
   ws_dbg("mask decoding; i=%d toDecode=%d\n", i, toDecode);
 
