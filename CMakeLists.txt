@@ -551,7 +551,6 @@ if(FFMPEG_FOUND)
 endif(FFMPEG_FOUND)
 
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
 foreach(e ${LIBVNCSERVER_EXAMPLES})
   add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
   set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
@@ -559,7 +558,6 @@ foreach(e ${LIBVNCSERVER_EXAMPLES})
   target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT})
 endforeach(e ${LIBVNCSERVER_EXAMPLES})
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
 foreach(e ${LIBVNCCLIENT_EXAMPLES})
   add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
   set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
@@ -588,7 +586,6 @@ if(CMAKE_USE_PTHREADS_INIT)
      )
 endif(CMAKE_USE_PTHREADS_INIT)
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
 foreach(t ${SIMPLETESTS})
   add_executable(test_${t} ${TESTS_DIR}/${t}.c)
   set_target_properties(test_${t} PROPERTIES OUTPUT_NAME ${t})
