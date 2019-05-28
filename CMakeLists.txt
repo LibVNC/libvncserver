@@ -709,7 +709,7 @@ function(get_link_libraries OUT TARGET)
     set(RESULT "")
     get_target_property(LIBRARIES ${TARGET} INTERFACE_LINK_LIBRARIES)
     foreach(LIB ${LIBRARIES})
-	if("${LIB}" MATCHES ".*NOTFOUND.*")
+	if(NOT LIB)
 	    continue()
 	endif()
 	string(REGEX REPLACE "^.*/lib" "" LIB ${LIB}) # remove leading path and "lib" name prefix
