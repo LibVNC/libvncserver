@@ -220,26 +220,23 @@ if(WITH_THREADS AND Threads_FOUND)
 endif()
 if(ZLIB_FOUND)
   set(LIBVNCSERVER_HAVE_LIBZ 1)
-else()
-  unset(ZLIB_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
+  list(APPEND ADDITIONAL_LIBS ${ZLIB_LIBRARIES})
 endif()
 if(LZO_FOUND)
   set(LIBVNCSERVER_HAVE_LZO 1)
-else()
-  unset(LZO_LIBRARIES CACHE) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
+  list(APPEND ADDITIONAL_LIBS ${LZO_LIBRARIES})
 endif()
 if(JPEG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBJPEG 1)
-else()
-  unset(JPEG_LIBRARIES) # would otherwise confuse target_link_libraries()
+  list(APPEND ADDITIONAL_LIBS ${JPEG_LIBRARIES})
 endif()
 if(PNG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBPNG 1)
 else()
   unset(PNG_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
 endif()
-if(NOT OPENSSL_FOUND)
-    unset(OPENSSL_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
+if(OPENSSL_FOUND)
+  list(APPEND ADDITIONAL_LIBS ${OPENSSL_LIBRARIES})
 endif()
 if(SYSTEMD_FOUND)
   add_definitions(-DLIBVNCSERVER_WITH_SYSTEMD)
@@ -270,6 +267,7 @@ endif()
 
 if(GNUTLS_FOUND)
   set(LIBVNCSERVER_HAVE_GNUTLS 1)
+  list(APPEND ADDITIONAL_LIBS ${GNUTLS_LIBRARIES})
 endif()
 
 if(OPENSSL_FOUND)
@@ -505,21 +503,10 @@ endif()
 
 target_link_libraries(vncclient
                       ${ADDITIONAL_LIBS}
-                      ${ZLIB_LIBRARIES}
-                      ${LZO_LIBRARIES}
-                      ${JPEG_LIBRARIES}
-		      ${CRYPTO_LIBRARIES}
-                      ${GNUTLS_LIBRARIES}
-                      ${OPENSSL_LIBRARIES}
 )
 target_link_libraries(vncserver
                       ${ADDITIONAL_LIBS}
-                      ${ZLIB_LIBRARIES}
-                      ${LZO_LIBRARIES}
-                      ${JPEG_LIBRARIES}
 		      ${PNG_LIBRARIES}
-                      ${GNUTLS_LIBRARIES}
-                      ${OPENSSL_LIBRARIES}
 )
 
 SET_TARGET_PROPERTIES(vncclient vncserver
