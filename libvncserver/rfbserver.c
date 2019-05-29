@@ -445,6 +445,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->cursorX = rfbScreen->cursorX;
       cl->cursorY = rfbScreen->cursorY;
       cl->useNewFBSize = FALSE;
+      cl->useExtDesktopSize = FALSE;
+      cl->requestedDesktopSizeChange = 0;
+      cl->lastDesktopSizeChangeError = 0;
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
       cl->compStreamInited = FALSE;
@@ -973,6 +976,7 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     rfbSetBit(msgs.server2client, rfbServerCutText);
     rfbSetBit(msgs.server2client, rfbResizeFrameBuffer);
     rfbSetBit(msgs.server2client, rfbPalmVNCReSizeFrameBuffer);
+    rfbSetBit(msgs.client2server, rfbSetDesktopSize);
 
     if (cl->screen->xvpHook) {
         rfbSetBit(msgs.client2server, rfbXvp);
@@ -1025,6 +1029,7 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 	rfbEncodingPointerPos,
 	rfbEncodingLastRect,
 	rfbEncodingNewFBSize,
+	rfbEncodingExtDesktopSize,
 	rfbEncodingKeyboardLedState,
 	rfbEncodingSupportedMessages,
 	rfbEncodingSupportedEncodings,
@@ -2021,6 +2026,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     uint32_t lastPreferredEncoding = -1;
     char encBuf[64];
     char encBuf2[64];
+    rfbExtDesktopScreen *extDesktopScreens;
+    rfbClientIteratorPtr iterator;
+    rfbClientPtr clp;
 
     if ((n = rfbReadExact(cl, (char *)&msg, 1)) <= 0) {
         if (n != 0)
@@ -2109,6 +2117,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->preferredEncoding=-1;
         cl->useCopyRect              = FALSE;
         cl->useNewFBSize             = FALSE;
+        cl->useExtDesktopSize        = FALSE;
         cl->cursorWasChanged         = FALSE;
         cl->useRichCursorEncoding    = FALSE;
         cl->enableCursorPosUpdates   = FALSE;
@@ -2210,6 +2219,14 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		    cl->useNewFBSize = TRUE;
 		}
 		break;
+            case rfbEncodingExtDesktopSize:
+                if (!cl->useExtDesktopSize) {
+                    rfbLog("Enabling ExtDesktopSize protocol extension for client "
+                           "%s\n", cl->host);
+                    cl->useExtDesktopSize = TRUE;
+                    cl->useNewFBSize = TRUE;
+                }
+                break;
             case rfbEncodingKeyboardLedState:
                 if (!cl->enableKeyboardLedState) {
                   rfbLog("Enabling KeyboardLedState protocol extension for client "
@@ -2414,6 +2431,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
        if (!msg.fur.incremental) {
 	    sraRgnOr(cl->modifiedRegion,tmpRegion);
 	    sraRgnSubtract(cl->copyRegion,tmpRegion);
+            if (cl->useExtDesktopSize)
+                cl->newFBSizePending = TRUE;
        }
        TSIGNAL(cl->updateCond);
        UNLOCK(cl->updateMutex);
@@ -2705,6 +2724,74 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
       }
       return;
 
+    case rfbSetDesktopSize:
+
+        if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
+            sz_rfbSetDesktopSizeMsg - 1)) <= 0) {
+            if (n != 0)
+              rfbLogPerror("rfbProcessClientNormalMessage: read");
+            rfbCloseClient(cl);
+            return;
+        }
+
+        if (msg.sdm.numberOfScreens == 0) {
+            rfbLog("Ignoring setDesktopSize message from client that defines zero screens\n");
+            return;
+        }
+
+        extDesktopScreens = (rfbExtDesktopScreen *) malloc(msg.sdm.numberOfScreens * sz_rfbExtDesktopScreen);
+        if (extDesktopScreens == NULL) {
+                rfbLogPerror("rfbProcessClientNormalMessage: not enough memory");
+                rfbCloseClient(cl);
+                return;
+        }
+
+        if ((n = rfbReadExact(cl, ((char *)extDesktopScreens), msg.sdm.numberOfScreens * sz_rfbExtDesktopScreen)) <= 0) {
+            if (n != 0)
+                rfbLogPerror("rfbProcessClientNormalMessage: read");
+            free(extDesktopScreens);
+            rfbCloseClient(cl);
+            return;
+        }
+        rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbSetDesktopSizeMsg + msg.sdm.numberOfScreens * sz_rfbExtDesktopScreen,
+                                 sz_rfbSetDesktopSizeMsg + msg.sdm.numberOfScreens * sz_rfbExtDesktopScreen);
+
+        for (i=0; i < msg.sdm.numberOfScreens; i++) {
+            extDesktopScreens[i].id = Swap32IfLE(extDesktopScreens[i].id);
+            extDesktopScreens[i].x = Swap16IfLE(extDesktopScreens[i].x);
+            extDesktopScreens[i].y = Swap16IfLE(extDesktopScreens[i].y);
+            extDesktopScreens[i].width = Swap16IfLE(extDesktopScreens[i].width);
+            extDesktopScreens[i].height = Swap16IfLE(extDesktopScreens[i].height);
+            extDesktopScreens[i].flags = Swap32IfLE(extDesktopScreens[i].flags);
+        }
+        msg.sdm.width = Swap16IfLE(msg.sdm.width);
+        msg.sdm.height = Swap16IfLE(msg.sdm.height);
+
+        rfbLog("Client requested resolution change to (%dx%d)\n", msg.sdm.width, msg.sdm.height);
+        cl->requestedDesktopSizeChange = rfbExtDesktopSize_ClientRequestedChange;
+        cl->lastDesktopSizeChangeError = cl->screen->setDesktopSizeHook(msg.sdm.width, msg.sdm.height, msg.sdm.numberOfScreens,
+                                           extDesktopScreens, cl);
+
+        if (cl->lastDesktopSizeChangeError == 0) {
+            /* Let other clients know it was this client that requested the change */
+            iterator = rfbGetClientIterator(cl->screen);
+            while ((clp = rfbClientIteratorNext(iterator)) != NULL) {
+                LOCK(clp->updateMutex);
+                if (clp != cl)
+                    clp->requestedDesktopSizeChange = rfbExtDesktopSize_OtherClientRequestedChange;
+                UNLOCK(clp->updateMutex);
+            }
+        }
+        else
+        {
+            /* Force ExtendedDesktopSize message to be sent with result code in case of error.
+               (In case of success, it is delayed until the new framebuffer is created) */
+            cl->newFBSizePending = TRUE;
+        }
+
+        free(extDesktopScreens);
+        return;
+
     default:
 	{
 	    rfbExtensionData *e,*next;
@@ -2771,7 +2858,15 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
       fu->type = rfbFramebufferUpdate;
       fu->nRects = Swap16IfLE(1);
       cl->ublen = sz_rfbFramebufferUpdateMsg;
-      if (!rfbSendNewFBSize(cl, cl->scaledScreen->width, cl->scaledScreen->height)) {
+
+      if (cl->useExtDesktopSize) {
+        if (!rfbSendExtDesktopSize(cl, cl->scaledScreen->width, cl->scaledScreen->height)) {
+          if(cl->screen->displayFinishedHook)
+            cl->screen->displayFinishedHook(cl, FALSE);
+          return FALSE;
+        }
+      }
+      else if (!rfbSendNewFBSize(cl, cl->scaledScreen->width, cl->scaledScreen->height)) {
 	if(cl->screen->displayFinishedHook)
 	  cl->screen->displayFinishedHook(cl, FALSE);
         return FALSE;
@@ -3412,6 +3507,101 @@ rfbSendNewFBSize(rfbClientPtr cl,
     return TRUE;
 }
 
+/*
+ * Send ExtDesktopSize pseudo-rectangle. This message is used:
+ * - to tell the client to change its framebuffer size
+ * - at the start of the session to inform the client we support size changes through setDesktopSize
+ * - in response to setDesktopSize commands to indicate success or failure
+ */
+
+rfbBool
+rfbSendExtDesktopSize(rfbClientPtr cl,
+                 int w,
+                 int h)
+{
+    rfbFramebufferUpdateRectHeader rect;
+    rfbExtDesktopSizeMsg edsHdr;
+    rfbExtDesktopScreen eds;
+    int i;
+    char *logmsg;
+    int numScreens = cl->screen->numberOfExtDesktopScreensHook(cl);
+
+    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader
+            + sz_rfbExtDesktopSizeMsg
+            + sz_rfbExtDesktopScreen * numScreens > UPDATE_BUF_SIZE) {
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
+    }
+
+    rect.encoding = Swap32IfLE(rfbEncodingExtDesktopSize);
+    rect.r.w = Swap16IfLE(w);
+    rect.r.h = Swap16IfLE(h);
+    rect.r.x = Swap16IfLE(cl->requestedDesktopSizeChange);
+    rect.r.y = Swap16IfLE(cl->lastDesktopSizeChangeError);
+
+    logmsg = "";
+
+    if (cl->requestedDesktopSizeChange == rfbExtDesktopSize_ClientRequestedChange)
+    {
+        /* our client requested the resize through setDesktopSize */
+
+        switch (cl->lastDesktopSizeChangeError)
+        {
+        case rfbExtDesktopSize_Success:
+            logmsg = "resize successful";
+            break;
+        case rfbExtDesktopSize_ResizeProhibited:
+            logmsg = "resize prohibited";
+            break;
+        case rfbExtDesktopSize_OutOfResources:
+            logmsg = "resize failed: out of resources";
+            break;
+        case rfbExtDesktopSize_InvalidScreenLayout:
+            logmsg = "resize failed: invalid screen layout";
+            break;
+        default:
+            break;
+        }
+    }
+
+    cl->requestedDesktopSizeChange = 0;
+    cl->lastDesktopSizeChangeError = 0;
+
+    rfbLog("Sending rfbEncodingExtDesktopSize for size (%dx%d) %s\n", w, h, logmsg);
+
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+           sz_rfbFramebufferUpdateRectHeader);
+    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    edsHdr.numberOfScreens = numScreens;
+    edsHdr.pad[0] = edsHdr.pad[1] = edsHdr.pad[2] = 0;
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&edsHdr,
+           sz_rfbExtDesktopSizeMsg);
+    cl->ublen += sz_rfbExtDesktopSizeMsg;
+
+    for (i=0; i<numScreens; i++) {
+        if (!cl->screen->getExtDesktopScreenHook(i, &eds, cl))
+        {
+            rfbErr("Error getting ExtendedDesktopSize information for screen #%d\n", i);
+            return FALSE;
+        }
+        eds.id = Swap32IfLE(eds.id);
+        eds.x = Swap16IfLE(eds.x);
+        eds.y = Swap16IfLE(eds.y);
+        eds.width = Swap16IfLE(eds.width);
+        eds.height = Swap16IfLE(eds.height);
+        eds.flags = Swap32IfLE(eds.flags);
+        memcpy(&cl->updateBuf[cl->ublen], (char *)&eds,
+               sz_rfbExtDesktopScreen);
+        cl->ublen += sz_rfbExtDesktopScreen;
+    }
+
+    rfbStatRecordEncodingSent(cl, rfbEncodingExtDesktopSize,
+                              sz_rfbFramebufferUpdateRectHeader + sz_rfbExtDesktopSizeMsg + sz_rfbExtDesktopScreen * numScreens,
+                              sz_rfbFramebufferUpdateRectHeader + sz_rfbExtDesktopSizeMsg + sz_rfbExtDesktopScreen * numScreens);
+
+    return TRUE;
+}
 
 /*
  * Send the contents of cl->updateBuf.  Returns 1 if successful, -1 if

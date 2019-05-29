@@ -794,6 +794,32 @@ static enum rfbNewClientAction rfbDefaultNewClientHook(rfbClientPtr cl)
 	return RFB_CLIENT_ACCEPT;
 }
 
+static int rfbDefaultNumberOfExtDesktopScreens(rfbClientPtr cl)
+{
+    return 1;
+}
+
+static rfbBool rfbDefaultGetExtDesktopScreen(int seqnumber, rfbExtDesktopScreen* s, rfbClientPtr cl)
+{
+    if (seqnumber != 0)
+        return FALSE;
+
+    /* Populate the provided rfbExtDesktopScreen structure */
+    s->id = 1;
+    s->width = cl->scaledScreen->width;
+    s->height = cl->scaledScreen->height;
+    s->x = 0;
+    s->y = 0;
+    s->flags = 0;
+
+    return TRUE;
+}
+
+static int rfbDefaultSetDesktopSize(int width, int height, int numScreens, rfbExtDesktopScreen* extDesktopScreens, rfbClientPtr cl)
+{
+    return rfbExtDesktopSize_ResizeProhibited;
+}
+
 /*
  * Update server's pixel format in screenInfo structure. This
  * function is called from rfbGetScreen() and rfbNewFramebuffer().
@@ -956,6 +982,9 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->displayFinishedHook = NULL;
    screen->getKeyboardLedStateHook = NULL;
    screen->xvpHook = NULL;
+   screen->setDesktopSizeHook = rfbDefaultSetDesktopSize;
+   screen->numberOfExtDesktopScreensHook = rfbDefaultNumberOfExtDesktopScreens;
+   screen->getExtDesktopScreenHook = rfbDefaultGetExtDesktopScreen;
 
    /* initialize client list and iterator mutex */
    rfbClientListInit(screen);

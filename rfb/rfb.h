@@ -154,6 +154,9 @@ typedef void (*rfbDisplayFinishedHookPtr)(struct _rfbClientRec* cl, int result);
 /** support the capability to view the caps/num/scroll states of the X server */
 typedef int  (*rfbGetKeyboardLedStateHookPtr)(struct _rfbScreenInfo* screen);
 typedef rfbBool (*rfbXvpHookPtr)(struct _rfbClientRec* cl, uint8_t, uint8_t);
+typedef int (*rfbSetDesktopSizeHookPtr)(int width, int height, int numScreens, struct rfbExtDesktopScreen* extDesktopScreens, struct _rfbClientRec* cl);
+typedef int (*rfbNumberOfExtDesktopScreensPtr)(struct _rfbClientRec* cl);
+typedef rfbBool (*rfbGetExtDesktopScreenPtr)(int seqnumber, struct rfbExtDesktopScreen *extDesktopScreen, struct _rfbClientRec* cl);
 /**
  * If x==1 and y==1 then set the whole display
  * else find the window underneath x and y and set the framebuffer to the dimensions
@@ -388,6 +391,13 @@ typedef struct _rfbScreenInfo
     SOCKET listen6Sock;
     int http6Port;
     SOCKET httpListen6Sock;
+    /** hook to let client set resolution */
+    rfbSetDesktopSizeHookPtr setDesktopSizeHook;
+    /** Optional hooks to query ExtendedDesktopSize screen information.
+     * If not set it is assumed only one screen is present spanning entire fb */
+    rfbNumberOfExtDesktopScreensPtr numberOfExtDesktopScreensHook;
+    rfbGetExtDesktopScreenPtr getExtDesktopScreenHook;
+
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -695,11 +705,16 @@ typedef struct _rfbClientRec {
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     int pipe_notify_client_thread[2];
 #endif
+
     /**
      * clientFramebufferUpdateRequestHook is called when a client requests a frame
      * buffer update.
      */
     ClientFramebufferUpdateRequestHookPtr clientFramebufferUpdateRequestHook;
+
+    rfbBool useExtDesktopSize;
+    int requestedDesktopSizeChange;
+    int lastDesktopSizeChangeError;
 } rfbClientRec, *rfbClientPtr;
 
 /**
@@ -802,6 +817,7 @@ extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
 extern rfbBool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
 extern rfbBool rfbSendLastRectMarker(rfbClientPtr cl);
 extern rfbBool rfbSendNewFBSize(rfbClientPtr cl, int w, int h);
+extern rfbBool rfbSendExtDesktopSize(rfbClientPtr cl, int w, int h);
 extern rfbBool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
 extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
 
