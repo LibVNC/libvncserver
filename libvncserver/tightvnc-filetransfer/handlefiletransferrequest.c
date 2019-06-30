@@ -971,7 +971,13 @@ HandleFileCreateDirRequest(rfbClientPtr cl, rfbTightClientPtr rtcp)
 
 	msg.fcdr.dNameLen = Swap16IfLE(msg.fcdr.dNameLen);
 
-	/* TODO :: chk if the dNameLen is greater than PATH_MAX */	
+	/* chk if the dNameLen is greater than PATH_MAX */
+	if(msg.fcdr.dNameLen >= sizeof(dirName)-1) {
+	    rfbLog("File [%s]: Method [%s]: Error directory name is too long.\n",
+	            __FILE__, __FUNCTION__);
+	    rfbCloseClient(cl);
+	    return;
+	}
 	
 	if((n = rfbReadExact(cl, dirName, msg.fcdr.dNameLen)) <= 0) {
 		
