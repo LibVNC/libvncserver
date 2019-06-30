@@ -463,6 +463,11 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
       cl->lastPtrX = -1;
 
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+      cl->pipe_notify_client_thread[0] = -1;
+      cl->pipe_notify_client_thread[1] = -1;
+#endif
+
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
       /*
        * Wait a few ms for the client to send WebSockets connection (TLS/SSL or plain)
