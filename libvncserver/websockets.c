@@ -215,7 +215,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         if (((llen >= 2)) && (buf[len-1] == '\n')) {
             line = buf+linestart;
             if ((llen == 2) && (strncmp("\r\n", line, 2) == 0)) {
-                if (key1 && key2) {
+                if (key1 && key2 && len+8 < sizeof(buf)) {
                     if ((n = rfbReadExact(cl, buf+len, 8)) <= 0) {
                         if ((n < 0) && (errno == ETIMEDOUT)) {
                             break;
