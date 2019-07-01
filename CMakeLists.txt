@@ -125,7 +125,12 @@ endif(WITH_GNUTLS)
 
 
 if(WITH_OPENSSL)
-  find_package(OpenSSL)
+  find_package(PkgConfig)
+  if(PKGCONFIG_FOUND)
+    pkg_check_modules(OpenSSL "openssl")
+  else(PKGCONFIG_FOUND)
+    find_package(OpenSSL)
+  endif(PKGCONFIG_FOUND)
 endif(WITH_OPENSSL)
 
 
