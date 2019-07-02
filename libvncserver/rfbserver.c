@@ -2385,8 +2385,10 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	        rfbLog("Warning, ignoring rfbFramebufferUpdateRequest: %dXx%dY-%dWx%dH\n",msg.fur.x, msg.fur.y, msg.fur.w, msg.fur.h);
 		return;
         }
- 
-        
+
+        if (cl->clientFramebufferUpdateRequestHook)
+            cl->clientFramebufferUpdateRequestHook(cl, &msg.fur);
+
 	tmpRegion =
 	  sraRgnCreateRect(msg.fur.x,
 			   msg.fur.y,
