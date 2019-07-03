@@ -422,6 +422,7 @@ typedef struct sraRegion* sraRegionPtr;
  */
 
 typedef void (*ClientGoneHookPtr)(struct _rfbClientRec* cl);
+typedef void (*ClientFramebufferUpdateRequestHookPtr)(struct _rfbClientRec* cl, rfbFramebufferUpdateRequestMsg* furMsg);
 
 typedef struct _rfbFileTransferData {
   int fd;
@@ -708,6 +709,13 @@ typedef struct _rfbClientRec {
     rfbBool useExtDesktopSize;
     int requestedDesktopSizeChange;
     int lastDesktopSizeChangeError;
+
+    /**
+     * clientFramebufferUpdateRequestHook is called when a client requests a frame
+     * buffer update.
+     */
+    ClientFramebufferUpdateRequestHookPtr clientFramebufferUpdateRequestHook;
+
 } rfbClientRec, *rfbClientPtr;
 
 /**

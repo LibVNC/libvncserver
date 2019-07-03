@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.4)
-cmake_policy(SET CMP0037 NEW)
 
-project(LibVNCServer)
+project(LibVNCServer VERSION 0.9.12 LANGUAGES C)
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckIncludeFile)
@@ -15,11 +14,7 @@ enable_testing()
 
 set(PACKAGE_NAME           "LibVNCServer")
 set(FULL_PACKAGE_NAME      "LibVNCServer")
-set(VERSION_MAJOR          "0")
-set(VERSION_MINOR          "9")
-set(VERSION_PATCHLEVEL     "12")
 set(VERSION_SO             "1")
-set(PACKAGE_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCHLEVEL}")
 set(PROJECT_BUGREPORT_PATH "https://github.com/LibVNC/libvncserver/issues")
 set(LIBVNCSERVER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver)
 set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/common)
@@ -70,7 +65,11 @@ if(WITH_JPEG)
     # Check whether the version of libjpeg we found was libjpeg-turbo and print a
     # warning if not.
     set(CMAKE_REQUIRED_LIBRARIES ${JPEG_LIBRARIES})
-    set(CMAKE_REQUIRED_FLAGS -I${JPEG_INCLUDE_DIR})
+    if(JPEG_INCLUDE_DIRS) # this was not present in 3.4
+      set(CMAKE_REQUIRED_INCLUDES ${JPEG_INCLUDE_DIRS})
+    else()
+      set(CMAKE_REQUIRED_INCLUDES ${JPEG_INCLUDE_DIR})
+    endif()
 
     set(JPEG_TEST_SOURCE "\n
     #include <stdio.h>\n
@@ -94,7 +93,7 @@ if(WITH_JPEG)
     endif()
 
     set(CMAKE_REQUIRED_LIBRARIES)
-    set(CMAKE_REQUIRED_FLAGS)
+    set(CMAKE_REQUIRED_INCLUDES)
     set(CMAKE_REQUIRED_DEFINITIONS)
 
     if(NOT FOUND_LIBJPEG_TURBO)
@@ -226,11 +225,10 @@ if(SYSTEMD_FOUND)
 endif(SYSTEMD_FOUND)
 
 if(LIBVNCSERVER_HAVE_SYS_UIO_H)
-  if(GNUTLS_FOUND)
-    message(STATUS "Building crypto with GnuTLS")
-    set(CRYPTO_LIBRARIES ${GNUTLS_LIBRARIES})
-    set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_gnutls)
-    include_directories(${GNUTLS_INCLUDE_DIR})
+  if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
+    message(STATUS "Building crypto with Libgcrypt")
+    set(CRYPTO_LIBRARIES ${LIBGCRYPT_LIBRARIES})
+    set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_libgcrypt)
   elseif(OPENSSL_FOUND)
     message(STATUS "Building crypto with OpenSSL")
     set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
@@ -482,7 +480,7 @@ target_link_libraries(vncserver
 )
 
 SET_TARGET_PROPERTIES(vncclient vncserver
-		PROPERTIES SOVERSION "${VERSION_SO}" VERSION "${PACKAGE_VERSION}"
+		PROPERTIES SOVERSION "${VERSION_SO}" VERSION "${LibVNCServer_VERSION}"
 )
 
 # EXAMPLES
@@ -552,7 +550,6 @@ if(FFMPEG_FOUND)
 endif(FFMPEG_FOUND)
 
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
 foreach(e ${LIBVNCSERVER_EXAMPLES})
   add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
   set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
@@ -560,7 +557,6 @@ foreach(e ${LIBVNCSERVER_EXAMPLES})
   target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT})
 endforeach(e ${LIBVNCSERVER_EXAMPLES})
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
 foreach(e ${LIBVNCCLIENT_EXAMPLES})
   add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
   set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
@@ -589,7 +585,6 @@ if(CMAKE_USE_PTHREADS_INIT)
      )
 endif(CMAKE_USE_PTHREADS_INIT)
 
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
 foreach(t ${SIMPLETESTS})
   add_executable(test_${t} ${TESTS_DIR}/${t}.c)
   set_target_properties(test_${t} PROPERTIES OUTPUT_NAME ${t})
@@ -671,19 +666,21 @@ get_link_libraries(PRIVATE_LIBS vncclient)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
 
 if(LIBVNCSERVER_INSTALL)
-  install_targets(/${CMAKE_INSTALL_LIBDIR} vncserver)
-  install_targets(/${CMAKE_INSTALL_LIBDIR} vncclient)
-  install_files(/include/rfb FILES
+  install(TARGETS vncserver DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  install(TARGETS vncclient DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  install(FILES
     rfb/keysym.h
     rfb/rfb.h
     rfb/rfbclient.h
-    rfb/rfbconfig.h
+    ${CMAKE_CURRENT_BINARY_DIR}/rfb/rfbconfig.h
     rfb/rfbproto.h
     rfb/rfbregion.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rfb
     )
 
-  install_files(/${CMAKE_INSTALL_LIBDIR}/pkgconfig FILES
-    libvncserver.pc
-    libvncclient.pc
+  install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc
+    ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
     )
 endif()
