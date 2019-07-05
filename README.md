@@ -338,22 +338,18 @@ Basics
 
 VNC (Virtual network computing) works like this: You set up a server and can
 connect to it via vncviewers. The communication uses a protocol named RFB
-(Remote Frame Buffer). If the server supports HTTP, you can also connect
-using a java enabled browser. In this case, the server sends back a
-vncviewer applet with the correct settings.
+(Remote Frame Buffer). If the server supports WebSockets (which LibVNCServer does), 
+you can also connect using an in-browser VNC viewer like [noVNC](https://novnc.com). 
 
 There exist several encodings for VNC, which are used to compress the regions
 which have changed before they are sent to the client. A client need not be
 able to understand every encoding, but at least Raw encoding. Which encoding
 it understands is negotiated by the RFB protocol.
 
-The following encodings are known to me:
-Raw, RRE, CoRRE, Hextile, CopyRect from the original AT&T code and
-Tight, ZLib, LastRect, XCursor, RichCursor from Const Kaplinsky et al.
-
-If you are using a modem, you want to try the "new" encodings. Especially
-with my 56k modem I like ZLib or Tight with Quality 0. In my tests, it even
-beats Tarantella.
+If you want to know how RFB works, please take the time and read the [protocol
+specification](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst),
+it is very well written and contains a lot of prose that really explains how stuff
+works.
 
 There is the possibility to set a password, which is also negotiated by the
 RFB protocol, but IT IS NOT SECURE. Anybody sniffing your net can get the
