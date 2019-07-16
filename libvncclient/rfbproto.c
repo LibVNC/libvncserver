@@ -216,13 +216,13 @@ SetServer2Client(rfbClient* client, int messageType)
 void
 ClearClient2Server(rfbClient* client, int messageType)
 {
-  client->supportedMessages.client2server[((messageType & 0xFF)/8)] &= (!(1<<(messageType % 8)));
+  client->supportedMessages.client2server[((messageType & 0xFF)/8)] &= ~(1<<(messageType % 8));
 }
 
 void
 ClearServer2Client(rfbClient* client, int messageType)
 {
-  client->supportedMessages.server2client[((messageType & 0xFF)/8)] &= (!(1<<(messageType % 8)));
+  client->supportedMessages.server2client[((messageType & 0xFF)/8)] &= ~(1<<(messageType % 8));
 }
 
 
