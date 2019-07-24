@@ -52,12 +52,12 @@
 
 static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
   int x, y, w, h;
-  uint8_t type, last_type;
+  uint8_t type, last_type = 0;
   int min_buffer_size = 16 * 16 * (REALBPP / 8) * 2;
   uint8_t *buffer;
   CARDBPP palette[128];
-  int bpp, mask, divider;
-  CARDBPP color;
+  int bpp = 0, mask = 0, divider = 0;
+  CARDBPP color = 0;
 
   /* First make sure we have a large enough raw buffer to hold the
    * decompressed data.  In practice, with a fixed REALBPP, fixed frame
