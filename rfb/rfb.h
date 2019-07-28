@@ -397,6 +397,10 @@ typedef struct _rfbScreenInfo
      * If not set it is assumed only one screen is present spanning entire fb */
     rfbNumberOfExtDesktopScreensPtr numberOfExtDesktopScreensHook;
     rfbGetExtDesktopScreenPtr getExtDesktopScreenHook;
+    /** This value between 0 and 1.0 defines which fraction of the maximum number
+	of file descriptors LibVNCServer uses before denying new client connections.
+	It is set to 0.5 per default. */
+    float fdQuota;
 
 } rfbScreenInfo, *rfbScreenInfoPtr;
 

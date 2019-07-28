@@ -63,6 +63,9 @@
 #ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
 #endif
+#ifdef LIBVNCSERVER_HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
 #ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -488,7 +491,10 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
     int sock = -1;
     fd_set listen_fds; 
     int chosen_listen_sock = -1;
-
+#if defined LIBVNCSERVER_HAVE_SYS_RESOURCE_H && defined LIBVNCSERVER_HAVE_FCNTL_H
+    struct rlimit rlim;
+    size_t maxfds, curfds;
+#endif
     /* Do another select() call to find out which listen socket
        has an incoming connection pending. We know that at least 
        one of them has, so this should not block for too long! */
@@ -506,8 +512,36 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
     if (rfbScreen->listen6Sock >= 0 && FD_ISSET(rfbScreen->listen6Sock, &listen_fds))
       chosen_listen_sock = rfbScreen->listen6Sock;
 
+
+    /*
+      Avoid accept() giving EMFILE, i.e. running out of file descriptors, a situation that's hard to recover from.
+      https://stackoverflow.com/questions/47179793/how-to-gracefully-handle-accept-giving-emfile-and-close-the-connection
+      describes the problem nicely.
+      Our approach is to deny new clients when we have reached a certain fraction of the per-process limit of file descriptors.
+      TODO: add Windows support.
+     */
+#if defined LIBVNCSERVER_HAVE_SYS_RESOURCE_H && defined LIBVNCSERVER_HAVE_FCNTL_H
+    if(getrlimit(RLIMIT_NOFILE, &rlim) < 0)
+	maxfds = 100;  /* use a sane default if getting the limit fails */
+    else
+	maxfds = rlim.rlim_cur;
+
+    /* get the number of currently open fds as per https://stackoverflow.com/a/7976880/361413 */
+    curfds = 0;
+    for(size_t i = 0; i < maxfds; ++i)
+	if(fcntl(i, F_GETFD) != -1)
+	    ++curfds;
+
+    if(curfds > maxfds * rfbScreen->fdQuota) {
+	rfbErr("rfbProcessNewconnection: open fd count of %lu exceeds quota %.1f of limit %lu, denying connection\n", curfds, rfbScreen->fdQuota, maxfds);
+	sock = accept(chosen_listen_sock, NULL, NULL);
+	close(sock);
+	return FALSE;
+    }
+#endif
+
     if ((sock = accept(chosen_listen_sock, NULL, NULL)) < 0) {
-      rfbLogPerror("rfbCheckFds: accept");
+      rfbLogPerror("rfbProcessNewconnection: accept");
       return FALSE;
     }
 
