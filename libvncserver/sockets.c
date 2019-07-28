@@ -493,7 +493,7 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
     int chosen_listen_sock = -1;
 #if defined LIBVNCSERVER_HAVE_SYS_RESOURCE_H && defined LIBVNCSERVER_HAVE_FCNTL_H
     struct rlimit rlim;
-    size_t maxfds, curfds;
+    size_t maxfds, curfds, i;
 #endif
     /* Do another select() call to find out which listen socket
        has an incoming connection pending. We know that at least 
@@ -528,7 +528,7 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
 
     /* get the number of currently open fds as per https://stackoverflow.com/a/7976880/361413 */
     curfds = 0;
-    for(size_t i = 0; i < maxfds; ++i)
+    for(i = 0; i < maxfds; ++i)
 	if(fcntl(i, F_GETFD) != -1)
 	    ++curfds;
 
