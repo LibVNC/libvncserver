@@ -39,6 +39,7 @@ typedef CRITICAL_SECTION MUTEX_TYPE;
 #define MUTEX_UNLOCK(mutex) LeaveCriticalSection(&mutex)
 #define CURRENT_THREAD_ID GetCurrentThreadId()
 #else
+#include <pthread.h>
 typedef pthread_mutex_t MUTEX_TYPE;
 #define MUTEX_INIT(mutex) {\
 	pthread_mutexattr_t mutexAttr;\
@@ -50,10 +51,6 @@ typedef pthread_mutex_t MUTEX_TYPE;
 #define MUTEX_LOCK(mutex) pthread_mutex_lock(&mutex)
 #define MUTEX_UNLOCK(mutex) pthread_mutex_unlock(&mutex)
 #define CURRENT_THREAD_ID pthread_self()
-#endif
-
-#ifndef _MSC_VER
-#include <pthread.h>
 #endif
 
 #include "tls.h"
