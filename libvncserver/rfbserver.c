@@ -3724,6 +3724,8 @@ rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len)
     rfbServerCutTextMsg sct;
     rfbClientIteratorPtr iterator;
 
+    memset((char *)&sct, 0, sizeof(sct));
+
     iterator = rfbGetClientIterator(rfbScreen);
     while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
         sct.type = rfbServerCutText;
