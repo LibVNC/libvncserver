@@ -529,7 +529,8 @@ void rfbClientCleanup(rfbClient* client) {
 
   while (client->clientData) {
     rfbClientData* next = client->clientData->next;
-    free(client->clientData);
+    if (client->clientData)
+      free(client->clientData);
     client->clientData = next;
   }
 
@@ -537,8 +538,10 @@ void rfbClientCleanup(rfbClient* client) {
     close(client->sock);
   if (client->listenSock >= 0)
     close(client->listenSock);
-  free(client->desktopName);
-  free(client->serverHost);
+  if (client->desktopName)
+    free(client->desktopName);
+  if (client->serverHost)
+    free(client->serverHost);
   if (client->destHost)
     free(client->destHost);
   if (client->clientAuthSchemes)
@@ -549,5 +552,6 @@ void rfbClientCleanup(rfbClient* client) {
     free(client->saslSecret);
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
-  free(client);
+  if (client)
+    free(client);
 }
