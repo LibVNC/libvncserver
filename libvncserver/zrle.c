@@ -45,46 +45,46 @@
 #define ENDIAN_NO 2
 #define BPP 8
 #define ZYWRLE_ENDIAN ENDIAN_NO
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #undef BPP
 #define BPP 15
 #undef ZYWRLE_ENDIAN
 #define ZYWRLE_ENDIAN ENDIAN_LITTLE
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #undef ZYWRLE_ENDIAN
 #define ZYWRLE_ENDIAN ENDIAN_BIG
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #undef BPP
 #define BPP 16
 #undef ZYWRLE_ENDIAN
 #define ZYWRLE_ENDIAN ENDIAN_LITTLE
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #undef ZYWRLE_ENDIAN
 #define ZYWRLE_ENDIAN ENDIAN_BIG
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #undef BPP
 #define BPP 32
 #undef ZYWRLE_ENDIAN
 #define ZYWRLE_ENDIAN ENDIAN_LITTLE
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #undef ZYWRLE_ENDIAN
 #define ZYWRLE_ENDIAN ENDIAN_BIG
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #define CPIXEL 24A
 #undef ZYWRLE_ENDIAN
 #define ZYWRLE_ENDIAN ENDIAN_LITTLE
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #undef ZYWRLE_ENDIAN
 #define ZYWRLE_ENDIAN ENDIAN_BIG
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #undef CPIXEL
 #define CPIXEL 24B
 #undef ZYWRLE_ENDIAN
 #define ZYWRLE_ENDIAN ENDIAN_LITTLE
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #undef ZYWRLE_ENDIAN
 #define ZYWRLE_ENDIAN ENDIAN_BIG
-#include <zrleencodetemplate.c>
+#include "zrleencodetemplate.c"
 #undef CPIXEL
 #undef BPP
 

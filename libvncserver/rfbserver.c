@@ -71,7 +71,7 @@
 #define DEBUGPROTO(x)
 #endif
 #include <stdarg.h>
-#include <scale.h>
+#include "scale.h"
 /* stst() */
 #include <sys/types.h>
 #include <sys/stat.h>
