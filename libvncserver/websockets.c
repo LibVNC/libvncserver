@@ -171,7 +171,7 @@ static rfbBool
 webSocketsHandshake(rfbClientPtr cl, char *scheme)
 {
     char *buf, *response, *line;
-    int n, linestart = 0, len = 0, llen, base64 = TRUE;
+    int n, linestart = 0, len = 0, llen, base64 = FALSE;
     char prefix[5], trailer[17];
     char *path = NULL, *host = NULL, *origin = NULL, *protocol = NULL;
     char *key1 = NULL, *key2 = NULL, *key3 = NULL;
@@ -294,15 +294,14 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         return FALSE;
     }
 
-    if ((protocol) && (strstr(protocol, "binary"))) {
-        rfbLog("  - webSocketsHandshake: using binary/raw encoding\n");
-        base64 = FALSE;
-        protocol = "binary";
-    } else {
+    if ((protocol) && (strstr(protocol, "base64"))) {
         rfbLog("  - webSocketsHandshake: using base64 encoding\n");
         base64 = TRUE;
-        if ((protocol) && (strstr(protocol, "base64"))) {
-            protocol = "base64";
+        protocol = "base64";
+    } else {
+        rfbLog("  - webSocketsHandshake: using binary/raw encoding\n");
+        if ((protocol) && (strstr(protocol, "binary"))) {
+            protocol = "binary";
         } else {
             protocol = "";
         }
