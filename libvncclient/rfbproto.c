@@ -367,7 +367,6 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
   rfbProtocolVersionMsg pv;
   int major,minor;
   char tmphost[250];
-  int tmphostlen;
 
 #ifdef LIBVNCSERVER_IPv6
   client->sock = ConnectClientToTcpAddr6(repeaterHost, repeaterPort);
@@ -403,11 +402,8 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 
   rfbClientLog("Connected to VNC repeater, using protocol version %d.%d\n", major, minor);
 
-  tmphostlen = snprintf(tmphost, sizeof(tmphost), "%s:%d", destHost, destPort);
-  if(tmphostlen < 0 || tmphostlen >= (int)sizeof(tmphost))
-    return FALSE; /* snprintf error or output truncated */
-
-  if (!WriteToRFBServer(client, tmphost, tmphostlen + 1))
+  snprintf(tmphost, sizeof(tmphost), "%s:%d", destHost, destPort);
+  if (!WriteToRFBServer(client, tmphost, sizeof(tmphost)))
     return FALSE;
 
   return TRUE;
