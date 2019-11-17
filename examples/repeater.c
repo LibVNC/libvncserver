@@ -24,7 +24,11 @@ int main(int argc,char** argv)
     exit(1);
   }
   memset(id, 0, sizeof(id));
-  snprintf(id, sizeof(id), "ID:%s", argv[1]);
+  if(snprintf(id, sizeof(id), "ID:%s", argv[1]) >= (int)sizeof(id)) {
+      /* truncated! */
+      fprintf(stderr, "Error, given ID is too long.\n");
+      return 1;
+  }
   repeaterHost = argv[2];
   repeaterPort = argc < 4 ? 5500 : atoi(argv[3]);
 
