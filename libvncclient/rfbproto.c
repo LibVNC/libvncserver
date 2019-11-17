@@ -402,6 +402,7 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 
   rfbClientLog("Connected to VNC repeater, using protocol version %d.%d\n", major, minor);
 
+  memset(tmphost, 0, sizeof(tmphost));
   snprintf(tmphost, sizeof(tmphost), "%s:%d", destHost, destPort);
   if (!WriteToRFBServer(client, tmphost, sizeof(tmphost)))
     return FALSE;
