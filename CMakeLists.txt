@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.4)
 
-project(LibVNCServer VERSION 0.9.12 LANGUAGES C)
+project(LibVNCServer VERSION 0.9.13 LANGUAGES C)
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckIncludeFile)
