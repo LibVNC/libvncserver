@@ -198,6 +198,13 @@ static rfbSecurityHandler VncSecurityHandlerNone = {
 };
                         
 
+void
+rfbUnregisterPrimarySecurityHandlers (void)
+{
+    rfbUnregisterSecurityHandler(&VncSecurityHandlerNone);
+    rfbUnregisterSecurityHandler(&VncSecurityHandlerVncAuth);
+}
+
 static void
 rfbSendSecurityTypeList(rfbClientPtr cl, int primaryType)
 {

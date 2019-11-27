@@ -862,6 +862,7 @@ extern void rfbProcessClientSecurityType(rfbClientPtr cl);
 extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
 extern void rfbRegisterSecurityHandler(rfbSecurityHandler* handler);
 extern void rfbUnregisterSecurityHandler(rfbSecurityHandler* handler);
+extern void rfbUnregisterPrimarySecurityHandlers (void);
 
 /* rre.c */
 
