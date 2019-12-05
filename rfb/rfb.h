@@ -55,10 +55,7 @@ extern "C"
 #ifdef WIN32
 typedef UINT32 in_addr_t;
 #include <winsock2.h>
-#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
-#undef socklen_t
 #include <ws2tcpip.h>
-#endif
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD

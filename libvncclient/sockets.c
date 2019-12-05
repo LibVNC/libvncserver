@@ -45,11 +45,7 @@
 #define EWOULDBLOCK WSAEWOULDBLOCK
 #define read(sock,buf,len) recv(sock,buf,len,0)
 #define write(sock,buf,len) send(sock,buf,len,0)
-#define socklen_t int
-#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
-#undef socklen_t
 #include <ws2tcpip.h>
-#endif
 #else
 #include <sys/socket.h>
 #include <netinet/in.h>

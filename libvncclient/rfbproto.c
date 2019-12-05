@@ -36,9 +36,6 @@
 #endif
 #include <errno.h>
 #include <rfb/rfbclient.h>
-#ifdef WIN32
-#undef socklen_t
-#endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #include <zlib.h>
 #ifdef __CHECKER__
