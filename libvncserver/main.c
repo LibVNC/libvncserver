@@ -642,11 +642,16 @@ rfbStartOnHoldClient(rfbClientPtr cl)
     cl->onHold = FALSE;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     if(cl->screen->backgroundLoop) {
+#ifndef WIN32
         if (pipe(cl->pipe_notify_client_thread) == -1) {
             cl->pipe_notify_client_thread[0] = -1;
             cl->pipe_notify_client_thread[1] = -1;
         }
         fcntl(cl->pipe_notify_client_thread[0], F_SETFL, O_NONBLOCK);
+#else
+        cl->pipe_notify_client_thread[0] = -1;
+        cl->pipe_notify_client_thread[1] = -1;
+#endif
 
         pthread_create(&cl->client_thread, NULL, clientInput, (void *)cl);
     }
