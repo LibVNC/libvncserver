@@ -31,9 +31,9 @@
 		#include <stdio.h>
 		#define snprintf(str, n, format, ...)  \
 			_snprintf_s(str, n, _TRUNCATE, format, __VA_ARGS__)
+		#define strcasecmp stricmp
+		#define strncasecmp strnicmp
 	#endif
-	#define strcasecmp stricmp
-	#define strncasecmp strnicmp
 #endif
 
 #ifndef min
