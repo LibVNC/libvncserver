@@ -259,7 +259,7 @@ hexdump:
  */
 
 rfbBool
-WriteToRFBServer(rfbClient* client, char *buf, unsigned int n)
+WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 {
   fd_set fds;
   int i = 0;

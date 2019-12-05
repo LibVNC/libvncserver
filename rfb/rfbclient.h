@@ -648,7 +648,7 @@ void rfbClientRegisterExtension(rfbClientProtocolExtension* e);
 extern rfbBool errorMessageOnReadFailure;
 
 extern rfbBool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
-extern rfbBool WriteToRFBServer(rfbClient* client, char *buf, unsigned int n);
+extern rfbBool WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n);
 extern int FindFreeTcpPort(void);
 extern int ListenAtTcpPort(int port);
 extern int ListenAtTcpPortAndAddress(int port, const char *address);
