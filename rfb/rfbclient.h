@@ -270,7 +270,7 @@ typedef struct _rfbClient {
 #define RFB_BUF_SIZE 8192
 	char buf[RFB_BUF_SIZE];
 	char *bufoutptr;
-	int buffered;
+	unsigned int buffered;
 
 	/* The zlib encoding requires expansion/decompression/deflation of the
 	   compressed data in the "buffer" above into another, result buffer.
@@ -648,7 +648,7 @@ void rfbClientRegisterExtension(rfbClientProtocolExtension* e);
 extern rfbBool errorMessageOnReadFailure;
 
 extern rfbBool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
-extern rfbBool WriteToRFBServer(rfbClient* client, char *buf, int n);
+extern rfbBool WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n);
 extern int FindFreeTcpPort(void);
 extern int ListenAtTcpPort(int port);
 extern int ListenAtTcpPortAndAddress(int port, const char *address);
