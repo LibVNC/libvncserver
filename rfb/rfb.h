@@ -53,7 +53,6 @@ extern "C"
 #endif
 
 #ifdef WIN32
-#undef SOCKET
 typedef UINT32 in_addr_t;
 #include <winsock2.h>
 #ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
@@ -268,7 +267,7 @@ typedef struct _rfbScreenInfo
 
     rfbBool autoPort;
     int port;
-    SOCKET listenSock;
+    rfbSocket listenSock;
     int maxSock;
     int maxFd;
 #ifdef WIN32
@@ -278,11 +277,11 @@ typedef struct _rfbScreenInfo
 #endif
 
     enum rfbSocketState socketState;
-    SOCKET inetdSock;
+    rfbSocket inetdSock;
     rfbBool inetdInitDone;
 
     int udpPort;
-    SOCKET udpSock;
+    rfbSocket udpSock;
     struct _rfbClientRec* udpClient;
     rfbBool udpSockConnected;
     struct sockaddr_in udpRemoteAddr;
@@ -294,8 +293,8 @@ typedef struct _rfbScreenInfo
     rfbBool httpEnableProxyConnect;
     int httpPort;
     char* httpDir;
-    SOCKET httpListenSock;
-    SOCKET httpSock;
+    rfbSocket httpListenSock;
+    rfbSocket httpSock;
 
     rfbPasswordCheckProcPtr passwordCheck;
     void* authPasswdData;
@@ -388,9 +387,9 @@ typedef struct _rfbScreenInfo
     /* We have an additional IPv6 listen socket since there are systems that
        don't support dual binding sockets under *any* circumstances, for
        instance OpenBSD */
-    SOCKET listen6Sock;
+    rfbSocket listen6Sock;
     int http6Port;
-    SOCKET httpListen6Sock;
+    rfbSocket httpListen6Sock;
     /** hook to let client set resolution */
     rfbSetDesktopSizeHookPtr setDesktopSizeHook;
     /** Optional hooks to query ExtendedDesktopSize screen information.
@@ -472,7 +471,7 @@ typedef struct _rfbClientRec {
     void* clientData;
     ClientGoneHookPtr clientGoneHook;
 
-    SOCKET sock;
+    rfbSocket sock;
     char *host;
 
     /* RFB protocol minor version number */
@@ -774,13 +773,13 @@ extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbPeekExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
 extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
-extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
-extern int rfbConnectToTcpAddr(char* host, int port);
-extern int rfbListenOnTCPPort(int port, in_addr_t iface);
-extern int rfbListenOnTCP6Port(int port, const char* iface);
-extern int rfbListenOnUDPPort(int port, in_addr_t iface);
+extern rfbSocket rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
+extern rfbSocket rfbConnectToTcpAddr(char* host, int port);
+extern rfbSocket rfbListenOnTCPPort(int port, in_addr_t iface);
+extern rfbSocket rfbListenOnTCP6Port(int port, const char* iface);
+extern rfbSocket rfbListenOnUDPPort(int port, in_addr_t iface);
 extern int rfbStringToAddr(char* string,in_addr_t* addr);
-extern rfbBool rfbSetNonBlocking(int sock);
+extern rfbBool rfbSetNonBlocking(rfbSocket sock);
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 /* websockets.c */
@@ -805,14 +804,14 @@ extern void rfbReleaseClientIterator(rfbClientIteratorPtr iterator);
 extern void rfbIncrClientRef(rfbClientPtr cl);
 extern void rfbDecrClientRef(rfbClientPtr cl);
 
-extern void rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,int sock);
-extern rfbClientPtr rfbNewClient(rfbScreenInfoPtr rfbScreen,int sock);
+extern void rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,rfbSocket sock);
+extern rfbClientPtr rfbNewClient(rfbScreenInfoPtr rfbScreen,rfbSocket sock);
 extern rfbClientPtr rfbNewUDPClient(rfbScreenInfoPtr rfbScreen);
 extern rfbClientPtr rfbReverseConnection(rfbScreenInfoPtr rfbScreen,char *host, int port);
 extern void rfbClientConnectionGone(rfbClientPtr cl);
 extern void rfbProcessClientMessage(rfbClientPtr cl);
 extern void rfbClientConnFailed(rfbClientPtr cl, const char *reason);
-extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
+extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,rfbSocket sock);
 extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
 extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
 extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
