@@ -91,7 +91,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 #undef DEBUG_READ_EXACT
 #ifdef DEBUG_READ_EXACT
 	char* oout=out;
-	int nn=n;
+	unsigned int nn=n;
 	rfbClientLog("ReadFromRFBServer %d bytes\n",n);
 #endif
 
@@ -243,7 +243,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 
 #ifdef DEBUG_READ_EXACT
 hexdump:
-  { int ii;
+  { unsigned int ii;
     for(ii=0;ii<nn;ii++)
       fprintf(stderr,"%02x ",(unsigned char)oout[ii]);
     fprintf(stderr,"\n");

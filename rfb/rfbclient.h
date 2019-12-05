@@ -270,7 +270,7 @@ typedef struct _rfbClient {
 #define RFB_BUF_SIZE 8192
 	char buf[RFB_BUF_SIZE];
 	char *bufoutptr;
-	int buffered;
+	unsigned int buffered;
 
 	/* The zlib encoding requires expansion/decompression/deflation of the
 	   compressed data in the "buffer" above into another, result buffer.
