@@ -143,6 +143,7 @@ if(WITH_FFMPEG)
 endif(WITH_FFMPEG)
 
 
+check_include_file("dirent.h"      LIBVNCSERVER_HAVE_DIRENT_H)
 check_include_file("endian.h"      LIBVNCSERVER_HAVE_ENDIAN_H)
 check_include_file("fcntl.h"       LIBVNCSERVER_HAVE_FCNTL_H)
 check_include_file("netinet/in.h"  LIBVNCSERVER_HAVE_NETINET_IN_H)
@@ -457,6 +458,7 @@ add_library(vncclient ${LIBVNCCLIENT_SOURCES})
 add_library(vncserver ${LIBVNCSERVER_SOURCES})
 if(WIN32)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ws2_32)
+  add_definitions(-D_WIN32_WINNT=0x0600)
 endif(WIN32)
 
 target_link_libraries(vncclient
