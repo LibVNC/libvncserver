@@ -1,9 +1,10 @@
 /*
- * rfbcrypto_gnutls.c - Crypto wrapper (gnutls version)
+ * rfbcrypto_gnutls.c - Crypto wrapper (libgcrypt version)
  */
 
 /*
  *  Copyright (C) 2011 Gernot Tenchio
+ *  Copyright (C) 2019 Christian Beier
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
