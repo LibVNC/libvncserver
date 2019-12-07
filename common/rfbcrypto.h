@@ -7,13 +7,6 @@
 #define SHA1_HASH_SIZE 20
 #define MD5_HASH_SIZE 16
 
-#ifdef LIBVNCSERVER_HAVE_SYS_UIO_H
-#include <sys/uio.h>
-
-void digestmd5(const struct iovec *iov, int iovcnt, void *dest);
-void digestsha1(const struct iovec *iov, int iovcnt, void *dest);
-#endif
-
 /* Generates an MD5 hash of 'in' and writes it to 'out', which must be 16 bytes in size. */
 int hash_md5(void *out, const void *in, const size_t in_len);
 

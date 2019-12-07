@@ -29,28 +29,6 @@
 #include <openssl/evp.h>
 #include "rfbcrypto.h"
 
-void digestmd5(const struct iovec *iov, int iovcnt, void *dest)
-{
-    MD5_CTX c;
-    int i;
-    
-    MD5_Init(&c);
-    for (i = 0; i < iovcnt; i++)
-	MD5_Update(&c, iov[i].iov_base, iov[i].iov_len);
-    MD5_Final(dest, &c);
-}
-
-void digestsha1(const struct iovec *iov, int iovcnt, void *dest)
-{
-    SHA_CTX c;
-    int i;
-    
-    SHA1_Init(&c);
-    for (i = 0; i < iovcnt; i++)
-	SHA1_Update(&c, iov[i].iov_base, iov[i].iov_len);
-    SHA1_Final(dest, &c);
-}
-
 int hash_md5(void *out, const void *in, const size_t in_len)
 {
     MD5_CTX md5;

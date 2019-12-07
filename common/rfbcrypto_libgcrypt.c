@@ -42,30 +42,6 @@ static int mpiToBytes(const gcry_mpi_t value, uint8_t *result, size_t size)
     return 1;
 }
 
-void digestmd5(const struct iovec *iov, int iovcnt, void *dest)
-{
-    gcry_md_hd_t c;
-    int i;
-
-    gcry_md_open(&c, GCRY_MD_MD5, 0);
-    for (i = 0; i < iovcnt; i++)
-	gcry_md_write(c, iov[i].iov_base, iov[i].iov_len);
-    gcry_md_final(c);
-    memcpy(dest, gcry_md_read(c, 0), gcry_md_get_algo_dlen(GCRY_MD_MD5));
-}
-
-void digestsha1(const struct iovec *iov, int iovcnt, void *dest)
-{
-    gcry_md_hd_t c;
-    int i;
-
-    gcry_md_open(&c, GCRY_MD_SHA1, 0);
-    for (i = 0; i < iovcnt; i++)
-	gcry_md_write(c, iov[i].iov_base, iov[i].iov_len);
-    gcry_md_final(c);
-    memcpy(dest, gcry_md_read(c, 0), gcry_md_get_algo_dlen(GCRY_MD_SHA1));
-}
-
 int hash_md5(void *out, const void *in, const size_t in_len)
 {
     int result = 0;

@@ -26,24 +26,3 @@
 #include "sha.h"
 #include "rfbcrypto.h"
 
-void digestmd5(const struct iovec *iov, int iovcnt, void *dest)
-{
-    struct md5_ctx c;
-    int i;
-
-    __md5_init_ctx(&c);
-    for (i = 0; i < iovcnt; i++)
-	__md5_process_bytes(iov[i].iov_base, iov[i].iov_len, &c);
-    __md5_finish_ctx(&c, dest);
-}
-
-void digestsha1(const struct iovec *iov, int iovcnt, void *dest)
-{
-    SHA1Context c;
-    int i;
-
-    SHA1Reset(&c);
-    for (i = 0; i < iovcnt; i++)
-	SHA1Input(&c, iov[i].iov_base, iov[i].iov_len);
-    SHA1Result(&c, dest);
-}
