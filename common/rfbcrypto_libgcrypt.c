@@ -91,6 +91,31 @@ int hash_md5(void *out, const void *in, const size_t in_len)
     return result;
 }
 
+int hash_sha1(void *out, const void *in, const size_t in_len)
+{
+    int result = 0;
+    gcry_error_t error;
+    gcry_md_hd_t sha1 = NULL;
+    void *digest;
+
+    error = gcry_md_open(&sha1, GCRY_MD_SHA1, 0);
+    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
+	goto out;
+
+    gcry_md_write(sha1, in, in_len);
+
+    if(!(digest = gcry_md_read(sha1, GCRY_MD_SHA1)))
+       goto out;
+
+    memcpy(out, digest, gcry_md_get_algo_dlen(GCRY_MD_SHA1));
+
+    result = 1;
+
+ out:
+    gcry_md_close(sha1);
+    return result;
+}
+
 void random_bytes(void *out, size_t len)
 {
     gcry_randomize(out, len, GCRY_STRONG_RANDOM);

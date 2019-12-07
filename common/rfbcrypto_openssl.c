@@ -63,6 +63,18 @@ int hash_md5(void *out, const void *in, const size_t in_len)
     return 1;
 }
 
+int hash_sha1(void *out, const void *in, const size_t in_len)
+{
+    SHA_CTX sha1;
+    if(!SHA1_Init(&sha1))
+	return 0;
+    if(!SHA1_Update(&sha1, in, in_len))
+	return 0;
+    if(!SHA1_Final(out, &sha1))
+	return 0;
+    return 1;
+}
+
 void random_bytes(void *out, size_t len)
 {
     RAND_bytes(out, len);
