@@ -4,6 +4,7 @@
 
 /*
  *  Copyright (C) 2011 Gernot Tenchio
+ *  Copyright (C) 2019 Christian Beier
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,6 +25,8 @@
 #include <string.h>
 #include <openssl/sha.h>
 #include <openssl/md5.h>
+#include <openssl/dh.h>
+#include <openssl/evp.h>
 #include "rfbcrypto.h"
 
 void digestmd5(const struct iovec *iov, int iovcnt, void *dest)
@@ -46,4 +49,85 @@ void digestsha1(const struct iovec *iov, int iovcnt, void *dest)
     for (i = 0; i < iovcnt; i++)
 	SHA1_Update(&c, iov[i].iov_base, iov[i].iov_len);
     SHA1_Final(dest, &c);
+}
+
+int hash_md5(void *out, const void *in, const size_t in_len)
+{
+    MD5_CTX md5;
+    if(!MD5_Init(&md5))
+	return 0;
+    if(!MD5_Update(&md5, in, in_len))
+	return 0;
+    if(!MD5_Final(out, &md5))
+	return 0;
+    return 1;
+}
+
+void random_bytes(void *out, size_t len)
+{
+    RAND_bytes(out, len);
+}
+
+int encrypt_aes128ecb(void *out, int *out_len, const void *key, const void *in, const size_t in_len)
+{
+    int result = 0;
+    EVP_CIPHER_CTX *aes;
+
+    if(!(aes = EVP_CIPHER_CTX_new()))
+	goto out;
+    EVP_CIPHER_CTX_set_padding(aes, 0);
+    if(!EVP_EncryptInit_ex(aes, EVP_aes_128_ecb(), NULL, key, NULL))
+	goto out;
+    if(!EVP_EncryptUpdate(aes, out, out_len, in, in_len))
+	goto out;
+
+    result = 1;
+
+ out:
+    EVP_CIPHER_CTX_free(aes);
+    return result;
+}
+
+int dh_generate_keypair(uint8_t *priv_out, uint8_t *pub_out, const uint8_t *gen, const size_t gen_len, const uint8_t *prime, const size_t keylen)
+{
+    int result = 0;
+    DH *dh;
+
+    if(!(dh = DH_new()))
+	goto out;
+    if(!DH_set0_pqg(dh, BN_bin2bn(prime, keylen, NULL), NULL, BN_bin2bn(gen, gen_len, NULL)))
+	goto out;
+    if(!DH_generate_key(dh))
+	goto out;
+    if(BN_bn2binpad(DH_get0_priv_key(dh), priv_out, keylen) == -1)
+	goto out;
+    if(BN_bn2binpad(DH_get0_pub_key(dh), pub_out, keylen) == -1)
+	goto out;
+
+    result = 1;
+
+ out:
+    DH_free(dh);
+    return result;
+}
+
+int dh_compute_shared_key(uint8_t *shared_out, const uint8_t *priv, const uint8_t *pub, const uint8_t *prime, const size_t keylen)
+{
+    int result = 0;
+    DH *dh;
+
+    if(!(dh = DH_new()))
+	goto out;
+    if(!DH_set0_pqg(dh, BN_bin2bn(prime, keylen, NULL), NULL, BN_new()))
+	goto out;
+    if(!DH_set0_key(dh, NULL, BN_bin2bn(priv, keylen, NULL)))
+	goto out;
+    if(DH_compute_key(shared_out, BN_bin2bn(pub, keylen, NULL), dh) == -1)
+	goto out;
+
+    result = 1;
+
+ out:
+    DH_free(dh);
+    return result;
 }
