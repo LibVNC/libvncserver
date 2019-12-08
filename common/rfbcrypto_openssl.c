@@ -85,14 +85,26 @@ int dh_generate_keypair(uint8_t *priv_out, uint8_t *pub_out, const uint8_t *gen,
 
     if(!(dh = DH_new()))
 	goto out;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined LIBRESSL_VERSION_NUMBER
+    dh->p = BN_bin2bn(prime, keylen, NULL);
+    dh->g = BN_bin2bn(gen, gen_len, NULL);
+#else
     if(!DH_set0_pqg(dh, BN_bin2bn(prime, keylen, NULL), NULL, BN_bin2bn(gen, gen_len, NULL)))
 	goto out;
+#endif
     if(!DH_generate_key(dh))
 	goto out;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined LIBRESSL_VERSION_NUMBER
+    if(BN_bn2bin(dh->priv_key, priv_out) == 0)
+	goto out;
+    if(BN_bn2bin(dh->pub_key, pub_out) == 0)
+	goto out;
+#else
     if(BN_bn2binpad(DH_get0_priv_key(dh), priv_out, keylen) == -1)
 	goto out;
     if(BN_bn2binpad(DH_get0_pub_key(dh), pub_out, keylen) == -1)
 	goto out;
+#endif
 
     result = 1;
 
@@ -108,10 +120,15 @@ int dh_compute_shared_key(uint8_t *shared_out, const uint8_t *priv, const uint8_
 
     if(!(dh = DH_new()))
 	goto out;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined LIBRESSL_VERSION_NUMBER
+    dh->p = BN_bin2bn(prime, keylen, NULL);
+    dh->priv_key = BN_bin2bn(priv, keylen, NULL);
+#else
     if(!DH_set0_pqg(dh, BN_bin2bn(prime, keylen, NULL), NULL, BN_new()))
 	goto out;
     if(!DH_set0_key(dh, NULL, BN_bin2bn(priv, keylen, NULL)))
 	goto out;
+#endif
     if(DH_compute_key(shared_out, BN_bin2bn(pub, keylen, NULL), dh) == -1)
 	goto out;
 
