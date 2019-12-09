@@ -115,6 +115,16 @@ void rfbDesKey(unsigned char *key,
 	return;
 	}
 
+static void rfbUseKey(register unsigned long *from)
+{
+	register unsigned long *to, *endp;
+
+	to = KnL, endp = &KnL[32];
+	while( to < endp ) *to++ = *from++;
+	return;
+	}
+
+
 static void cookey(register unsigned long *raw1)
 {
 	register unsigned long *cook, *raw0;
@@ -137,15 +147,6 @@ static void cookey(register unsigned long *raw1)
 	return;
 	}
 
-
-void rfbUseKey(register unsigned long *from)
-{
-	register unsigned long *to, *endp;
-
-	to = KnL, endp = &KnL[32];
-	while( to < endp ) *to++ = *from++;
-	return;
-	}
 
 void rfbDes(unsigned char *inblock,
             unsigned char *outblock)
