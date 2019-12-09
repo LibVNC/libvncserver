@@ -26,3 +26,33 @@
 #include "sha.h"
 #include "rfbcrypto.h"
 
+
+int hash_md5(void *out, const void *in, const size_t in_len)
+{
+    return 0;
+}
+
+int hash_sha1(void *out, const void *in, const size_t in_len)
+{
+    return 0;
+}
+
+void random_bytes(void *out, size_t len)
+{
+
+}
+
+int encrypt_aes128ecb(void *out, int *out_len, const void *key, const void *in, const size_t in_len)
+{
+    return 0;
+}
+
+int dh_generate_keypair(uint8_t *priv_out, uint8_t *pub_out, const uint8_t *gen, const size_t gen_len, const uint8_t *prime, const size_t keylen)
+{
+    return 0;
+}
+
+int dh_compute_shared_key(uint8_t *shared_out, const uint8_t *priv, const uint8_t *pub, const uint8_t *prime, const size_t keylen)
+{
+    return 0;
+}
