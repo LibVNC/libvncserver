@@ -234,7 +234,7 @@ endif(SYSTEMD_FOUND)
     set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_openssl)
   else()
     message(STATUS "Building crypto with builtin functions")
-    set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_included.c ${COMMON_DIR}/md5.c ${COMMON_DIR}/sha1.c)
+    set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_included.c ${COMMON_DIR}/sha1.c)
   endif()
   set(LIBVNCSERVER_HAVE_CRYPTO 1)
 

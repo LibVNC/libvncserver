@@ -22,7 +22,6 @@
  */
 
 #include <string.h>
-#include "md5.h"
 #include "sha.h"
 #include "rfbcrypto.h"
 
