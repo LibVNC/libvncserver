@@ -1514,10 +1514,18 @@ typedef union {
 #define MAXPWLEN 8
 #define CHALLENGESIZE 16
 
+#if(defined __cplusplus)
+extern "C"
+{
+#endif
+
 extern int rfbEncryptAndStorePasswd(char *passwd, char *fname);
 extern char *rfbDecryptPasswdFromFile(char *fname);
 extern void rfbRandomBytes(unsigned char *bytes);
 extern void rfbEncryptBytes(unsigned char *bytes, char *passwd);
 
+#if(defined __cplusplus)
+}
+#endif
 
 #endif

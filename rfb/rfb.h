@@ -1127,7 +1127,6 @@ extern rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *bu
 rfbBool rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen);
 rfbBool rfbUpdateClient(rfbClientPtr cl);
 
-
 #if(defined __cplusplus)
 }
 #endif

@@ -8,6 +8,11 @@
 
 /* -=- sraRect */
 
+#if(defined __cplusplus)
+extern "C"
+{
+#endif
+
 typedef struct _rect {
 	int x1;
 	int y1;
@@ -61,5 +66,9 @@ extern rfbBool sraClipRect(int *x, int *y, int *w, int *h,
 
 extern rfbBool sraClipRect2(int *x, int *y, int *x2, int *y2,
 			int cx, int cy, int cx2, int cy2);
+
+#if(defined __cplusplus)
+}
+#endif
 
 #endif

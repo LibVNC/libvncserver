@@ -29,6 +29,11 @@
 
 #define ARRAYSIZE(a) ((sizeof(a) / sizeof((a[0]))) / (size_t)(!(sizeof(a) % sizeof((a[0])))))
 
+#if(defined __cplusplus)
+extern "C"
+{
+#endif
+
 struct ws_ctx_s;
 typedef struct ws_ctx_s ws_ctx_t;
 
@@ -142,4 +147,9 @@ enum
 int webSocketsDecodeHybi(ws_ctx_t *wsctx, char *dst, int len);
 
 void hybiDecodeCleanupComplete(ws_ctx_t *wsctx);
+
+#if(defined __cplusplus)
+}
+#endif
+
 #endif
