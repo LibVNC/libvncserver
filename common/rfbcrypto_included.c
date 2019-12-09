@@ -34,7 +34,15 @@ int hash_md5(void *out, const void *in, const size_t in_len)
 
 int hash_sha1(void *out, const void *in, const size_t in_len)
 {
-    return 0;
+    SHA1Context sha1;
+    if(SHA1Reset(&sha1) != shaSuccess)
+	return 0;
+    if(SHA1Input(&sha1, in, in_len) != shaSuccess)
+	return 0;
+    if(SHA1Result(&sha1, out) != shaSuccess)
+	return 0;
+
+    return 1;
 }
 
 void random_bytes(void *out, size_t len)
