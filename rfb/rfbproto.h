@@ -1519,10 +1519,14 @@ extern "C"
 {
 #endif
 
+#pragma GCC visibility push(default)
+
 extern int rfbEncryptAndStorePasswd(char *passwd, char *fname);
 extern char *rfbDecryptPasswdFromFile(char *fname);
 extern void rfbRandomBytes(unsigned char *bytes);
 extern void rfbEncryptBytes(unsigned char *bytes, char *passwd);
+
+#pragma GCC visibility pop
 
 #if(defined __cplusplus)
 }

@@ -34,6 +34,8 @@ extern "C"
 {
 #endif
 
+#pragma GCC visibility push(default)
+
 struct ws_ctx_s;
 typedef struct ws_ctx_s ws_ctx_t;
 
@@ -147,6 +149,8 @@ enum
 int webSocketsDecodeHybi(ws_ctx_t *wsctx, char *dst, int len);
 
 void hybiDecodeCleanupComplete(ws_ctx_t *wsctx);
+
+#pragma GCC visibility pop
 
 #if(defined __cplusplus)
 }

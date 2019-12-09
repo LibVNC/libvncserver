@@ -92,6 +92,8 @@ extern "C"
 {
 #endif
 
+#pragma GCC visibility push(default)
+
 /** vncrec */
 
 typedef struct {
@@ -739,6 +741,8 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv);
  * @param client The client to clean up
  */
 void rfbClientCleanup(rfbClient* client);
+
+#pragma GCC visibility pop
 
 #if(defined __cplusplus)
 }

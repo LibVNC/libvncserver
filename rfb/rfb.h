@@ -125,6 +125,8 @@ typedef UINT32 in_addr_t;
 #endif
 #endif
 
+#pragma GCC visibility push(default)
+
 struct _rfbClientRec;
 struct _rfbScreenInfo;
 struct rfbCursor;
@@ -1126,6 +1128,8 @@ extern rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *bu
  */
 rfbBool rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen);
 rfbBool rfbUpdateClient(rfbClientPtr cl);
+
+#pragma GCC visibility pop
 
 #if(defined __cplusplus)
 }
