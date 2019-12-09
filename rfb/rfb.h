@@ -824,6 +824,7 @@ extern rfbBool rfbSendNewFBSize(rfbClientPtr cl, int w, int h);
 extern rfbBool rfbSendExtDesktopSize(rfbClientPtr cl, int w, int h);
 extern rfbBool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
 extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
+extern void rfbClientSendString(rfbClientPtr cl, const char *reason);
 
 extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
 extern rfbBool rfbSendFileTransferChunk(rfbClientPtr cl);
