@@ -24,7 +24,7 @@
 #include <string.h>
 #include "sha.h"
 #include "d3des.h"
-#include "rfbcrypto.h"
+#include "crypto.h"
 
 
 int hash_md5(void *out, const void *in, const size_t in_len)

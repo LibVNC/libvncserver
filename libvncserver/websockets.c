@@ -50,7 +50,7 @@
 #endif
 #include "rfb/rfbconfig.h"
 #include "rfbssl.h"
-#include "rfbcrypto.h"
+#include "crypto.h"
 #include "ws_decode.h"
 #include "base64.h"
 

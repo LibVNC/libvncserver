@@ -56,7 +56,7 @@
 #include <stdarg.h>
 #include <time.h>
 
-#include "rfbcrypto.h"
+#include "crypto.h"
 
 #include "sasl.h"
 #ifdef LIBVNCSERVER_HAVE_LZO

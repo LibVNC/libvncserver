@@ -24,7 +24,7 @@
 
 #include <string.h>
 #include <gcrypt.h>
-#include "rfbcrypto.h"
+#include "crypto.h"
 
 static int mpiToBytes(const gcry_mpi_t value, uint8_t *result, size_t size)
 {

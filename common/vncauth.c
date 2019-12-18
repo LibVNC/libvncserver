@@ -35,7 +35,7 @@
 #include <unistd.h>
 #endif
 #include <rfb/rfbproto.h>
-#include "rfbcrypto.h"
+#include "crypto.h"
 
 #include <string.h>
 #include <math.h>

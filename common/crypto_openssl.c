@@ -27,7 +27,7 @@
 #include <openssl/md5.h>
 #include <openssl/dh.h>
 #include <openssl/evp.h>
-#include "rfbcrypto.h"
+#include "crypto.h"
 
 static unsigned char reverseByte(unsigned char b) {
    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
