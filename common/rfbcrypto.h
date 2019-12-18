@@ -29,7 +29,7 @@ int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
 int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len);
 
 /* Encrypts 'in' with the the 16-byte key in 'key' using AES-128-ECB and writes the result to 'out'. */
-int encrypt_aes128ecb(void *out, int *out_len, const void *key, const void *in, const size_t in_len);
+int encrypt_aes128ecb(void *out, int *out_len, const unsigned char key[16], const void *in, const size_t in_len);
 
 /*
    Generates a Diffie-Hellman public-private keypair using the generator value 'gen' and prime modulo

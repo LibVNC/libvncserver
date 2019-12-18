@@ -76,7 +76,7 @@ int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
     return 1;
 }
 
-int encrypt_aes128ecb(void *out, int *out_len, const void *key, const void *in, const size_t in_len)
+int encrypt_aes128ecb(void *out, int *out_len, const unsigned char key[16], const void *in, const size_t in_len)
 {
     return 0;
 }
