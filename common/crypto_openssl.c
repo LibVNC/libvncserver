@@ -1,5 +1,5 @@
 /*
- * rfbcrypto_openssl.c - Crypto wrapper (openssl version)
+ * crypto_openssl.c - Crypto wrapper (openssl version)
  */
 
 /*

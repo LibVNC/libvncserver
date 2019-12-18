@@ -1,5 +1,5 @@
 /*
- * rfbcrypto_gnutls.c - Crypto wrapper (libgcrypt version)
+ * crypto_gnutls.c - Crypto wrapper (libgcrypt version)
  */
 
 /*
