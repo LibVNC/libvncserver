@@ -42,6 +42,13 @@ static int mpiToBytes(const gcry_mpi_t value, uint8_t *result, size_t size)
     return 1;
 }
 
+static unsigned char reverseByte(unsigned char b) {
+   b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+   b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+   b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+   return b;
+}
+
 int hash_md5(void *out, const void *in, const size_t in_len)
 {
     int result = 0;
@@ -96,6 +103,71 @@ void random_bytes(void *out, size_t len)
 {
     gcry_randomize(out, len, GCRY_STRONG_RANDOM);
 }
+
+int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
+{
+    int result = 0;
+    gcry_error_t error;
+    gcry_cipher_hd_t des = NULL;
+    unsigned char mungedkey[8];
+    int i;
+
+    for (i = 0; i < 8; i++)
+      mungedkey[i] = reverseByte(key[i]);
+
+    error = gcry_cipher_open(&des, GCRY_CIPHER_DES, GCRY_CIPHER_MODE_ECB, 0);
+    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
+	goto out;
+
+    error = gcry_cipher_setkey(des, mungedkey, 8);
+    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
+	goto out;
+
+    error = gcry_cipher_encrypt(des, out, in_len, in, in_len);
+    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
+	goto out;
+
+    *out_len = in_len;
+
+    result = 1;
+
+ out:
+    gcry_cipher_close(des);
+    return result;
+}
+
+int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
+{
+    int result = 0;
+    gcry_error_t error;
+    gcry_cipher_hd_t des = NULL;
+    unsigned char mungedkey[8];
+    int i;
+
+    for (i = 0; i < 8; i++)
+      mungedkey[i] = reverseByte(key[i]);
+
+    error = gcry_cipher_open(&des, GCRY_CIPHER_DES, GCRY_CIPHER_MODE_ECB, 0);
+    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
+	goto out;
+
+    error = gcry_cipher_setkey(des, mungedkey, 8);
+    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
+	goto out;
+
+    error = gcry_cipher_decrypt(des, out, in_len, in, in_len);
+    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
+	goto out;
+
+    *out_len = in_len;
+
+    result = 1;
+
+ out:
+    gcry_cipher_close(des);
+    return result;
+}
+
 
 int encrypt_aes128ecb(void *out, int *out_len, const void *key, const void *in, const size_t in_len)
 {

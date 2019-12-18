@@ -23,6 +23,7 @@
 
 #include <string.h>
 #include "sha.h"
+#include "d3des.h"
 #include "rfbcrypto.h"
 
 
@@ -47,6 +48,32 @@ int hash_sha1(void *out, const void *in, const size_t in_len)
 void random_bytes(void *out, size_t len)
 {
 
+}
+
+int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
+{
+    int eightbyteblocks = in_len/8;
+    int i;
+    rfbDesKey((unsigned char*)key, EN0);
+    for(i = 0; i < eightbyteblocks; ++i)
+	rfbDes((unsigned char*)in + i*8, out + i*8);
+
+    *out_len = in_len;
+
+    return 1;
+}
+
+int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
+{
+    int eightbyteblocks = in_len/8;
+    int i;
+    rfbDesKey((unsigned char*)key, DE1);
+    for(i = 0; i < eightbyteblocks; ++i)
+	rfbDes((unsigned char*)in + i*8, out + i*8);
+
+    *out_len = in_len;
+
+    return 1;
 }
 
 int encrypt_aes128ecb(void *out, int *out_len, const void *key, const void *in, const size_t in_len)

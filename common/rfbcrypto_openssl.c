@@ -29,6 +29,13 @@
 #include <openssl/evp.h>
 #include "rfbcrypto.h"
 
+static unsigned char reverseByte(unsigned char b) {
+   b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+   b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+   b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+   return b;
+}
+
 int hash_md5(void *out, const void *in, const size_t in_len)
 {
     MD5_CTX md5;
@@ -56,6 +63,54 @@ int hash_sha1(void *out, const void *in, const size_t in_len)
 void random_bytes(void *out, size_t len)
 {
     RAND_bytes(out, len);
+}
+
+int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
+{
+    int result = 0;
+    EVP_CIPHER_CTX *des;
+    unsigned char mungedkey[8];
+    int i;
+
+    for (i = 0; i < 8; i++)
+      mungedkey[i] = reverseByte(key[i]);
+
+    if(!(des = EVP_CIPHER_CTX_new()))
+	goto out;
+    if(!EVP_EncryptInit_ex(des, EVP_des_ecb(), NULL, mungedkey, NULL))
+	goto out;
+    if(!EVP_EncryptUpdate(des, out, out_len, in, in_len))
+	goto out;
+
+    result = 1;
+
+ out:
+    EVP_CIPHER_CTX_free(des);
+    return result;
+}
+
+int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
+{
+    int result = 0;
+    EVP_CIPHER_CTX *des;
+    unsigned char mungedkey[8];
+    int i;
+
+    for (i = 0; i < 8; i++)
+      mungedkey[i] = reverseByte(key[i]);
+
+    if(!(des = EVP_CIPHER_CTX_new()))
+	goto out;
+    if(!EVP_DecryptInit_ex(des, EVP_des_ecb(), NULL, mungedkey, NULL))
+	goto out;
+    if(!EVP_DecryptUpdate(des, out, out_len, in, in_len))
+	goto out;
+
+    result = 1;
+
+ out:
+    EVP_CIPHER_CTX_free(des);
+    return result;
 }
 
 int encrypt_aes128ecb(void *out, int *out_len, const void *key, const void *in, const size_t in_len)

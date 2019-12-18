@@ -16,6 +16,18 @@ int hash_sha1(void *out, const void *in, const size_t in_len);
 /* Fill 'out' with 'len' random bytes. */
 void random_bytes(void *out, size_t len);
 
+/*
+  Takes the 8-byte key in 'key', reverses the bits in each byte of key as required by the RFB protocol,
+  encrypts 'in' with the resulting key using single-key 56-bit DES and writes the result to 'out'.
+ */
+int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len);
+
+/*
+  Takes the 8-byte key in 'key', reverses the bits in each byte of key as required by the RFB protocol,
+  decrypts 'in' with the resulting key using single-key 56-bit DES and writes the result to 'out'.
+ */
+int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len);
+
 /* Encrypts 'in' with the the 16-byte key in 'key' using AES-128-ECB and writes the result to 'out'. */
 int encrypt_aes128ecb(void *out, int *out_len, const void *key, const void *in, const size_t in_len);
 

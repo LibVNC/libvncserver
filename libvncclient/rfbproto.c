@@ -2370,4 +2370,3 @@ PrintPixelFormat(rfbPixelFormat *format)
 #define rfbUseKey rfbClientUseKey
 
 #include "vncauth.c"
-#include "d3des.c"
