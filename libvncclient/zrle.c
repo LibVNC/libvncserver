@@ -106,6 +106,9 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 		client->raw_buffer_size = min_buffer_size;
 		client->raw_buffer = (char*) malloc( client->raw_buffer_size );
 
+		if (client->raw_buffer == NULL) {
+			return FALSE;
+		}
 	}
 
 	if (!ReadFromRFBServer(client, (char *)&header, sz_rfbZRLEHeader))
