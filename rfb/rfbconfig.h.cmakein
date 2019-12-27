@@ -146,7 +146,7 @@
 #define LIBVNCSERVER_VERSION_PATCHLEVEL "@LibVNCServer_VERSION_PATCH@"
 
 /* Define to 1 if libgcrypt is present */
-#cmakedefine LIBVNCSERVER_WITH_CLIENT_GCRYPT 1
+#cmakedefine LIBVNCSERVER_HAVE_LIBGCRYPT 1
 
 /* Define to 1 if GnuTLS is present */
 #cmakedefine LIBVNCSERVER_HAVE_GNUTLS 1
