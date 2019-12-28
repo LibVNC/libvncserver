@@ -88,6 +88,23 @@ LibVNCServer uses CMake, so you can build via:
     cmake ..
     cmake --build .
 
+Crypto support in LibVNCClient and LibVNCServer can use different backends:
+
+ * OpenSSL   (`-DWITH_OPENSSL=ON -DWITH_GCRYPT=OFF`)
+   * Supports all authentication methods in LibVNCClient and LibVNCServer.
+   * Supports WebSockets in LibVNCServer.
+ * Libgcrypt (`-DWITH_OPENSSL=OFF -DWITH_GCRYPT=ON`)
+   * Supports all authentication methods in LibVNCClient and LibVNCServer.
+   * Supports WebSockets in LibVNCServer.
+ * Included  (`-DWITH_OPENSSL=OFF -DWITH_GCRYPT=OFF`)
+   * Supports _only VNC authentication_ in LibVNCClient and LibVNCServer.
+   * Supports WebSockets in LibVNCServer.
+
+Transport Layer Security support in LibVNCClient and LibVNCServer can use:
+
+ * OpenSSL (`-DWITH_OPENSSL=ON -DWITH_GNUTLS=OFF`)
+ * GnuTLS  (`-DWITH_OPENSSL=OFF -DWITH_GNUTLS=ON`)
+
 For some more comprehensive examples that include installation of dependencies, see
 the [Unix CI](.travis.yml) and [Windows CI](.appveyor.yml) build setups.
 
