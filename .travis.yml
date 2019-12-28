@@ -6,17 +6,20 @@ os:
   - linux
   - osx
 
-compiler:
-  - gcc
-  - clang
+env:
+  - CMAKE_OPTIONS="-DWITH_OPENSSL=ON  -DWITH_GNUTLS=OFF -DWITH_GCRYPT=OFF" # build with OpenSSL
+  - CMAKE_OPTIONS="-DWITH_OPENSSL=OFF -DWITH_GNUTLS=ON  -DWITH_GCRYPT=ON"  # build with GnuTLS and Libgrypt
+  - CMAKE_OPTIONS="-DWITH_OPENSSL=OFF -DWITH_GNUTLS=OFF -DWITH_GCRYPT=OFF" # build without external encryption libraries
 
-# Build steps
+before_install:
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get update; sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev liblzo2-dev gnutls-dev libgcrypt-dev; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update; brew install sdl2 lzo; fi
+
 script:
   - mkdir build
   - cd build
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then sudo apt-get update; sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev liblzo2-dev; fi
-  - if [[ "${TRAVIS_OS_NAME}" == "osx" ]]; then brew update; brew install sdl2; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cmake .. -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl; else cmake ..; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then cmake $CMAKE_OPTIONS .. ; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then cmake $CMAKE_OPTIONS -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl .. ; fi
   - cmake --build .
   - ctest --output-on-failure
 

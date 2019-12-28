@@ -38,10 +38,10 @@ option(WITH_JPEG "Search for the libjpeg compression library to support addition
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
 option(WITH_THREADS "Search for a threading library to build with multithreading support" ON)
-option(WITH_GNUTLS "Search for the GnuTLS secure communications library to support encryption" ON)
-option(WITH_OPENSSL "Search for the OpenSSL cryptography library to support encryption" ON)
+option(WITH_GNUTLS "Search for the GnuTLS secure communications library to support TLS" ON)
+option(WITH_OPENSSL "Search for the OpenSSL cryptography library to support TLS and use as crypto backend" ON)
 option(WITH_SYSTEMD "Search for libsystemd to build with systemd socket activation support" ON)
-option(WITH_GCRYPT "Search for libgcrypt to support additional authentication methods in LibVNCClient" ON)
+option(WITH_GCRYPT "Search for Libgcrypt to use as crypto backend" ON)
 option(WITH_FFMPEG "Search for FFMPEG to build an example VNC to MPEG encoder" ON)
 option(WITH_TIGHTVNC_FILETRANSFER "Enable filetransfer if there is pthreads support" ON)
 option(WITH_24BPP "Allow 24 bpp" ON)
@@ -153,7 +153,6 @@ check_include_file("sys/time.h"    LIBVNCSERVER_HAVE_SYS_TIME_H)
 check_include_file("sys/types.h"   LIBVNCSERVER_HAVE_SYS_TYPES_H)
 check_include_file("sys/wait.h"    LIBVNCSERVER_HAVE_SYS_WAIT_H)
 check_include_file("unistd.h"      LIBVNCSERVER_HAVE_UNISTD_H)
-check_include_file("sys/uio.h"     LIBVNCSERVER_HAVE_SYS_UIO_H)
 check_include_file("sys/resource.h"     LIBVNCSERVER_HAVE_SYS_RESOURCE_H)
 
 
@@ -225,31 +224,26 @@ if(SYSTEMD_FOUND)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${SYSTEMD_LIBRARIES})
 endif(SYSTEMD_FOUND)
 
-if(LIBVNCSERVER_HAVE_SYS_UIO_H)
-  if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
-    message(STATUS "Building crypto with Libgcrypt")
-    set(CRYPTO_LIBRARIES ${LIBGCRYPT_LIBRARIES})
-    set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_libgcrypt)
-  elseif(OPENSSL_FOUND)
-    message(STATUS "Building crypto with OpenSSL")
-    set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
-    set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_openssl)
-  else()
-    message(STATUS "Building crypto with builtin functions")
-    set(CRYPTO_SOURCES ${COMMON_DIR}/rfbcrypto_included.c ${COMMON_DIR}/md5.c ${COMMON_DIR}/sha1.c)
-  endif()
-  set(LIBVNCSERVER_HAVE_CRYPTO 1)
-endif(LIBVNCSERVER_HAVE_SYS_UIO_H)
+# common crypto used by both libvncserver and libvncclient
+if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
+  message(STATUS "Building crypto with Libgcrypt")
+  set(CRYPTO_LIBRARIES ${LIBGCRYPT_LIBRARIES})
+  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt)
+elseif(OPENSSL_FOUND)
+  message(STATUS "Building crypto with OpenSSL")
+  set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
+  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl)
+else()
+  message(STATUS "Building crypto with builtin functions, only including SHA1 and D3DES")
+  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_included.c ${COMMON_DIR}/sha1.c ${COMMON_DIR}/d3des.c)
+endif()
 
-
-if(WITH_WEBSOCKETS AND LIBVNCSERVER_HAVE_CRYPTO AND (LIBVNCSERVER_HAVE_HTOBE64 OR LIBVNCSERVER_HAVE_OSSWAPHOSTTOBIGINT64))
+if(WITH_WEBSOCKETS AND (LIBVNCSERVER_HAVE_HTOBE64 OR LIBVNCSERVER_HAVE_OSSWAPHOSTTOBIGINT64))
   set(LIBVNCSERVER_WITH_WEBSOCKETS 1)
 endif()
 
 if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
-  message(STATUS "Found libgcrypt: ${LIBGCRYPT_LIBRARIES}")
-  set(LIBVNCSERVER_WITH_CLIENT_GCRYPT 1)
-  set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${LIBGCRYPT_LIBRARIES})
+  set(LIBVNCSERVER_HAVE_LIBGCRYPT 1)
 endif(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
 
 if(GNUTLS_FOUND)
@@ -257,6 +251,7 @@ if(GNUTLS_FOUND)
 endif(GNUTLS_FOUND)
 
 if(OPENSSL_FOUND)
+  include_directories(${OPENSSL_INCLUDE_DIR})
   set(LIBVNCSERVER_HAVE_LIBSSL 1)
 endif(OPENSSL_FOUND)
 
@@ -332,11 +327,11 @@ set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/font.c
     ${LIBVNCSERVER_DIR}/draw.c
     ${LIBVNCSERVER_DIR}/selbox.c
-    ${COMMON_DIR}/d3des.c
     ${COMMON_DIR}/vncauth.c
     ${LIBVNCSERVER_DIR}/cargs.c
     ${LIBVNCSERVER_DIR}/ultra.c
     ${LIBVNCSERVER_DIR}/scale.c
+    ${CRYPTO_SOURCES}
 )
 
 set(LIBVNCCLIENT_SOURCES
@@ -345,6 +340,7 @@ set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/rfbproto.c
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
+    ${CRYPTO_SOURCES}
 )
 
 if(JPEG_FOUND)
@@ -355,6 +351,7 @@ if(JPEG_FOUND)
 endif()
 
 if(GNUTLS_FOUND)
+  message(STATUS "Building TLS with GnuTLS")
   set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_SOURCES}
     ${LIBVNCCLIENT_DIR}/tls_gnutls.c
@@ -365,6 +362,7 @@ if(GNUTLS_FOUND)
     )
   include_directories(${GNUTLS_INCLUDE_DIR})
 elseif(OPENSSL_FOUND)
+  message(STATUS "Building TLS with OpenSSL")
   set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_SOURCES}
     ${LIBVNCCLIENT_DIR}/tls_openssl.c
@@ -375,6 +373,7 @@ elseif(OPENSSL_FOUND)
   )
   include_directories(${OPENSSL_INCLUDE_DIR})
 else()
+  message(STATUS "Building without TLS")
   set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_SOURCES}
     ${LIBVNCCLIENT_DIR}/tls_none.c
@@ -451,7 +450,6 @@ if(LIBVNCSERVER_WITH_WEBSOCKETS)
     ${LIBVNCSERVER_DIR}/websockets.c
     ${LIBVNCSERVER_DIR}/ws_decode.c
     ${COMMON_DIR}/base64.c
-    ${CRYPTO_SOURCES}
   )
 endif(LIBVNCSERVER_WITH_WEBSOCKETS)
 
@@ -466,6 +464,7 @@ target_link_libraries(vncclient
                       ${ZLIB_LIBRARIES}
                       ${LZO_LIBRARIES}
                       ${JPEG_LIBRARIES}
+		      ${CRYPTO_LIBRARIES}
                       ${GNUTLS_LIBRARIES}
                       ${OPENSSL_LIBRARIES}
 )

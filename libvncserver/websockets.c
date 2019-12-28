@@ -50,7 +50,7 @@
 #endif
 #include "rfb/rfbconfig.h"
 #include "rfbssl.h"
-#include "rfbcrypto.h"
+#include "crypto.h"
 #include "ws_decode.h"
 #include "base64.h"
 
@@ -106,14 +106,11 @@ min (int a, int b) {
 
 static void webSocketsGenSha1Key(char *target, int size, char *key)
 {
-    struct iovec iov[2];
-    unsigned char hash[20];
-
-    iov[0].iov_base = key;
-    iov[0].iov_len = strlen(key);
-    iov[1].iov_base = GUID;
-    iov[1].iov_len = sizeof(GUID) - 1;
-    digestsha1(iov, 2, hash);
+    unsigned char hash[SHA1_HASH_SIZE];
+    char tmp[strlen(key) + sizeof(GUID) - 1];
+    memcpy(tmp, key, strlen(key));
+    memcpy(tmp + strlen(key), GUID, sizeof(GUID) - 1);
+    hash_sha1(hash, tmp, sizeof(tmp));
     if (-1 == rfbBase64NtoP(hash, sizeof(hash), target, size))
 	rfbErr("rfbBase64NtoP failed\n");
 }

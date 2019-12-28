@@ -35,7 +35,7 @@
 #include <unistd.h>
 #endif
 #include <rfb/rfbproto.h>
-#include "d3des.h"
+#include "crypto.h"
 
 #include <string.h>
 #include <math.h>
@@ -77,6 +77,7 @@ rfbEncryptAndStorePasswd(char *passwd, char *fname)
     FILE *fp;
     unsigned int i;
     unsigned char encryptedPasswd[8];
+    int out_len;
 
     if ((fp = fopen(fname,"w")) == NULL) return 1;
 
@@ -97,9 +98,7 @@ rfbEncryptAndStorePasswd(char *passwd, char *fname)
 
     /* Do encryption in-place - this way we overwrite our copy of the plaintext
        password */
-
-    rfbDesKey(fixedkey, EN0);
-    rfbDes(encryptedPasswd, encryptedPasswd);
+    encrypt_rfbdes(encryptedPasswd, &out_len, fixedkey, encryptedPasswd, sizeof(encryptedPasswd));
 
     for (i = 0; i < 8; i++) {
 	putc(encryptedPasswd[i], fp);
@@ -122,6 +121,7 @@ rfbDecryptPasswdFromFile(char *fname)
     FILE *fp;
     int i, ch;
     unsigned char *passwd = (unsigned char *)malloc(9);
+    int out_len;
 
     if ((fp = fopen(fname,"r")) == NULL) {
 	free(passwd);
@@ -140,8 +140,8 @@ rfbDecryptPasswdFromFile(char *fname)
 
     fclose(fp);
 
-    rfbDesKey(fixedkey, DE1);
-    rfbDes(passwd, passwd);
+    if(!decrypt_rfbdes(passwd, &out_len, fixedkey, passwd, 8))
+	return NULL;
 
     passwd[8] = 0;
 
@@ -181,6 +181,7 @@ rfbEncryptBytes(unsigned char *bytes, char *passwd)
 {
     unsigned char key[8];
     unsigned int i;
+    int out_len;
 
     /* key is simply password padded with nulls */
 
@@ -192,24 +193,19 @@ rfbEncryptBytes(unsigned char *bytes, char *passwd)
 	}
     }
 
-    rfbDesKey(key, EN0);
-
-    for (i = 0; i < CHALLENGESIZE; i += 8) {
-	rfbDes(bytes+i, bytes+i);
-    }
+    encrypt_rfbdes(bytes, &out_len, key, bytes, CHALLENGESIZE);
 }
 
 void
 rfbEncryptBytes2(unsigned char *where, const int length, unsigned char *key) {
-  int i, j;
-  rfbDesKey(key, EN0);
+  int i, j, out_len;
   for (i = 0; i< 8; i++)
     where[i] ^= key[i];
-  rfbDes(where, where);
+  encrypt_rfbdes(where, &out_len, key, where, 8);
   for (i = 8; i < length; i += 8) {
     for (j = 0; j < 8; j++) {
       where[i + j] ^= where[i + j - 8];
     }
-    rfbDes(where + i, where + i);
+    encrypt_rfbdes(where + i, &out_len, key, where + i, 8);
   }
 }

@@ -32,10 +32,6 @@ extern void rfbDesKey(unsigned char *, int);
  * for encryption or decryption according to MODE.
  */
 
-extern void rfbUseKey(unsigned long *);
-/*		    cookedkey[32]
- * Loads the internal key register with the data in cookedkey.
- */
 
 extern void rfbDes(unsigned char *, unsigned char *);
 /*		    from[8]	      to[8]
