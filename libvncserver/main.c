@@ -1152,6 +1152,8 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
       write(currentCl->pipe_notify_client_thread[1], "\x00", 1);
       /* And wait for it to finish. */
       pthread_join(currentCl->client_thread, NULL);
+    } else {
+      rfbClientConnectionGone(currentCl);
     }
 #else
       rfbClientConnectionGone(currentCl);
