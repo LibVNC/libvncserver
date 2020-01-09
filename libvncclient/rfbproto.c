@@ -37,7 +37,6 @@
 #include <errno.h>
 #include <rfb/rfbclient.h>
 #ifdef WIN32
-#undef SOCKET
 #undef socklen_t
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -318,7 +317,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
       fclose(rec->file);
       return FALSE;
     }
-    client->sock = -1;
+    client->sock = RFB_INVALID_SOCKET;
     return TRUE;
   }
 
@@ -331,7 +330,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
   {
 #ifdef LIBVNCSERVER_IPv6
     client->sock = ConnectClientToTcpAddr6(hostname, port);
-    if (client->sock == -1)
+    if (client->sock == RFB_INVALID_SOCKET)
 #endif
     {
       unsigned int host;
@@ -345,7 +344,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     }
   }
 
-  if (client->sock < 0) {
+  if (client->sock == RFB_INVALID_SOCKET) {
     rfbClientLog("Unable to connect to VNC server\n");
     return FALSE;
   }
@@ -380,7 +379,7 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
     client->sock = ConnectClientToTcpAddr(host, repeaterPort);
   }
 
-  if (client->sock < 0) {
+  if (client->sock == RFB_INVALID_SOCKET) {
     rfbClientLog("Unable to connect to VNC repeater\n");
     return FALSE;
   }

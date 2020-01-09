@@ -39,7 +39,6 @@
 #include <rfb/rfbclient.h>
 
 #ifdef WIN32
-#undef SOCKET
 #include <winsock2.h>
 #ifdef EWOULDBLOCK
 #undef EWOULDBLOCK

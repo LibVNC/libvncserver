@@ -22,7 +22,6 @@
 #include <rfb/rfbclient.h>
 #include <errno.h>
 #ifdef WIN32
-#undef SOCKET
 #include <windows.h>           /* for Sleep() */
 #define sleep(X) Sleep(1000*X) /* MinGW32 has no sleep() */
 #include <winsock2.h>
