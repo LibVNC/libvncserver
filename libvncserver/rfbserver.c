@@ -253,7 +253,7 @@ rfbReleaseClientIterator(rfbClientIteratorPtr iterator)
 
 void
 rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,
-                       int sock)
+                       rfbSocket sock)
 {
     rfbNewClient(rfbScreen,sock);
 }
@@ -269,7 +269,7 @@ rfbReverseConnection(rfbScreenInfoPtr rfbScreen,
                      char *host,
                      int port)
 {
-    int sock;
+    rfbSocket sock;
     rfbClientPtr cl;
 
     if ((sock = rfbConnect(rfbScreen, host, port)) < 0)
@@ -306,7 +306,7 @@ rfbSetProtocolVersion(rfbScreenInfoPtr rfbScreen, int major_, int minor_)
 
 static rfbClientPtr
 rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
-                     int sock,
+                     rfbSocket sock,
                      rfbBool isUDP)
 {
     rfbProtocolVersionMsg pv;
@@ -522,7 +522,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
 rfbClientPtr
 rfbNewClient(rfbScreenInfoPtr rfbScreen,
-             int sock)
+             rfbSocket sock)
 {
   return(rfbNewTCPOrUDPClient(rfbScreen,sock,FALSE));
 }
@@ -3760,7 +3760,7 @@ static unsigned char ptrAcceleration = 50;
 
 void
 rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,
-                    int sock)
+                    rfbSocket sock)
 {
   if (write(sock, (char*) &ptrAcceleration, 1) < 0) {
 	rfbLogPerror("rfbNewUDPConnection: write");
