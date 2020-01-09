@@ -57,7 +57,7 @@ int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
     int i;
     rfbDesKey((unsigned char*)key, EN0);
     for(i = 0; i < eightbyteblocks; ++i)
-	rfbDes((unsigned char*)in + i*8, out + i*8);
+	rfbDes((unsigned char*)in + i*8, (unsigned char*)out + i*8);
 
     *out_len = in_len;
 
@@ -70,7 +70,7 @@ int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
     int i;
     rfbDesKey((unsigned char*)key, DE1);
     for(i = 0; i < eightbyteblocks; ++i)
-	rfbDes((unsigned char*)in + i*8, out + i*8);
+	rfbDes((unsigned char*)in + i*8, (unsigned char*)out + i*8);
 
     *out_len = in_len;
 
