@@ -362,7 +362,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       rfbLog("  %lu other clients\n", (unsigned long) otherClientsCount);
 
       if(!rfbSetNonBlocking(sock)) {
-	close(sock);
+	rfbCloseSocket(sock);
 	return NULL;
       }
 
@@ -571,7 +571,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
 #endif
 
     if(cl->sock>=0)
-	close(cl->sock);
+	rfbCloseSocket(cl->sock);
 
     if (cl->scaledScreen!=NULL)
         cl->scaledScreen->scaledScreenRefCount--;

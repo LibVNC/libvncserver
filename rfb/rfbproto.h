@@ -93,6 +93,7 @@ typedef int8_t rfbBool;
 #ifdef WIN32
 #define rfbSocket SOCKET
 #define RFB_INVALID_SOCKET INVALID_SOCKET
+#define rfbCloseSocket closesocket
 #else
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -103,6 +104,7 @@ typedef int8_t rfbBool;
 #define rfbSocket int
 #define SOCKET int /* LibVNCServer versions older than 0.9.13 defined this for non-Windows, so keep it here */
 #define RFB_INVALID_SOCKET (-1)
+#define rfbCloseSocket close
 typedef int8_t rfbBool;
 #undef FALSE
 #define FALSE 0

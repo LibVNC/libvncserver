@@ -46,7 +46,6 @@
 #include <io.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#define close closesocket
 #define strcasecmp _stricmp 
 #if defined(_MSC_VER)
 #include <BaseTsd.h> /* For the missing ssize_t */
@@ -139,19 +138,19 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
 
 void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
     if(rfbScreen->httpSock>-1) {
-	close(rfbScreen->httpSock);
+	rfbCloseSocket(rfbScreen->httpSock);
 	FD_CLR(rfbScreen->httpSock,&rfbScreen->allFds);
 	rfbScreen->httpSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->httpListenSock>-1) {
-	close(rfbScreen->httpListenSock);
+	rfbCloseSocket(rfbScreen->httpListenSock);
 	FD_CLR(rfbScreen->httpListenSock,&rfbScreen->allFds);
 	rfbScreen->httpListenSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->httpListen6Sock>-1) {
-	close(rfbScreen->httpListen6Sock);
+	rfbCloseSocket(rfbScreen->httpListen6Sock);
 	FD_CLR(rfbScreen->httpListen6Sock,&rfbScreen->allFds);
 	rfbScreen->httpListen6Sock=RFB_INVALID_SOCKET;
     }
@@ -209,7 +208,7 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
     }
 
     if (FD_ISSET(rfbScreen->httpListenSock, &fds) || FD_ISSET(rfbScreen->httpListen6Sock, &fds)) {
-	if (rfbScreen->httpSock != RFB_INVALID_SOCKET) close(rfbScreen->httpSock);
+	if (rfbScreen->httpSock != RFB_INVALID_SOCKET) rfbCloseSocket(rfbScreen->httpSock);
 
 	if(FD_ISSET(rfbScreen->httpListenSock, &fds)) {
 	    if ((rfbScreen->httpSock = accept(rfbScreen->httpListenSock, (struct sockaddr *)&addr, &addrlen)) == RFB_INVALID_SOCKET) {
@@ -238,13 +237,13 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
 		      STRING_UNKNOWN)) {
 	  rfbLog("Rejected HTTP connection from client %s\n",
 		 host);
-	  close(rfbScreen->httpSock);
+	  rfbCloseSocket(rfbScreen->httpSock);
 	  rfbScreen->httpSock=RFB_INVALID_SOCKET;
 	  return;
 	}
 #endif
         if(!rfbSetNonBlocking(rfbScreen->httpSock)) {
-	    close(rfbScreen->httpSock);
+	    rfbCloseSocket(rfbScreen->httpSock);
 	    rfbScreen->httpSock=RFB_INVALID_SOCKET;
 	    return;
 	}
@@ -256,7 +255,7 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
 static void
 httpCloseSock(rfbScreenInfoPtr rfbScreen)
 {
-    close(rfbScreen->httpSock);
+    rfbCloseSocket(rfbScreen->httpSock);
     rfbScreen->httpSock = RFB_INVALID_SOCKET;
     buf_filled = 0;
 }

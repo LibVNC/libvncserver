@@ -52,7 +52,6 @@ static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 static char* NoPassword(rfbClient* client) {
   return strdup("");
 }
-#define close closesocket
 #else
 #include <stdio.h>
 #include <termios.h>
@@ -533,9 +532,9 @@ void rfbClientCleanup(rfbClient* client) {
   }
 
   if (client->sock != RFB_INVALID_SOCKET)
-    close(client->sock);
+    rfbCloseSocket(client->sock);
   if (client->listenSock != RFB_INVALID_SOCKET)
-    close(client->listenSock);
+    rfbCloseSocket(client->listenSock);
   free(client->desktopName);
   free(client->serverHost);
   if (client->destHost)

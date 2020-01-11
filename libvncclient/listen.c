@@ -30,7 +30,6 @@
 #endif
 #include <sys/types.h>
 #ifdef WIN32
-#define close closesocket
 #include <winsock2.h>
 #else // #ifdef WIN32
 #include <sys/wait.h>
@@ -123,13 +122,13 @@ listenForIncomingConnections(rfbClient* client)
 
       case 0:
 	/* child - return to caller */
-	close(listenSocket);
-	close(listen6Socket);
+	rfbCloseSocket(listenSocket);
+	rfbCloseSocket(listen6Socket);
 	return;
 
       default:
 	/* parent - go round and listen again */
-	close(client->sock); 
+	rfbCloseSocket(client->sock);
 	break;
       }
     }
@@ -213,11 +212,11 @@ listenForIncomingConnectionsNoFork(rfbClient* client, int timeout)
 	return -1;
 
       if(client->listenSock != RFB_INVALID_SOCKET) {
-	close(client->listenSock);
+	rfbCloseSocket(client->listenSock);
 	client->listenSock = RFB_INVALID_SOCKET;
       }
       if(client->listen6Sock != RFB_INVALID_SOCKET) {
-	close(client->listen6Sock);
+	rfbCloseSocket(client->listen6Sock);
 	client->listen6Sock = RFB_INVALID_SOCKET;
       }
       return r;

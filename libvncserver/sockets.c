@@ -122,7 +122,6 @@ int deny_severity=LOG_WARNING;
 #define ETIMEDOUT WSAETIMEDOUT
 #define write(sock,buf,len) send(sock,buf,len,0)
 #else
-#define closesocket close
 #endif
 
 #ifdef _MSC_VER
@@ -150,7 +149,7 @@ rfbNewConnectionFromSock(rfbScreenInfoPtr rfbScreen, rfbSocket sock)
 
     if(!rfbSetNonBlocking(sock)) {
       rfbLogPerror("rfbCheckFds: setnonblock");
-      closesocket(sock);
+      rfbCloseSocket(sock);
       return FALSE;
     }
 
@@ -164,7 +163,7 @@ rfbNewConnectionFromSock(rfbScreenInfoPtr rfbScreen, rfbSocket sock)
 		  STRING_UNKNOWN)) {
       rfbLog("Rejected connection from client %s\n",
 	     inet_ntoa(addr.sin_addr));
-      closesocket(sock);
+      rfbCloseSocket(sock);
       return FALSE;
     }
 #endif
@@ -324,25 +323,25 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
     rfbScreen->socketState = RFB_SOCKET_SHUTDOWN;
 
     if(rfbScreen->inetdSock!=RFB_INVALID_SOCKET) {
-	closesocket(rfbScreen->inetdSock);
+	rfbCloseSocket(rfbScreen->inetdSock);
 	FD_CLR(rfbScreen->inetdSock,&rfbScreen->allFds);
 	rfbScreen->inetdSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->listenSock!=RFB_INVALID_SOCKET) {
-	closesocket(rfbScreen->listenSock);
+	rfbCloseSocket(rfbScreen->listenSock);
 	FD_CLR(rfbScreen->listenSock,&rfbScreen->allFds);
 	rfbScreen->listenSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->listen6Sock!=RFB_INVALID_SOCKET) {
-	closesocket(rfbScreen->listen6Sock);
+	rfbCloseSocket(rfbScreen->listen6Sock);
 	FD_CLR(rfbScreen->listen6Sock,&rfbScreen->allFds);
 	rfbScreen->listen6Sock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->udpSock!=RFB_INVALID_SOCKET) {
-	closesocket(rfbScreen->udpSock);
+	rfbCloseSocket(rfbScreen->udpSock);
 	FD_CLR(rfbScreen->udpSock,&rfbScreen->allFds);
 	rfbScreen->udpSock=RFB_INVALID_SOCKET;
     }
@@ -535,7 +534,7 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
     if(curfds > maxfds * rfbScreen->fdQuota) {
 	rfbErr("rfbProcessNewconnection: open fd count of %lu exceeds quota %.1f of limit %lu, denying connection\n", curfds, rfbScreen->fdQuota, maxfds);
 	sock = accept(chosen_listen_sock, NULL, NULL);
-	close(sock);
+	rfbCloseSocket(sock);
 	return FALSE;
     }
 #endif
@@ -584,7 +583,7 @@ rfbCloseClient(rfbClientPtr cl)
 #ifndef __MINGW32__
 	shutdown(cl->sock,SHUT_RDWR);
 #endif
-	closesocket(cl->sock);
+	rfbCloseSocket(cl->sock);
 	cl->sock = RFB_INVALID_SOCKET;
       }
     TSIGNAL(cl->updateCond);
@@ -613,7 +612,7 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
     }
 
     if(!rfbSetNonBlocking(sock)) {
-        closesocket(sock);
+        rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
 
@@ -937,15 +936,15 @@ rfbListenOnTCPPort(int port,
     }
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 		   (char *)&one, sizeof(one)) < 0) {
-	closesocket(sock);
+	rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-	closesocket(sock);
+	rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
     if (listen(sock, 32) < 0) {
-	closesocket(sock);
+	rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
 
@@ -989,7 +988,7 @@ rfbListenOnTCP6Port(int port,
 	/* we have separate IPv4 and IPv6 sockets since some OS's do not support dual binding */
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof(one)) < 0) {
 	  rfbLogPerror("rfbListenOnTCP6Port error in setsockopt IPV6_V6ONLY");
-	  closesocket(sock);
+	  rfbCloseSocket(sock);
 	  freeaddrinfo(servinfo);
 	  return RFB_INVALID_SOCKET;
 	}
@@ -997,13 +996,13 @@ rfbListenOnTCP6Port(int port,
 
 	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one)) < 0) {
 	  rfbLogPerror("rfbListenOnTCP6Port: error in setsockopt SO_REUSEADDR");
-	  closesocket(sock);
+	  rfbCloseSocket(sock);
 	  freeaddrinfo(servinfo);
 	  return RFB_INVALID_SOCKET;
 	}
 
 	if (bind(sock, p->ai_addr, p->ai_addrlen) < 0) {
-	  closesocket(sock);
+	  rfbCloseSocket(sock);
 	  continue;
 	}
 
@@ -1021,7 +1020,7 @@ rfbListenOnTCP6Port(int port,
 
     if (listen(sock, 32) < 0) {
         rfbLogPerror("rfbListenOnTCP6Port: error in listen on IPv6 socket");
-	closesocket(sock);
+	rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
 
@@ -1057,7 +1056,7 @@ rfbConnectToTcpAddr(char *host,
             continue;
 
         if (connect(sock, p->ai_addr, p->ai_addrlen) < 0) {
-            closesocket(sock);
+            rfbCloseSocket(sock);
             continue;
         }
 
@@ -1094,7 +1093,7 @@ rfbConnectToTcpAddr(char *host,
     }
 
     if (connect(sock, (struct sockaddr *)&addr, (sizeof(addr))) < 0) {
-	closesocket(sock);
+	rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
 #endif
