@@ -139,7 +139,7 @@ if(WITH_GCRYPT)
 endif(WITH_GCRYPT)
 
 if(WITH_FFMPEG)
-  find_package(FFMPEG 3.1.0)
+  find_package(FFMPEG 3.1.0 COMPONENTS avformat avcodec avutil swscale)
 endif(WITH_FFMPEG)
 
 
