@@ -2,7 +2,6 @@ high-prio:
 ----------
 - Add sources for the java stuff.
 - Implement encryption in libvncserver.
-- Get rid of compat dir
 - Fix encodingstest
 
 
