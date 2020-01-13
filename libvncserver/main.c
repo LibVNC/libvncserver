@@ -1174,7 +1174,7 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
 #include <conio.h>
 #include <sys/timeb.h>
 
-void gettimeofday(struct timeval* tv,char* dummy)
+static void gettimeofday(struct timeval* tv,char* dummy)
 {
    SYSTEMTIME t;
    GetSystemTime(&t);
