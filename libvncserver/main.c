@@ -1169,7 +1169,7 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
   rfbHttpShutdownSockets(screen);
 }
 
-#ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
+#if !defined LIBVNCSERVER_HAVE_GETTIMEOFDAY && defined WIN32
 #include <fcntl.h>
 #include <conio.h>
 #include <sys/timeb.h>
