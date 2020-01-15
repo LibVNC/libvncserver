@@ -404,7 +404,7 @@ ConnectClientToTcpAddr6(const char *hostname, int port)
   memset(&hints, 0, sizeof(struct addrinfo));
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
-  if ((n = getaddrinfo(hostname, port_s, &hints, &res)))
+  if ((n = getaddrinfo(strcmp(hostname,"") == 0 ? "localhost": hostname, port_s, &hints, &res)))
   {
     rfbClientErr("ConnectClientToTcpAddr6: getaddrinfo (%s)\n", gai_strerror(n));
     return RFB_INVALID_SOCKET;
