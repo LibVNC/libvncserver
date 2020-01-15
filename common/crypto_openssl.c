@@ -27,6 +27,7 @@
 #include <openssl/md5.h>
 #include <openssl/dh.h>
 #include <openssl/evp.h>
+#include <openssl/rand.h>
 #include "crypto.h"
 
 static unsigned char reverseByte(unsigned char b) {
@@ -137,6 +138,10 @@ int dh_generate_keypair(uint8_t *priv_out, uint8_t *pub_out, const uint8_t *gen,
 {
     int result = 0;
     DH *dh;
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    const BIGNUM *pub_key = NULL;
+    const BIGNUM *priv_key = NULL;
+#endif
 
     if(!(dh = DH_new()))
 	goto out;
@@ -155,9 +160,10 @@ int dh_generate_keypair(uint8_t *priv_out, uint8_t *pub_out, const uint8_t *gen,
     if(BN_bn2bin(dh->pub_key, pub_out) == 0)
 	goto out;
 #else
-    if(BN_bn2binpad(DH_get0_priv_key(dh), priv_out, keylen) == -1)
+    DH_get0_key(dh, &pub_key, &priv_key);
+    if(BN_bn2binpad(priv_key, priv_out, keylen) == -1)
 	goto out;
-    if(BN_bn2binpad(DH_get0_pub_key(dh), pub_out, keylen) == -1)
+    if(BN_bn2binpad(pub_key, pub_out, keylen) == -1)
 	goto out;
 #endif
 
