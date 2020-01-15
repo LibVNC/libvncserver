@@ -131,7 +131,7 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet, int *nPayload)
 {
   int ret;
   char *headerDst = wsctx->codeBufDecode + wsctx->header.nRead;
-  int n = ((uint64_t)WSHLENMAX) - wsctx->header.nRead;
+  int n = ((uint64_t)WS_HYBI_HEADER_LEN_SHORT) - wsctx->header.nRead;
 
 
   ws_dbg("header_read to %p with len=%d\n", headerDst, n);
@@ -215,6 +215,31 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet, int *nPayload)
     goto err_cleanup_state;
   }
 
+  /* Read now the rest of the frame header, if it is longer as the minimum */
+  if ((wsctx->header.payloadLen == 126) || (wsctx->header.payloadLen == 127)) {
+    headerDst = wsctx->codeBufDecode + wsctx->header.nRead;
+    if (wsctx->header.payloadLen == 126) {
+      n = ((uint64_t)WS_HYBI_HEADER_LEN_EXTENDED) - wsctx->header.nRead;
+    } else if (wsctx->header.payloadLen == 127) {
+      n = ((uint64_t)WS_HYBI_HEADER_LEN_LONG) - wsctx->header.nRead;
+    }
+    ret = wsctx->ctxInfo.readFunc(wsctx->ctxInfo.ctxPtr, headerDst, n);
+    if (ret <= 0) {
+      if (-1 == ret) {
+        /* save errno because rfbErr() will tamper it */
+        int olderrno = errno;
+        rfbErr("%s: read; %s\n", __func__, strerror(errno));
+        errno = olderrno;
+        goto err_cleanup_state;
+      } else {
+        *sockRet = 0;
+        goto err_cleanup_state_sock_closed;
+      }
+    }
+
+    /* if more header data was read, account for it */
+    wsctx->header.nRead += ret;
+  }
 
   if (wsctx->header.payloadLen < 126 && wsctx->header.nRead >= 6) {
     wsctx->header.headerLen = WS_HYBI_HEADER_LEN_SHORT;
