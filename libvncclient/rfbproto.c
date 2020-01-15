@@ -367,7 +367,7 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 
 #ifdef LIBVNCSERVER_IPv6
   client->sock = ConnectClientToTcpAddr6(repeaterHost, repeaterPort);
-  if (client->sock == -1)
+  if (client->sock == RFB_INVALID_SOCKET)
 #endif
   {
     unsigned int host;
