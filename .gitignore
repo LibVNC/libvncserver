@@ -58,3 +58,6 @@ CMakeCache.txt
 /rfbproto.rst
 /vencrypt.txt
 /INSTALL
+.ccls-cache
+.log
+compile_commands.json
