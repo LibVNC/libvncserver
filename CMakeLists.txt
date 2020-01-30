@@ -128,10 +128,10 @@ if(WITH_OPENSSL)
 endif(WITH_OPENSSL)
 
 
-if(WITH_SYSTEMD AND NOT ANDROID)
+if(WITH_SYSTEMD AND NOT ANDROID AND NOT WIN32)
   find_package(PkgConfig)
   pkg_check_modules(SYSTEMD "libsystemd")
-endif(WITH_SYSTEMD AND NOT ANDROID)
+endif(WITH_SYSTEMD AND NOT ANDROID AND NOT WIN32)
 
 
 if(WITH_GCRYPT)
@@ -143,6 +143,7 @@ if(WITH_FFMPEG)
 endif(WITH_FFMPEG)
 
 
+check_include_file("dirent.h"      LIBVNCSERVER_HAVE_DIRENT_H)
 check_include_file("endian.h"      LIBVNCSERVER_HAVE_ENDIAN_H)
 check_include_file("fcntl.h"       LIBVNCSERVER_HAVE_FCNTL_H)
 check_include_file("netinet/in.h"  LIBVNCSERVER_HAVE_NETINET_IN_H)
@@ -457,6 +458,9 @@ add_library(vncclient ${LIBVNCCLIENT_SOURCES})
 add_library(vncserver ${LIBVNCSERVER_SOURCES})
 if(WIN32)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ws2_32)
+  if(WITH_TIGHTVNC_FILETRANSFER)
+    add_definitions(-D_WIN32_WINNT=0x0600)
+  endif(WITH_TIGHTVNC_FILETRANSFER)
 endif(WIN32)
 
 target_link_libraries(vncclient

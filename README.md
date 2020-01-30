@@ -108,16 +108,28 @@ Transport Layer Security support in LibVNCClient and LibVNCServer can use:
 For some more comprehensive examples that include installation of dependencies, see
 the [Unix CI](.travis.yml) and [Windows CI](.appveyor.yml) build setups.
 
-Crosscompiling involves some more advanced command line switches but is easily possible
-as well.
+Crosscompiling from Unix to Android
+-----------------------------------
 
-For instance, building for Android (see https://developer.android.com/ndk/guides/cmake.html as a reference):
+See https://developer.android.com/ndk/guides/cmake.html as a reference,
+but basically it boils down to:
 
     mkdir build
     cd build
     cmake .. -DANDROID_NDK=<path> -DCMAKE_TOOLCHAIN_FILE=<path> -DANDROID_NATIVE_API_LEVEL=<API level you want> -DWITH_PNG=OFF # NDK not shipping png per default
     cmake --build .
 
+Crosscompiling from Linux to Windows
+------------------------------------
+
+Tested with MinGW-w64 on Debian. You can make use of the [provided toolchain
+file](cmake/Toolchain-cross-mingw32-linux.cmake). It sets CMake to expect
+(optional) win32 dependencies like libjpeg and friends in the `deps` directory.
+
+	mkdir build
+	cd build
+	cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake ..
+	cmake --build .
 
 How to use
 ==========
