@@ -458,7 +458,9 @@ add_library(vncclient ${LIBVNCCLIENT_SOURCES})
 add_library(vncserver ${LIBVNCSERVER_SOURCES})
 if(WIN32)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ws2_32)
-  add_definitions(-D_WIN32_WINNT=0x0600)
+  if(WITH_TIGHTVNC_FILETRANSFER)
+    add_definitions(-D_WIN32_WINNT=0x0600)
+  endif(WITH_TIGHTVNC_FILETRANSFER)
 endif(WIN32)
 
 target_link_libraries(vncclient
