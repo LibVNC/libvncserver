@@ -58,18 +58,14 @@ static char* NoPassword(rfbClient* client) {
 #endif
 
 static char* ReadPassword(rfbClient* client) {
-#ifdef WIN32
-	/* FIXME */
-	rfbClientErr("ReadPassword on Windows NOT IMPLEMENTED\n");
-	return NoPassword(client);
-#else
 	int i;
-	char* p=malloc(9);
+	char* p=calloc(1,9);
+#ifndef WIN32
 	struct termios save,noecho;
-	p[0]=0;
 	if(tcgetattr(fileno(stdin),&save)!=0) return p;
 	noecho=save; noecho.c_lflag &= ~ECHO;
 	if(tcsetattr(fileno(stdin),TCSAFLUSH,&noecho)!=0) return p;
+#endif
 	fprintf(stderr,"Password: ");
 	i=0;
 	while(1) {
@@ -82,9 +78,10 @@ static char* ReadPassword(rfbClient* client) {
 			p[i]=0;
 		}
 	}
+#ifndef WIN32
 	tcsetattr(fileno(stdin),TCSAFLUSH,&save);
-	return p;
 #endif
+	return p;
 }
 static rfbBool MallocFrameBuffer(rfbClient* client) {
   uint64_t allocSize;
