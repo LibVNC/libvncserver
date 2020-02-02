@@ -328,21 +328,6 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
   return TRUE;
 }
 
-static int initSockets() {
-#ifdef WIN32
-  WSADATA trash;
-  static rfbBool WSAinitted=FALSE;
-  if(!WSAinitted) {
-    int i=WSAStartup(MAKEWORD(2,0),&trash);
-    if(i!=0) {
-      rfbClientErr("Couldn't init Windows Sockets\n");
-      return 0;
-    }
-    WSAinitted=TRUE;
-  }
-#endif
-  return 1;
-}
 
 /*
  * ConnectToTcpAddr connects to the given TCP port.
@@ -354,9 +339,6 @@ ConnectClientToTcpAddr(unsigned int host, int port)
   rfbSocket sock;
   struct sockaddr_in addr;
   int one = 1;
-
-  if (!initSockets())
-	  return RFB_INVALID_SOCKET;
 
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
@@ -396,9 +378,6 @@ ConnectClientToTcpAddr6(const char *hostname, int port)
   struct addrinfo hints, *res, *ressave;
   char port_s[10];
   int one = 1;
-
-  if (!initSockets())
-	  return RFB_INVALID_SOCKET;
 
   snprintf(port_s, 10, "%d", port);
   memset(&hints, 0, sizeof(struct addrinfo));
@@ -498,9 +477,6 @@ FindFreeTcpPort(void)
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-  if (!initSockets())
-    return -1;
-
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock == RFB_INVALID_SOCKET) {
     rfbClientErr(": FindFreeTcpPort: socket\n");
@@ -553,9 +529,6 @@ ListenAtTcpPortAndAddress(int port, const char *address)
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
   }
 
-  if (!initSockets())
-    return RFB_INVALID_SOCKET;
-
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock == RFB_INVALID_SOCKET) {
     rfbClientErr("ListenAtTcpPort: socket\n");
@@ -586,9 +559,6 @@ ListenAtTcpPortAndAddress(int port, const char *address)
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_PASSIVE; /* fill in wildcard address if address == NULL */
-
-  if (!initSockets())
-    return RFB_INVALID_SOCKET;
 
   if ((rv = getaddrinfo(address, port_str, &hints, &servinfo)) != 0) {
     rfbClientErr("ListenAtTcpPortAndAddress: error in getaddrinfo: %s\n", gai_strerror(rv));
@@ -763,9 +733,6 @@ StringToIPAddr(const char *str, unsigned int *addr)
 
   if (*addr != -1)
     return TRUE;
-
-  if (!initSockets())
-	  return FALSE;
 
   hp = gethostbyname(str);
 

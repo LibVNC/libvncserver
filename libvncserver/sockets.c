@@ -190,11 +190,22 @@ rfbNewConnectionFromSock(rfbScreenInfoPtr rfbScreen, rfbSocket sock)
 void
 rfbInitSockets(rfbScreenInfoPtr rfbScreen)
 {
+#ifdef WIN32
+    WSADATA unused;
+#endif
+
     in_addr_t iface = rfbScreen->listenInterface;
 
     if (rfbScreen->socketState == RFB_SOCKET_READY) {
         return;
     }
+
+#ifdef WIN32
+    if((errno = WSAStartup(MAKEWORD(2,0), &unused)) != 0) {
+	rfbLogPerror("Could not init Windows Sockets\n");
+	return;
+    }
+#endif
 
     rfbScreen->socketState = RFB_SOCKET_READY;
 
@@ -345,6 +356,13 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
 	FD_CLR(rfbScreen->udpSock,&rfbScreen->allFds);
 	rfbScreen->udpSock=RFB_INVALID_SOCKET;
     }
+
+#ifdef WIN32
+    if(WSACleanup() != 0) {
+	errno=WSAGetLastError();
+	rfbLogPerror("Could not terminate Windows Sockets\n");
+    }
+#endif
 }
 
 /*

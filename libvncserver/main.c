@@ -1113,18 +1113,6 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
 
 void rfbInitServer(rfbScreenInfoPtr screen)
 {
-#ifdef WIN32
-  WSADATA trash;
-  static rfbBool WSAinitted=FALSE;
-  if(!WSAinitted) {
-    int i=WSAStartup(MAKEWORD(2,0),&trash);
-    if(i!=0) {
-      rfbErr("Couldn't init Windows Sockets\n");
-      return;
-    }
-    WSAinitted=TRUE;
-  }
-#endif
   rfbInitSockets(screen);
   rfbHttpInitSockets(screen);
 #ifndef WIN32
@@ -1168,8 +1156,8 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
     rfbReleaseClientIterator(iter);
   }
 
-  rfbShutdownSockets(screen);
   rfbHttpShutdownSockets(screen);
+  rfbShutdownSockets(screen);
 }
 
 #if !defined LIBVNCSERVER_HAVE_GETTIMEOFDAY && defined WIN32

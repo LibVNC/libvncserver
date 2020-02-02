@@ -248,11 +248,20 @@ static void initAppData(AppData* data) {
 
 rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 			int bytesPerPixel) {
+#ifdef WIN32
+    WSADATA unused;
+#endif
   rfbClient* client=(rfbClient*)calloc(sizeof(rfbClient),1);
   if(!client) {
     rfbClientErr("Couldn't allocate client structure!\n");
     return NULL;
   }
+#ifdef WIN32
+  if((errno = WSAStartup(MAKEWORD(2,0), &unused)) != 0) {
+      rfbClientErr("Could not init Windows Sockets: %s\n", strerror(errno));
+      return NULL;
+  }
+#endif
   initAppData(&client->appData);
   client->endianTest = 1;
   client->programName="";
@@ -543,6 +552,13 @@ void rfbClientCleanup(rfbClient* client) {
   if (client->saslSecret)
     free(client->saslSecret);
 #endif /* LIBVNCSERVER_HAVE_SASL */
+
+#ifdef WIN32
+  if(WSACleanup() != 0) {
+      errno=WSAGetLastError();
+      rfbClientErr("Could not terminate Windows Sockets: %s\n", strerror(errno));
+  }
+#endif
 
   free(client);
 }
