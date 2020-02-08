@@ -76,6 +76,16 @@ https://www.virtualbox.org/
 Veyon
 https://veyon.io
 
+AQEMU
+http://aqemu.sourceforge.net/
+
+Remmina
+https://remmina.org/
+
+GNOME Remote Desktop
+https://wiki.gnome.org/Projects/Mutter/RemoteDesktop
+
+
 Mail us if your application is missing!
 
 How to build
