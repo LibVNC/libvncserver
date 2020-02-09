@@ -37,27 +37,7 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <rfb/rfbclient.h>
-#ifdef WIN32
-#include <winsock2.h>
-#ifdef EWOULDBLOCK
-#undef EWOULDBLOCK
-#endif
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define read(sock,buf,len) recv(sock,buf,len,0)
-#define write(sock,buf,len) send(sock,buf,len,0)
-#define socklen_t int
-#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
-#undef socklen_t
-#include <ws2tcpip.h>
-#endif
-#else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/un.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#endif
+#include "sockets.h"
 #include "tls.h"
 #include "sasl.h"
 

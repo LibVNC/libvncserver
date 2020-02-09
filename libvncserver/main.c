@@ -29,10 +29,7 @@
 #include <sys/types.h>
 #endif
 
-#ifndef WIN32
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
+#ifdef LIBVNCSERVER_HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
 

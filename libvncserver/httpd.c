@@ -41,32 +41,23 @@
 #include <fcntl.h>
 #endif
 #include <errno.h>
+#ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
 
 #ifdef WIN32
 #include <io.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#define strcasecmp _stricmp 
+#define strcasecmp _stricmp
 #if defined(_MSC_VER)
 #include <BaseTsd.h> /* For the missing ssize_t */
 #define ssize_t SSIZE_T
 #define read _read /* Prevent POSIX deprecation warnings */
 #endif
 #else
-#ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
-#include <sys/time.h>
-#endif
-#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
-#endif
-#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#endif
 #include <pwd.h>
 #endif
+
+#include "sockets.h"
 
 #ifdef USE_LIBWRAP
 #include <tcpd.h>

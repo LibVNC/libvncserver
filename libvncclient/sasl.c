@@ -38,22 +38,7 @@
 #include <errno.h>
 #include <rfb/rfbclient.h>
 
-#ifdef WIN32
-#include <winsock2.h>
-#ifdef EWOULDBLOCK
-#undef EWOULDBLOCK
-#endif
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define socklen_t int
-#define read(sock,buf,len) recv(sock,buf,len,0)
-#define write(sock,buf,len) send(sock,buf,len,0)
-#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
-#undef socklen_t
-#include <ws2tcpip.h>
-#endif /* LIBVNCSERVER_HAVE_WS2TCPIP_H */
-#else /* WIN32 */
-#include <arpa/inet.h>
-#endif /* WIN32 */
+#include "sockets.h"
 
 #include "sasl.h"
 

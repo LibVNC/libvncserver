@@ -24,9 +24,6 @@
 #ifdef WIN32
 #include <windows.h>           /* for Sleep() */
 #define sleep(X) Sleep(1000*X) /* MinGW32 has no sleep() */
-#include <winsock2.h>
-#define read(sock,buf,len) recv(sock,buf,len,0)
-#define write(sock,buf,len) send(sock,buf,len,0)
 #endif
 #include "tls.h"
 

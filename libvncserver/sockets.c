@@ -60,17 +60,8 @@
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
-#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
-#endif
 #ifdef LIBVNCSERVER_HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
-#endif
-#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <netdb.h>
-#include <arpa/inet.h>
 #endif
 #ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
@@ -105,31 +96,7 @@ int allow_severity=LOG_INFO;
 int deny_severity=LOG_WARNING;
 #endif
 
-#if defined(WIN32)
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#ifndef __MINGW32__
-#pragma warning (disable: 4018 4761)
-#endif
-#define read(sock,buf,len) recv(sock,buf,len,0)
-#ifdef EWOULDBLOCK
-#undef EWOULDBLOCK
-#endif
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#ifdef ETIMEDOUT
-#undef ETIMEDOUT
-#endif
-#define ETIMEDOUT WSAETIMEDOUT
-#define write(sock,buf,len) send(sock,buf,len,0)
-#else
-#endif
-
-#ifdef _MSC_VER
-#define SHUT_RD   0x00
-#define SHUT_WR   0x01
-#define SHUT_RDWR 0x02
-#define snprintf _snprintf /* Missing in MSVC */
-#endif
+#include "sockets.h"
 
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */

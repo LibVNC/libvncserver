@@ -44,25 +44,12 @@
 #endif
 
 #ifdef WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
 #include <io.h>
-#define write(sock,buf,len) send(sock,buf,len,0)
 #else
-#ifdef LIBVNCSERVER_HAVE_UNISTD_H
-#include <unistd.h>
-#endif
 #include <pwd.h>
-#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
 #endif
-#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#endif
-#endif
+
+#include "sockets.h"
 
 #ifdef DEBUGPROTO
 #undef DEBUGPROTO
