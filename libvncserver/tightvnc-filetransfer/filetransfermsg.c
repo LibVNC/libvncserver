@@ -632,8 +632,7 @@ ChkFileUploadErr(rfbClientPtr cl, rfbTightClientPtr rtcp)
     FileTransferMsg fileUploadErrMsg;
 
 	memset(&fileUploadErrMsg, 0, sizeof(FileTransferMsg));
-	if( (rtcp->rcft.rcfu.fName == NULL) ||
-		(strlen(rtcp->rcft.rcfu.fName) == 0) ||
+	if((strlen(rtcp->rcft.rcfu.fName) == 0) ||
 		((rtcp->rcft.rcfu.uploadFD = creat(rtcp->rcft.rcfu.fName, 
 		S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)) == -1)) {
 
