@@ -21,6 +21,7 @@
  * vncauth.c - Functions for VNC password management and authentication.
  */
 
+#include <rfb/rfbproto.h>
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #define _POSIX_SOURCE
@@ -34,7 +35,6 @@
 #ifdef LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#include <rfb/rfbproto.h>
 #include "crypto.h"
 
 #include <string.h>
