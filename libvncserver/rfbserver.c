@@ -1503,7 +1503,7 @@ char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length)
 rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
 {
     /* Allocate buffer for compression */
-    unsigned char readBuf[sz_rfbBlockSize];
+    char readBuf[sz_rfbBlockSize];
     int bytesRead=0;
     int retval=0;
     fd_set wfds;
@@ -1575,11 +1575,11 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
                 rfbLog("rfbSendFileTransferChunk(): Read %d bytes\n", bytesRead);
                 */
                 if (!cl->fileTransfer.compressionEnabled)
-                    return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, (char *)readBuf);
+                    return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, readBuf);
                 else
                 {
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-                    nRetC = compress(compBuf, &nMaxCompSize, readBuf, bytesRead);
+                    nRetC = compress(compBuf, &nMaxCompSize, (unsigned char *)readBuf, bytesRead);
                     /*
                     rfbLog("Compressed the packet from %d -> %d bytes\n", nMaxCompSize, bytesRead);
                     */
@@ -1587,10 +1587,10 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
                     if ((nRetC==0) && (nMaxCompSize<bytesRead))
                         return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 1, nMaxCompSize, (char *)compBuf);
                     else
-                        return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, (char *)readBuf);
+                        return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, readBuf);
 #else
                     /* We do not support compression of the data stream */
-                    return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, (char *)readBuf);
+                    return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, readBuf);
 #endif
                 }
             }
