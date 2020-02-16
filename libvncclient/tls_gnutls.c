@@ -324,12 +324,6 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
         return FALSE;
     }
 
-    if (count>sizeof(tAuth))
-    {
-        rfbClientLog("%d security types are too many; maximum is %d\n", count, sizeof(tAuth));
-        return FALSE;
-    }
-
     rfbClientLog("We have %d security types to read\n", count);
     authScheme=0;
     /* now, we have a list of available security types to read ( uint8_t[] ) */
