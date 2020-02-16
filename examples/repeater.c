@@ -53,7 +53,7 @@ int main(int argc,char** argv)
     perror("connect to repeater");
     return 1;
   }
-  if (write(sock, id, sizeof(id)) != sizeof(id)) {
+  if (send(sock, id, sizeof(id),0) != sizeof(id)) {
     perror("writing id");
     return 1;
   }
