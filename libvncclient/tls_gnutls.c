@@ -330,7 +330,7 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
 
     if (count>(sizeof(tAuth)/sizeof(tAuth[0])))
     {
-        rfbClientLog("%d security types are too many; maximum is %d\n", count, sizeof(tAuth));
+         rfbClientLog("%d security types are too many; maximum is %d\n", count, (sizeof(tAuth)/sizeof(tAuth[0])));
         return FALSE;
     }
 
@@ -648,4 +648,3 @@ GetTLSCipherBits(rfbClient* client)
     return gnutls_cipher_get_key_size(cipher) * 8;
 }
 #endif /* LIBVNCSERVER_HAVE_SASL */
-
