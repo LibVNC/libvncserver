@@ -314,11 +314,11 @@ Using Websockets
 ----------------
 
 You can try out the built-in websockets support by starting the example server
-from the build directory via `examples/example`. It's important to _not_ start
-from within the `examples` directory as otherwise the server program won't find
-its HTTP index file. The server program will tell you a URL to point your web
-browser to. There, you can click on the noVNC-Button to connect using the bundled
-noVNC viewer.
+from the [webclients](webclients) directory via `../examples/example`. It's
+important to _not_ start from within the `examples` directory as otherwise the
+server program won't find its HTTP index file. The server program will tell you
+a URL to point your web browser to. There, you can click on the noVNC-Button to
+connect using the bundled noVNC viewer.
 
 History
 =======
