@@ -1,6 +1,5 @@
 high-prio:
 ----------
-- Add sources for the java stuff.
 - Implement encryption in libvncserver.
 - Fix encodingstest
 
