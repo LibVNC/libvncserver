@@ -320,6 +320,32 @@ server program won't find its HTTP index file. The server program will tell you
 a URL to point your web browser to. There, you can click on the noVNC-Button to
 connect using the bundled noVNC viewer.
 
+### Using Secure Websockets
+
+If you don't already have an SSL cert that's trusted by your browser, the most
+comfortable way to create one is using [minica](https://github.com/jsha/minica).
+On Debian-based distros, you can install it via `sudo apt install minica`, on
+MacOS via `brew install minica`.
+
+Go to the webclients directory and create host and CA certs via:
+
+	cd webclients
+	minica -org "LibVNC" $(hostname)
+
+Trust the cert in your browser by importing the created `cacert.crt`, e.g. for
+Firefox go to Options->Privacy & Security->View Certificates->Authorities and
+import the created `cacert.crt`, tick the checkbox to use it for trusting
+websites. For other browsers, the process is similar.
+
+Then, you can finally start the example server, giving it the created host
+key and cert:
+
+	../examples/example -sslkeyfile $(hostname).key -sslcertfile $(hostname).crt
+
+The server program will tell you a URL to point your web browser to. There,
+you can click on the noVNC-encrypted-connection-button to connect using the
+bundled noVNC viewer using an encrypted Websockets connection.
+
 History
 =======
 
