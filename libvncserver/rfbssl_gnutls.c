@@ -54,13 +54,12 @@ static int rfbssl_init_session(struct rfbssl_ctx *ctx, int fd)
 
     if (GNUTLS_E_SUCCESS != (ret = gnutls_init(&session, GNUTLS_SERVER))) {
       /* */
-    } else if (GNUTLS_E_SUCCESS != (ret = gnutls_priority_set_direct(session, "EXPORT", NULL))) {
+    } else if (GNUTLS_E_SUCCESS != (ret = gnutls_set_default_priority(session))) {
       /* */
     } else if (GNUTLS_E_SUCCESS != (ret = gnutls_credentials_set(session, GNUTLS_CRD_CERTIFICATE, ctx->x509_cred))) {
       /* */
     } else {
       gnutls_session_enable_compatibility_mode(session);
-      gnutls_set_default_priority(session);
       gnutls_transport_set_ptr(session, (gnutls_transport_ptr_t)(uintptr_t)fd);
       ctx->session = session;
     }
