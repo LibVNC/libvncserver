@@ -149,8 +149,9 @@ How to use
 
 To make a server, you just have to initialise a server structure using the
 function rfbDefaultScreenInit, like
-  rfbScreenInfoPtr rfbScreen =
-    rfbGetScreen(argc,argv,width,height,8,3,bpp);
+
+	rfbScreenInfoPtr rfbScreen = rfbGetScreen(argc,argv,width,height,8,3,bpp);
+
 where byte per pixel should be 1, 2 or 4. If performance doesn't matter,
 you may try bpp=3 (internally one cannot use native data types in this
 case; if you want to use this, look at pnmshow24).
@@ -160,10 +161,12 @@ You then can set hooks and io functions (see below) or other
 options (see below).
 
 And you allocate the frame buffer like this:
-    rfbScreen->frameBuffer = (char*)malloc(width*height*bpp);
+
+	rfbScreen->frameBuffer = (char*)malloc(width*height*bpp);
 
 After that, you initialize the server, like
-  rfbInitServer(rfbScreen);
+
+	rfbInitServer(rfbScreen);
 
 You can use a blocking event loop, a background (pthread based) event loop,
 or implement your own using the rfbProcessEvents function.
@@ -179,11 +182,15 @@ Utility functions
 -----------------
 
 Whenever you draw something, you have to call
- rfbMarkRectAsModified(screen,x1,y1,x2,y2).
+
+	rfbMarkRectAsModified(screen,x1,y1,x2,y2).
+
 This tells LibVNCServer to send updates to all connected clients.
 
 Before you draw something, be sure to call
- rfbUndrawCursor(screen).
+
+	rfbUndrawCursor(screen).
+
 This tells LibVNCServer to hide the cursor.
 Remark: There are vncviewers out there, which know a cursor encoding, so
 that network traffic is low, and also the cursor doesn't need to be
@@ -191,7 +198,9 @@ drawn the cursor every time an update is sent. LibVNCServer handles
 all the details. Just set the cursor and don't bother any more.
 
 To set the mouse coordinates (or emulate mouse clicks), call
-  rfbDefaultPtrAddEvent(buttonMask,x,y,cl);
+
+	rfbDefaultPtrAddEvent(buttonMask,x,y,cl);
+
 IMPORTANT: do this at the end of your function, because this actually draws
 the cursor if no cursor encoding is active.
 
@@ -211,13 +220,19 @@ have a server and three clients are connected, you have one instance
 of a rfbScreenInfo and three instances of rfbClientRec's.
 
 The rfbClientRec structure holds a member
-  rfbScreenInfoPtr screen
+
+	rfbScreenInfoPtr screen
+
 which points to the server and a member
-  rfbClientPtr next
+
+	rfbClientPtr next
+
 to the next client.
 
 The rfbScreenInfo structure holds a member
-  rfbClientPtr rfbClientHead
+
+	rfbClientPtr rfbClientHead
+
 which points to the first client.
 
 So, to access the server from the client structure, you use client->screen.
@@ -225,11 +240,17 @@ To access all clients from a server, get screen->rfbClientHead and
 iterate using client->next.
 
 If you change client settings, be sure to use the provided iterator
- rfbGetClientIterator(rfbScreen)
+
+	rfbGetClientIterator(rfbScreen)
+
 with
- rfbClientIteratorNext(iterator)
+
+	rfbClientIteratorNext(iterator)
+
 and
- rfbReleaseClientIterator
+	
+	rfbReleaseClientIterator
+
 to prevent thread clashes.
 
 Other options
@@ -250,36 +271,55 @@ Hooks and IO functions
 There exist the following IO functions as members of rfbScreen:
 kbdAddEvent, kbdReleaseAllKeys, ptrAddEvent and setXCutText
 
-kbdAddEvent(rfbBool down,rfbKeySym key,rfbClientPtr cl)
-  is called when a key is pressed.
-kbdReleaseAllKeys(rfbClientPtr cl)
-  is not called at all (maybe in the future).
-ptrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl)
-  is called when the mouse moves or a button is pressed.
-  WARNING: if you want to have proper cursor handling, call
+	kbdAddEvent(rfbBool down,rfbKeySym key,rfbClientPtr cl)
+
+is called when a key is pressed.
+
+	kbdReleaseAllKeys(rfbClientPtr cl)
+
+is not called at all (maybe in the future).
+
+	ptrAddEvent(int buttonMask,int x,int y,rfbClientPtr cl)
+
+is called when the mouse moves or a button is pressed.
+ WARNING: if you want to have proper cursor handling, call
+
 	rfbDefaultPtrAddEvent(buttonMask,x,y,cl)
-  in your own function. This sets the coordinates of the cursor.
-setXCutText(char* str,int len,rfbClientPtr cl)
-  is called when the selection changes.
+
+in your own function. This sets the coordinates of the cursor.
+
+	setXCutText(char* str,int len,rfbClientPtr cl)
+
+is called when the selection changes.
 
 There are only two hooks:
-newClientHook(rfbClientPtr cl)
-  is called when a new client has connected.
-displayHook
-  is called just before a frame buffer update is sent.
+
+	newClientHook(rfbClientPtr cl)
+
+is called when a new client has connected.
+
+	displayHook
+
+is called just before a frame buffer update is sent.
 
 You can also override the following methods:
-getCursorPtr(rfbClientPtr cl)
-  This could be used to make an animated cursor (if you really want ...)
-setTranslateFunction(rfbClientPtr cl)
-  If you insist on colour maps or something more obscure, you have to
-  implement this. Default is a trueColour mapping.
+
+	getCursorPtr(rfbClientPtr cl)
+
+This could be used to make an animated cursor (if you really want ...)
+
+	setTranslateFunction(rfbClientPtr cl)
+
+If you insist on colour maps or something more obscure, you have to
+implement this. Default is a trueColour mapping.
 
 Cursor handling
 ---------------
 
 The screen holds a pointer
- rfbCursorPtr cursor
+
+	rfbCursorPtr cursor
+
 to the current cursor. Whenever you set it, remember that any dynamically
 created cursor (like return value from rfbMakeXCursor) is not free'd!
 
@@ -288,28 +328,28 @@ describes, which pixels are drawn for the cursor (a cursor needn't be
 rectangular). The source describes, which colour those pixels should have.
 
 The standard is an XCursor: a cursor with a foreground and a background
-colour (stored in backRed,backGreen,backBlue and the same for foreground
-in a range from 0-0xffff). Therefore, the arrays "mask" and "source"
+colour (stored in `backRed`,`backGreen`,`backBlue` and the same for foreground
+in a range from 0-0xffff). Therefore, the arrays `mask` and `source`
 contain pixels as single bits stored in bytes in MSB order. The rows are
 padded, such that each row begins with a new byte (i.e. a 10x4
 cursor's mask has 2x4 bytes, because 2 bytes are needed to hold 10 bits).
 
 It is however very easy to make a cursor like this:
 
-char* cur="    "
-          " xx "
-	  " x  "
-	  "    ";
-char* mask="xxxx"
-           "xxxx"
-	   "xxxx"
-	   "xxx ";
-rfbCursorPtr c=rfbMakeXCursor(4,4,cur,mask);
+	char* cur="    "
+              " xx "
+	          " x  "
+	          "    ";
+	char* mask="xxxx"
+               "xxxx"
+	           "xxxx"
+	           "xxx ";
+    rfbCursorPtr c=rfbMakeXCursor(4,4,cur,mask);
 
-You can even set "mask" to NULL in this call and LibVNCServer will calculate
+You can even set `mask` to NULL in this call and LibVNCServer will calculate
 a mask for you (dynamically, so you have to free it yourself).
 
-There is also an array named "richSource" for colourful cursors. They have
+There is also an array named `richSource` for colourful cursors. They have
 the same format as the frameBuffer (i.e. if the server is 32 bit,
 a 10x4 cursor has 4x10x4 bytes).
 
