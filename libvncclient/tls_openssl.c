@@ -268,7 +268,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
   SSL *ssl = NULL;
   int n, finished = 0;
   X509_VERIFY_PARAM *param;
-  uint8_t verify_crls = cred->x509Credential.x509CrlVerifyMode;
+  uint8_t verify_crls;
 
   if (!(ssl_ctx = SSL_CTX_new(SSLv23_client_method())))
   {
@@ -281,6 +281,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
   /* Setup verification if not anonymous */
   if (!anonTLS)
   {
+    verify_crls = cred->x509Credential.x509CrlVerifyMode;
     if (cred->x509Credential.x509CACertFile)
     {
       if (!SSL_CTX_load_verify_locations(ssl_ctx, cred->x509Credential.x509CACertFile, NULL))
