@@ -341,6 +341,14 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
     SSL_CTX_set1_param(ssl_ctx, param);
   }
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+  /*
+    See https://www.openssl.org/docs/man1.1.0/man3/SSL_set_security_level.html
+    Not specifying 0 here makes LibVNCClient fail connecting to some servers.
+  */
+  SSL_CTX_set_security_level(ssl_ctx, 0);
+#endif
+
   if (!(ssl = SSL_new (ssl_ctx)))
   {
     rfbClientLog("Could not create a new SSL session.\n");
