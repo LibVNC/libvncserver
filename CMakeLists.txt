@@ -37,6 +37,7 @@ option(WITH_LZO "Search for the LZO compression library to omit internal miniLZO
 option(WITH_JPEG "Search for the libjpeg compression library to support additional encodings" ON)
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
+option(WITH_GTK "Search for the GTK library to build an example GTK vnc client" ON)
 option(WITH_THREADS "Search for a threading library to build with multithreading support" ON)
 option(WITH_GNUTLS "Search for the GnuTLS secure communications library to support TLS" ON)
 option(WITH_OPENSSL "Search for the OpenSSL cryptography library to support TLS and use as crypto backend" ON)
@@ -112,6 +113,9 @@ if(WITH_SDL)
   find_package(SDL2)
 endif(WITH_SDL)
 
+if(WITH_GTK)
+  find_package(GTK2)
+endif(WITH_GTK)
 
 if(WITH_THREADS)
   find_package(Threads)
@@ -546,6 +550,15 @@ if(SDL2_FOUND)
   )
 endif(SDL2_FOUND)
 
+if(GTK2_FOUND)
+  include_directories(${GTK2_INCLUDE_DIRS})
+  set(LIBVNCCLIENT_EXAMPLES
+    ${LIBVNCCLIENT_EXAMPLES}
+    gtkvncviewer
+  )
+endif(GTK2_FOUND)
+
+
 if(FFMPEG_FOUND)
   set(LIBVNCCLIENT_EXAMPLES
     ${LIBVNCCLIENT_EXAMPLES}
@@ -565,7 +578,7 @@ foreach(e ${LIBVNCCLIENT_EXAMPLES})
   add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
   set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
   set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
-  target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${FFMPEG_LIBRARIES})
+  target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES})
 endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 
 
