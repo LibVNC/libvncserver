@@ -271,6 +271,8 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->destHost = NULL;
   client->destPort = 5900;
   
+  client->connectTimeout = DEFAULT_CONNECT_TIMEOUT;
+
   client->CurrentKeyboardLedState = 0;
   client->HandleKeyboardLedState = (HandleKeyboardLedStateProc)DummyPoint;
 
