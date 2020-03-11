@@ -341,7 +341,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
     SSL_CTX_set1_param(ssl_ctx, param);
   }
 
-#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined LIBRESSL_VERSION_NUMBER
   /*
     See https://www.openssl.org/docs/man1.1.0/man3/SSL_set_security_level.html
     Not specifying 0 here makes LibVNCClient fail connecting to some servers.
