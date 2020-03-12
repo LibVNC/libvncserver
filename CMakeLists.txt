@@ -525,12 +525,14 @@ if(WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
   )
 endif(WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
 
-if(MACOS)
+if(APPLE)
   set(LIBVNCSERVER_EXAMPLES
     ${LIBVNCSERVER_EXAMPLES}
     mac
   )
-endif(MACOS)
+  find_library(CARBON_LIBRARY Carbon)
+  find_library(IOKIT_LIBRARY IOKit)
+endif(APPLE)
 
 if(ANDROID)
   set(LIBVNCSERVER_EXAMPLES
@@ -573,7 +575,7 @@ foreach(e ${LIBVNCSERVER_EXAMPLES})
   add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
   set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
   set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
-  target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT})
+  target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY})
 endforeach(e ${LIBVNCSERVER_EXAMPLES})
 
 foreach(e ${LIBVNCCLIENT_EXAMPLES})
