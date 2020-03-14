@@ -72,6 +72,9 @@
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #cmakedefine LIBVNCSERVER_HAVE_LIBPTHREAD  1 
 
+/* Define to 1 if you have win32 threads. */
+#cmakedefine LIBVNCSERVER_HAVE_WIN32THREADS 1
+
 /* Define to 1 if you have the `z' library (-lz). */
 #cmakedefine LIBVNCSERVER_HAVE_LIBZ  1 
 

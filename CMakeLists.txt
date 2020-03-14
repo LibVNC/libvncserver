@@ -277,7 +277,15 @@ endif()
 
 if(CMAKE_USE_PTHREADS_INIT)
   set(LIBVNCSERVER_HAVE_LIBPTHREAD 1)
+  message(STATUS "Threads support is using pthreads")
 endif(CMAKE_USE_PTHREADS_INIT)
+
+if(CMAKE_USE_WIN32_THREADS_INIT)
+  set(LIBVNCSERVER_HAVE_WIN32THREADS 1)
+  message(STATUS "Threads support is using win32 threads")
+endif(CMAKE_USE_WIN32_THREADS_INIT)
+
+
 if(LIBVNCSERVER_HAVE_SYS_SOCKET_H)
   # socklen_t
   list(APPEND CMAKE_EXTRA_INCLUDE_FILES "sys/socket.h")
