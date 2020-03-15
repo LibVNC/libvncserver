@@ -141,7 +141,7 @@ void rfbIncrClientRef(rfbClientPtr cl) {}
 void rfbDecrClientRef(rfbClientPtr cl) {}
 #endif
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 static MUTEX(rfbClientListMutex);
 #endif
 

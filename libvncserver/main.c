@@ -42,7 +42,7 @@
 
 static int extMutex_initialized = 0;
 static int logMutex_initialized = 0;
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 static MUTEX(logMutex);
 static MUTEX(extMutex);
 #endif

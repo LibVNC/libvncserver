@@ -90,6 +90,19 @@ typedef UINT32 in_addr_t;
 #define TINI_COND(cond) pthread_cond_destroy(&(cond))
 #define IF_PTHREADS(x) x
 #endif
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+#include <windows.h>
+#define LOCK(mutex) EnterCriticalSection(&(mutex))
+#define UNLOCK(mutex) LeaveCriticalSection(&(mutex))
+#define MUTEX(mutex) CRITICAL_SECTION (mutex)
+#define INIT_MUTEX(mutex)  InitializeCriticalSection(&(mutex))
+#define TINI_MUTEX(mutex) DeleteCriticalSection(&(mutex))
+#define TSIGNAL(cond)
+#define WAIT(cond,mutex) this_is_unsupported
+#define COND(cond)
+#define INIT_COND(cond)
+#define TINI_COND(cond)
+#define IF_PTHREADS(x)
 #else
 #define LOCK(mutex)
 #define UNLOCK(mutex)
@@ -347,7 +360,7 @@ typedef struct _rfbScreenInfo
     /** These hooks are called to pass keyboard state back to the client */
     rfbGetKeyboardLedStateHookPtr getKeyboardLedStateHook;
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     MUTEX(cursorMutex);
     rfbBool backgroundLoop;
 #endif
@@ -650,7 +663,7 @@ typedef struct _rfbClientRec {
     struct _rfbClientRec *prev;
     struct _rfbClientRec *next;
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     /** whenever a client is referenced, the refCount has to be incremented
        and afterwards decremented, so that the client is not cleaned up
        while being referenced.
@@ -658,11 +671,15 @@ typedef struct _rfbClientRec {
     */
     int refCount;
     MUTEX(refCountMutex);
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     COND(deleteCond);
+#endif
 
     MUTEX(outputMutex);
     MUTEX(updateMutex);
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     COND(updateCond);
+#endif
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -682,7 +699,7 @@ typedef struct _rfbClientRec {
     void *paletteHelper;
 
     /** for thread safety for rfbSendFBUpdate() */
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 #define LIBVNCSERVER_SEND_MUTEX
     MUTEX(sendMutex);
 #endif
