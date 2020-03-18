@@ -39,6 +39,7 @@ option(WITH_PNG "Search for the PNG compression library to support additional en
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
 option(WITH_GTK "Search for the GTK library to build an example GTK vnc client" ON)
 option(WITH_THREADS "Search for a threading library to build with multithreading support" ON)
+option(PREFER_WIN32THREADS "When searching for a threading library, prefer win32 threads if they are found" OFF)
 option(WITH_GNUTLS "Search for the GnuTLS secure communications library to support TLS" ON)
 option(WITH_OPENSSL "Search for the OpenSSL cryptography library to support TLS and use as crypto backend" ON)
 option(WITH_SYSTEMD "Search for libsystemd to build with systemd socket activation support" ON)
@@ -274,6 +275,14 @@ if(WITH_24BPP)
   set(LIBVNCSERVER_ALLOW24BPP 1)
 endif()
 
+# Make sure that only one threading system is used. This happens on MinGW.
+if(CMAKE_USE_PTHREADS_INIT AND CMAKE_USE_WIN32_THREADS_INIT)
+  if(PREFER_WIN32THREADS)
+    unset(CMAKE_USE_PTHREADS_INIT)
+  else()
+    unset(CMAKE_USE_WIN32_THREADS_INIT)
+  endif(PREFER_WIN32THREADS)
+endif(CMAKE_USE_PTHREADS_INIT AND CMAKE_USE_WIN32_THREADS_INIT)
 
 if(CMAKE_USE_PTHREADS_INIT)
   set(LIBVNCSERVER_HAVE_LIBPTHREAD 1)
