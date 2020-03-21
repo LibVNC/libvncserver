@@ -65,9 +65,6 @@
 #endif
 #include "tls.h"
 
-#ifdef _MSC_VER
-#  define snprintf _snprintf /* MSVC went straight to the underscored syntax */
-#endif
 
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
