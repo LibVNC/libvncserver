@@ -83,7 +83,6 @@
 #endif
 
 #ifdef _MSC_VER
-#define snprintf _snprintf /* Missing in MSVC */
 /* Prevent POSIX deprecation warnings */
 #define close _close
 #define strdup _strdup 
