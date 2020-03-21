@@ -59,7 +59,11 @@ typedef UINT32 in_addr_t;
 #undef socklen_t
 #include <ws2tcpip.h>
 #endif
+#ifdef _MSC_VER
+#pragma warning(disable:4996)
 #endif
+#endif
+
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 #include <pthread.h>
