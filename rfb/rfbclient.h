@@ -34,6 +34,9 @@
 
 #ifdef WIN32
 #define WIN32_LEAN_AND_MEAN /* Prevent loading any Winsock 1.x headers from windows.h */
+#ifdef _MSC_VER
+#pragma warning(disable:4996)
+#endif
 #endif
 
 #if defined(ANDROID) || defined(LIBVNCSERVER_HAVE_ANDROID)
