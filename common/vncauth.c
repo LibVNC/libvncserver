@@ -49,6 +49,7 @@
 #ifdef WIN32
 #define srandom srand
 #define random rand
+#include <process.h>
 #else
 #include <sys/time.h>
 #endif
