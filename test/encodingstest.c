@@ -297,6 +297,7 @@ int main(int argc,char** argv)
 	rfbInitServer(server);
 	rfbProcessEvents(server,0);
 
+	INIT_MUTEX(frameBufferMutex);
 	initStatistics();
 
 #ifndef ALL_AT_ONCE
