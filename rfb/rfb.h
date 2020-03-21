@@ -110,7 +110,7 @@ typedef UINT32 in_addr_t;
 #define THREAD_ROUTINE_RETURN_TYPE void
 #define THREAD_ROUTINE_RETURN_VALUE
 #define THREAD_SLEEP_MS(ms) Sleep(ms)
-#define THREAD_JOIN(thread) WaitForSingleObject(thread, INFINITE)
+#define THREAD_JOIN(thread) WaitForSingleObject((HANDLE)thread, INFINITE)
 #else
 #define LOCK(mutex)
 #define UNLOCK(mutex)
