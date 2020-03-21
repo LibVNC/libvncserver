@@ -320,8 +320,8 @@ int main(int argc,char** argv)
   rfbRunEventLoop(rfbScreen,40000,FALSE);
 #endif /* OWN LOOP */
 #else
-#if !defined(LIBVNCSERVER_HAVE_LIBPTHREAD)
-#error "I need pthreads for that."
+#if !defined(LIBVNCSERVER_HAVE_LIBPTHREAD) && !defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+#error "I need pthreads or win32 threads for that."
 #endif
 
   /* this is the non-blocking event loop; a background thread is started */

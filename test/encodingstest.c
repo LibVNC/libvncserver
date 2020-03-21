@@ -6,8 +6,8 @@
 #include <rfb/rfb.h>
 #include <rfb/rfbclient.h>
 
-#ifndef LIBVNCSERVER_HAVE_LIBPTHREAD
-#error This test need pthread support (otherwise the client blocks the client)
+#if !defined(LIBVNCSERVER_HAVE_LIBPTHREAD) && !defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+#error "I need pthreads or win32 threads for that."
 #endif
 
 #define ALL_AT_ONCE
@@ -66,7 +66,7 @@ static void updateStatistics(int encodingIndex,rfbBool failed) {
 }
 
 /* Here begin the functions for the client. They will be called in a
- * pthread. */
+ * thread. */
 
 /* maxDelta=0 means they are expected to match exactly;
  * maxDelta>0 means that the average difference must be lower than maxDelta */
@@ -148,7 +148,7 @@ static void update_finished(rfbClient* client) {
 }
 
 
-static void* clientLoop(void* data) {
+static THREAD_ROUTINE_RETURN_TYPE clientLoop(void* data) {
 	rfbClient* client=(rfbClient*)data;
 	clientData* cd=(clientData*)client->clientData;
 
@@ -163,7 +163,7 @@ static void* clientLoop(void* data) {
 		rfbClientErr("Had problems starting client (encoding %s)\n",
 				testEncodings[cd->encodingIndex].str);
 		updateStatistics(cd->encodingIndex,TRUE);
-		return NULL;
+		return THREAD_ROUTINE_RETURN_VALUE;
 	}
 	while(1) {
 		if(WaitForMessage(client,50)>=0)
@@ -176,10 +176,14 @@ static void* clientLoop(void* data) {
 	if(client->frameBuffer)
 		free(client->frameBuffer);
 	rfbClientCleanup(client);
-	return NULL;
+	return THREAD_ROUTINE_RETURN_VALUE;
 }
 
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD)
 static pthread_t all_threads[NUMBER_OF_ENCODINGS_TO_TEST];
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+static uintptr_t all_threads[NUMBER_OF_ENCODINGS_TO_TEST];
+#endif
 static int thread_counter;
 
 static void startClient(int encodingIndex,rfbScreenInfo* server) {
@@ -197,7 +201,12 @@ static void startClient(int encodingIndex,rfbScreenInfo* server) {
 	cd->display=(char*)malloc(6);
 	sprintf(cd->display,":%d",server->port-5900);
 
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD)
 	pthread_create(&all_threads[thread_counter++],NULL,clientLoop,(void*)client);
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+	all_threads[thread_counter++] = _beginthread(clientLoop, 0, client);
+#endif
+
 }
 
 /* Here begin the server functions */
@@ -288,6 +297,7 @@ int main(int argc,char** argv)
 	rfbInitServer(server);
 	rfbProcessEvents(server,0);
 
+	INIT_MUTEX(frameBufferMutex);
 	initStatistics();
 
 #ifndef ALL_AT_ONCE
@@ -322,7 +332,7 @@ int main(int argc,char** argv)
 	rfbShutdownServer(server, TRUE);
 
 	for(i=0;i<thread_counter;i++)
-		pthread_join(all_threads[i], NULL);
+		THREAD_JOIN(all_threads[i]);
 
 	free(server->frameBuffer);
 	rfbScreenCleanup(server);

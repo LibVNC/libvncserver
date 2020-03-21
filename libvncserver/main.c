@@ -42,7 +42,7 @@
 
 static int extMutex_initialized = 0;
 static int logMutex_initialized = 0;
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 static MUTEX(logMutex);
 static MUTEX(extMutex);
 #endif
@@ -447,10 +447,9 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
    sraRgnDestroy(region);
 }
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-#include <unistd.h>
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 
-static void *
+static THREAD_ROUTINE_RETURN_TYPE
 clientOutput(void *data)
 {
     rfbClientPtr cl = (rfbClientPtr)data;
@@ -462,11 +461,11 @@ clientOutput(void *data)
         while (!haveUpdate) {
 		if (cl->sock == RFB_INVALID_SOCKET) {
 			/* Client has disconnected. */
-			return NULL;
+			return THREAD_ROUTINE_RETURN_VALUE;
 		}
 		if (cl->state != RFB_NORMAL || cl->onHold) {
 			/* just sleep until things get normal */
-			usleep(cl->screen->deferUpdateTime * 1000);
+		        THREAD_SLEEP_MS(cl->screen->deferUpdateTime);
 			continue;
 		}
 
@@ -492,7 +491,7 @@ clientOutput(void *data)
         
         /* OK, now, to save bandwidth, wait a little while for more
            updates to come along. */
-        usleep(cl->screen->deferUpdateTime * 1000);
+	THREAD_SLEEP_MS(cl->screen->deferUpdateTime);
 
         /* Now, get the region we're going to update, and remove
            it from cl->modifiedRegion _before_ we send the update.
@@ -513,15 +512,19 @@ clientOutput(void *data)
     }
 
     /* Not reached. */
-    return NULL;
+    return THREAD_ROUTINE_RETURN_VALUE;
 }
 
-static void *
+static THREAD_ROUTINE_RETURN_TYPE
 clientInput(void *data)
 {
     rfbClientPtr cl = (rfbClientPtr)data;
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_t output_thread;
     pthread_create(&output_thread, NULL, clientOutput, (void *)cl);
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    uintptr_t output_thread = _beginthread(clientOutput, 0, cl);
+#endif
 
     while (1) {
 	fd_set rfds, wfds, efds;
@@ -546,8 +549,12 @@ clientInput(void *data)
 	if ((cl->fileTransfer.fd!=-1) && (cl->fileTransfer.sending==1))
 	    FD_SET(cl->sock, &wfds);
 
+#ifndef WIN32
 	int nfds = cl->pipe_notify_client_thread[0] > cl->sock ? cl->pipe_notify_client_thread[0] : cl->sock;
-	
+#else
+	int nfds = cl->sock;
+#endif
+
 	tv.tv_sec = 60; /* 1 minute */
 	tv.tv_usec = 0;
 
@@ -567,12 +574,14 @@ clientInput(void *data)
         if (FD_ISSET(cl->sock, &wfds))
             rfbSendFileTransferChunk(cl);
 
+#ifndef WIN32
 	if (FD_ISSET(cl->pipe_notify_client_thread[0], &rfds))
 	{
 	    /* Reset the pipe */
 	    char buf;
 	    while (read(cl->pipe_notify_client_thread[0], &buf, sizeof(buf)) == sizeof(buf));
 	}
+#endif
 
         if (FD_ISSET(cl->sock, &rfds) || FD_ISSET(cl->sock, &efds))
         {
@@ -590,14 +599,15 @@ clientInput(void *data)
     LOCK(cl->updateMutex);
     TSIGNAL(cl->updateCond);
     UNLOCK(cl->updateMutex);
-    IF_PTHREADS(pthread_join(output_thread, NULL));
+    THREAD_JOIN(output_thread);
 
     rfbClientConnectionGone(cl);
 
-    return NULL;
+    return THREAD_ROUTINE_RETURN_VALUE;
 }
 
-static void*
+
+static THREAD_ROUTINE_RETURN_TYPE
 listenerRun(void *data)
 {
     rfbScreenInfoPtr screen=(rfbScreenInfoPtr)data;
@@ -619,7 +629,7 @@ listenerRun(void *data)
 
         if (select(screen->maxFd+1, &listen_fds, NULL, NULL, NULL) == -1) {
             rfbLogPerror("listenerRun: error in select");
-            return NULL;
+            return THREAD_ROUTINE_RETURN_VALUE;
         }
 	
 	/* there is something on the listening sockets, handle new connections */
@@ -634,7 +644,7 @@ listenerRun(void *data)
 	if (cl && !cl->onHold )
 	  rfbStartOnHoldClient(cl);
     }
-    return(NULL);
+    return THREAD_ROUTINE_RETURN_VALUE;
 }
 
 #endif
@@ -653,6 +663,10 @@ rfbStartOnHoldClient(rfbClientPtr cl)
         fcntl(cl->pipe_notify_client_thread[0], F_SETFL, O_NONBLOCK);
 #endif
         pthread_create(&cl->client_thread, NULL, clientInput, (void *)cl);
+    }
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    if(cl->screen->backgroundLoop) {
+	cl->client_thread = _beginthread(clientInput, 0, cl);
     }
 #endif
 }
@@ -973,7 +987,9 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->cursor = &myCursor;
    INIT_MUTEX(screen->cursorMutex);
 
-   IF_PTHREADS(screen->backgroundLoop = FALSE);
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+   screen->backgroundLoop = FALSE;
+#endif
 
    /* proc's and hook's */
 
@@ -1272,6 +1288,10 @@ void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground
 
        pthread_create(&listener_thread, NULL, listenerRun, screen);
     return;
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+       screen->backgroundLoop = TRUE;
+       _beginthread(listenerRun, 0, screen);
+       return;
 #else
     rfbErr("Can't run in background, because I don't have PThreads!\n");
     return;
