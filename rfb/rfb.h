@@ -89,20 +89,28 @@ typedef UINT32 in_addr_t;
 #define INIT_COND(cond) pthread_cond_init(&(cond),NULL)
 #define TINI_COND(cond) pthread_cond_destroy(&(cond))
 #define IF_PTHREADS(x) x
+#define THREAD_ROUTINE_RETURN_TYPE void*
+#define THREAD_ROUTINE_RETURN_VALUE NULL
+#define THREAD_SLEEP_MS(ms) usleep(ms*1000)
+#define THREAD_JOIN(thread) pthread_join(thread, NULL)
 #endif
 #elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
-#include <windows.h>
+#include <process.h>
 #define LOCK(mutex) EnterCriticalSection(&(mutex))
 #define UNLOCK(mutex) LeaveCriticalSection(&(mutex))
 #define MUTEX(mutex) CRITICAL_SECTION (mutex)
 #define INIT_MUTEX(mutex)  InitializeCriticalSection(&(mutex))
 #define TINI_MUTEX(mutex) DeleteCriticalSection(&(mutex))
-#define TSIGNAL(cond)
-#define WAIT(cond,mutex) this_is_unsupported
-#define COND(cond)
-#define INIT_COND(cond)
+#define TSIGNAL(cond) WakeAllConditionVariable(&(cond))
+#define WAIT(cond,mutex) SleepConditionVariableCS(&(cond),&(mutex),INFINITE);
+#define COND(cond) CONDITION_VARIABLE (cond)
+#define INIT_COND(cond) InitializeConditionVariable(&(cond));
 #define TINI_COND(cond)
 #define IF_PTHREADS(x)
+#define THREAD_ROUTINE_RETURN_TYPE void
+#define THREAD_ROUTINE_RETURN_VALUE
+#define THREAD_SLEEP_MS(ms) Sleep(ms)
+#define THREAD_JOIN(thread) WaitForSingleObject(thread, INFINITE)
 #else
 #define LOCK(mutex)
 #define UNLOCK(mutex)
@@ -493,6 +501,8 @@ typedef struct _rfbClientRec {
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_t client_thread;
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    uintptr_t client_thread;
 #endif
 
     /* Note that the RFB_INITIALISATION_SHARED state is provided to support
@@ -671,15 +681,11 @@ typedef struct _rfbClientRec {
     */
     int refCount;
     MUTEX(refCountMutex);
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     COND(deleteCond);
-#endif
 
     MUTEX(outputMutex);
     MUTEX(updateMutex);
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     COND(updateCond);
-#endif
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ

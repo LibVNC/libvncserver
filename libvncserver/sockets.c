@@ -552,7 +552,7 @@ rfbCloseClient(rfbClientPtr cl)
 	    extension->extension->close(cl, extension->data);
 
     LOCK(cl->updateMutex);
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     if (cl->sock != RFB_INVALID_SOCKET)
 #endif
       {

@@ -120,7 +120,7 @@ static void rfbProcessClientProtocolVersion(rfbClientPtr cl);
 static void rfbProcessClientNormalMessage(rfbClientPtr cl);
 static void rfbProcessClientInitMessage(rfbClientPtr cl);
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 void rfbIncrClientRef(rfbClientPtr cl)
 {
   LOCK(cl->refCountMutex);
@@ -189,7 +189,7 @@ rfbGetClientIteratorWithClosed(rfbScreenInfoPtr rfbScreen)
 rfbClientPtr
 rfbClientIteratorHead(rfbClientIteratorPtr i)
 {
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
   if(i->next != 0) {
     rfbDecrClientRef(i->next);
     rfbIncrClientRef(i->screen->clientHead);
@@ -209,12 +209,12 @@ rfbClientIteratorNext(rfbClientIteratorPtr i)
     i->next = i->screen->clientHead;
     UNLOCK(rfbClientListMutex);
   } else {
-    IF_PTHREADS(rfbClientPtr cl = i->next);
+    rfbClientPtr cl = i->next;
     i->next = i->next->next;
-    IF_PTHREADS(rfbDecrClientRef(cl));
+    rfbDecrClientRef(cl);
   }
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     if(!i->closedToo)
       while(i->next && i->next->sock<0)
         i->next = i->next->next;
@@ -228,7 +228,7 @@ rfbClientIteratorNext(rfbClientIteratorPtr i)
 void
 rfbReleaseClientIterator(rfbClientIteratorPtr iterator)
 {
-  IF_PTHREADS(if(iterator->next) rfbDecrClientRef(iterator->next));
+  if(iterator->next) rfbDecrClientRef(iterator->next);
   free(iterator);
 }
 
@@ -395,8 +395,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->translateLookupTable = NULL;
 
       LOCK(rfbClientListMutex);
-
-      IF_PTHREADS(cl->refCount = 0);
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+      cl->refCount = 0;
+#endif
       cl->next = rfbScreen->clientHead;
       cl->prev = NULL;
       if (rfbScreen->clientHead)
@@ -544,7 +545,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
 
     UNLOCK(rfbClientListMutex);
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     if(cl->screen->backgroundLoop != FALSE) {
       int i;
       do {
