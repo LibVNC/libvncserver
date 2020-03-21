@@ -155,7 +155,7 @@ static THREAD_ROUTINE_RETURN_TYPE clientLoop(void* data) {
 	client->appData.encodingsString=strdup(testEncodings[cd->encodingIndex].str);
 	client->appData.qualityLevel = 7; /* ZYWRLE fails the test with standard settings */
 
-	sleep(1);
+	THREAD_SLEEP_MS(1000);
 	rfbClientLog("Starting client (encoding %s, display %s)\n",
 			testEncodings[cd->encodingIndex].str,
 			cd->display);
