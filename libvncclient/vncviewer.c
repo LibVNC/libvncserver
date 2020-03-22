@@ -493,7 +493,14 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
       }
     }
   }
-
+  if (client->RfbClientLog != NULL) {
+    // Redefine log function
+    rfbClientLog=client->RfbClientLog;
+  }
+  if (client->RfbClientErr != NULL) {
+    // Redefine err function
+    rfbClientErr=client->RfbClientErr;
+  }
   if(!rfbInitConnection(client)) {
     rfbClientCleanup(client);
     return FALSE;

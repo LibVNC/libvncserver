@@ -234,6 +234,9 @@ typedef char* (*GetUserProc)(struct _rfbClient* client);
 typedef char* (*GetSASLMechanismProc)(struct _rfbClient* client, char* mechlist);
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
+/* rfbproto.c (see below for the rest of the declarations for rfbproto.c) */
+typedef void (*rfbClientLogProc)(const char *format, ...);
+
 typedef struct _rfbClient {
 	uint8_t* frameBuffer;
 	int width, height;
@@ -450,6 +453,8 @@ typedef struct _rfbClient {
 
 #endif
 #endif
+    rfbClientLogProc RfbClientLog;
+    rfbClientLogProc RfbClientErr;
 } rfbClient;
 
 /* cursor.c */
@@ -469,7 +474,6 @@ extern int listenForIncomingConnectionsNoFork(rfbClient* viewer, int usec_timeou
 /* rfbproto.c */
 
 extern rfbBool rfbEnableClientLogging;
-typedef void (*rfbClientLogProc)(const char *format, ...);
 extern rfbClientLogProc rfbClientLog,rfbClientErr;
 extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
 extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
