@@ -17,6 +17,7 @@
  *  USA.
  */
 
+#include <stdio.h>
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
 #include <rfb/rfbclient.h>
