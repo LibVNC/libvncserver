@@ -64,6 +64,7 @@ typedef SSIZE_T ssize_t;
 
 static rfbBool rfbTLSInitialized = FALSE;
 static MUTEX_TYPE *mutex_buf = NULL;
+static MUTEX_TYPE mutex_rw;
 
 struct CRYPTO_dynlock_value {
 	MUTEX_TYPE mutex;
@@ -156,6 +157,8 @@ InitializeTLS(void)
 
   for (i = 0; i < CRYPTO_num_locks(); i++)
     MUTEX_INIT(mutex_buf[i]);
+
+  MUTEX_INIT(mutex_rw);
 
   CRYPTO_set_locking_callback(locking_function);
   CRYPTO_set_id_callback(id_function);
@@ -630,7 +633,9 @@ ReadFromTLS(rfbClient* client, char *out, unsigned int n)
 {
   ssize_t ret;
 
+  MUTEX_LOCK(mutex_rw);
   ret = SSL_read (client->tlsSession, out, n);
+  MUTEX_UNLOCK(mutex_rw);
 
   if (ret >= 0)
     return ret;
@@ -653,8 +658,9 @@ WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 
   while (offset < n)
   {
-
+    MUTEX_LOCK(mutex_rw);
     ret = SSL_write (client->tlsSession, buf + offset, (size_t)(n-offset));
+    MUTEX_UNLOCK(mutex_rw);
 
     if (ret < 0)
       errno = ssl_errno (client->tlsSession, ret);
@@ -688,6 +694,8 @@ void FreeTLS(rfbClient* client)
     free(mutex_buf);
     mutex_buf = NULL;
   }
+
+  MUTEX_FREE(mutex_rw);
 
   SSL_free(client->tlsSession);
 }
