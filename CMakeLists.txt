@@ -513,40 +513,40 @@ SET_TARGET_PROPERTIES(vncclient vncserver
 
 # EXAMPLES
 set(LIBVNCSERVER_EXAMPLES
-    backchannel
-    camera
-    colourmaptest
-    example
-    fontsel
-    pnmshow
-    pnmshow24
-    regiontest
-    repeater
-    rotate
-    simple
-    simple15
-    storepasswd
-    vncev
+    backchannel.c
+    camera.c
+    colourmaptest.c
+    example.c
+    fontsel.c
+    pnmshow.c
+    pnmshow24.c
+    regiontest.c
+    repeater.c
+    rotate.c
+    simple.c
+    simple15.c
+    storepasswd.c
+    vncev.c
   )
 
 if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
   set(LIBVNCSERVER_EXAMPLES
     ${LIBVNCSERVER_EXAMPLES}
-    blooptest
+    blooptest.c
   )
 endif(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
 
 if(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
   set(LIBVNCSERVER_EXAMPLES
     ${LIBVNCSERVER_EXAMPLES}
-    filetransfer
+    filetransfer.c
   )
 endif(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
 
 if(APPLE AND NOT IOS)
   set(LIBVNCSERVER_EXAMPLES
     ${LIBVNCSERVER_EXAMPLES}
-    mac
+    mac.c
   )
   find_library(CARBON_LIBRARY Carbon)
   find_library(IOKIT_LIBRARY IOKit)
@@ -555,7 +555,7 @@ endif(APPLE AND NOT IOS)
 if(ANDROID)
   set(LIBVNCSERVER_EXAMPLES
     ${LIBVNCSERVER_EXAMPLES}
-    androidvncserver
+    androidvncserver.c
   )
 endif(ANDROID)
 
@@ -589,12 +589,13 @@ if(FFMPEG_FOUND)
 endif(FFMPEG_FOUND)
 
 
-foreach(e ${LIBVNCSERVER_EXAMPLES})
-  add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
+foreach(srcfile ${LIBVNCSERVER_EXAMPLES})
+  string(REGEX REPLACE "\\.[^.]*$" "" e ${srcfile}) # strip suffix
+  add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${srcfile})
   set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
   set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
   target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY})
-endforeach(e ${LIBVNCSERVER_EXAMPLES})
+endforeach(srcfile ${LIBVNCSERVER_EXAMPLES})
 
 foreach(e ${LIBVNCCLIENT_EXAMPLES})
   add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
