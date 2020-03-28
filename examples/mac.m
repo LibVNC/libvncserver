@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
+#import <Cocoa/Cocoa.h>
 /* zlib doesn't like Byte already defined */
 #undef Byte
 #undef TRUE
