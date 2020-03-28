@@ -117,9 +117,9 @@ dyn_destroy_function(struct CRYPTO_dynlock_value *l, const char *file, int line)
 
 
 static int
-ssl_errno (SSL *ssl, int ret)
+ssl_error_to_errno (int ssl_error)
 {
-	switch (SSL_get_error (ssl, ret)) {
+	switch (ssl_error) {
 	case SSL_ERROR_NONE:
 		return 0;
 	case SSL_ERROR_ZERO_RETURN:
@@ -632,16 +632,19 @@ int
 ReadFromTLS(rfbClient* client, char *out, unsigned int n)
 {
   ssize_t ret;
+  int ssl_error = SSL_ERROR_NONE;
 
   MUTEX_LOCK(mutex_rw);
   ret = SSL_read (client->tlsSession, out, n);
+
+  if (ret < 0)
+      ssl_error = SSL_get_error(client->tlsSession, ret);
   MUTEX_UNLOCK(mutex_rw);
 
   if (ret >= 0)
     return ret;
   else {
-    errno = ssl_errno (client->tlsSession, ret);
-
+    errno = ssl_error_to_errno(ssl_error);
     if (errno != EAGAIN) {
       rfbClientLog("Error reading from TLS: -.\n");
     }
@@ -655,19 +658,21 @@ WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 {
   unsigned int offset = 0;
   ssize_t ret;
+  int ssl_error = SSL_ERROR_NONE;
 
   while (offset < n)
   {
     MUTEX_LOCK(mutex_rw);
     ret = SSL_write (client->tlsSession, buf + offset, (size_t)(n-offset));
-    MUTEX_UNLOCK(mutex_rw);
 
     if (ret < 0)
-      errno = ssl_errno (client->tlsSession, ret);
+      ssl_error = SSL_get_error (client->tlsSession, ret);
+    MUTEX_UNLOCK(mutex_rw);
 
     if (ret == 0) continue;
     if (ret < 0)
     {
+      errno = ssl_error_to_errno(ssl_error);
       if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
       rfbClientLog("Error writing to TLS: -\n");
       return -1;
