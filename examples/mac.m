@@ -464,8 +464,7 @@ ScreenInit(int argc, char**argv)
 
   gethostname(rfbScreen->thisHost, 255);
   rfbScreen->paddedWidthInBytes = CGDisplayBytesPerRow(kCGDirectMainDisplay);
-  rfbScreen->frameBuffer =
-    (char *)CGDisplayBaseAddress(kCGDirectMainDisplay);
+  rfbScreen->frameBuffer = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
 
   /* we cannot write to the frame buffer */
   rfbScreen->cursor = NULL;
@@ -481,18 +480,34 @@ ScreenInit(int argc, char**argv)
 }
 
 static void 
-refreshCallback(CGRectCount count, const CGRect *rectArray, void *ignore)
+refreshCallback()
 {
-  int i;
-
   if(startTime>0 && time(0)>startTime+maxSecsToConnect)
     rfbShutdown(0);
 
-  for (i = 0; i < count; i++)
-    rfbMarkRectAsModified(rfbScreen,
-			  rectArray[i].origin.x,rectArray[i].origin.y,
-			  rectArray[i].origin.x + rectArray[i].size.width,
-			  rectArray[i].origin.y + rectArray[i].size.height);
+  CGImageRef img = CGDisplayCreateImage(kCGDirectMainDisplay);
+
+  size_t width = CGImageGetWidth(img);
+  size_t height = CGImageGetHeight(img);
+  CGRect rect = {{0, 0}, {width, height}};
+  CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+
+  CGContextRef drawContext = CGBitmapContextCreate(rfbScreen->frameBuffer,
+						  width,
+						  height,
+						  8,
+						  width * 4,
+						  colorSpace,
+						  kCGBitmapByteOrder32Host | kCGImageAlphaPremultipliedFirst);
+  CGContextSetBlendMode(drawContext, kCGBlendModeCopy);
+
+  CGContextDrawImage(drawContext, rect, img);
+
+  CGContextRelease(drawContext);
+  CGImageRelease(img);
+  CGColorSpaceRelease(colorSpace);
+
+  rfbMarkRectAsModified(rfbScreen, 0, 0, width, height);
 }
 
 void clientGone(rfbClientPtr cl)
@@ -534,12 +549,11 @@ int main(int argc,char *argv[])
   ScreenInit(argc,argv);
   rfbScreen->newClientHook = newClient;
 
-  /* enter background event loop */
-  rfbRunEventLoop(rfbScreen,40,TRUE);
-
-  /* enter OS X loop */
-  CGRegisterScreenRefreshCallback(refreshCallback, NULL);
-  RunApplicationEventLoop();
+  /* TODO: do it in a multithreaded way, input is very laggy this way */
+  while (rfbIsActive(rfbScreen)) {
+      refreshCallback();
+      rfbProcessEvents(rfbScreen, rfbScreen->deferUpdateTime*1000);
+  }
 
   rfbDimmingShutdown();
 
