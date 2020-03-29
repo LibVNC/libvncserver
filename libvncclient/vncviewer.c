@@ -472,7 +472,7 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 	}
         j+=2;
       } else {
-	char* colon=strchr(argv[i],':');
+	char* colon=strrchr(argv[i],':');
 
 	if(client->serverHost)
 	  free(client->serverHost);
