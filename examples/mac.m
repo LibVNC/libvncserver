@@ -450,12 +450,13 @@ rfbBool viewOnly = FALSE, sharedMode = FALSE;
 void 
 ScreenInit(int argc, char**argv)
 {
-  int bitsPerSample=CGDisplayBitsPerSample(kCGDirectMainDisplay);
+  int bitsPerSample = 8;
   rfbScreen = rfbGetScreen(&argc,argv,
 			   CGDisplayPixelsWide(kCGDirectMainDisplay),
 			   CGDisplayPixelsHigh(kCGDirectMainDisplay),
 			   bitsPerSample,
-			   CGDisplaySamplesPerPixel(kCGDirectMainDisplay),4);
+			   3,
+			   4);
   if(!rfbScreen)
     exit(0);
   rfbScreen->serverFormat.redShift = bitsPerSample*2;
@@ -463,7 +464,6 @@ ScreenInit(int argc, char**argv)
   rfbScreen->serverFormat.blueShift = 0;
 
   gethostname(rfbScreen->thisHost, 255);
-  rfbScreen->paddedWidthInBytes = CGDisplayBytesPerRow(kCGDirectMainDisplay);
   rfbScreen->frameBuffer = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
 
   /* we cannot write to the frame buffer */
