@@ -557,7 +557,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
     }
 #endif
 
-    if(cl->sock>=0)
+    if(cl->sock != RFB_INVALID_SOCKET)
 	rfbCloseSocket(cl->sock);
 
     if (cl->scaledScreen!=NULL)
@@ -573,7 +573,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
     free(cl->beforeEncBuf);
     free(cl->afterEncBuf);
 
-    if(cl->sock>=0)
+    if(cl->sock != RFB_INVALID_SOCKET)
        FD_CLR(cl->sock,&(cl->screen->allFds));
 
     cl->clientGoneHook(cl);
