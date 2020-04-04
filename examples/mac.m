@@ -44,6 +44,9 @@
 #include <signal.h>
 #include <pthread.h>
 
+/* The frames/s we want to achieve. Due to operations taking longer, this might not be achieved. */
+#define FRAMERATE 30
+
 rfbBool rfbNoDimming = FALSE;
 rfbBool rfbNoSleep   = TRUE;
 
@@ -389,6 +392,7 @@ static int keyTable[] = {
 #endif
 };
 
+/* Synthesize a keyboard event. This is not called on the main thread due to rfbRunEventLoop(..,..,TRUE), but it works. */
 void
 KbdAddEvent(rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl)
 {
@@ -418,6 +422,7 @@ KbdAddEvent(rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl)
     }
 }
 
+/* Synthesize a mouse event. This is not called on the main thread due to rfbRunEventLoop(..,..,TRUE), but it works. */
 void
 PtrAddEvent(buttonMask, x, y, cl)
     int buttonMask;
@@ -549,10 +554,25 @@ int main(int argc,char *argv[])
   ScreenInit(argc,argv);
   rfbScreen->newClientHook = newClient;
 
-  /* TODO: do it in a multithreaded way, input is very laggy this way */
-  while (rfbIsActive(rfbScreen)) {
+  rfbRunEventLoop(rfbScreen,-1,TRUE);
+
+  /*
+     The VNC machinery is in the background now, we can use the main thread for getting screen contents.
+     Unlike in GUI programs, this is okay here as input injection happens on the VNC worker threads as well.
+  */
+  while(1) {
+      static struct timeval stop, start;
+      gettimeofday(&start, NULL);
+
       refreshCallback();
-      rfbProcessEvents(rfbScreen, rfbScreen->deferUpdateTime*1000);
+
+      gettimeofday(&stop, NULL);
+      size_t duration = (stop.tv_sec - start.tv_sec) * 1000 + (stop.tv_usec - start.tv_usec)/1000;
+
+      if(duration < 1000/FRAMERATE) {
+	  /* Don't hog the CPU, sleep for the remainder of the time slot. */
+	  usleep((1000/FRAMERATE - duration)*1000);
+      }
   }
 
   rfbDimmingShutdown();
