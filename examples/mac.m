@@ -487,6 +487,9 @@ ScreenInit(int argc, char**argv)
 static void 
 refreshCallback()
 {
+  rfbClientIteratorPtr iterator;
+  rfbClientPtr cl;
+
   if(startTime>0 && time(0)>startTime+maxSecsToConnect)
     rfbShutdown(0);
 
@@ -506,6 +509,14 @@ refreshCallback()
 						  kCGBitmapByteOrder32Host | kCGImageAlphaPremultipliedFirst);
   CGContextSetBlendMode(drawContext, kCGBlendModeCopy);
 
+  /* Framebuffer write operation follows, lock out client reads. */
+  iterator=rfbGetClientIterator(rfbScreen);
+  while((cl=rfbClientIteratorNext(iterator))) {
+     LOCK(cl->sendMutex);
+  }
+  rfbReleaseClientIterator(iterator);
+
+
   CGContextDrawImage(drawContext, rect, img);
 
   CGContextRelease(drawContext);
@@ -513,6 +524,15 @@ refreshCallback()
   CGColorSpaceRelease(colorSpace);
 
   rfbMarkRectAsModified(rfbScreen, 0, 0, width, height);
+
+
+  /* Framebuffer write operation finished, reenable  client reads. */
+  iterator=rfbGetClientIterator(rfbScreen);
+  while((cl=rfbClientIteratorNext(iterator))) {
+     UNLOCK(cl->sendMutex);
+  }
+  rfbReleaseClientIterator(iterator);
+
 }
 
 void clientGone(rfbClientPtr cl)
