@@ -47,6 +47,13 @@
 /* The frames/s we want to achieve. Due to operations taking longer, this might not be achieved. */
 #define FRAMERATE 30
 
+/* Two framebuffers. */
+void *frameBufferOne;
+void *frameBufferTwo;
+
+/* Pointer to the current backbuffer. */
+void *backBuffer;
+
 rfbBool rfbNoDimming = FALSE;
 rfbBool rfbNoSleep   = TRUE;
 
@@ -469,7 +476,14 @@ ScreenInit(int argc, char**argv)
   rfbScreen->serverFormat.blueShift = 0;
 
   gethostname(rfbScreen->thisHost, 255);
-  rfbScreen->frameBuffer = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
+
+  frameBufferOne = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
+  frameBufferTwo = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
+
+  /* back buffer */
+  backBuffer = frameBufferOne;
+  /* front buffer */
+  rfbScreen->frameBuffer = frameBufferTwo;
 
   /* we cannot write to the frame buffer */
   rfbScreen->cursor = NULL;
@@ -500,7 +514,7 @@ refreshCallback()
   CGRect rect = {{0, 0}, {width, height}};
   CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
 
-  CGContextRef drawContext = CGBitmapContextCreate(rfbScreen->frameBuffer,
+  CGContextRef drawContext = CGBitmapContextCreate(backBuffer,
 						  width,
 						  height,
 						  8,
@@ -509,24 +523,32 @@ refreshCallback()
 						  kCGBitmapByteOrder32Host | kCGImageAlphaPremultipliedFirst);
   CGContextSetBlendMode(drawContext, kCGBlendModeCopy);
 
-  /* Framebuffer write operation follows, lock out client reads. */
-  iterator=rfbGetClientIterator(rfbScreen);
-  while((cl=rfbClientIteratorNext(iterator))) {
-     LOCK(cl->sendMutex);
-  }
-  rfbReleaseClientIterator(iterator);
-
-
   CGContextDrawImage(drawContext, rect, img);
 
   CGContextRelease(drawContext);
   CGImageRelease(img);
   CGColorSpaceRelease(colorSpace);
 
+  /* Lock out client reads. */
+  iterator=rfbGetClientIterator(rfbScreen);
+  while((cl=rfbClientIteratorNext(iterator))) {
+     LOCK(cl->sendMutex);
+  }
+  rfbReleaseClientIterator(iterator);
+
+  /* Swap framebuffers. */
+  if (backBuffer == frameBufferOne) {
+      backBuffer = frameBufferTwo;
+      rfbScreen->frameBuffer = frameBufferOne;
+  } else {
+      backBuffer = frameBufferOne;
+      rfbScreen->frameBuffer = frameBufferTwo;
+  }
+
+  /* Mark new framebuffer as modified */
   rfbMarkRectAsModified(rfbScreen, 0, 0, width, height);
 
-
-  /* Framebuffer write operation finished, reenable  client reads. */
+  /* Swapping framebuffers finished, reenable client reads. */
   iterator=rfbGetClientIterator(rfbScreen);
   while((cl=rfbClientIteratorNext(iterator))) {
      UNLOCK(cl->sendMutex);
