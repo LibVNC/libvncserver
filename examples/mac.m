@@ -486,7 +486,7 @@ ScreenInit(int argc, char**argv)
       /* do nothing with it */
       CFRelease(stream);
   } else {
-      rfbErr("Could not get screen contents. Check if the program has been given screen recording permisssions in 'System Preferences'->'Security & Privacy'->'Privacy'.\n");
+      rfbErr("Could not get screen contents. Check if the program has been given screen recording permisssions in 'System Preferences'->'Security & Privacy'->'Privacy'->'Screen Recording'.\n");
       return FALSE;
   }
 
