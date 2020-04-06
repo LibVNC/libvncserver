@@ -425,7 +425,9 @@ KbdAddEvent(rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl)
     } else {
         /* Hopefully I can get away with not specifying a CGCharCode.
            (Why would you need both?) */
-        CGPostKeyboardEvent((CGCharCode)0, keyCode, down);
+        if(CGPostKeyboardEvent((CGCharCode)0, keyCode, down) != kCGErrorSuccess) {
+	      rfbErr("Could not post keyboard events. Check if the program has been given permission to control your computer in 'System Preferences'->'Security & Privacy'->'Privacy'->'Accessibility'.\n");
+	}
     }
 }
 
@@ -446,7 +448,7 @@ PtrAddEvent(buttonMask, x, y, cl)
     position.x = x;
     position.y = y;
 
-    CGPostMouseEvent(position, TRUE, 8,
+    if(CGPostMouseEvent(position, TRUE, 8,
                      (buttonMask & (1 << 0)) ? TRUE : FALSE,
                      (buttonMask & (1 << 1)) ? TRUE : FALSE,
                      (buttonMask & (1 << 2)) ? TRUE : FALSE,
@@ -454,7 +456,9 @@ PtrAddEvent(buttonMask, x, y, cl)
                      (buttonMask & (1 << 4)) ? TRUE : FALSE,
                      (buttonMask & (1 << 5)) ? TRUE : FALSE,
                      (buttonMask & (1 << 6)) ? TRUE : FALSE,
-                     (buttonMask & (1 << 7)) ? TRUE : FALSE);
+   		     (buttonMask & (1 << 7)) ? TRUE : FALSE) != kCGErrorSuccess) {
+	      rfbErr("Could not post mouse events. Check if the program has been given permission to control your computer in 'System Preferences'->'Security & Privacy'->'Privacy'->'Accessibility'.\n");
+    }
 }
 
 rfbBool viewOnly = FALSE, sharedMode = FALSE;
