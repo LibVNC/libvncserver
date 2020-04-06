@@ -459,7 +459,7 @@ PtrAddEvent(buttonMask, x, y, cl)
 
 rfbBool viewOnly = FALSE, sharedMode = FALSE;
 
-void 
+rfbBool
 ScreenInit(int argc, char**argv)
 {
   int bitsPerSample = 8;
@@ -469,8 +469,27 @@ ScreenInit(int argc, char**argv)
 			   bitsPerSample,
 			   3,
 			   4);
-  if(!rfbScreen)
-    exit(0);
+  if(!rfbScreen) {
+      rfbErr("Could not init rfbScreen.\n");
+      return FALSE;
+  }
+
+  CGDisplayStreamRef stream = CGDisplayStreamCreate(CGMainDisplayID(),
+						    CGDisplayPixelsWide(kCGDirectMainDisplay),
+						    CGDisplayPixelsHigh(kCGDirectMainDisplay),
+						    'BGRA',
+						    nil,
+						    ^(CGDisplayStreamFrameStatus status, uint64_t displayTime, IOSurfaceRef frameSurface, CGDisplayStreamUpdateRef updateRef) {
+							;
+						    });
+  if(stream) {
+      /* do nothing with it */
+      CFRelease(stream);
+  } else {
+      rfbErr("Could not get screen contents. Check if the program has been given screen recording permisssions in 'System Preferences'->'Security & Privacy'->'Privacy'.\n");
+      return FALSE;
+  }
+
   rfbScreen->serverFormat.redShift = bitsPerSample*2;
   rfbScreen->serverFormat.greenShift = bitsPerSample*1;
   rfbScreen->serverFormat.blueShift = 0;
@@ -496,6 +515,8 @@ ScreenInit(int argc, char**argv)
   }
 
   rfbInitServer(rfbScreen);
+
+  return TRUE;
 }
 
 static void 
@@ -593,7 +614,8 @@ int main(int argc,char *argv[])
 
   rfbDimmingInit();
 
-  ScreenInit(argc,argv);
+  if(!ScreenInit(argc,argv))
+      exit(1);
   rfbScreen->newClientHook = newClient;
 
   rfbRunEventLoop(rfbScreen,-1,TRUE);
