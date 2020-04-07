@@ -24,6 +24,7 @@ examples/zippy
 examples/backchannel
 examples/blooptest
 examples/camera
+examples/cursors
 examples/colourmaptest
 examples/example
 examples/filetransfer
@@ -41,7 +42,6 @@ examples/vncev
 test/blooptest
 test/cargstest
 test/copyrecttest
-test/cursortest
 test/encodingstest
 test/wstest
 /test/tjbench

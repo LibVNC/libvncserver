@@ -515,6 +515,7 @@ SET_TARGET_PROPERTIES(vncclient vncserver
 set(LIBVNCSERVER_EXAMPLES
     backchannel
     camera
+    cursors
     colourmaptest
     example
     fontsel
