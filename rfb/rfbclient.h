@@ -659,11 +659,48 @@ extern rfbBool WriteToRFBServer(rfbClient* client, const char *buf, unsigned int
 extern int FindFreeTcpPort(void);
 extern rfbSocket ListenAtTcpPort(int port);
 extern rfbSocket ListenAtTcpPortAndAddress(int port, const char *address);
+/**
+   Tries to connect to an IPv4 host.
+   @param host Binary IPv4 address
+   @param port Port
+   @return A blocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
 extern rfbSocket ConnectClientToTcpAddr(unsigned int host, int port);
+/**
+   Tries to connect to an IPv4 or IPv6 host.
+   @param hostname A hostname or IP address
+   @param port Port
+   @return A blocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
 extern rfbSocket ConnectClientToTcpAddr6(const char *hostname, int port);
+/**
+   Tries to connect to a Unix socket.
+   @param sockFile Path of the socket file
+   @return A blocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
 extern rfbSocket ConnectClientToUnixSock(const char *sockFile);
+/**
+   Tries to connect to an IPv4 host using the given timeout value.
+   @param host Binary IPv4 address
+   @param port Port
+   @param timeout The time in seconds to wait for a connection
+   @return A nonblocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
 extern rfbSocket ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int timeout);
+/**
+   Tries to connect to an IPv4 or IPv6 host using the given timeout value.
+   @param hostname A hostname or IP address
+   @param port Port
+   @param timeout The time in seconds to wait for a connection
+   @return A nonblocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
 extern rfbSocket ConnectClientToTcpAddr6WithTimeout(const char *hostname, int port, unsigned int timeout);
+/**
+   Tries to connect to a Unix socket using the given timeout value.
+   @param sockFile Path of the socket file
+   @param timeout The time in seconds to wait for a connection
+   @return A nonblocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
 extern rfbSocket ConnectClientToUnixSockWithTimeout(const char *sockFile, unsigned int timeout);
 extern rfbSocket AcceptTcpConnection(rfbSocket listenSock);
 extern rfbBool SetNonBlocking(rfbSocket sock);

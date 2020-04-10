@@ -335,9 +335,6 @@ static rfbBool WaitForConnected(int socket, unsigned int secs)
   return FALSE;
 }
 
-/*
- * ConnectToTcpAddr connects to the given TCP port.
- */
 
 rfbSocket
 ConnectClientToTcpAddr(unsigned int host, int port)
