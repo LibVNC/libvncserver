@@ -537,39 +537,6 @@ There is the possibility to set a password, which is also negotiated by the
 RFB protocol, but IT IS NOT SECURE. Anybody sniffing your net can get the
 password. You really should tunnel through SSH.
 
-Windows or: why do you do that to me?
-=====================================
-
-If you love products from Redmod, you better skip this paragraph.
-I am always amazed how people react whenever Microsoft(tm) puts in some
-features into their products which were around for a long time. Especially
-reporters seem to not know dick about what they are reporting about! But
-what is every time annoying again, is that they don't do it right. Every
-concept has its new name (remember what enumerators used to be until
-Mickeysoft(tm) claimed that enumerators are what we thought were iterators.
-Yeah right, enumerators are also containers. They are not separated. Muddy.)
-
-There are three packages you want to get hold of: zlib, jpeg and pthreads.
-The latter is not strictly necessary, but when you put something like this
-into your source:
-
-```
-#define MUTEX(s)
-	struct {
-		int something;
-		MUTEX(latex);
-	}
-```
-
-Microsoft's C++ compiler doesn't do it. It complains that this is an error.
-This, however, is how I implemented mutexes in case you don't need pthreads,
-and so don't need the mutex.
-
-You can find the packages at
-http://www.gimp.org/win32/extralibs-dev-20001007.zip
-
-Thanks go to all the GIMP team!
-
 What are those other targets in the Makefile?
 =============================================
 
