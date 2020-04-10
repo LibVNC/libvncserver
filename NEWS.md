@@ -1,119 +1,119 @@
 # 0.9.12
 ## Overall changes:
-     * CMake now is the default build system, Autotools were removed.
-     * In addition to TravisCI, all commits are now build-tested by AppVeyorCI.
+   * CMake now is the default build system, Autotools were removed.
+   * In addition to TravisCI, all commits are now build-tested by AppVeyorCI.
 
 ## LibVNCServer/LibVNCClient:
-     * Numerous build fixes for Visual Studio compilers to the extent that
-       one can now _build_ the project with these. The needed changes for
-       successfully _running_ stuff will be implemented in 0.9.13.
-     * Fixed building for Android and added build instructions.
-     * Removed the unused PolarSSL wrapper.
-     * Updated the bundled noVNC to latest release 1.0.0.
-     * Allowed to use global LZO library instead of miniLZO.
+   * Numerous build fixes for Visual Studio compilers to the extent that
+     one can now _build_ the project with these. The needed changes for
+     successfully _running_ stuff will be implemented in 0.9.13.
+   * Fixed building for Android and added build instructions.
+   * Removed the unused PolarSSL wrapper.
+   * Updated the bundled noVNC to latest release 1.0.0.
+   * Allowed to use global LZO library instead of miniLZO.
 
 ## LibVNCClient:
-     * Support for OpenSSL 1.1.x.
-     * Support for overriding the default rectangle decode handlers (with
-       hardware-accelerated ones for instance) thanks to Balazs Ludmany.
-     * vnc2mpg updated.
-     * Added support for X509 server certificate verification as part of the
-       handshake process thanks to Simon Waterman.
-     * Added a TRLE decoder thanks to Wiki Wang.
-     * Included Tight decoding optimizations from TurboVNC thanks to DRC.
-     * Ported the SDL viewer from SDL 1.2 to SDL 2.0.
-     * Numerous security fixes.
-     * Added support for custom auth handlers in order to support additional
-       security types.
+   * Support for OpenSSL 1.1.x.
+   * Support for overriding the default rectangle decode handlers (with
+     hardware-accelerated ones for instance) thanks to Balazs Ludmany.
+   * vnc2mpg updated.
+   * Added support for X509 server certificate verification as part of the
+     handshake process thanks to Simon Waterman.
+   * Added a TRLE decoder thanks to Wiki Wang.
+   * Included Tight decoding optimizations from TurboVNC thanks to DRC.
+   * Ported the SDL viewer from SDL 1.2 to SDL 2.0.
+   * Numerous security fixes.
+   * Added support for custom auth handlers in order to support additional
+     security types.
 
 ## LibVNCServer:
-     * Websockets rework to remove obsolete code thanks to Andreas Weigel.
-     * Ensured compatibility with gtk-vnc 0.7.0+ thanks to Michał Kępień.
-     * The built-in webserver now sends correct MIME type for Javascript.
-     * Numerous memory management issues fixed.
-     * Made the TightVNC-style file transfer more stable.
+   * Websockets rework to remove obsolete code thanks to Andreas Weigel.
+   * Ensured compatibility with gtk-vnc 0.7.0+ thanks to Michał Kępień.
+   * The built-in webserver now sends correct MIME type for Javascript.
+   * Numerous memory management issues fixed.
+   * Made the TightVNC-style file transfer more stable.
 
 # 0.9.11
 ## Overall changes:
-     * LibVNCServer/LibVNCClient development now uses continous intregration,
-       provided by TravisCI.
+   * LibVNCServer/LibVNCClient development now uses continous intregration,
+     provided by TravisCI.
 
 ## LibVNCClient:
-     * Now initializes libgcrypt before use if the application did not do it.
-       Fixes a crash when connection to Mac hosts
-       (https://github.com/LibVNC/libvncserver/issues/45).
-     * Various fixes that result in more stable handling of malicious or broken
-       servers.
-     * Removed broken and unmaintained H264 decoding.
-     * Some documentation fixes.
-     * Added hooks to WriteToTLS() for optional protection by mutex.
+   * Now initializes libgcrypt before use if the application did not do it.
+     Fixes a crash when connection to Mac hosts
+     (https://github.com/LibVNC/libvncserver/issues/45).
+   * Various fixes that result in more stable handling of malicious or broken
+     servers.
+   * Removed broken and unmaintained H264 decoding.
+   * Some documentation fixes.
+   * Added hooks to WriteToTLS() for optional protection by mutex.
 
 ## LibVNCServer:
-     * Stability fixes for the WebSocket implementation.
-     * Replaced SHA1 implementation with the one from RFC 6234.
-     * The built-in HTTP server does not allow directory traversals anymore.
-     * The built-in HTTP now sends correct MIME types for CSS and SVG.
-     * Added support for systemd socket activation.
-     * Made it possible to get autoPort behavior with either ipv4 or ipv6
-       disabled.
-     * Fixed starting of an onHold-client in threaded mode.
+   * Stability fixes for the WebSocket implementation.
+   * Replaced SHA1 implementation with the one from RFC 6234.
+   * The built-in HTTP server does not allow directory traversals anymore.
+   * The built-in HTTP now sends correct MIME types for CSS and SVG.
+   * Added support for systemd socket activation.
+   * Made it possible to get autoPort behavior with either ipv4 or ipv6
+     disabled.
+   * Fixed starting of an onHold-client in threaded mode.
 
 # 0.9.10
 ## Overall changes:
-     * Moved the whole project from sourceforge to https://libvnc.github.io/.
-     * Cleaned out the autotools build system which now uses autoreconf.
-     * Updated noVNC HTML5 client to latest version.
-     * Split out x11vnc sources into separate repository at
-       https://github.com/LibVNC/x11vnc
-     * Split out vncterm sources into separate repository at
-       https://github.com/LibVNC/vncterm
-     * Split out VisualNaCro sources into separate repository at
-       https://github.com/LibVNC/VisualNaCro
-     * Merged Debian patches.
+   * Moved the whole project from sourceforge to https://libvnc.github.io/.
+   * Cleaned out the autotools build system which now uses autoreconf.
+   * Updated noVNC HTML5 client to latest version.
+   * Split out x11vnc sources into separate repository at
+     https://github.com/LibVNC/x11vnc
+   * Split out vncterm sources into separate repository at
+     https://github.com/LibVNC/vncterm
+   * Split out VisualNaCro sources into separate repository at
+     https://github.com/LibVNC/VisualNaCro
+   * Merged Debian patches.
 
 ## LibVNCServer/LibVNCClient:
-     * Fixed some security-related buffer overflow cases.
-     * Added compatibility headers to make LibVNCServer/LibVNCClient build on native
-       Windows 8.
-     * Update LZO to version 2.07, fixing CVE-2014-4607.
+   * Fixed some security-related buffer overflow cases.
+   * Added compatibility headers to make LibVNCServer/LibVNCClient build on native
+     Windows 8.
+   * Update LZO to version 2.07, fixing CVE-2014-4607.
 
 ## LibVNCServer:
-     * Merged patches from KDE/krfb.
-     * Can now do IPv6 without IPv4.
-     * Fixed a use-after-free issue in scale.c.
+   * Merged patches from KDE/krfb.
+   * Can now do IPv6 without IPv4.
+   * Fixed a use-after-free issue in scale.c.
 
 # 0.9.9
 ## Overall changes:
-     * Added noVNC HTML5 VNC viewer (http://kanaka.github.com/noVNC/) connect possibility
-       to our http server. Pure JavaScript, no Java plugin required anymore! (But a
-       recent browser...)
-     * Added a GTK+ VNC viewer example.
+   * Added noVNC HTML5 VNC viewer (http://kanaka.github.com/noVNC/) connect possibility
+     to our http server. Pure JavaScript, no Java plugin required anymore! (But a
+     recent browser...)
+   * Added a GTK+ VNC viewer example.
 
 ## LibVNCServer/LibVNCClient:
-     * Added support to build for Google Android.
-     * Complete IPv6 support in both LibVNCServer and LibVNCClient.
+   * Added support to build for Google Android.
+   * Complete IPv6 support in both LibVNCServer and LibVNCClient.
 
 ## LibVNCServer:
-     * Split two event-loop related functions out of the rfbProcessEvents() mechanism.
-       This is required to be able to do proper event loop integration with Qt. Idea was
-       taken from Vino's libvncserver fork.
-     * Added TightPNG (http://wiki.qemu.org/VNC_Tight_PNG) encoding support. Like the
-       original Tight encoding, this still uses JPEG, but ZLIB encoded rects are encoded
-       with PNG here.
-     * Added suport for serving VNC sessions through WebSockets
-       (http://en.wikipedia.org/wiki/WebSocket), a web technology providing for multiplexing
-       bi-directional, full-duplex communications channels over a single TCP connection.
-     * Support connections from the Mac OS X built-in VNC client to LibVNCServer
-       instances running with no password.
-     * Replaced the Tight encoder with a TurboVNC one which is tremendously faster in most
-       cases, especially with high-color video or 3D workloads.
-       (http://www.virtualgl.org/pmwiki/uploads/About/tighttoturbo.pdf)
+   * Split two event-loop related functions out of the rfbProcessEvents() mechanism.
+     This is required to be able to do proper event loop integration with Qt. Idea was
+     taken from Vino's libvncserver fork.
+   * Added TightPNG (http://wiki.qemu.org/VNC_Tight_PNG) encoding support. Like the
+     original Tight encoding, this still uses JPEG, but ZLIB encoded rects are encoded
+     with PNG here.
+   * Added suport for serving VNC sessions through WebSockets
+     (http://en.wikipedia.org/wiki/WebSocket), a web technology providing for multiplexing
+     bi-directional, full-duplex communications channels over a single TCP connection.
+   * Support connections from the Mac OS X built-in VNC client to LibVNCServer
+     instances running with no password.
+   * Replaced the Tight encoder with a TurboVNC one which is tremendously faster in most
+     cases, especially with high-color video or 3D workloads.
+     (http://www.virtualgl.org/pmwiki/uploads/About/tighttoturbo.pdf)
 
 ## LibVNCClient:
-     * Added support to only listen for reverse connections on a specific IP address.
-     * Support for using OpenSSL instead of GnuTLS. This could come in handy on embedded
-       devices where only this TLS implementation is available.
-     * Added support to connect to UltraVNC Single Click servers.
+   * Added support to only listen for reverse connections on a specific IP address.
+   * Support for using OpenSSL instead of GnuTLS. This could come in handy on embedded
+     devices where only this TLS implementation is available.
+   * Added support to connect to UltraVNC Single Click servers.
 
 # 0.9.8.2
    - Fixed a regression that crept in with the Apple Remote Desktop support.
@@ -123,52 +123,52 @@
 
 # 0.9.8
 ## Overall changes:
-     * Automagically generated API documentation using doxygen.
-     * Added support for pkg-config.
-     * Fixed Mingw32 cross compilation.
-     * Fixed CMake build system.
+   * Automagically generated API documentation using doxygen.
+   * Added support for pkg-config.
+   * Fixed Mingw32 cross compilation.
+   * Fixed CMake build system.
 
 ## LibVNCServer/LibVNCClient:
-     * All files used by _both_ LibVNCServer and LibVNCClient were put into
-       a 'common' directory, reducing code duplication.
-     * Implemented xvp VNC extension.
-     * Updated minilzo library used for Ultra encoding to ver 2.04.
-       According to the minilzo README, this brings a significant
-       speedup on 64-bit architectures.
+   * All files used by _both_ LibVNCServer and LibVNCClient were put into
+     a 'common' directory, reducing code duplication.
+   * Implemented xvp VNC extension.
+   * Updated minilzo library used for Ultra encoding to ver 2.04.
+     According to the minilzo README, this brings a significant
+     speedup on 64-bit architectures.
 
 ## LibVNCServer:
-     * Thread safety for ZRLE, Zlib, Tight, RRE, CoRRE and Ultra encodings.
-       This makes all VNC encodings safe to use with a multithreaded server.
-     * A DisplayFinishedHook for LibVNCServer. If set, this hook gets called
-       just before rfbSendFrameBufferUpdate() returns.
-     * Fix for tight security type for RFB 3.8 in TightVNC file transfer
-       (Debian Bug #517422).
+   * Thread safety for ZRLE, Zlib, Tight, RRE, CoRRE and Ultra encodings.
+     This makes all VNC encodings safe to use with a multithreaded server.
+   * A DisplayFinishedHook for LibVNCServer. If set, this hook gets called
+     just before rfbSendFrameBufferUpdate() returns.
+   * Fix for tight security type for RFB 3.8 in TightVNC file transfer
+     (Debian Bug #517422).
 
 ## LibVNCClient:
-     * Unix sockets support.
-     * Anonymous TLS security type support.
-     * VeNCrypt security type support.
-     * MSLogon security type support.
-     * ARD (Apple Remote Desktop) security type support.
-     * UltraVNC Repeater support.
-     * A new FinishedFrameBufferUpdate callback that is invoked after each
-       complete framebuffer update.
-     * A new non-forking listen (reverse VNC) function that works under
-       Windows.
-     * IPv6 support. LibVNCClient is now able to connect to IPv6 VNC servers.
-     * IP QoS support. This enables setting the DSCP/Traffic Class field of
-       IP/IPv6 packets sent by a client. For example starting a client with
-       -qosdscp 184 marks all outgoing traffic for expedited forwarding.
-       Implementation for Win32 is still a TODO, though.
-     * Fixed hostname resolution problems under Windows.
+   * Unix sockets support.
+   * Anonymous TLS security type support.
+   * VeNCrypt security type support.
+   * MSLogon security type support.
+   * ARD (Apple Remote Desktop) security type support.
+   * UltraVNC Repeater support.
+   * A new FinishedFrameBufferUpdate callback that is invoked after each
+     complete framebuffer update.
+   * A new non-forking listen (reverse VNC) function that works under
+     Windows.
+   * IPv6 support. LibVNCClient is now able to connect to IPv6 VNC servers.
+   * IP QoS support. This enables setting the DSCP/Traffic Class field of
+     IP/IPv6 packets sent by a client. For example starting a client with
+     -qosdscp 184 marks all outgoing traffic for expedited forwarding.
+     Implementation for Win32 is still a TODO, though.
+   * Fixed hostname resolution problems under Windows.
 
 ## SDLvncviewer
-     * Is now resizable and can do key repeat, mouse wheel scrolling
-       and clipboard copy and paste.
+   * Is now resizable and can do key repeat, mouse wheel scrolling
+     and clipboard copy and paste.
 
 ## LinuxVNC:
-     * Fix for no input possible because of ctrl key being stuck.
-       Issue was reported as Debian bug #555988.
+   * Fix for no input possible because of ctrl key being stuck.
+     Issue was reported as Debian bug #555988.
 
 
 # 0.9.7
