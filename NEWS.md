@@ -1,4 +1,15 @@
-# 0.9.12
+# 2019-01-06: Version 0.9.12
+
+Over two years of work have now culminated in 0.9.12. We have ditched
+the legacy Autotools build system in favour of the truly cross-platform
+CMake and extended the continuous integration tests to run MS Windows
+builds as well. LibVNCServer saw quite some memory management issues
+fixed, LibVNCClient received X509 server certificate verification, Tight
+decoding optimizations, support for overriding the default rectangle
+decode handlers and a port of the SDL-based VNC viewer to SDL 2.0. [42
+issues](https://github.com/LibVNC/libvncserver/issues?q=is%3Aclosed+milestone%3A%22Release+0.9.12%22)
+were fixed with this release.
+
 ## Overall changes:
    * CMake now is the default build system, Autotools were removed.
    * In addition to TravisCI, all commits are now build-tested by AppVeyorCI.
@@ -33,7 +44,15 @@
    * Numerous memory management issues fixed.
    * Made the TightVNC-style file transfer more stable.
 
-# 0.9.11
+# 2016-12-30: Version 0.9.11
+
+After quite some time finally a major release featuring continous
+integration to make sure the code builds on all supported platforms.
+LibVNCClient saw a lot of robustness fixes making it more stable when
+dealing with broken or malicious servers. LibVNCServer received
+WebSocket improvements, its built-in webserver got more secure and
+systemd support was added.
+
 ## Overall changes:
    * LibVNCServer/LibVNCClient development now uses continous intregration,
      provided by TravisCI.
@@ -58,7 +77,12 @@
      disabled.
    * Fixed starting of an onHold-client in threaded mode.
 
-# 0.9.10
+# 2014-10-21: Version 0.9.10
+
+Another major release that saw a massive code re-organisation, merged
+some Debian patches, addressed some security issues and fixed building
+on Windows 8.
+
 ## Overall changes:
    * Moved the whole project from sourceforge to https://libvnc.github.io/.
    * Cleaned out the autotools build system which now uses autoreconf.
@@ -82,7 +106,12 @@
    * Can now do IPv6 without IPv4.
    * Fixed a use-after-free issue in scale.c.
 
-# 0.9.9
+# 2012-05-04: Version 0.9.9
+
+This is a major release that contains numerous bugfixes and a nice bag
+of shiny new features, mainly full IPv6 support, the new TurboVNC
+encoder and support for WebSockets.
+
 ## Overall changes:
    * Added noVNC HTML5 VNC viewer (http://kanaka.github.com/noVNC/) connect possibility
      to our http server. Pure JavaScript, no Java plugin required anymore! (But a
@@ -115,13 +144,20 @@
      devices where only this TLS implementation is available.
    * Added support to connect to UltraVNC Single Click servers.
 
-# 0.9.8.2
-   - Fixed a regression that crept in with the Apple Remote Desktop support.
+# 2011-11-09: Version 0.9.8.2
 
-# 0.9.8.1
-   - Fixed an ABI compatibility issue.
+This is a maintenance release that fixes a regression in libvncclient
+that crept in with Apple Remote Desktop support added with 0.9.8.
+Viewers that were not adapted to the new functionality would fail
+connecting to ARD servers before.
 
-# 0.9.8
+# 2011-10-12: Version 0.9.8.1
+
+This is a maintenance release that fixes an ABI compatibility issue
+introduced with 0.9.8.
+
+# 2011-03-30: Version 0.9.8
+
 ## Overall changes:
    * Automagically generated API documentation using doxygen.
    * Added support for pkg-config.
@@ -171,7 +207,7 @@
      Issue was reported as Debian bug #555988.
 
 
-# 0.9.7
+# Version 0.9.7
    * Mark sent me patches to no longer need C++ for ZRLE encoding!
      added --disable-cxx Option for configure
    * x11vnc changes from Karl Runge:
@@ -230,7 +266,144 @@
    * more portable way to determine endianness and types of a given size
 	 through autoconf based methods
 
-# 0.5
+# 2005-09-29
+
+LibVNCServer now sports a brand new method to extend the protocol,
+thanks to Rohit Kumar! He also extended the library to support RFB 3.7.
+Furthermore, he contributed TightVNC file transfer protocol support to
+LibVNCServer!
+
+# 2005-05-25
+
+LibVNCClient now features ZRLE decoding!
+
+# 2005-05-15
+
+Another round of valgrinding completed. This time it is augmented by
+changes instigated by using Linus' sparse. In the course, the complete
+sources were converted to ANSI C.
+
+# 2005-05-07
+
+The member socketInitDone was renamed to socketState, and no longer
+contains a bool value. This allows us to quit a server cleanly from the
+event loop via rfbShutdownServer(), so that the structures can be
+cleaned up properly. This is demonstrated in examples/example.c.
+
+# 2005-01-21
+
+The function rfbMakeMaskFromAlphaSource() applies a Floyd-Steinberg
+dither to approximate a binary mask from a cursor with alpha channel. A
+demonstration can be found in test/cursortest.c.
+
+# 2005-01-16
+
+Renamed this page to reflect that LibVNCClient is actually very usable.
+
+# 2005-01-16
+
+Karl Runge has done awesome work to support cursors with alpha blending!
+You can try it with x11vnc as in CVS, or wait a few more days for x11vnc
+to be released officially!
+
+# 2005-01-15
+
+Happy new year! It begins with a new macro recorder based on
+LibVNCServer/LibVNCClient using perl as script language. The macro
+recorder is itself written in perl, and writes out perl scripts, acting
+as a VNC proxy, so that you can connect a vncviewer to it, and it
+records all your input, possibly looking for a certain button, image,
+word, etc. before continuing. I called it VisualNaCro, and it's in CVS.
+
+# 2004-12-20: Version 0.7
+
+Just before christmas, a new release! Version 0.7 brings you the first
+non-beta of LibVNCServer...
+
+# 2004-12-02
+
+Finally MinGW32 support. I only had problems with a vncviewer which
+wouldn't connect to localhost: I use SDLvncviewer...
+
+# 2004-12-01
+
+LibVNCClient is getting better and better... Expect a very powerful
+client soon!
+
+# 2004-10-16
+
+LibVNCServer has automated test, thanks to LibVNCClient (included). It
+doesn't do ZRLE yet, and exposed some bugs, the only remaining of these
+is CoRRE (not sure yet if it's a bug in the client or the server).
+
+# 2004-09-14
+
+Added success stories.
+
+# 2004-09-07
+
+The API was cleaned up. The structures and functions now have a prefix
+(mostly "rfb", sometimes "zrle" or "sra") in order not to clutter
+the namespace, while the structure's members don't need such a prefix.
+
+# 2004-08-17
+
+I finally came around to fix mouse behaviour in QEMU\'s VNC frontend for
+Windows 98. Please find the patch [here](https://libvnc.github.io/oldstuff/qemu.tar.gz).
+If mouse behaves strangely, try to wiggle the pointer to a free spot on the
+desktop, hit Ctrl+Shift and release them. After that, the mouse should
+behave nicely.
+
+# 2004-06-07
+
+After silently being added almost a year ago, libvncclient's API was
+modified for real use, and three examples were added: ppmtest (a very
+simple demo), SDLvncviewer, and vnc2mpg (which lets you record your VNC
+session to a movie). Automated regression tests of the libraries are
+planned.
+
+# 2004-06-02
+
+[x11vnc](http://www.karlrunge.com/x11vnc/)-0.6.1 was released! This
+reflects the long way the original, small example has gone, improved in
+many possible ways and having a broad user base.
+
+# 2004-05-29
+
+Some [patches](https://libvnc.github.io/oldstuff/qemu.tar.gz) were created for
+[QEMU](http://qemu.org/), a FAST! emulator by Fabrice Bellard, to
+control those sessions with a vncviewer.
+
+# 2004-02-29
+
+LibVNCServer is listed as a project using
+[Valgrind](http://valgrind.org/)!
+
+# 2003-11-07: Version 0.6
+
+Version 0.6 is out! x11vnc performance boosts! You no longer need a c++
+compiler in order to have ZRLE coding! LinuxVNC was added (This is to
+the text console what x11vnc is to X11)!
+
+# 2003-02-21
+
+rdp2vnc is in rdesktop's CVS.
+
+# 2003-02-19
+
+A preliminary patch for rdesktop (CVS) to make rdp2vnc, a translator
+from Windows Terminal Server's protocol to VNC's protocol, is
+[available](https://libvnc.github.io/oldstuff/rdesktop-cvs+vnc.diff.gz). It needs a new version of
+libvncserver; try CVS until I release 0.6.
+
+
+# 2003-02-09: Version 0.5
+
+Version 0.5 is out! Features include autoconf based configure, rpm
+package (YMMV), cleanup of directory structure, NEW x11vnc! ZRLE
+encoding! HTTP tunnelling through LibVNCServer's HTTP support! Many bug
+fixes!
+
    * rpm packaging through autoconf
    * autoconf'ed the whole package (including optional support for zlib,
 	 pthreads and libjpeg as well as zrle/c++)
@@ -245,7 +418,12 @@
    * a HTTP request for tunnelling was added (to fool strict web proxies)
    * sync'ed with TightVNC 1.2.5
 
-# 0.4
+
+# 2002-07-28: Version 0.4
+
+Version 0.4 is out! Biggest feature: NewFB encoding. Quite a few
+bugfixes also (Thanks to all!).
+
    * support for NewFB from Const Kaplinsky
    * memory leaks squashed (localtime pseudo leak is still there :-)
    * small improvements for OSXvnc (still not working correctly)
@@ -259,15 +437,32 @@
    * x11vnc can be controlled by starting again with special options if compiling
 	 with LOCAL_CONTROL defined
 
-# 0.3
-   added x11vnc, a x0rfbserver clone
-   regard deferUpdateTime in processEvents, if usec<0
-   initialize deferUpdateTime (memory "leak"!)
-   changed command line handling (arguments are parsed and then removed)
-   added very simple example: zippy
-   added rfbDrawLine, rfbDrawPixel
+# Version 0.3
+   * added x11vnc, a x0rfbserver clone
+   * regard deferUpdateTime in processEvents, if usec<0
+   * initialize deferUpdateTime (memory "leak"!)
+   * changed command line handling (arguments are parsed and then removed)
+   * added very simple example: zippy
+   * added rfbDrawLine, rfbDrawPixel
 
-# 0.2
+# 2001-12-14
+
+A new version of [rdesktop+vnc](rdesktop-1.1.0+vnc-0.2.tar.gz) is
+available! (Includes support for other platforms keyboard mapping with
+plain rdesktop!)
+
+# 2001-10-23
+
+Added a link to my homepage at the end.
+
+# 2001-10-18
+
+I released the rdp2vnc extensions as well as patches for general
+keyboard handling, working inside Xvnc and `process_text2` (the famous
+"font:" error) to rdesktop. Please find it on the [download
+page](http://sourceforge.net/project/showfiles.php?group_id=32584).
+
+# Version 0.2
    * inserted a deferUpdate mechanism (X11 independent).
    * removed deletion of requestedRegion
    * added rfbLoadConsoleFont
@@ -319,7 +514,19 @@
    * compiles cleanly on Linux, IRIX, BSD, Apple (Darwin)
    * fixed prototypes
 
-# 0.1
+# 2001-10-13
+
+A snapshot of
+[LibVNCServer](http://sourceforge.net/project/showfiles.php?group_id=32584)
+and
+[RDP2VNC](http://sourceforge.net/project/showfiles.php?group_id=32584)
+is now available. You can also download the
+[diff](http://sourceforge.net/project/showfiles.php?group_id=32584)
+against rdesktop-1.1.0. rdp2vnc also contains the patches for keyboards
+other than PC keyboards, and you can specify \"-k fr\" again.
+
+# Version 0.1
+
    * rewrote API to use pseudo-methods instead of required functions.
    * lots of clean up.
    * Example can show symbols now.
