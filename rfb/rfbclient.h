@@ -84,6 +84,8 @@
 #define TUNNEL_PORT_OFFSET 5500
 #define SERVER_PORT_OFFSET 5900
 
+#define DEFAULT_CONNECT_TIMEOUT 60
+
 #define DEFAULT_SSH_CMD "/usr/bin/ssh"
 #define DEFAULT_TUNNEL_CMD  \
   (DEFAULT_SSH_CMD " -f -L %L:localhost:%R %H sleep 20")
@@ -450,6 +452,8 @@ typedef struct _rfbClient {
 
 #endif
 #endif
+	/* timeout in seconds for select() after connect() */
+	unsigned int connectTimeout;
 } rfbClient;
 
 /* cursor.c */
@@ -658,6 +662,9 @@ extern rfbSocket ListenAtTcpPortAndAddress(int port, const char *address);
 extern rfbSocket ConnectClientToTcpAddr(unsigned int host, int port);
 extern rfbSocket ConnectClientToTcpAddr6(const char *hostname, int port);
 extern rfbSocket ConnectClientToUnixSock(const char *sockFile);
+extern rfbSocket ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int timeout);
+extern rfbSocket ConnectClientToTcpAddr6WithTimeout(const char *hostname, int port, unsigned int timeout);
+extern rfbSocket ConnectClientToUnixSockWithTimeout(const char *sockFile, unsigned int timeout);
 extern rfbSocket AcceptTcpConnection(rfbSocket listenSock);
 extern rfbBool SetNonBlocking(rfbSocket sock);
 extern rfbBool SetDSCP(rfbSocket sock, int dscp);
