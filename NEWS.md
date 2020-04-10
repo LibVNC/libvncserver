@@ -447,7 +447,7 @@ bugfixes also (Thanks to all!).
 
 # 2001-12-14
 
-A new version of [rdesktop+vnc](rdesktop-1.1.0+vnc-0.2.tar.gz) is
+A new version of [rdesktop+vnc](https://libvnc.github.io/oldstuff/rdesktop-1.1.0+vnc-0.2.tar.gz) is
 available! (Includes support for other platforms keyboard mapping with
 plain rdesktop!)
 
