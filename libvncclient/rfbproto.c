@@ -65,6 +65,7 @@
 #endif
 #include "tls.h"
 
+#define MAX_TEXTCHAT_SIZE 10485760 /* 10MB */
 
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
@@ -2159,6 +2160,8 @@ HandleRFBServerMessage(rfbClient* client)
               client->HandleTextChat(client, (int)rfbTextChatFinished, NULL);
           break;
       default:
+	  if(msg.tc.length > MAX_TEXTCHAT_SIZE)
+	      return FALSE;
           buffer=malloc(msg.tc.length+1);
           if (!ReadFromRFBServer(client, buffer, msg.tc.length))
           {
