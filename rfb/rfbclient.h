@@ -667,6 +667,7 @@ extern rfbSocket ConnectClientToTcpAddr6WithTimeout(const char *hostname, int po
 extern rfbSocket ConnectClientToUnixSockWithTimeout(const char *sockFile, unsigned int timeout);
 extern rfbSocket AcceptTcpConnection(rfbSocket listenSock);
 extern rfbBool SetNonBlocking(rfbSocket sock);
+extern rfbBool SetBlocking(rfbSocket sock);
 extern rfbBool SetDSCP(rfbSocket sock, int dscp);
 
 extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);

@@ -305,22 +305,6 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 }
 
 
-static rfbBool SetBlocking(rfbSocket sock)
-{
-#ifdef WIN32
-  unsigned long block=0;
-  if(ioctlsocket(sock, FIONBIO, &block) == SOCKET_ERROR) {
-    errno=WSAGetLastError();
-#else
-  int flags = fcntl(sock, F_GETFL);
-  if(flags < 0 || fcntl(sock, F_SETFL, flags & ~O_NONBLOCK) < 0) {
-#endif
-    rfbClientErr("Setting socket to blocking failed: %s\n",strerror(errno));
-    return FALSE;
-  }
-  return TRUE;
-}
-
 static rfbBool WaitForConnected(int socket, unsigned int secs)
 {
   fd_set writefds;
@@ -744,6 +728,22 @@ SetNonBlocking(rfbSocket sock)
   return TRUE;
 }
 
+
+rfbBool SetBlocking(rfbSocket sock)
+{
+#ifdef WIN32
+  unsigned long block=0;
+  if(ioctlsocket(sock, FIONBIO, &block) == SOCKET_ERROR) {
+    errno=WSAGetLastError();
+#else
+  int flags = fcntl(sock, F_GETFL);
+  if(flags < 0 || fcntl(sock, F_SETFL, flags & ~O_NONBLOCK) < 0) {
+#endif
+    rfbClientErr("Setting socket to blocking failed: %s\n",strerror(errno));
+    return FALSE;
+  }
+  return TRUE;
+}
 
 
 /*
