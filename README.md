@@ -5,7 +5,7 @@
 LibVNCServer: A library for easy implementation of a VNC server.
 Copyright (C) 2001-2003 Johannes E. Schindelin
 
-If you already used LibVNCServer, you probably want to read [NEWS](NEWS).
+If you already used LibVNCServer, you probably want to read [NEWS](NEWS.md).
 
 What is it?
 ===========
