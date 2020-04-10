@@ -434,7 +434,8 @@ from the [webclients](webclients) directory via `../examples/example`. It's
 important to _not_ start from within the `examples` directory as otherwise the
 server program won't find its HTTP index file. The server program will tell you
 a URL to point your web browser to. There, you can click on the noVNC-Button to
-connect using the bundled noVNC viewer.
+connect using the noVNC viewer git submodule (installable via
+`git submodule update --init`).
 
 ### Using Secure Websockets
 
