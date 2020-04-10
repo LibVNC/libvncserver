@@ -537,33 +537,6 @@ There is the possibility to set a password, which is also negotiated by the
 RFB protocol, but IT IS NOT SECURE. Anybody sniffing your net can get the
 password. You really should tunnel through SSH.
 
-What are those other targets in the Makefile?
-=============================================
-
-OSXvnc-server is the original OSXvnc adapted to use the library, which was in
-turn adapted from OSXvnc. As you easily can see, the OSX dependend part is
-minimal.
-
-storepasswd is the original program to save a vnc style password in a file.
-Unfortunately, authentication as every vncviewer speaks it means the server
-has to know the plain password. You really should tunnel via ssh or use
-your own PasswordCheck to build a PIN/TAN system.
-
-sratest is a test unit. Run it to assert correct behaviour of sraRegion. I
-wrote this to test my iterator implementation.
-
-blooptest is a test of pthreads. It is just the example, but with a background
-loop to hunt down thread lockups.
-
-pnmshow24 is like pnmshow, but it uses 3 bytes/pixel internally, which is not
-as efficient as 4 bytes/pixel for translation, because there is no native data
-type of that size, so you have to memcpy pixels and be real cautious with
-endianness. Anyway, it works.
-
-fontsel is a test for rfbSelectBox and rfbLoadConsoleFont. If you have Linux
-console fonts, you can browse them via VNC. Directory browsing not implemented
-yet :-(
-
 Commercial Use
 ==============
 

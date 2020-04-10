@@ -598,9 +598,12 @@ INPUT                  = rfb \
                          client_examples/vnc2mpg.c \
                          examples/camera.c \
                          examples/example.c \
+			 examples/blooptest.c \
                          examples/filetransfer.c \
+			 examples/fontsel.c \
                          examples/pnmshow.c \
                          examples/pnmshow24.c \
+			 examples/storepasswd.c \
                          examples/vncev.c
 
 # This tag can be used to specify the character encoding of the source files 

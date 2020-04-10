@@ -1,5 +1,9 @@
 /**
- * @example pnmshow24.c
+   @example pnmshow24.c
+   pnmshow24 is like pnmshow, but it uses 3 bytes/pixel internally, which is not
+   as efficient as 4 bytes/pixel for translation, because there is no native data
+   type of that size, so you have to memcpy pixels and be real cautious with
+   endianness. Anyway, it works.
  */
 
 #include <stdio.h>
