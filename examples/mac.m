@@ -475,6 +475,30 @@ ScreenInit(int argc, char**argv)
       return FALSE;
   }
 
+  rfbScreen->serverFormat.redShift = bitsPerSample*2;
+  rfbScreen->serverFormat.greenShift = bitsPerSample*1;
+  rfbScreen->serverFormat.blueShift = 0;
+
+  gethostname(rfbScreen->thisHost, 255);
+
+  frameBufferOne = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
+  frameBufferTwo = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
+
+  /* back buffer */
+  backBuffer = frameBufferOne;
+  /* front buffer */
+  rfbScreen->frameBuffer = frameBufferTwo;
+
+  /* we cannot write to the frame buffer */
+  rfbScreen->cursor = NULL;
+
+  rfbScreen->ptrAddEvent = PtrAddEvent;
+  rfbScreen->kbdAddEvent = KbdAddEvent;
+
+  if(sharedMode) {
+    rfbScreen->alwaysShared = TRUE;
+  }
+
   dispatch_queue_t dispatchQueue = dispatch_queue_create("libvncserver.examples.mac", NULL);
   CGDisplayStreamRef stream = CGDisplayStreamCreateWithDispatchQueue(CGMainDisplayID(),
 								     CGDisplayPixelsWide(kCGDirectMainDisplay),
@@ -548,30 +572,6 @@ ScreenInit(int argc, char**argv)
   } else {
       rfbErr("Could not get screen contents. Check if the program has been given screen recording permisssions in 'System Preferences'->'Security & Privacy'->'Privacy'->'Screen Recording'.\n");
       return FALSE;
-  }
-
-  rfbScreen->serverFormat.redShift = bitsPerSample*2;
-  rfbScreen->serverFormat.greenShift = bitsPerSample*1;
-  rfbScreen->serverFormat.blueShift = 0;
-
-  gethostname(rfbScreen->thisHost, 255);
-
-  frameBufferOne = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
-  frameBufferTwo = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
-
-  /* back buffer */
-  backBuffer = frameBufferOne;
-  /* front buffer */
-  rfbScreen->frameBuffer = frameBufferTwo;
-
-  /* we cannot write to the frame buffer */
-  rfbScreen->cursor = NULL;
-
-  rfbScreen->ptrAddEvent = PtrAddEvent;
-  rfbScreen->kbdAddEvent = KbdAddEvent;
-
-  if(sharedMode) {
-    rfbScreen->alwaysShared = TRUE;
   }
 
   rfbInitServer(rfbScreen);
