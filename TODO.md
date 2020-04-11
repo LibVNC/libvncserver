@@ -1,6 +1,8 @@
 high-prio:
 ----------
-- Implement encryption in libvncserver.
+- [Merge MulticastVNC](https://github.com/LibVNC/libvncserver/issues/394) 
+- [style fixes: use Linux' coding guidelines & ANSIfy tightvnc-filetransfer](https://github.com/LibVNC/libvncserver/issues/395)
+- [Implement encryption in libvncserver](https://github.com/LibVNC/libvncserver/issues/396)
 
 
 maybe-later:
@@ -16,8 +18,6 @@ maybe-later:
 	- map Apple/Linux/Windows keys onto each other,
 	- handle selection
 	- handle scroll wheel
-- style fixes: use Linux' coding guidelines & ANSIfy tightvnc-filetransfer:
-	discuss on list
 - LibVNCClient cleanup: prefix with "rfbClient", and make sure it does
 	not deliberately die() or exit() anywhere!
 - make corre work again (libvncclient or libvncserver?)
