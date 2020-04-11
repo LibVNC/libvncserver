@@ -489,7 +489,7 @@ ScreenInit(int argc, char**argv)
   /* front buffer */
   rfbScreen->frameBuffer = frameBufferTwo;
 
-  /* we cannot write to the frame buffer */
+  /* we already capture the cursor in the framebuffer */
   rfbScreen->cursor = NULL;
 
   rfbScreen->ptrAddEvent = PtrAddEvent;
