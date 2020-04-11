@@ -44,9 +44,6 @@
 #include <signal.h>
 #include <pthread.h>
 
-/* The frames/s we want to achieve. Due to operations taking longer, this might not be achieved. */
-#define FRAMERATE 30
-
 /* Two framebuffers. */
 void *frameBufferOne;
 void *frameBufferTwo;
@@ -478,17 +475,76 @@ ScreenInit(int argc, char**argv)
       return FALSE;
   }
 
-  CGDisplayStreamRef stream = CGDisplayStreamCreate(CGMainDisplayID(),
-						    CGDisplayPixelsWide(kCGDirectMainDisplay),
-						    CGDisplayPixelsHigh(kCGDirectMainDisplay),
-						    'BGRA',
-						    nil,
-						    ^(CGDisplayStreamFrameStatus status, uint64_t displayTime, IOSurfaceRef frameSurface, CGDisplayStreamUpdateRef updateRef) {
-							;
-						    });
+  dispatch_queue_t dispatchQueue = dispatch_queue_create("libvncserver.examples.mac", NULL);
+  CGDisplayStreamRef stream = CGDisplayStreamCreateWithDispatchQueue(CGMainDisplayID(),
+								     CGDisplayPixelsWide(kCGDirectMainDisplay),
+								     CGDisplayPixelsHigh(kCGDirectMainDisplay),
+								     'BGRA',
+								     nil,
+								     dispatchQueue,
+								     ^(CGDisplayStreamFrameStatus status,
+								       uint64_t displayTime,
+								       IOSurfaceRef frameSurface,
+								       CGDisplayStreamUpdateRef updateRef) {
+
+									 if (status == kCGDisplayStreamFrameStatusFrameComplete && frameSurface != NULL) {
+									     rfbClientIteratorPtr iterator;
+									     rfbClientPtr cl;
+									     const CGRect *updatedRects;
+									     size_t updatedRectsCount;
+									     size_t r;
+
+									     if(startTime>0 && time(0)>startTime+maxSecsToConnect)
+										 rfbShutdown(0);
+
+									     /*
+									       Copy new frame to back buffer.
+									     */
+									     IOSurfaceLock(frameSurface, kIOSurfaceLockReadOnly, NULL);
+
+									     memcpy(backBuffer,
+										    IOSurfaceGetBaseAddress(frameSurface),
+										    CGDisplayPixelsWide(kCGDirectMainDisplay) *  CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
+
+									     IOSurfaceUnlock(frameSurface, kIOSurfaceLockReadOnly, NULL);
+
+									     /* Lock out client reads. */
+									     iterator=rfbGetClientIterator(rfbScreen);
+									     while((cl=rfbClientIteratorNext(iterator))) {
+										 LOCK(cl->sendMutex);
+									     }
+									     rfbReleaseClientIterator(iterator);
+
+									     /* Swap framebuffers. */
+									     if (backBuffer == frameBufferOne) {
+										 backBuffer = frameBufferTwo;
+										 rfbScreen->frameBuffer = frameBufferOne;
+									     } else {
+										 backBuffer = frameBufferOne;
+										 rfbScreen->frameBuffer = frameBufferTwo;
+									     }
+
+									     /* Mark modified rects in new framebuffer. */
+									     updatedRects = CGDisplayStreamUpdateGetRects(updateRef, kCGDisplayStreamUpdateDirtyRects, &updatedRectsCount);
+									     for(r=0; r<updatedRectsCount; ++r) {
+										 rfbMarkRectAsModified(rfbScreen,
+												       updatedRects[r].origin.x,
+												       updatedRects[r].origin.y,
+												       updatedRects[r].origin.x + updatedRects[r].size.width,
+												       updatedRects[r].origin.y + updatedRects[r].size.height);
+									     }
+
+									     /* Swapping framebuffers finished, reenable client reads. */
+									     iterator=rfbGetClientIterator(rfbScreen);
+									     while((cl=rfbClientIteratorNext(iterator))) {
+										 UNLOCK(cl->sendMutex);
+										 }
+									     rfbReleaseClientIterator(iterator);
+									 }
+
+								     });
   if(stream) {
-      /* do nothing with it */
-      CFRelease(stream);
+      CGDisplayStreamStart(stream);
   } else {
       rfbErr("Could not get screen contents. Check if the program has been given screen recording permisssions in 'System Preferences'->'Security & Privacy'->'Privacy'->'Screen Recording'.\n");
       return FALSE;
@@ -523,64 +579,6 @@ ScreenInit(int argc, char**argv)
   return TRUE;
 }
 
-static void 
-refreshCallback()
-{
-  rfbClientIteratorPtr iterator;
-  rfbClientPtr cl;
-
-  if(startTime>0 && time(0)>startTime+maxSecsToConnect)
-    rfbShutdown(0);
-
-  CGImageRef img = CGDisplayCreateImage(kCGDirectMainDisplay);
-
-  size_t width = CGImageGetWidth(img);
-  size_t height = CGImageGetHeight(img);
-  CGRect rect = {{0, 0}, {width, height}};
-  CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-
-  CGContextRef drawContext = CGBitmapContextCreate(backBuffer,
-						  width,
-						  height,
-						  8,
-						  width * 4,
-						  colorSpace,
-						  kCGBitmapByteOrder32Host | kCGImageAlphaPremultipliedFirst);
-  CGContextSetBlendMode(drawContext, kCGBlendModeCopy);
-
-  CGContextDrawImage(drawContext, rect, img);
-
-  CGContextRelease(drawContext);
-  CGImageRelease(img);
-  CGColorSpaceRelease(colorSpace);
-
-  /* Lock out client reads. */
-  iterator=rfbGetClientIterator(rfbScreen);
-  while((cl=rfbClientIteratorNext(iterator))) {
-     LOCK(cl->sendMutex);
-  }
-  rfbReleaseClientIterator(iterator);
-
-  /* Swap framebuffers. */
-  if (backBuffer == frameBufferOne) {
-      backBuffer = frameBufferTwo;
-      rfbScreen->frameBuffer = frameBufferOne;
-  } else {
-      backBuffer = frameBufferOne;
-      rfbScreen->frameBuffer = frameBufferTwo;
-  }
-
-  /* Mark new framebuffer as modified */
-  rfbMarkRectAsModified(rfbScreen, 0, 0, width, height);
-
-  /* Swapping framebuffers finished, reenable client reads. */
-  iterator=rfbGetClientIterator(rfbScreen);
-  while((cl=rfbClientIteratorNext(iterator))) {
-     UNLOCK(cl->sendMutex);
-  }
-  rfbReleaseClientIterator(iterator);
-
-}
 
 void clientGone(rfbClientPtr cl)
 {
@@ -625,22 +623,11 @@ int main(int argc,char *argv[])
   rfbRunEventLoop(rfbScreen,-1,TRUE);
 
   /*
-     The VNC machinery is in the background now, we can use the main thread for getting screen contents.
-     Unlike in GUI programs, this is okay here as input injection happens on the VNC worker threads as well.
+     The VNC machinery is in the background now and framebuffer updating happens on another thread as well.
   */
   while(1) {
-      static struct timeval stop, start;
-      gettimeofday(&start, NULL);
-
-      refreshCallback();
-
-      gettimeofday(&stop, NULL);
-      size_t duration = (stop.tv_sec - start.tv_sec) * 1000 + (stop.tv_usec - start.tv_usec)/1000;
-
-      if(duration < 1000/FRAMERATE) {
-	  /* Don't hog the CPU, sleep for the remainder of the time slot. */
-	  usleep((1000/FRAMERATE - duration)*1000);
-      }
+      /* Nothing left to do on the main thread. */
+      sleep(1);
   }
 
   rfbDimmingShutdown();
