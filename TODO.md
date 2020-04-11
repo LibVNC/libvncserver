@@ -1,7 +1,6 @@
 high-prio:
 ----------
 - Implement encryption in libvncserver.
-- Fix encodingstest
 
 
 maybe-later:
@@ -21,7 +20,6 @@ maybe-later:
 	discuss on list
 - LibVNCClient cleanup: prefix with "rfbClient", and make sure it does
 	not deliberately die() or exit() anywhere!
-- java vncviewer doesn't do colour cursors?
 - make corre work again (libvncclient or libvncserver?)
 - teach SDLvncviewer about CopyRect...
 - implement "-record" in libvncclient
