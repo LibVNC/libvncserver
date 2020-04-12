@@ -407,8 +407,6 @@ KbdAddEvent(rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl)
     CGKeyCode keyCode = -1;
     int found = 0;
 
-    if(((int)cl->clientData)==-1) return; /* viewOnly */
-
     rfbUndim();
 
     for (i = 0; i < (sizeof(keyTable) / sizeof(int)); i += 2) {
@@ -441,8 +439,6 @@ PtrAddEvent(buttonMask, x, y, cl)
 {
     CGPoint position;
     CGRect displayBounds = CGDisplayBounds(displayID);
-
-    if(((int)cl->clientData)==-1) return; /* viewOnly */
 
     rfbUndim();
 
@@ -618,7 +614,7 @@ enum rfbNewClientAction newClient(rfbClientPtr cl)
   if(disconnectAfterFirstClient)
     cl->clientGoneHook = clientGone;
 
-  cl->clientData=(void*)((viewOnly)?-1:0);
+  cl->viewOnly = viewOnly;
 
   return(RFB_CLIENT_ACCEPT);
 }
