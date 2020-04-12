@@ -51,6 +51,9 @@ void *frameBufferTwo;
 /* Pointer to the current backbuffer. */
 void *backBuffer;
 
+int displayNumber = -1;
+CGDirectDisplayID displayID;
+
 rfbBool rfbNoDimming = FALSE;
 rfbBool rfbNoSleep   = TRUE;
 
@@ -437,13 +440,14 @@ PtrAddEvent(buttonMask, x, y, cl)
     rfbClientPtr cl;
 {
     CGPoint position;
+    CGRect displayBounds = CGDisplayBounds(displayID);
 
     if(((int)cl->clientData)==-1) return; /* viewOnly */
 
     rfbUndim();
 
-    position.x = x;
-    position.y = y;
+    position.x = x + displayBounds.origin.x;
+    position.y = y + displayBounds.origin.y;
 
     if(CGPostMouseEvent(position, TRUE, 8,
                      (buttonMask & (1 << 0)) ? TRUE : FALSE,
@@ -464,9 +468,30 @@ rfbBool
 ScreenInit(int argc, char**argv)
 {
   int bitsPerSample = 8;
+  CGDisplayCount displayCount;
+  CGDirectDisplayID displays[32];
+
+  /* grab the active displays */
+  CGGetActiveDisplayList(32, displays, &displayCount);
+  for (int i=0; i<displayCount; i++) {
+      CGRect bounds = CGDisplayBounds(displays[i]);
+      printf("Found %s display %d at (%d,%d) and a resolution of %dx%d\n", (CGDisplayIsMain(displays[i]) ? "primary" : "secondary"), i, (int)bounds.origin.x, (int)bounds.origin.y, (int)bounds.size.width, (int)bounds.size.height);
+  }
+  if(displayNumber < 0) {
+      printf("Using primary display as a default\n");
+      displayID = CGMainDisplayID();
+  } else if (displayNumber < displayCount) {
+      printf("Using specified display %d\n", displayNumber);
+      displayID = displays[displayNumber];
+  } else {
+      fprintf(stderr, "Specified display %d does not exist\n", displayNumber);
+      return FALSE;
+  }
+
+
   rfbScreen = rfbGetScreen(&argc,argv,
-			   CGDisplayPixelsWide(kCGDirectMainDisplay),
-			   CGDisplayPixelsHigh(kCGDirectMainDisplay),
+			   CGDisplayPixelsWide(displayID),
+			   CGDisplayPixelsHigh(displayID),
 			   bitsPerSample,
 			   3,
 			   4);
@@ -481,8 +506,8 @@ ScreenInit(int argc, char**argv)
 
   gethostname(rfbScreen->thisHost, 255);
 
-  frameBufferOne = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
-  frameBufferTwo = malloc(CGDisplayPixelsWide(kCGDirectMainDisplay) * CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
+  frameBufferOne = malloc(CGDisplayPixelsWide(displayID) * CGDisplayPixelsHigh(displayID) * 4);
+  frameBufferTwo = malloc(CGDisplayPixelsWide(displayID) * CGDisplayPixelsHigh(displayID) * 4);
 
   /* back buffer */
   backBuffer = frameBufferOne;
@@ -500,9 +525,9 @@ ScreenInit(int argc, char**argv)
   }
 
   dispatch_queue_t dispatchQueue = dispatch_queue_create("libvncserver.examples.mac", NULL);
-  CGDisplayStreamRef stream = CGDisplayStreamCreateWithDispatchQueue(CGMainDisplayID(),
-								     CGDisplayPixelsWide(kCGDirectMainDisplay),
-								     CGDisplayPixelsHigh(kCGDirectMainDisplay),
+  CGDisplayStreamRef stream = CGDisplayStreamCreateWithDispatchQueue(displayID,
+								     CGDisplayPixelsWide(displayID),
+								     CGDisplayPixelsHigh(displayID),
 								     'BGRA',
 								     nil,
 								     dispatchQueue,
@@ -528,7 +553,7 @@ ScreenInit(int argc, char**argv)
 
 									     memcpy(backBuffer,
 										    IOSurfaceGetBaseAddress(frameSurface),
-										    CGDisplayPixelsWide(kCGDirectMainDisplay) *  CGDisplayPixelsHigh(kCGDirectMainDisplay) * 4);
+										    CGDisplayPixelsWide(displayID) *  CGDisplayPixelsHigh(displayID) * 4);
 
 									     IOSurfaceUnlock(frameSurface, kIOSurfaceLockReadOnly, NULL);
 
@@ -612,6 +637,8 @@ int main(int argc,char *argv[])
       viewOnly=TRUE;
     } else if(strcmp(argv[i],"-shared")==0) {
       sharedMode=TRUE;
+    } else if(strcmp(argv[i],"-display")==0) {
+	displayNumber = atoi(argv[i+1]);
     }
 
   rfbDimmingInit();
