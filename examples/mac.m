@@ -637,6 +637,11 @@ int main(int argc,char *argv[])
 	displayNumber = atoi(argv[i+1]);
     }
 
+  if(!viewOnly && !AXIsProcessTrusted()) {
+      fprintf(stderr, "You have configured the server to post input events, but it does not have the necessary system permission. Please check if the program has been given permission to control your computer in 'System Preferences'->'Security & Privacy'->'Privacy'->'Accessibility'.\n");
+      exit(1);
+  }
+
   rfbDimmingInit();
 
   if(!ScreenInit(argc,argv))
