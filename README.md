@@ -20,40 +20,6 @@ It is already in wide use for administration, but it is not that easy to program
 
 This has been changed by LibVNCServer.
 
-There are several examples included, both for [servers](./examples) and 
-[clients](./client_examples).
-
-These examples are not too well documented, but easy straight forward and a
-good starting point.
-
-Try 'example', a shared scribble sheet: it outputs on which port it listens (default: 5900), so it is
-display 0. To view, call
-	`vncviewer :0`
-You should see a sheet with a gradient and "Hello World!" written on it. Try
-to paint something. Note that every time you click, there is some bigger blot,
-whereas when you drag the mouse while clicked you draw a line. The size of the
-blot depends on the mouse button you click. Open a second vncviewer with
-the same parameters and watch it as you paint in the other window. This also
-works over internet. You just have to know either the name or the IP of your
-machine. Then it is
-	`vncviewer machine.where.example.runs.com:0`
-or similar for the remote client. Now you are ready to type something. Be sure
-that your mouse sits still, because every time the mouse moves, the cursor is
-reset to the position of the pointer! If you are done with that demo, press
-the down or up arrows. If your viewer supports it, then the dimensions of the
-sheet change. Just press Escape in the viewer. Note that the server still
-runs, even if you closed both windows. When you reconnect now, everything you
-painted and wrote is still there. You can press "Page Up" for a blank page.
-
-The demo 'pnmshow' is much simpler: you either provide a filename as argument
-or pipe a file through stdin. Note that the file has to be a raw pnm/ppm file,
-i.e. a truecolour graphics. Only the Escape key is implemented. This may be
-the best starting point if you want to learn how to use LibVNCServer. You
-are confronted with the fact that the bytes per pixel can only be 8, 16 or 32.
-
-If you want to build a VNC client instead, please have a look at the [various
-client examples](./client_examples).
-
 Projects using it
 =================
 
