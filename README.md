@@ -12,9 +12,11 @@ What is it?
 
 [VNC](https://en.wikipedia.org/wiki/Virtual_Network_Computing) is a set of programs
 using the [RFB (Remote Frame Buffer)](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst)
-protocol. They are designed to "export" a frame buffer via net (if you don't know VNC, I
-suggest you read "Basics" below). It is already in wide use for
-administration, but it is not that easy to program a server yourself.
+protocol. They are designed to "export" a frame buffer via net: you set up a server and can
+connect to it via VNC viewers. If the server supports WebSockets (which LibVNCServer does), 
+you can also connect using an in-browser VNC viewer like [noVNC](https://novnc.com). 
+
+It is already in wide use for administration, but it is not that easy to program a server yourself.
 
 This has been changed by LibVNCServer.
 
@@ -359,30 +361,6 @@ key and cert:
 The server program will tell you a URL to point your web browser to. There,
 you can click on the noVNC-encrypted-connection-button to connect using the
 bundled noVNC viewer using an encrypted Websockets connection.
-
-
-
-Basics
-======
-
-VNC (Virtual network computing) works like this: You set up a server and can
-connect to it via vncviewers. The communication uses a protocol named RFB
-(Remote Frame Buffer). If the server supports WebSockets (which LibVNCServer does), 
-you can also connect using an in-browser VNC viewer like [noVNC](https://novnc.com). 
-
-There exist several encodings for VNC, which are used to compress the regions
-which have changed before they are sent to the client. A client need not be
-able to understand every encoding, but at least Raw encoding. Which encoding
-it understands is negotiated by the RFB protocol.
-
-If you want to know how RFB works, please take the time and read the [protocol
-specification](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst),
-it is very well written and contains a lot of prose that really explains how stuff
-works.
-
-There is the possibility to set a password, which is also negotiated by the
-RFB protocol, but IT IS NOT SECURE. Anybody sniffing your net can get the
-password. You really should tunnel through SSH.
 
 Commercial Use
 ==============
