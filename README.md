@@ -182,5 +182,5 @@ Contact
 =======
 
 * To file an issue, go to https://github.com/LibVNC/libvncserver/issues
-* For non-public contact mail dontmind at sdf dot org
+* For non-public contact please see [SECURITY.md](SECURITY.md).
 
