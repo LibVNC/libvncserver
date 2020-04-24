@@ -62,6 +62,8 @@ rfbBool errorMessageOnReadFailure = TRUE;
 rfbBool
 ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 {
+  const int USECS_WAIT_PER_RETRY = 100000;
+  int retries = 0;
 #undef DEBUG_READ_EXACT
 #ifdef DEBUG_READ_EXACT
 	char* oout=out;
@@ -151,10 +153,16 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       if (i <= 0) {
 	if (i < 0) {
 	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
+	    if (client->readTimeout > 0 &&
+		++retries > (client->readTimeout * 1000 * 1000 / USECS_WAIT_PER_RETRY))
+	    {
+	      rfbClientLog("Connection timed out\n");
+	      return FALSE;
+	    }
 	    /* TODO:
 	       ProcessXtEvents();
 	    */
-	    WaitForMessage(client, 100000);
+	    WaitForMessage(client, USECS_WAIT_PER_RETRY);
 	    i = 0;
 	  } else {
 	    rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
@@ -194,10 +202,16 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	  errno=WSAGetLastError();
 #endif
 	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
+	    if (client->readTimeout > 0 &&
+		++retries > (client->readTimeout * 1000 * 1000 / USECS_WAIT_PER_RETRY))
+	    {
+		rfbClientLog("Connection timed out\n");
+		return FALSE;
+	    }
 	    /* TODO:
 	       ProcessXtEvents();
 	    */
-	    WaitForMessage(client, 100000);
+	    WaitForMessage(client, USECS_WAIT_PER_RETRY);
 	    i = 0;
 	  } else {
 	    rfbClientErr("read (%s)\n",strerror(errno));
