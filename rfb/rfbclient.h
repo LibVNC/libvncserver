@@ -85,6 +85,7 @@
 #define SERVER_PORT_OFFSET 5900
 
 #define DEFAULT_CONNECT_TIMEOUT 60
+#define DEFAULT_READ_TIMEOUT 0
 
 #define DEFAULT_SSH_CMD "/usr/bin/ssh"
 #define DEFAULT_TUNNEL_CMD  \
@@ -454,6 +455,9 @@ typedef struct _rfbClient {
 #endif
 	/* timeout in seconds for select() after connect() */
 	unsigned int connectTimeout;
+	/* timeout in seconds when reading from half-open connections in
+	 * ReadFromRFBServer() - keep at 0 to disable timeout detection and handling */
+	unsigned int readTimeout;
 } rfbClient;
 
 /* cursor.c */
