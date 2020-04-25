@@ -55,6 +55,7 @@
 #endif
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
+#include <common/threading.h>
 
 #ifdef LIBVNCSERVER_HAVE_SASL
 #include <sasl/sasl.h>
@@ -454,6 +455,12 @@ typedef struct _rfbClient {
 #endif
 	/* timeout in seconds for select() after connect() */
 	unsigned int connectTimeout;
+
+	/**
+	 * Mutex to protect concurrent TLS read/write.
+	 * For internal use only.
+	 */
+	MUTEX(tlsRwMutex);
 } rfbClient;
 
 /* cursor.c */
