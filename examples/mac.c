@@ -6,6 +6,7 @@
  * 
  * Cut in two parts by Johannes Schindelin (2001): libvncserver and OSXvnc.
  * 
+ * Completely revamped and adapted to work with contemporary APIs by Christian Beier (2020).
  * 
  * This file implements every system specific function for Mac OS X.
  * 
