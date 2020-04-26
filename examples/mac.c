@@ -36,7 +36,9 @@
 #include <stdio.h>
 #include <pthread.h>
 
+/* The main LibVNCServer screen object */
 rfbScreenInfoPtr rfbScreen;
+/* Operation modes set by CLI options */
 rfbBool viewOnly = FALSE, sharedMode = FALSE;
 
 /* Two framebuffers. */
@@ -46,13 +48,17 @@ void *frameBufferTwo;
 /* Pointer to the current backbuffer. */
 void *backBuffer;
 
+/* The multi-sceen display number chosen by the user */
 int displayNumber = -1;
+/* The corresponding multi-sceen display ID */
 CGDirectDisplayID displayID;
+
+/* The server's private event source */
 CGEventSourceRef eventSource;
 
+/* Screen (un)dimming machinery */
 rfbBool rfbNoDimming = FALSE;
 rfbBool rfbNoSleep   = TRUE;
-
 static pthread_mutex_t  dimming_mutex;
 static unsigned long    dim_time;
 static unsigned long    sleep_time;
@@ -155,6 +161,7 @@ static int specialKeyMap[] = {
 #endif
 };
 
+/* Global shifting modifier states */
 rfbBool isShiftDown;
 rfbBool isAltGrDown;
 
