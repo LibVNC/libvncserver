@@ -57,8 +57,8 @@ CGDirectDisplayID displayID;
 CGEventSourceRef eventSource;
 
 /* Screen (un)dimming machinery */
-rfbBool rfbNoDimming = FALSE;
-rfbBool rfbNoSleep   = TRUE;
+rfbBool preventDimming = FALSE;
+rfbBool preventSleep   = TRUE;
 static pthread_mutex_t  dimming_mutex;
 static unsigned long    dim_time;
 static unsigned long    sleep_time;
@@ -224,7 +224,7 @@ restoreSleepSettings(void)
 
 
 int
-rfbDimmingInit(void)
+dimmingInit(void)
 {
     pthread_mutex_init(&dimming_mutex, NULL);
 
@@ -234,7 +234,7 @@ rfbDimmingInit(void)
     if (!(power_mgt = IOPMFindPowerManagement(master_dev_port)))
         return -1;
 
-    if (rfbNoDimming) {
+    if (preventDimming) {
         if (saveDimSettings() < 0)
             return -1;
         if (IOPMSetAggressiveness(power_mgt, 
@@ -242,7 +242,7 @@ rfbDimmingInit(void)
             return -1;
     }
 
-    if (rfbNoSleep) {
+    if (preventSleep) {
         if (saveSleepSettings() < 0)
             return -1;
         if (IOPMSetAggressiveness(power_mgt, 
@@ -256,7 +256,7 @@ rfbDimmingInit(void)
 
 
 int
-rfbUndim(void)
+undim(void)
 {
     int result = -1;
 
@@ -265,7 +265,7 @@ rfbUndim(void)
     if (!initialized)
         goto DONE;
 
-    if (!rfbNoDimming) {
+    if (!preventDimming) {
         if (saveDimSettings() < 0)
             goto DONE;
         if (IOPMSetAggressiveness(power_mgt, kPMMinutesToDim, 0) != kIOReturnSuccess)
@@ -274,7 +274,7 @@ rfbUndim(void)
             goto DONE;
     }
     
-    if (!rfbNoSleep) {
+    if (!preventSleep) {
         if (saveSleepSettings() < 0)
             goto DONE;
         if (IOPMSetAggressiveness(power_mgt, kPMMinutesToSleep, 0) != kIOReturnSuccess)
@@ -292,7 +292,7 @@ rfbUndim(void)
 
 
 int
-rfbDimmingShutdown(void)
+dimmingShutdown(void)
 {
     int result = -1;
 
@@ -314,7 +314,7 @@ rfbDimmingShutdown(void)
     return result;
 }
 
-void rfbShutdown(rfbClientPtr cl);
+void serverShutdown(rfbClientPtr cl);
 
 /*
   Synthesize a keyboard event. This is not called on the main thread due to rfbRunEventLoop(..,..,TRUE), but it works.
@@ -331,7 +331,7 @@ KbdAddEvent(rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl)
     CGEventRef keyboardEvent;
     int specialKeyFound = 0;
 
-    rfbUndim();
+    undim();
 
     /* look for special key */
     for (i = 0; i < (sizeof(specialKeyMap) / sizeof(int)); i += 2) {
@@ -394,7 +394,7 @@ PtrAddEvent(buttonMask, x, y, cl)
     CGRect displayBounds = CGDisplayBounds(displayID);
     CGEventRef mouseEvent = NULL;
 
-    rfbUndim();
+    undim();
 
     position.x = x + displayBounds.origin.x;
     position.y = y + displayBounds.origin.y;
@@ -587,7 +587,7 @@ ScreenInit(int argc, char**argv)
 									     size_t r;
 
 									     if(startTime>0 && time(0)>startTime+maxSecsToConnect)
-										 rfbShutdown(0);
+										 serverShutdown(0);
 
 									     /*
 									       Copy new frame to back buffer.
@@ -650,13 +650,13 @@ ScreenInit(int argc, char**argv)
 
 void clientGone(rfbClientPtr cl)
 {
-  rfbShutdown(cl);
+  serverShutdown(cl);
 }
 
 enum rfbNewClientAction newClient(rfbClientPtr cl)
 {
   if(startTime>0 && time(0)>startTime+maxSecsToConnect)
-    rfbShutdown(cl);
+    serverShutdown(cl);
 
   if(disconnectAfterFirstClient)
     cl->clientGoneHook = clientGone;
@@ -689,7 +689,7 @@ int main(int argc,char *argv[])
       exit(1);
   }
 
-  rfbDimmingInit();
+  dimmingInit();
 
   /* Create a private event source for the server. This helps a lot with modifier keys getting stuck on the OS side
      (but does not completely mitigate the issue: For this, we keep track of modifier key state and set it specifically
@@ -713,14 +713,14 @@ int main(int argc,char *argv[])
       sleep(1);
   }
 
-  rfbDimmingShutdown();
+  dimmingShutdown();
 
   return(0); /* never ... */
 }
 
-void rfbShutdown(rfbClientPtr cl)
+void serverShutdown(rfbClientPtr cl)
 {
   rfbScreenCleanup(rfbScreen);
-  rfbDimmingShutdown();
+  dimmingShutdown();
   exit(0);
 }
