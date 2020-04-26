@@ -10,15 +10,14 @@
  * 
  * This file implements every system specific function for Mac OS X.
  * 
- *  It includes the keyboard functions:
+ *  It includes the keyboard function:
  * 
      void KbdAddEvent(down, keySym, cl)
         rfbBool down;
         rfbKeySym keySym;
         rfbClientPtr cl;
-     void KbdReleaseAllKeys()
  * 
- *  the mouse functions:
+ *  the mouse function:
  * 
      void PtrAddEvent(buttonMask, x, y, cl)
         int buttonMask;
