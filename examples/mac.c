@@ -43,6 +43,9 @@
 #include <signal.h>
 #include <pthread.h>
 
+rfbScreenInfoPtr rfbScreen;
+rfbBool viewOnly = FALSE, sharedMode = FALSE;
+
 /* Two framebuffers. */
 void *frameBufferOne;
 void *frameBufferTwo;
@@ -65,6 +68,103 @@ static io_connect_t     power_mgt;
 static rfbBool initialized            = FALSE;
 static rfbBool dim_time_saved         = FALSE;
 static rfbBool sleep_time_saved       = FALSE;
+
+/* some variables to enable special behaviour */
+int startTime = -1, maxSecsToConnect = 0;
+rfbBool disconnectAfterFirstClient = TRUE;
+
+/* a dictionary mapping characters to keycodes */
+CFMutableDictionaryRef charKeyMap;
+
+/* a dictionary mapping characters obtained by Shift to keycodes */
+CFMutableDictionaryRef charShiftKeyMap;
+
+/* a dictionary mapping characters obtained by Alt-Gr to keycodes */
+CFMutableDictionaryRef charAltGrKeyMap;
+
+/* a dictionary mapping characters obtained by Shift+Alt-Gr to keycodes */
+CFMutableDictionaryRef charShiftAltGrKeyMap;
+
+/* a table mapping special keys to keycodes. static as these are layout-independent */
+static int specialKeyMap[] = {
+    /* "Special" keys */
+    XK_space,             49,      /* Space */
+    XK_Return,            36,      /* Return */
+    XK_Delete,           117,      /* Delete */
+    XK_Tab,               48,      /* Tab */
+    XK_Escape,            53,      /* Esc */
+    XK_Caps_Lock,         57,      /* Caps Lock */
+    XK_Num_Lock,          71,      /* Num Lock */
+    XK_Scroll_Lock,      107,      /* Scroll Lock */
+    XK_Pause,            113,      /* Pause */
+    XK_BackSpace,         51,      /* Backspace */
+    XK_Insert,           114,      /* Insert */
+
+    /* Cursor movement */
+    XK_Up,               126,      /* Cursor Up */
+    XK_Down,             125,      /* Cursor Down */
+    XK_Left,             123,      /* Cursor Left */
+    XK_Right,            124,      /* Cursor Right */
+    XK_Page_Up,          116,      /* Page Up */
+    XK_Page_Down,        121,      /* Page Down */
+    XK_Home,             115,      /* Home */
+    XK_End,              119,      /* End */
+
+    /* Numeric keypad */
+    XK_KP_0,              82,      /* KP 0 */
+    XK_KP_1,              83,      /* KP 1 */
+    XK_KP_2,              84,      /* KP 2 */
+    XK_KP_3,              85,      /* KP 3 */
+    XK_KP_4,              86,      /* KP 4 */
+    XK_KP_5,              87,      /* KP 5 */
+    XK_KP_6,              88,      /* KP 6 */
+    XK_KP_7,              89,      /* KP 7 */
+    XK_KP_8,              91,      /* KP 8 */
+    XK_KP_9,              92,      /* KP 9 */
+    XK_KP_Enter,          76,      /* KP Enter */
+    XK_KP_Decimal,        65,      /* KP . */
+    XK_KP_Add,            69,      /* KP + */
+    XK_KP_Subtract,       78,      /* KP - */
+    XK_KP_Multiply,       67,      /* KP * */
+    XK_KP_Divide,         75,      /* KP / */
+
+    /* Function keys */
+    XK_F1,               122,      /* F1 */
+    XK_F2,               120,      /* F2 */
+    XK_F3,                99,      /* F3 */
+    XK_F4,               118,      /* F4 */
+    XK_F5,                96,      /* F5 */
+    XK_F6,                97,      /* F6 */
+    XK_F7,                98,      /* F7 */
+    XK_F8,               100,      /* F8 */
+    XK_F9,               101,      /* F9 */
+    XK_F10,              109,      /* F10 */
+    XK_F11,              103,      /* F11 */
+    XK_F12,              111,      /* F12 */
+
+    /* Modifier keys */
+    XK_Shift_L,           56,      /* Shift Left */
+    XK_Shift_R,           56,      /* Shift Right */
+    XK_Control_L,         59,      /* Ctrl Left */
+    XK_Control_R,         59,      /* Ctrl Right */
+    XK_Meta_L,            58,      /* Logo Left (-> Option) */
+    XK_Meta_R,            58,      /* Logo Right (-> Option) */
+    XK_Alt_L,             55,      /* Alt Left (-> Command) */
+    XK_Alt_R,             55,      /* Alt Right (-> Command) */
+    XK_ISO_Level3_Shift,  61,      /* Alt-Gr (-> Option Right) */
+    0x1008FF2B,           63,      /* Fn */
+
+    /* Weirdness I can't figure out */
+#if 0
+    XK_3270_PrintScreen,     105,     /* PrintScrn */
+    ???  94,          50,      /* International */
+    XK_Menu,              50,      /* Menu (-> International) */
+#endif
+};
+
+rfbBool isShiftDown;
+rfbBool isAltGrDown;
+
 
 static int
 saveDimSettings(void)
@@ -214,105 +314,7 @@ rfbDimmingShutdown(void)
     return result;
 }
 
-rfbScreenInfoPtr rfbScreen;
-
 void rfbShutdown(rfbClientPtr cl);
-
-/* some variables to enable special behaviour */
-int startTime = -1, maxSecsToConnect = 0;
-rfbBool disconnectAfterFirstClient = TRUE;
-
-/* a dictionary mapping characters to keycodes */
-CFMutableDictionaryRef charKeyMap;
-
-/* a dictionary mapping characters obtained by Shift to keycodes */
-CFMutableDictionaryRef charShiftKeyMap;
-
-/* a dictionary mapping characters obtained by Alt-Gr to keycodes */
-CFMutableDictionaryRef charAltGrKeyMap;
-
-/* a dictionary mapping characters obtained by Shift+Alt-Gr to keycodes */
-CFMutableDictionaryRef charShiftAltGrKeyMap;
-
-/* a table mapping special keys to keycodes. static as these are layout-independent */
-static int specialKeyMap[] = {
-    /* "Special" keys */
-    XK_space,             49,      /* Space */
-    XK_Return,            36,      /* Return */
-    XK_Delete,           117,      /* Delete */
-    XK_Tab,               48,      /* Tab */
-    XK_Escape,            53,      /* Esc */
-    XK_Caps_Lock,         57,      /* Caps Lock */
-    XK_Num_Lock,          71,      /* Num Lock */
-    XK_Scroll_Lock,      107,      /* Scroll Lock */
-    XK_Pause,            113,      /* Pause */
-    XK_BackSpace,         51,      /* Backspace */
-    XK_Insert,           114,      /* Insert */
-
-    /* Cursor movement */
-    XK_Up,               126,      /* Cursor Up */
-    XK_Down,             125,      /* Cursor Down */
-    XK_Left,             123,      /* Cursor Left */
-    XK_Right,            124,      /* Cursor Right */
-    XK_Page_Up,          116,      /* Page Up */
-    XK_Page_Down,        121,      /* Page Down */
-    XK_Home,             115,      /* Home */
-    XK_End,              119,      /* End */
-
-    /* Numeric keypad */
-    XK_KP_0,              82,      /* KP 0 */
-    XK_KP_1,              83,      /* KP 1 */
-    XK_KP_2,              84,      /* KP 2 */
-    XK_KP_3,              85,      /* KP 3 */
-    XK_KP_4,              86,      /* KP 4 */
-    XK_KP_5,              87,      /* KP 5 */
-    XK_KP_6,              88,      /* KP 6 */
-    XK_KP_7,              89,      /* KP 7 */
-    XK_KP_8,              91,      /* KP 8 */
-    XK_KP_9,              92,      /* KP 9 */
-    XK_KP_Enter,          76,      /* KP Enter */
-    XK_KP_Decimal,        65,      /* KP . */
-    XK_KP_Add,            69,      /* KP + */
-    XK_KP_Subtract,       78,      /* KP - */
-    XK_KP_Multiply,       67,      /* KP * */
-    XK_KP_Divide,         75,      /* KP / */
-
-    /* Function keys */
-    XK_F1,               122,      /* F1 */
-    XK_F2,               120,      /* F2 */
-    XK_F3,                99,      /* F3 */
-    XK_F4,               118,      /* F4 */
-    XK_F5,                96,      /* F5 */
-    XK_F6,                97,      /* F6 */
-    XK_F7,                98,      /* F7 */
-    XK_F8,               100,      /* F8 */
-    XK_F9,               101,      /* F9 */
-    XK_F10,              109,      /* F10 */
-    XK_F11,              103,      /* F11 */
-    XK_F12,              111,      /* F12 */
-
-    /* Modifier keys */
-    XK_Shift_L,           56,      /* Shift Left */
-    XK_Shift_R,           56,      /* Shift Right */
-    XK_Control_L,         59,      /* Ctrl Left */
-    XK_Control_R,         59,      /* Ctrl Right */
-    XK_Meta_L,            58,      /* Logo Left (-> Option) */
-    XK_Meta_R,            58,      /* Logo Right (-> Option) */
-    XK_Alt_L,             55,      /* Alt Left (-> Command) */
-    XK_Alt_R,             55,      /* Alt Right (-> Command) */
-    XK_ISO_Level3_Shift,  61,      /* Alt-Gr (-> Option Right) */
-    0x1008FF2B,           63,      /* Fn */
-
-    /* Weirdness I can't figure out */
-#if 0
-    XK_3270_PrintScreen,     105,     /* PrintScrn */
-    ???  94,          50,      /* International */
-    XK_Menu,              50,      /* Menu (-> International) */
-#endif
-};
-
-rfbBool isShiftDown;
-rfbBool isAltGrDown;
 
 /*
   Synthesize a keyboard event. This is not called on the main thread due to rfbRunEventLoop(..,..,TRUE), but it works.
@@ -427,7 +429,6 @@ PtrAddEvent(buttonMask, x, y, cl)
     }
 }
 
-rfbBool viewOnly = FALSE, sharedMode = FALSE;
 
 /*
   Initialises keyboard handling:
