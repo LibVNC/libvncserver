@@ -391,22 +391,40 @@ PtrAddEvent(buttonMask, x, y, cl)
 {
     CGPoint position;
     CGRect displayBounds = CGDisplayBounds(displayID);
+    CGEventRef mouseEvent = NULL;
 
     rfbUndim();
 
     position.x = x + displayBounds.origin.x;
     position.y = y + displayBounds.origin.y;
 
-    if(CGPostMouseEvent(position, TRUE, 8,
-                     (buttonMask & (1 << 0)) ? TRUE : FALSE,
-                     (buttonMask & (1 << 1)) ? TRUE : FALSE,
-                     (buttonMask & (1 << 2)) ? TRUE : FALSE,
-                     (buttonMask & (1 << 3)) ? TRUE : FALSE,
-                     (buttonMask & (1 << 4)) ? TRUE : FALSE,
-                     (buttonMask & (1 << 5)) ? TRUE : FALSE,
-                     (buttonMask & (1 << 6)) ? TRUE : FALSE,
-   		     (buttonMask & (1 << 7)) ? TRUE : FALSE) != kCGErrorSuccess) {
-	      rfbErr("Could not post mouse events. Check if the program has been given permission to control your computer in 'System Preferences'->'Security & Privacy'->'Privacy'->'Accessibility'.\n");
+    /* map buttons 4 5 6 7 to scroll events as per https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#745pointerevent */
+    if(buttonMask & (1 << 3))
+	mouseEvent = CGEventCreateScrollWheelEvent(eventSource, kCGScrollEventUnitLine, 2, 1, 0);
+    if(buttonMask & (1 << 4))
+	mouseEvent = CGEventCreateScrollWheelEvent(eventSource, kCGScrollEventUnitLine, 2, -1, 0);
+    if(buttonMask & (1 << 5))
+	mouseEvent = CGEventCreateScrollWheelEvent(eventSource, kCGScrollEventUnitLine, 2, 0, 1);
+    if(buttonMask & (1 << 6))
+	mouseEvent = CGEventCreateScrollWheelEvent(eventSource, kCGScrollEventUnitLine, 2, 0, -1);
+
+    if (mouseEvent) {
+	CGEventPost(kCGSessionEventTap, mouseEvent);
+	CFRelease(mouseEvent);
+    }
+    else {
+	/*
+	  Use the deprecated CGPostMouseEvent API here as we get a buttonmask plus position which is pretty low-level
+	  whereas CGEventCreateMouseEvent is expecting higher-level events. This allows for direct injection of
+	  double clicks and drags whereas we would need to synthesize these events for the high-level API.
+	 */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+	CGPostMouseEvent(position, TRUE, 3,
+			 (buttonMask & (1 << 0)) ? TRUE : FALSE,
+			 (buttonMask & (1 << 2)) ? TRUE : FALSE,
+			 (buttonMask & (1 << 1)) ? TRUE : FALSE);
+#pragma clang diagnostic pop
     }
 }
 
