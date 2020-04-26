@@ -53,6 +53,7 @@ void *backBuffer;
 
 int displayNumber = -1;
 CGDirectDisplayID displayID;
+CGEventSourceRef eventSource;
 
 rfbBool rfbNoDimming = FALSE;
 rfbBool rfbNoSleep   = TRUE;
@@ -222,110 +223,20 @@ void rfbShutdown(rfbClientPtr cl);
 int startTime = -1, maxSecsToConnect = 0;
 rfbBool disconnectAfterFirstClient = TRUE;
 
-/* Where do I get the "official" list of Mac key codes?
-   Ripped these out of a Mac II emulator called Basilisk II
-   that I found on the net. */
-static int keyTable[] = {
-    /* The alphabet */
-    XK_A,                  0,      /* A */
-    XK_B,                 11,      /* B */
-    XK_C,                  8,      /* C */
-    XK_D,                  2,      /* D */
-    XK_E,                 14,      /* E */
-    XK_F,                  3,      /* F */
-    XK_G,                  5,      /* G */
-    XK_H,                  4,      /* H */
-    XK_I,                 34,      /* I */
-    XK_J,                 38,      /* J */
-    XK_K,                 40,      /* K */
-    XK_L,                 37,      /* L */
-    XK_M,                 46,      /* M */
-    XK_N,                 45,      /* N */
-    XK_O,                 31,      /* O */
-    XK_P,                 35,      /* P */
-    XK_Q,                 12,      /* Q */
-    XK_R,                 15,      /* R */
-    XK_S,                  1,      /* S */
-    XK_T,                 17,      /* T */
-    XK_U,                 32,      /* U */
-    XK_V,                  9,      /* V */
-    XK_W,                 13,      /* W */
-    XK_X,                  7,      /* X */
-    XK_Y,                 16,      /* Y */
-    XK_Z,                  6,      /* Z */
-    XK_a,                  0,      /* a */
-    XK_b,                 11,      /* b */
-    XK_c,                  8,      /* c */
-    XK_d,                  2,      /* d */
-    XK_e,                 14,      /* e */
-    XK_f,                  3,      /* f */
-    XK_g,                  5,      /* g */
-    XK_h,                  4,      /* h */
-    XK_i,                 34,      /* i */
-    XK_j,                 38,      /* j */
-    XK_k,                 40,      /* k */
-    XK_l,                 37,      /* l */
-    XK_m,                 46,      /* m */
-    XK_n,                 45,      /* n */
-    XK_o,                 31,      /* o */
-    XK_p,                 35,      /* p */
-    XK_q,                 12,      /* q */
-    XK_r,                 15,      /* r */
-    XK_s,                  1,      /* s */
-    XK_t,                 17,      /* t */
-    XK_u,                 32,      /* u */
-    XK_v,                  9,      /* v */
-    XK_w,                 13,      /* w */
-    XK_x,                  7,      /* x */
-    XK_y,                 16,      /* y */
-    XK_z,                  6,      /* z */
+/* a dictionary mapping characters to keycodes */
+CFMutableDictionaryRef charKeyMap;
 
-    /* Numbers */
-    XK_0,                 29,      /* 0 */
-    XK_1,                 18,      /* 1 */
-    XK_2,                 19,      /* 2 */
-    XK_3,                 20,      /* 3 */
-    XK_4,                 21,      /* 4 */
-    XK_5,                 23,      /* 5 */
-    XK_6,                 22,      /* 6 */
-    XK_7,                 26,      /* 7 */
-    XK_8,                 28,      /* 8 */
-    XK_9,                 25,      /* 9 */
+/* a dictionary mapping characters obtained by Shift to keycodes */
+CFMutableDictionaryRef charShiftKeyMap;
 
-    /* Symbols */
-    XK_exclam,            18,      /* ! */
-    XK_at,                19,      /* @ */
-    XK_numbersign,        20,      /* # */
-    XK_dollar,            21,      /* $ */
-    XK_percent,           23,      /* % */
-    XK_asciicircum,       22,      /* ^ */
-    XK_ampersand,         26,      /* & */
-    XK_asterisk,          28,      /* * */
-    XK_parenleft,         25,      /* ( */
-    XK_parenright,        29,      /* ) */
-    XK_minus,             27,      /* - */
-    XK_underscore,        27,      /* _ */
-    XK_equal,             24,      /* = */
-    XK_plus,              24,      /* + */
-    XK_grave,             10,      /* ` */  /* XXX ? */
-    XK_asciitilde,        10,      /* ~ */
-    XK_bracketleft,       33,      /* [ */
-    XK_braceleft,         33,      /* { */
-    XK_bracketright,      30,      /* ] */
-    XK_braceright,        30,      /* } */
-    XK_semicolon,         41,      /* ; */
-    XK_colon,             41,      /* : */
-    XK_apostrophe,        39,      /* ' */
-    XK_quotedbl,          39,      /* " */
-    XK_comma,             43,      /* , */
-    XK_less,              43,      /* < */
-    XK_period,            47,      /* . */
-    XK_greater,           47,      /* > */
-    XK_slash,             44,      /* / */
-    XK_question,          44,      /* ? */
-    XK_backslash,         42,      /* \ */
-    XK_bar,               42,      /* | */
+/* a dictionary mapping characters obtained by Alt-Gr to keycodes */
+CFMutableDictionaryRef charAltGrKeyMap;
 
+/* a dictionary mapping characters obtained by Shift+Alt-Gr to keycodes */
+CFMutableDictionaryRef charShiftAltGrKeyMap;
+
+/* a table mapping special keys to keycodes. static as these are layout-independent */
+static int specialKeyMap[] = {
     /* "Special" keys */
     XK_space,             49,      /* Space */
     XK_Return,            36,      /* Return */
@@ -390,6 +301,8 @@ static int keyTable[] = {
     XK_Meta_R,            58,      /* Logo Right (-> Option) */
     XK_Alt_L,             55,      /* Alt Left (-> Command) */
     XK_Alt_R,             55,      /* Alt Right (-> Command) */
+    XK_ISO_Level3_Shift,  61,      /* Alt-Gr (-> Option Right) */
+    0x1008FF2B,           63,      /* Fn */
 
     /* Weirdness I can't figure out */
 #if 0
@@ -399,34 +312,73 @@ static int keyTable[] = {
 #endif
 };
 
-/* Synthesize a keyboard event. This is not called on the main thread due to rfbRunEventLoop(..,..,TRUE), but it works. */
+rfbBool isShiftDown;
+rfbBool isAltGrDown;
+
+/*
+  Synthesize a keyboard event. This is not called on the main thread due to rfbRunEventLoop(..,..,TRUE), but it works.
+  We first look up the incoming keysym in the keymap for special keys (and save state of the shifting modifiers).
+  If the incoming keysym does not map to a special key, the char keymaps pertaining to the respective shifting modifier are used
+  in order to allow for keyboard combos with other modifiers.
+  As a last resort, the incoming keysym is simply used as a Unicode value. This way MacOS does not support any modifiers though.
+*/
 void
 KbdAddEvent(rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl)
 {
     int i;
     CGKeyCode keyCode = -1;
-    int found = 0;
+    CGEventRef keyboardEvent;
+    int specialKeyFound = 0;
 
     rfbUndim();
 
-    for (i = 0; i < (sizeof(keyTable) / sizeof(int)); i += 2) {
-        if (keyTable[i] == keySym) {
-            keyCode = keyTable[i+1];
-            found = 1;
+    /* look for special key */
+    for (i = 0; i < (sizeof(specialKeyMap) / sizeof(int)); i += 2) {
+        if (specialKeyMap[i] == keySym) {
+            keyCode = specialKeyMap[i+1];
+            specialKeyFound = 1;
             break;
         }
     }
 
-    if (!found) {
-        rfbErr("warning: couldn't figure out keycode for X keysym %d (0x%x)\n", 
-               (int)keySym, (int)keySym);
+    if(specialKeyFound) {
+	/* keycode for special key found */
+	keyboardEvent = CGEventCreateKeyboardEvent(eventSource, keyCode, down);
+	/* save state of shifting modifiers */
+	if(keySym == XK_ISO_Level3_Shift)
+	    isAltGrDown = down;
+	if(keySym == XK_Shift_L || keySym == XK_Shift_R)
+	    isShiftDown = down;
+
     } else {
-        /* Hopefully I can get away with not specifying a CGCharCode.
-           (Why would you need both?) */
-        if(CGPostKeyboardEvent((CGCharCode)0, keyCode, down) != kCGErrorSuccess) {
-	      rfbErr("Could not post keyboard events. Check if the program has been given permission to control your computer in 'System Preferences'->'Security & Privacy'->'Privacy'->'Accessibility'.\n");
-	}
+	/* look for char key */
+	size_t keyCodeFromDict;
+	CFStringRef charStr = CFStringCreateWithCharacters(kCFAllocatorDefault, (UniChar*)&keySym, 1);
+	CFMutableDictionaryRef keyMap = charKeyMap;
+	if(isShiftDown && !isAltGrDown)
+	    keyMap = charShiftKeyMap;
+	if(!isShiftDown && isAltGrDown)
+	    keyMap = charAltGrKeyMap;
+	if(isShiftDown && isAltGrDown)
+	    keyMap = charShiftAltGrKeyMap;
+
+	if (CFDictionaryGetValueIfPresent(keyMap, charStr, (const void **)&keyCodeFromDict)) {
+	    /* keycode for ASCII key found */
+	    keyboardEvent = CGEventCreateKeyboardEvent(eventSource, keyCodeFromDict, down);
+	} else {
+	    /* last resort: use the symbol's utf-16 value, does not support modifiers though */
+	    keyboardEvent = CGEventCreateKeyboardEvent(eventSource, 0, down);
+	    CGEventKeyboardSetUnicodeString(keyboardEvent, 1, (UniChar*)&keySym);
+        }
+
+	CFRelease(charStr);
     }
+
+    /* Set the Shift modifier explicitly as MacOS sometimes gets internal state wrong and Shift stuck. */
+    CGEventSetFlags(keyboardEvent, CGEventGetFlags(keyboardEvent) & (isShiftDown ? kCGEventFlagMaskShift : ~kCGEventFlagMaskShift));
+
+    CGEventPost(kCGSessionEventTap, keyboardEvent);
+    CFRelease(keyboardEvent);
 }
 
 /* Synthesize a mouse event. This is not called on the main thread due to rfbRunEventLoop(..,..,TRUE), but it works. */
@@ -459,6 +411,83 @@ PtrAddEvent(buttonMask, x, y, cl)
 }
 
 rfbBool viewOnly = FALSE, sharedMode = FALSE;
+
+/*
+  Initialises keyboard handling:
+  This creates four keymaps mapping UniChars to keycodes for the current keyboard layout with no shifting modifiers, Shift, Alt-Gr and Shift+Alt-Gr applied, respectively.
+ */
+rfbBool keyboardInit()
+{
+    size_t i, keyCodeCount=128;
+    TISInputSourceRef currentKeyboard = TISCopyCurrentKeyboardInputSource();
+    const UCKeyboardLayout *keyboardLayout;
+
+    if(!currentKeyboard) {
+	fprintf(stderr, "Could not get current keyboard info\n");
+	return FALSE;
+    }
+
+    keyboardLayout = (const UCKeyboardLayout *)CFDataGetBytePtr(TISGetInputSourceProperty(currentKeyboard, kTISPropertyUnicodeKeyLayoutData));
+
+    printf("Found keyboard layout '%s'\n", CFStringGetCStringPtr(TISGetInputSourceProperty(currentKeyboard, kTISPropertyInputSourceID), kCFStringEncodingUTF8));
+
+    charKeyMap = CFDictionaryCreateMutable(kCFAllocatorDefault, keyCodeCount, &kCFCopyStringDictionaryKeyCallBacks, NULL);
+    charShiftKeyMap = CFDictionaryCreateMutable(kCFAllocatorDefault, keyCodeCount, &kCFCopyStringDictionaryKeyCallBacks, NULL);
+    charAltGrKeyMap = CFDictionaryCreateMutable(kCFAllocatorDefault, keyCodeCount, &kCFCopyStringDictionaryKeyCallBacks, NULL);
+    charShiftAltGrKeyMap = CFDictionaryCreateMutable(kCFAllocatorDefault, keyCodeCount, &kCFCopyStringDictionaryKeyCallBacks, NULL);
+
+    if(!charKeyMap || !charShiftKeyMap || !charAltGrKeyMap || !charShiftAltGrKeyMap) {
+	fprintf(stderr, "Could not create keymaps\n");
+	return FALSE;
+    }
+
+    /* Loop through every keycode to find the character it is mapping to. */
+    for (i = 0; i < keyCodeCount; ++i) {
+	UInt32 deadKeyState = 0;
+	UniChar chars[4];
+	UniCharCount realLength;
+	UInt32 m, modifiers[] = {0, kCGEventFlagMaskShift, kCGEventFlagMaskAlternate, kCGEventFlagMaskShift|kCGEventFlagMaskAlternate};
+
+	/* do this for no modifier, shift and alt-gr applied */
+	for(m = 0; m < sizeof(modifiers) / sizeof(modifiers[0]); ++m) {
+	    UCKeyTranslate(keyboardLayout,
+			   i,
+			   kUCKeyActionDisplay,
+			   (modifiers[m] >> 16) & 0xff,
+			   LMGetKbdType(),
+			   kUCKeyTranslateNoDeadKeysBit,
+			   &deadKeyState,
+			   sizeof(chars) / sizeof(chars[0]),
+			   &realLength,
+			   chars);
+
+	    CFStringRef string = CFStringCreateWithCharacters(kCFAllocatorDefault, chars, 1);
+	    if(string) {
+		switch(modifiers[m]) {
+		case 0:
+		    CFDictionaryAddValue(charKeyMap, string, (const void *)i);
+		    break;
+		case kCGEventFlagMaskShift:
+		    CFDictionaryAddValue(charShiftKeyMap, string, (const void *)i);
+		    break;
+		case kCGEventFlagMaskAlternate:
+		    CFDictionaryAddValue(charAltGrKeyMap, string, (const void *)i);
+		    break;
+		case kCGEventFlagMaskShift|kCGEventFlagMaskAlternate:
+		    CFDictionaryAddValue(charShiftAltGrKeyMap, string, (const void *)i);
+		    break;
+		}
+
+		CFRelease(string);
+	    }
+	}
+    }
+
+    CFRelease(currentKeyboard);
+
+    return TRUE;
+}
+
 
 rfbBool
 ScreenInit(int argc, char**argv)
@@ -643,6 +672,14 @@ int main(int argc,char *argv[])
   }
 
   rfbDimmingInit();
+
+  /* Create a private event source for the server. This helps a lot with modifier keys getting stuck on the OS side
+     (but does not completely mitigate the issue: For this, we keep track of modifier key state and set it specifically
+     for the generated keyboard event in the keyboard event handler). */
+  eventSource = CGEventSourceCreate(kCGEventSourceStatePrivate);
+
+  if(!keyboardInit())
+      exit(1);
 
   if(!ScreenInit(argc,argv))
       exit(1);
