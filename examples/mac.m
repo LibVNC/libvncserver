@@ -30,14 +30,13 @@
 #include <unistd.h>
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
-#import <Cocoa/Cocoa.h>
 /* zlib doesn't like Byte already defined */
 #undef Byte
 #undef TRUE
 #undef rfbBool
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
-
+#include <IOSurface/IOSurface.h>
 #include <IOKit/pwr_mgt/IOPMLib.h>
 #include <IOKit/pwr_mgt/IOPM.h>
 #include <stdio.h>
