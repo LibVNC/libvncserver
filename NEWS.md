@@ -8,6 +8,7 @@ were closed with this release.
   * Lots of documentation updates and markdownifying.
   * The TravisCI continuous integration now also build-checks cross-compilation from
 	Linux to Windows.
+  * Setup a [Gitter community chat](https://gitter.im/LibVNC/libvncserver) for the project.
 
 ## LibVNCServer/LibVNCClient:
   * Both LibVNCServer and LibVNCClient now support an additional platform, namely
