@@ -1,3 +1,37 @@
+# 2020-xx-xx: Version 0.9.13
+
+[XX issues](https://github.com/LibVNC/libvncserver/issues?q=is%3Aclosed+milestone%3A%22Release+0.9.13%22)
+were closed with this release.
+
+## Overall changes:
+  * Small tweaks to the CMake build system.
+  * Lots of documentation updates and markdownifying.
+  * The TravisCI continuous integration now also build-checks cross-compilation from
+	Linux to Windows.
+
+## LibVNCServer/LibVNCClient:
+  * Both LibVNCServer and LibVNCClient now support an additional platform, namely
+	Microsoft Windows. Building is supported with Visual Studio as well as MingGW.
+  * The separate crypto routines used by LibVNCClient and LibVNCServer were refactored
+	into an implementation common to both libraries.
+  * Several security issues got fixed.
+  * The bundled noVNC client is now at version 1.1.0 and included via a git submodule.
+
+## LibVNCClient:
+  * Added connect timeout as well as read timeout support thanks to Tobias Junghans.
+  * Fixed regression in Tight/Raw decoding introduced in 0.9.12 thanks to DRC.
+  * Fixed encrypted connections to AnonTLS servers when using the OpenSSL back-end.
+	Made possible by the profound research done by Gaurav Ujjwal.
+
+## LibVNCServer:
+  * Added a hooking function (`clientFramebufferUpdateRequestHook`) to deliver
+	rfbFramebufferUpdateRequest messages from clients to the frame producer
+	thanks to Jae Hyun Yoo.
+  * Added SetDesktopSize/ExtendedDesktopSize support thanks to Floris Bos.
+  * Added multi-threading support for MS Windows.
+  * Fixed VNC repeater/proxy functionality that was broken in 0.9.12.
+  * Fixed unstable WebSockets connections thanks to Sebastian Kranz.
+
 # 2019-01-06: Version 0.9.12
 
 Over two years of work have now culminated in 0.9.12. We have ditched
