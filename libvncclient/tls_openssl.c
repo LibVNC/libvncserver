@@ -64,7 +64,6 @@ typedef SSIZE_T ssize_t;
 
 static rfbBool rfbTLSInitialized = FALSE;
 static MUTEX_TYPE *mutex_buf = NULL;
-static MUTEX_TYPE mutex_rw;
 
 struct CRYPTO_dynlock_value {
 	MUTEX_TYPE mutex;
@@ -157,8 +156,6 @@ InitializeTLS(void)
 
   for (i = 0; i < CRYPTO_num_locks(); i++)
     MUTEX_INIT(mutex_buf[i]);
-
-  MUTEX_INIT(mutex_rw);
 
   CRYPTO_set_locking_callback(locking_function);
   CRYPTO_set_id_callback(id_function);
@@ -410,6 +407,8 @@ InitializeTLSSession(rfbClient* client, rfbBool anonTLS, rfbCredential *cred)
   if (!client->tlsSession)
     return FALSE;
 
+  INIT_MUTEX(client->tlsRwMutex);
+
   rfbClientLog("TLS session initialized.\n");
 
   return TRUE;
@@ -634,12 +633,12 @@ ReadFromTLS(rfbClient* client, char *out, unsigned int n)
   ssize_t ret;
   int ssl_error = SSL_ERROR_NONE;
 
-  MUTEX_LOCK(mutex_rw);
+  LOCK(client->tlsRwMutex);
   ret = SSL_read (client->tlsSession, out, n);
 
   if (ret < 0)
       ssl_error = SSL_get_error(client->tlsSession, ret);
-  MUTEX_UNLOCK(mutex_rw);
+  UNLOCK(client->tlsRwMutex);
 
   if (ret >= 0)
     return ret;
@@ -662,12 +661,12 @@ WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 
   while (offset < n)
   {
-    MUTEX_LOCK(mutex_rw);
+    LOCK(client->tlsRwMutex);
     ret = SSL_write (client->tlsSession, buf + offset, (size_t)(n-offset));
 
     if (ret < 0)
       ssl_error = SSL_get_error (client->tlsSession, ret);
-    MUTEX_UNLOCK(mutex_rw);
+    UNLOCK(client->tlsRwMutex);
 
     if (ret == 0) continue;
     if (ret < 0)
@@ -700,7 +699,7 @@ void FreeTLS(rfbClient* client)
     mutex_buf = NULL;
   }
 
-  MUTEX_FREE(mutex_rw);
+  TINI_MUTEX(client->tlsRwMutex);
 
   SSL_free(client->tlsSession);
 }

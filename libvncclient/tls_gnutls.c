@@ -252,6 +252,8 @@ InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
   gnutls_transport_set_push_function((gnutls_session_t)client->tlsSession, PushTLS);
   gnutls_transport_set_pull_function((gnutls_session_t)client->tlsSession, PullTLS);
 
+  INIT_MUTEX(client->tlsRwMutex);
+
   rfbClientLog("TLS session initialized.\n");
 
   return TRUE;
@@ -566,7 +568,10 @@ ReadFromTLS(rfbClient* client, char *out, unsigned int n)
 {
   ssize_t ret;
 
+  LOCK(client->tlsRwMutex);
   ret = gnutls_record_recv((gnutls_session_t)client->tlsSession, out, n);
+  UNLOCK(client->tlsRwMutex);
+
   if (ret >= 0) return ret;
   if (ret == GNUTLS_E_REHANDSHAKE || ret == GNUTLS_E_AGAIN)
   {
@@ -585,39 +590,22 @@ WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
   unsigned int offset = 0;
   ssize_t ret;
 
-  if (client->LockWriteToTLS)
-  {
-    if (!client->LockWriteToTLS(client))
-    {
-      rfbClientLog("Callback to get lock in WriteToTLS() failed\n");
-      return -1;
-    }
-  }
   while (offset < n)
   {
+    LOCK(client->tlsRwMutex);
     ret = gnutls_record_send((gnutls_session_t)client->tlsSession, buf+offset, (size_t)(n-offset));
+    UNLOCK(client->tlsRwMutex);
+
     if (ret == 0) continue;
     if (ret < 0)
     {
       if (ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED) continue;
       rfbClientLog("Error writing to TLS: %s.\n", gnutls_strerror(ret));
-      if (client->UnlockWriteToTLS)
-      {
-        if (!client->UnlockWriteToTLS(client))
-          rfbClientLog("Callback to unlock WriteToTLS() failed\n");
-      }
       return -1;
     }
     offset += (unsigned int)ret;
   }
-  if (client->UnlockWriteToTLS)
-  {
-    if (!client->UnlockWriteToTLS(client))
-    {
-      rfbClientLog("Callback to unlock WriteToTLS() failed\n");
-      return -1;
-    }
-  }
+
   return offset;
 }
 
@@ -627,6 +615,7 @@ void FreeTLS(rfbClient* client)
   {
     gnutls_deinit((gnutls_session_t)client->tlsSession);
     client->tlsSession = NULL;
+    TINI_MUTEX(client->tlsRwMutex);
   }
 }
 
