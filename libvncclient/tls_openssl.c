@@ -32,28 +32,6 @@
 #include <openssl/rand.h>
 #include <openssl/x509.h>
 
-#ifdef _MSC_VER
-typedef CRITICAL_SECTION MUTEX_TYPE;
-#define MUTEX_INIT(mutex) InitializeCriticalSection(&mutex)
-#define MUTEX_FREE(mutex) DeleteCriticalSection(&mutex)
-#define MUTEX_LOCK(mutex) EnterCriticalSection(&mutex)
-#define MUTEX_UNLOCK(mutex) LeaveCriticalSection(&mutex)
-#define CURRENT_THREAD_ID GetCurrentThreadId()
-#else
-#include <pthread.h>
-typedef pthread_mutex_t MUTEX_TYPE;
-#define MUTEX_INIT(mutex) {\
-	pthread_mutexattr_t mutexAttr;\
-	pthread_mutexattr_init(&mutexAttr);\
-	pthread_mutexattr_settype(&mutexAttr, PTHREAD_MUTEX_RECURSIVE);\
-	pthread_mutex_init(&mutex, &mutexAttr);\
-}
-#define MUTEX_FREE(mutex) pthread_mutex_destroy(&mutex)
-#define MUTEX_LOCK(mutex) pthread_mutex_lock(&mutex)
-#define MUTEX_UNLOCK(mutex) pthread_mutex_unlock(&mutex)
-#define CURRENT_THREAD_ID pthread_self()
-#endif
-
 #include "tls.h"
 
 #ifdef _MSC_VER
@@ -63,18 +41,22 @@ typedef SSIZE_T ssize_t;
 #endif
 
 static rfbBool rfbTLSInitialized = FALSE;
-static MUTEX_TYPE *mutex_buf = NULL;
+
+// Locking callbacks are only initialized if we have mutex support.
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+
+static MUTEX(*mutex_buf) = NULL;
 
 struct CRYPTO_dynlock_value {
-	MUTEX_TYPE mutex;
+	MUTEX(mutex);
 };
 
 static void locking_function(int mode, int n, const char *file, int line)
 {
 	if (mode & CRYPTO_LOCK)
-		MUTEX_LOCK(mutex_buf[n]);
+		LOCK(mutex_buf[n]);
 	else
-		MUTEX_UNLOCK(mutex_buf[n]);
+		UNLOCK(mutex_buf[n]);
 }
 
 static unsigned long id_function(void)
@@ -90,7 +72,7 @@ static struct CRYPTO_dynlock_value *dyn_create_function(const char *file, int li
 		malloc(sizeof(struct CRYPTO_dynlock_value));
 	if (!value)
 		goto err;
-	MUTEX_INIT(value->mutex);
+	INIT_MUTEX(value->mutex);
 
 	return value;
 
@@ -101,19 +83,44 @@ err:
 static void dyn_lock_function (int mode, struct CRYPTO_dynlock_value *l, const char *file, int line)
 {
 	if (mode & CRYPTO_LOCK)
-		MUTEX_LOCK(l->mutex);
+		LOCK(l->mutex);
 	else
-		MUTEX_UNLOCK(l->mutex);
+		UNLOCK(l->mutex);
 }
 
 
 static void
 dyn_destroy_function(struct CRYPTO_dynlock_value *l, const char *file, int line)
 {
-	MUTEX_FREE(l->mutex);
+	TINI_MUTEX(l->mutex);
 	free(l);
 }
 
+static rfbBool InitLockingCb()
+{
+  mutex_buf = malloc(CRYPTO_num_locks() * MUTEX_SIZE);
+  if (mutex_buf == NULL) {
+    rfbClientLog("Failed to initialized OpenSSL: memory.\n");
+    return FALSE;
+  }
+
+  int i;
+  for (i = 0; i < CRYPTO_num_locks(); i++)
+    INIT_MUTEX(mutex_buf[i]);
+
+  CRYPTO_set_locking_callback(locking_function);
+  CRYPTO_set_id_callback(id_function);
+  CRYPTO_set_dynlock_create_callback(dyn_create_function);
+  CRYPTO_set_dynlock_lock_callback(dyn_lock_function);
+  CRYPTO_set_dynlock_destroy_callback(dyn_destroy_function);
+
+  return TRUE;
+}
+
+#else
+//If mutex support is not available, locking initialization is a no-op.
+static rfbBool InitLockingCb() { return TRUE; }
+#endif
 
 static int
 ssl_error_to_errno (int ssl_error)
@@ -144,24 +151,12 @@ ssl_error_to_errno (int ssl_error)
 static rfbBool
 InitializeTLS(void)
 {
-  int i;
+  if (rfbTLSInitialized)
+    return TRUE;
 
-  if (rfbTLSInitialized) return TRUE;
+  if (!InitLockingCb())
+    return FALSE;
 
-  mutex_buf = malloc(CRYPTO_num_locks() * sizeof(MUTEX_TYPE));
-  if (mutex_buf == NULL) {
-    rfbClientLog("Failed to initialized OpenSSL: memory.\n");
-    return (-1);
-  }
-
-  for (i = 0; i < CRYPTO_num_locks(); i++)
-    MUTEX_INIT(mutex_buf[i]);
-
-  CRYPTO_set_locking_callback(locking_function);
-  CRYPTO_set_id_callback(id_function);
-  CRYPTO_set_dynlock_create_callback(dyn_create_function);
-  CRYPTO_set_dynlock_lock_callback(dyn_lock_function);
-  CRYPTO_set_dynlock_destroy_callback(dyn_destroy_function);
   SSL_load_error_strings();
   SSLeay_add_ssl_algorithms();
   RAND_load_file("/dev/urandom", 1024);
@@ -683,25 +678,12 @@ WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 
 void FreeTLS(rfbClient* client)
 {
-  int i;
-
-  if (mutex_buf != NULL) {
-    CRYPTO_set_dynlock_create_callback(NULL);
-    CRYPTO_set_dynlock_lock_callback(NULL);
-    CRYPTO_set_dynlock_destroy_callback(NULL);
-
-    CRYPTO_set_locking_callback(NULL);
-    CRYPTO_set_id_callback(NULL);
-
-    for (i = 0; i < CRYPTO_num_locks(); i++)
-      MUTEX_FREE(mutex_buf[i]);
-    free(mutex_buf);
-    mutex_buf = NULL;
+  if (client->tlsSession)
+  {
+    SSL_free(client->tlsSession);
+    client->tlsSession = NULL;
+    TINI_MUTEX(client->tlsRwMutex);
   }
-
-  TINI_MUTEX(client->tlsRwMutex);
-
-  SSL_free(client->tlsSession);
 }
 
 #ifdef LIBVNCSERVER_HAVE_SASL

@@ -40,10 +40,11 @@
 #define IF_PTHREADS(x) x
 #else
 #if !NONETWORK
-#define LOCK(mutex) pthread_mutex_lock(&(mutex));
-#define UNLOCK(mutex) pthread_mutex_unlock(&(mutex));
+#define LOCK(mutex) pthread_mutex_lock(&(mutex))
+#define UNLOCK(mutex) pthread_mutex_unlock(&(mutex))
 #endif
 #define MUTEX(mutex) pthread_mutex_t (mutex)
+#define MUTEX_SIZE (sizeof(pthread_mutex_t))
 #define INIT_MUTEX(mutex) pthread_mutex_init(&(mutex),NULL)
 #define TINI_MUTEX(mutex) pthread_mutex_destroy(&(mutex))
 #define TSIGNAL(cond) pthread_cond_signal(&(cond))
@@ -56,12 +57,14 @@
 #define THREAD_ROUTINE_RETURN_VALUE NULL
 #define THREAD_SLEEP_MS(ms) usleep(ms*1000)
 #define THREAD_JOIN(thread) pthread_join(thread, NULL)
+#define CURRENT_THREAD_ID pthread_self()
 #endif
 #elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 #include <process.h>
 #define LOCK(mutex) EnterCriticalSection(&(mutex))
 #define UNLOCK(mutex) LeaveCriticalSection(&(mutex))
 #define MUTEX(mutex) CRITICAL_SECTION (mutex)
+#define MUTEX_SIZE (sizeof(CRITICAL_SECTION))
 #define INIT_MUTEX(mutex)  InitializeCriticalSection(&(mutex))
 #define TINI_MUTEX(mutex) DeleteCriticalSection(&(mutex))
 #define TSIGNAL(cond) WakeAllConditionVariable(&(cond))
@@ -74,6 +77,7 @@
 #define THREAD_ROUTINE_RETURN_VALUE
 #define THREAD_SLEEP_MS(ms) Sleep(ms)
 #define THREAD_JOIN(thread) WaitForSingleObject((HANDLE)thread, INFINITE)
+#define CURRENT_THREAD_ID GetCurrentThreadId()
 #else
 #define LOCK(mutex)
 #define UNLOCK(mutex)
