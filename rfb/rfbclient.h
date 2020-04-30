@@ -229,8 +229,8 @@ typedef void (*GotCopyRectProc)(struct _rfbClient* client, int src_x, int src_y,
 typedef void (*GotFillRectProc)(struct _rfbClient* client, int x, int y, int w, int h, uint32_t colour);
 typedef void (*GotBitmapProc)(struct _rfbClient* client, const uint8_t* buffer, int x, int y, int w, int h);
 typedef rfbBool (*GotJpegProc)(struct _rfbClient* client, const uint8_t* buffer, int length, int x, int y, int w, int h);
-typedef rfbBool (*LockWriteToTLSProc)(struct _rfbClient* client);
-typedef rfbBool (*UnlockWriteToTLSProc)(struct _rfbClient* client);
+typedef rfbBool (*LockWriteToTLSProc)(struct _rfbClient* client);   /** @deprecated */
+typedef rfbBool (*UnlockWriteToTLSProc)(struct _rfbClient* client); /** @deprecated */
 
 #ifdef LIBVNCSERVER_HAVE_SASL
 typedef char* (*GetUserProc)(struct _rfbClient* client);
@@ -415,7 +415,12 @@ typedef struct _rfbClient {
         /* Output Window ID. When set, client application enables libvncclient to perform direct rendering in its window */
         unsigned long outputWindow;
 
-	/** Hooks for optional protection WriteToTLS() by mutex */
+	/** 
+	 * These lock/unlock hooks are not used anymore. LibVNCClient will now use 
+	 * platform-specific synchronization library to protect concurrent TLS R/W.
+	 *  
+	 * @deprecated
+	 */
 	LockWriteToTLSProc LockWriteToTLS;
 	UnlockWriteToTLSProc UnlockWriteToTLS;
 
