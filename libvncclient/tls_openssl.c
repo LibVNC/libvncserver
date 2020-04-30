@@ -30,7 +30,6 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/rand.h>
-#include <openssl/x509.h>
 
 #include "tls.h"
 
