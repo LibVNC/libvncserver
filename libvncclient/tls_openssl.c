@@ -30,8 +30,6 @@
 #include "tls.h"
 
 #ifdef _MSC_VER
-#include <BaseTsd.h> // That's for SSIZE_T
-typedef SSIZE_T ssize_t;
 #define snprintf _snprintf
 #endif
 
@@ -617,7 +615,7 @@ HandleVeNCryptAuth(rfbClient* client)
 int
 ReadFromTLS(rfbClient* client, char *out, unsigned int n)
 {
-  ssize_t ret;
+  int ret = 0;
   int ssl_error = SSL_ERROR_NONE;
 
   LOCK(client->tlsRwMutex);
@@ -643,7 +641,7 @@ int
 WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 {
   unsigned int offset = 0;
-  ssize_t ret;
+  int ret = 0;
   int ssl_error = SSL_ERROR_NONE;
 
   while (offset < n)
