@@ -213,7 +213,6 @@ static rfbBool
 load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
 {
   X509_STORE *st;
-  X509_CRL *crl;
   int i;
   int count = 0;
   BIO *bio;
@@ -221,8 +220,6 @@ load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
   X509_INFO *xi;
 
   st = SSL_CTX_get_cert_store(ssl_ctx);
-
-    int rv = 0;
 
   bio = BIO_new_file(file, "r");
   if (bio == NULL)
