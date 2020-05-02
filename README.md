@@ -41,6 +41,24 @@ RFB Protocol Support Status
 |TLS                |         18 |              |            ✔ |
 |VeNCrypt           |         19 |              |            ✔ |
 
+## [Encodings](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#76encodings)
+
+| Name     | Number | LibVNCServer | LibVNCClient |
+|----------|--------|--------------|--------------|
+| Raw      | 1      | ✔            | ✔            |
+| CopyRect | 2      | ✔            | ✔            |
+| RRE      | 3      | ✔            | ✔            |
+| CoRRE    | 4      | ✔            | ✔            |
+| Hextile  | 5      | ✔            | ✔            |
+| Zlib     | 6      | ✔            | ✔            |
+| Tight    | 7      | ✔            | ✔            |
+| Zlibhex  | 8      | ✔            |              |
+| Ultra    | 9      | ✔            | ✔            |
+| TRLE     | 15     |              | ✔            |
+| ZRLE     | 16     | ✔            | ✔            |
+| ZYWRLE   | 17     | ✔            | ✔            |
+| TightPNG | -260   | ✔            |              |
+
 
 How to build
 ============
