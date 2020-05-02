@@ -31,24 +31,16 @@ RFB Protocol Support Status
 
 ## [Security Types](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#712security)
 
-### LibVNCServer
+|Name               |Number      | LibVNCServer | LibVNCClient |
+|-------------------|------------|--------------|--------------|
+|None               |          1 |            ✔ |            ✔ |
+|VNC Authentication |          2 |            ✔ |            ✔ |
+|SASL               |         20 |              |            ✔ |
+|MSLogon            | 0xfffffffa |              |            ✔ |
+|Apple ARD          |         30 |              |            ✔ |
+|TLS                |         18 |              |            ✔ |
+|VeNCrypt           |         19 |              |            ✔ |
 
-|Name               |Number      |
-|-------------------|------------|
-|None               |          1 |
-|VNC Authentication |          2 |
-
-### LibVNCClient
-
-|Name               |Number      |
-|-------------------|------------|
-|None               |          1 |
-|VNC Authentication |          2 |
-|SASL               |         20 |
-|MSLogon            | 0xfffffffa |
-|Apple ARD          |         30 |
-|TLS                |         18 |
-|VeNCrypt           |         19 |
 
 How to build
 ============
