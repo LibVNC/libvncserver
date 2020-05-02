@@ -441,13 +441,13 @@ CreateX509CertCredential(rfbCredential *cred)
 rfbBool
 HandleAnonTLSAuth(rfbClient* client)
 {
-  if (!InitializeTLS() || !InitializeTLSSession(client, TRUE)) return FALSE;
-
-  if (!SetTLSAnonCredential(client)) return FALSE;
-
-  if (!HandshakeTLS(client)) return FALSE;
-
-  return TRUE;
+  if (InitializeTLS() &&
+      InitializeTLSSession(client, TRUE) &&
+      SetTLSAnonCredential(client) &&
+      HandshakeTLS(client))
+    return TRUE;
+  else
+    return FALSE;
 }
 
 rfbBool

@@ -504,11 +504,12 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
 rfbBool
 HandleAnonTLSAuth(rfbClient* client)
 {
-  if (!InitializeTLS() || !InitializeTLSSession(client, TRUE, NULL)) return FALSE;
-
-  if (!HandshakeTLS(client)) return FALSE;
-
-  return TRUE;
+  if (InitializeTLS() &&
+      InitializeTLSSession(client, TRUE, NULL) &&
+      HandshakeTLS(client))
+    return TRUE;
+  else
+    return FALSE;
 }
 
 static void
