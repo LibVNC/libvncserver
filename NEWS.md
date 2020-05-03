@@ -20,6 +20,8 @@ were closed with this release.
 
 ## LibVNCClient:
   * Added connect timeout as well as read timeout support thanks to Tobias Junghans.
+  * Both TLS backends now do proper locking of network operations when multi-threaded
+    thanks to Gaurav Ujjwal.
   * Fixed regression in Tight/Raw decoding introduced in 0.9.12 thanks to DRC.
   * Fixed encrypted connections to AnonTLS servers when using the OpenSSL back-end.
 	Made possible by the profound research done by Gaurav Ujjwal.
