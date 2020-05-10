@@ -5,6 +5,8 @@ were closed with this release.
 
 ## Overall changes:
   * Small tweaks to the CMake build system.
+  * The macOS server example was overhauled and is now the most feature-complete sample
+	application of the project, ready for real-world use.
   * Lots of documentation updates and markdownifying.
   * The TravisCI continuous integration now also build-checks cross-compilation from
 	Linux to Windows.
