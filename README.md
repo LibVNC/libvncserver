@@ -65,7 +65,7 @@ How to build
 
 
 LibVNCServer uses CMake, so you can build via:
-Install cmake using command on Debian/Ubuntu platform  : `sudo apt-get install cmake`
+Install CMake using command on Debian/Ubuntu platform  : `sudo apt-get install cmake`
 On Redhat/Centos : `yum install cmake`
 
 And then:
