@@ -482,7 +482,7 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
     for (loop=0;loop<count;loop++)
     {
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
-        rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
+        rfbClientLog("%d) Received security type %d\n", loop + 1, tAuth[loop]);
         if (flag) continue;
         extAuthHandler=FALSE;
         for (e = rfbClientExtensions; e; e = e->next) {
@@ -524,7 +524,7 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
             }
             if (flag)
             {
-                rfbClientLog("Selecting security type %d (%d/%d in the list)\n", authScheme, loop, count);
+                rfbClientLog("Selecting security type %d (%d/%d in the list)\n", authScheme, loop + 1, count);
                 /* send back a single byte indicating which security type to use */
                 if (!WriteToRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
             }
