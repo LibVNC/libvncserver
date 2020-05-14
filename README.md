@@ -63,7 +63,11 @@ RFB Protocol Support Status
 How to build
 ============
 
-LibVNCServer uses CMake, so you can build via:
+LibVNCServer uses CMake, which you can download [here](https://cmake.org/download/)
+or, better yet, install using your platform's package manager (apt, yum, brew, macports,
+chocolatey, etc.).
+
+You can then build via:
 
     mkdir build
     cd build
