@@ -3369,6 +3369,9 @@ rfbSendRectEncodingRaw(rfbClientPtr cl,
     char *fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
                    + (x * (cl->scaledScreen->bitsPerPixel / 8)));
 
+    if(!h || !w)
+	return TRUE; /* nothing to send */
+
     /* Flush the buffer to guarantee correct alignment for translateFn(). */
     if (cl->ublen > 0) {
         if (!rfbSendUpdateBuf(cl))
