@@ -1,15 +1,9 @@
 *.swp
 *~
 Makefile
-Makefile.in
-LibVNCServer.spec.in
-LibVNCServer.spec
-libvncserver-config
 *.pc
 LibVNCServer*.tar.gz
-config.h.in
 rfbconfig.h
-rfbconfig.h.in
 *.o
 *.a
 *.so
