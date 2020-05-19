@@ -497,13 +497,12 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
         if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth ||
 			extAuthHandler ||
 #if defined(LIBVNCSERVER_HAVE_GNUTLS) || defined(LIBVNCSERVER_HAVE_LIBSSL)
-            tAuth[loop]==rfbVeNCrypt ||
+	    (!subAuth && (tAuth[loop]==rfbTLS || tAuth[loop]==rfbVeNCrypt)) ||
 #endif
 #ifdef LIBVNCSERVER_HAVE_SASL
             tAuth[loop]==rfbSASL ||
 #endif /* LIBVNCSERVER_HAVE_SASL */
-            (tAuth[loop]==rfbARD && client->GetCredential) ||
-            (!subAuth && (tAuth[loop]==rfbTLS || (tAuth[loop]==rfbVeNCrypt && client->GetCredential))))
+            (tAuth[loop]==rfbARD && client->GetCredential))
         {
             if (!subAuth && client->clientAuthSchemes)
             {
