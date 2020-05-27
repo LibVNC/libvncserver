@@ -48,14 +48,17 @@ static void zrleBufferFree(zrleBuffer *buffer)
 static rfbBool zrleBufferGrow(zrleBuffer *buffer, int size)
 {
   int offset;
+  void *new_buffer;
 
   size  += buffer->end - buffer->start;
   offset = ZRLE_BUFFER_LENGTH (buffer);
 
-  buffer->start = realloc(buffer->start, size);
-  if (!buffer->start) {
+  new_buffer = realloc(buffer->start, size);
+  if (!new_buffer) {
     return FALSE;
   }
+
+  buffer->start = new_buffer;
 
   buffer->end = buffer->start + size;
   buffer->ptr = buffer->start + offset;
