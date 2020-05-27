@@ -805,6 +805,7 @@ SetDSCP(rfbSocket sock, int dscp)
 
 
 
+#ifndef LIBVNCSERVER_IPv6
 /*
  * StringToIPAddr - convert a host string to an IP address.
  */
@@ -833,6 +834,7 @@ StringToIPAddr(const char *str, unsigned int *addr)
 
   return FALSE;
 }
+#endif
 
 
 /*

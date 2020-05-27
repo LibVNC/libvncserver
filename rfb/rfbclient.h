@@ -724,7 +724,10 @@ extern rfbBool SetNonBlocking(rfbSocket sock);
 extern rfbBool SetBlocking(rfbSocket sock);
 extern rfbBool SetDSCP(rfbSocket sock, int dscp);
 
+#ifndef LIBVNCSERVER_IPv6
 extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
+#endif
+
 extern rfbBool SameMachine(rfbSocket sock);
 /**
  * Waits for an RFB message to arrive from the server. Before handling a message
