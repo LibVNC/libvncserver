@@ -360,9 +360,12 @@ rfbSetTranslateFunction(rfbClientPtr cl)
 static rfbBool
 rfbSetClientColourMapBGR233(rfbClientPtr cl)
 {
-    char buf[sz_rfbSetColourMapEntriesMsg + 256 * 3 * 2];
-    rfbSetColourMapEntriesMsg *scme = (rfbSetColourMapEntriesMsg *)buf;
-    uint16_t *rgb = (uint16_t *)(&buf[sz_rfbSetColourMapEntriesMsg]);
+    union {
+        char bytes[sz_rfbSetColourMapEntriesMsg + 256 * 3 * 2];
+        rfbSetColourMapEntriesMsg msg;
+    } buf;
+    rfbSetColourMapEntriesMsg *scme = &buf.msg;
+    uint16_t *rgb = (uint16_t *)(&buf.bytes[sz_rfbSetColourMapEntriesMsg]);
     int i, len;
     int r, g, b;
 
@@ -394,7 +397,7 @@ rfbSetClientColourMapBGR233(rfbClientPtr cl)
 
     len += 256 * 3 * 2;
 
-    if (rfbWriteExact(cl, buf, len) < 0) {
+    if (rfbWriteExact(cl, buf.bytes, len) < 0) {
         rfbLogPerror("rfbSetClientColourMapBGR233: write");
         rfbCloseClient(cl);
         return FALSE;
