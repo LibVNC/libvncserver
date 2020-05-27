@@ -62,20 +62,34 @@ rfbSendRectEncodingRRE(rfbClientPtr cl,
     int maxRawSize = (cl->scaledScreen->width * cl->scaledScreen->height
                       * (cl->format.bitsPerPixel / 8));
 
-    if (cl->beforeEncBufSize < maxRawSize) {
-        cl->beforeEncBufSize = maxRawSize;
+    if (!cl->beforeEncBuf || cl->beforeEncBufSize < maxRawSize) {
         if (cl->beforeEncBuf == NULL)
-            cl->beforeEncBuf = (char *)malloc(cl->beforeEncBufSize);
-        else
-            cl->beforeEncBuf = (char *)realloc(cl->beforeEncBuf, cl->beforeEncBufSize);
+            cl->beforeEncBuf = (char *)malloc(maxRawSize);
+        else {
+            char *reallocedBeforeEncBuf = (char *)realloc(cl->beforeEncBuf, maxRawSize);
+            if (!reallocedBeforeEncBuf) return FALSE;
+            cl->beforeEncBuf = reallocedBeforeEncBuf;
+        }
+        if(cl->beforeEncBuf)
+            cl->beforeEncBufSize = maxRawSize;
     }
 
-    if (cl->afterEncBufSize < maxRawSize) {
-        cl->afterEncBufSize = maxRawSize;
+    if (!cl->afterEncBuf || cl->afterEncBufSize < maxRawSize) {
         if (cl->afterEncBuf == NULL)
-            cl->afterEncBuf = (char *)malloc(cl->afterEncBufSize);
-        else
-            cl->afterEncBuf = (char *)realloc(cl->afterEncBuf, cl->afterEncBufSize);
+            cl->afterEncBuf = (char *)malloc(maxRawSize);
+        else {
+            char *reallocedAfterEncBuf = (char *)realloc(cl->afterEncBuf, maxRawSize);
+            if (!reallocedAfterEncBuf) return FALSE;
+            cl->afterEncBuf = reallocedAfterEncBuf;
+        }
+        if(cl->afterEncBuf)
+            cl->afterEncBufSize = maxRawSize;
+    }
+
+    if (!cl->beforeEncBuf || !cl->afterEncBuf)
+    {
+        rfbLog("rfbSendRectEncodingRRE: failed to allocate memory\n");
+        return FALSE;
     }
 
     (*cl->translateFn)(cl->translateLookupTable,
