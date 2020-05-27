@@ -60,6 +60,7 @@ static char* NoPassword(rfbClient* client) {
 static char* ReadPassword(rfbClient* client) {
 	int i;
 	char* p=calloc(1,9);
+	if (!p) return p;
 #ifndef WIN32
 	struct termios save,noecho;
 	if(tcgetattr(fileno(stdin),&save)!=0) return p;
@@ -467,7 +468,7 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
         client->destPort = 5900;
 
 	client->destHost = strdup(argv[i+1]);
-	if(colon) {
+	if(client->destHost && colon) {
 	  client->destHost[(int)(colon-argv[i+1])] = '\0';
 	  client->destPort = atoi(colon+1);
 	}
@@ -480,8 +481,10 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 
 	if(colon) {
 	  client->serverHost = strdup(argv[i]);
-	  client->serverHost[(int)(colon-argv[i])] = '\0';
-	  client->serverPort = atoi(colon+1);
+	  if(client->serverHost) {
+	    client->serverHost[(int)(colon-argv[i])] = '\0';
+	    client->serverPort = atoi(colon+1);
+	  }
 	} else {
 	  client->serverHost = strdup(argv[i]);
 	}
