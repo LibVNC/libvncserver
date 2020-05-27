@@ -910,7 +910,6 @@ InitialiseRFBConnection(rfbClient* client)
     errorMessageOnReadFailure = FALSE;
 
   if (!ReadFromRFBServer(client, pv, sz_rfbProtocolVersionMsg)) return FALSE;
-  pv[sz_rfbProtocolVersionMsg]=0;
 
   errorMessageOnReadFailure = TRUE;
 
