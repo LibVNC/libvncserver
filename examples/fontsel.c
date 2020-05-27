@@ -49,7 +49,7 @@ int main(int argc,char** argv)
   int i,j;
 
   if(!s)
-    return 0;
+    return 1;
 
   s->frameBuffer=(char*)malloc(640*480*3);
   rfbInitServer(s);

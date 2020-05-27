@@ -151,7 +151,7 @@ int main(int argc,char** argv)
   
   rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,WIDTH,HEIGHT,8,3,BPP);
   if(!server)
-    return 0;
+    return 1;
   server->desktopName = "Live Video Feed Example";
   server->frameBuffer=(char*)malloc(WIDTH*HEIGHT*BPP);
   server->alwaysShared=(1==1);
