@@ -1489,7 +1489,7 @@ char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length)
                     rfbLogPerror("rfbProcessFileTransferReadBuffer: read");
                 rfbCloseClient(cl);
                 /* NOTE: don't forget to free(buffer) if you return early! */
-                if (buffer!=NULL) free(buffer);
+                free(buffer);
                 return NULL;
             }
             /* Null Terminate */
@@ -1650,7 +1650,6 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
             filename2[3]=0;
             filename2[4]=0;
             retval = rfbSendFileTransferMessage(cl, rfbDirPacket, rfbADrivesList, 0, 5, filename2);
-            if (buffer!=NULL) free(buffer);
             return retval;
             break;
         case rfbRDirContent: /* Client requests the content of a directory */
@@ -1659,7 +1658,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
             */
             if ((buffer = rfbProcessFileTransferReadBuffer(cl, length))==NULL) return FALSE;
             retval = rfbSendDirContent(cl, length, buffer);
-            if (buffer!=NULL) free(buffer);
+            free(buffer);
             return retval;
         }
         break;
@@ -1733,7 +1732,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
 
         if (cl->fileTransfer.fd==-1)
         {
-            if (buffer!=NULL) free(buffer);
+            free(buffer);
             return retval;
         }
         /* setup filetransfer stuff */
@@ -1749,7 +1748,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
           rfbLogPerror("rfbProcessFileTransfer: write");
           rfbCloseClient(cl);
           UNLOCK(cl->sendMutex);
-          if (buffer!=NULL) free(buffer);
+          free(buffer);
           return FALSE;
         }
         UNLOCK(cl->sendMutex);
@@ -1804,7 +1803,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
                 rfbLogPerror("rfbProcessFileTransfer: read sizeHtmp");
             rfbCloseClient(cl);
             /* NOTE: don't forget to free(buffer) if you return early! */
-            if (buffer!=NULL) free(buffer);
+            free(buffer);
             return FALSE;
         }
         sizeHtmp = Swap32IfLE(sizeHtmp);
@@ -1946,7 +1945,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
             /*
             */
             retval = rfbSendFileTransferMessage(cl, rfbCommandReturn, rfbADirCreate, retval, length, buffer);
-            if (buffer!=NULL) free(buffer);
+            free(buffer);
             return retval;
         case rfbCFileDelete: /* Client requests the deletion of a file */
             if (!rfbFilenameTranslate2UNIX(cl, buffer, filename1, sizeof(filename1)))
@@ -1960,7 +1959,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
             }
             else retval=-1;
             retval = rfbSendFileTransferMessage(cl, rfbCommandReturn, rfbAFileDelete, retval, length, buffer);
-            if (buffer!=NULL) free(buffer);
+            free(buffer);
             return retval;
         case rfbCFileRename: /* Client requests the Renaming of a file/directory */
             p = strrchr(buffer, '*');
@@ -1979,7 +1978,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
                 /* Restore the buffer so the reply is good */
                 *p = '*';
                 retval = rfbSendFileTransferMessage(cl, rfbCommandReturn, rfbAFileRename, retval, length, buffer);
-                if (buffer!=NULL) free(buffer);
+                free(buffer);
                 return retval;
             }
             break;
@@ -1989,11 +1988,11 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
     }
 
     /* NOTE: don't forget to free(buffer) if you return early! */
-    if (buffer!=NULL) free(buffer);
+    free(buffer);
     return TRUE;
 
 fail:
-    if (buffer!=NULL) free(buffer);
+    free(buffer);
     return FALSE;
 }
 
