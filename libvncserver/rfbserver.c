@@ -168,9 +168,11 @@ rfbGetClientIterator(rfbScreenInfoPtr rfbScreen)
 {
   rfbClientIteratorPtr i =
     (rfbClientIteratorPtr)malloc(sizeof(struct rfbClientIterator));
-  i->next = NULL;
-  i->screen = rfbScreen;
-  i->closedToo = FALSE;
+  if(i) {
+    i->next = NULL;
+    i->screen = rfbScreen;
+    i->closedToo = FALSE;
+  }
   return i;
 }
 
@@ -179,9 +181,11 @@ rfbGetClientIteratorWithClosed(rfbScreenInfoPtr rfbScreen)
 {
   rfbClientIteratorPtr i =
     (rfbClientIteratorPtr)malloc(sizeof(struct rfbClientIterator));
-  i->next = NULL;
-  i->screen = rfbScreen;
-  i->closedToo = TRUE;
+  if(i) {
+    i->next = NULL;
+    i->screen = rfbScreen;
+    i->closedToo = TRUE;
+  }
   return i;
 }
 
@@ -307,6 +311,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     rfbProtocolExtension* extension;
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
+
+    if (!cl)
+        return NULL;
 
     cl->screen = rfbScreen;
     cl->sock = sock;
@@ -719,12 +726,14 @@ rfbClientSendString(rfbClientPtr cl, const char *reason)
     rfbLog("rfbClientSendString(\"%s\")\n", reason);
 
     buf = (char *)malloc(4 + len);
-    ((uint32_t *)buf)[0] = Swap32IfLE(len);
-    memcpy(buf + 4, reason, len);
+    if (buf) {
+        ((uint32_t *)buf)[0] = Swap32IfLE(len);
+        memcpy(buf + 4, reason, len);
 
-    if (rfbWriteExact(cl, buf, 4 + len) < 0)
-        rfbLogPerror("rfbClientSendString: write");
-    free(buf);
+        if (rfbWriteExact(cl, buf, 4 + len) < 0)
+            rfbLogPerror("rfbClientSendString: write");
+        free(buf);
+    }
 
     rfbCloseClient(cl);
 }
@@ -744,13 +753,15 @@ rfbClientConnFailed(rfbClientPtr cl,
     rfbLog("rfbClientConnFailed(\"%s\")\n", reason);
 
     buf = (char *)malloc(8 + len);
-    ((uint32_t *)buf)[0] = Swap32IfLE(rfbConnFailed);
-    ((uint32_t *)buf)[1] = Swap32IfLE(len);
-    memcpy(buf + 8, reason, len);
+    if (buf) {
+        ((uint32_t *)buf)[0] = Swap32IfLE(rfbConnFailed);
+        ((uint32_t *)buf)[1] = Swap32IfLE(len);
+        memcpy(buf + 8, reason, len);
 
-    if (rfbWriteExact(cl, buf, 8 + len) < 0)
-        rfbLogPerror("rfbClientConnFailed: write");
-    free(buf);
+        if (rfbWriteExact(cl, buf, 8 + len) < 0)
+            rfbLogPerror("rfbClientConnFailed: write");
+        free(buf);
+    }
 
     rfbCloseClient(cl);
 }
