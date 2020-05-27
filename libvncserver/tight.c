@@ -1885,6 +1885,13 @@ static rfbBool SendPngRect(rfbClientPtr cl, int x, int y, int w, int h) {
 
     png_write_info(png_ptr, info_ptr);
     buf = malloc(w * 3);
+    if (buf == NULL)
+    {
+        pngFree(png_ptr, png_palette);
+        png_destroy_write_struct(&png_ptr, &info_ptr);
+        return FALSE;
+    }
+
     for (dy = 0; dy < h; dy++)
     {
 #if 0

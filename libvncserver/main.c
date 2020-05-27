@@ -172,6 +172,8 @@ rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
 			return FALSE;
 
 	extData = calloc(sizeof(rfbExtensionData),1);
+	if(!extData)
+		return FALSE;
 	extData->extension = extension;
 	extData->data = data;
 	extData->next = cl->extensions;
@@ -889,6 +891,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int bytesPerPixel)
 {
    rfbScreenInfoPtr screen=calloc(sizeof(rfbScreenInfo),1);
+   if (!screen)
+       return NULL;
 
    if (! logMutex_initialized) {
      INIT_MUTEX(logMutex);
