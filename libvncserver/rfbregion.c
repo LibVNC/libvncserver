@@ -51,24 +51,30 @@ sraSpanDup(const sraSpan *src) {
 
 static void
 sraSpanInsertAfter(sraSpan *newspan, sraSpan *after) {
-  newspan->_next = after->_next;
-  newspan->_prev = after;
-  after->_next->_prev = newspan;
-  after->_next = newspan;
+  if(newspan && after) {
+    newspan->_next = after->_next;
+    newspan->_prev = after;
+    after->_next->_prev = newspan;
+    after->_next = newspan;
+  }
 }
 
 static void
 sraSpanInsertBefore(sraSpan *newspan, sraSpan *before) {
-  newspan->_next = before;
-  newspan->_prev = before->_prev;
-  before->_prev->_next = newspan;
-  before->_prev = newspan;
+  if(newspan && before) {
+    newspan->_next = before;
+    newspan->_prev = before->_prev;
+    before->_prev->_next = newspan;
+    before->_prev = newspan;
+  }
 }
 
 static void
 sraSpanRemove(sraSpan *span) {
-  span->_prev->_next = span->_next;
-  span->_next->_prev = span->_prev;
+  if(span) {
+    span->_prev->_next = span->_next;
+    span->_next->_prev = span->_prev;
+  }
 }
 
 static void

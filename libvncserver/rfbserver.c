@@ -207,6 +207,8 @@ rfbClientIteratorHead(rfbClientIteratorPtr i)
 rfbClientPtr
 rfbClientIteratorNext(rfbClientIteratorPtr i)
 {
+  if (!i)
+    return NULL;
   if(i->next == 0) {
     LOCK(rfbClientListMutex);
     i->next = i->screen->clientHead;
@@ -231,7 +233,7 @@ rfbClientIteratorNext(rfbClientIteratorPtr i)
 void
 rfbReleaseClientIterator(rfbClientIteratorPtr iterator)
 {
-  if(iterator->next) rfbDecrClientRef(iterator->next);
+  if(iterator && iterator->next) rfbDecrClientRef(iterator->next);
   free(iterator);
 }
 
