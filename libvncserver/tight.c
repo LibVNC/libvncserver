@@ -1880,9 +1880,7 @@ static rfbBool SendPngRect(rfbClientPtr cl, int x, int y, int w, int h) {
 
     png_write_end(png_ptr, NULL);
 
-    if (color_type == PNG_COLOR_TYPE_PALETTE) {
-        pngFree(png_ptr, png_palette);
-    }
+    pngFree(png_ptr, png_palette);
 
     png_destroy_write_struct(&png_ptr, &info_ptr);
 
