@@ -1732,6 +1732,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
               length = strlen(buffer);
               if (DB) rfbLog("rfbProcessFileTransfer() buffer is now: \"%s\"\n", buffer);
             }
+        } else {
+            statbuf.st_size = 0;
         }
 
         /* The viewer supports compression if size==1 */
