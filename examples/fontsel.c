@@ -71,7 +71,7 @@ int main(int argc,char** argv)
     exit(1);
   }
   
-  for(j=0;j<0 && rfbIsActive(s);j++)
+  for(j=0;j<10 && rfbIsActive(s);j++)
     rfbProcessEvents(s,900000);
 
   i = rfbSelectBox(s,font,fontlist,10,20,200,300,0xffdfdf,0x602040,2,showFont);
