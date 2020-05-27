@@ -102,7 +102,7 @@ but basically it boils down to:
 
     mkdir build
     cd build
-    cmake .. -DANDROID_NDK=<path> -DCMAKE_TOOLCHAIN_FILE=<path> -DANDROID_NATIVE_API_LEVEL=<API level you want> -DWITH_PNG=OFF # NDK not shipping png per default
+    cmake .. -DANDROID_NDK=<path> -DCMAKE_TOOLCHAIN_FILE=<path> -DANDROID_NATIVE_API_LEVEL=<API level you want>
     cmake --build .
 
 Crosscompiling from Linux to Windows
