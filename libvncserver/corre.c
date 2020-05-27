@@ -233,7 +233,7 @@ subrectEncode##bpp(rfbClientPtr client, uint##bpp##_t *data, int w, int h) {    
             seg = data+(j*w);                                                 \
             if (seg[x] != cl) {break;}                                        \
             i = x;                                                            \
-            while ((seg[i] == cl) && (i < w)) i += 1;                         \
+            while ((i < w) && (seg[i] == cl)) i += 1;                         \
             i -= 1;                                                           \
             if (j == y) vx = hx = i;                                          \
             if (i < vx) vx = i;                                               \
