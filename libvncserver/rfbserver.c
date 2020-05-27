@@ -2109,7 +2109,6 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->useRichCursorEncoding    = FALSE;
         cl->enableCursorPosUpdates   = FALSE;
         cl->enableCursorShapeUpdates = FALSE;
-        cl->enableCursorShapeUpdates = FALSE;
         cl->enableLastRectEncoding   = FALSE;
         cl->enableKeyboardLedState   = FALSE;
         cl->enableSupportedMessages  = FALSE;
