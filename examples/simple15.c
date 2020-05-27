@@ -12,6 +12,8 @@ int main(int argc,char** argv)
   if(!server)
     return 0;
   server->frameBuffer=(char*)malloc(400*300*2);
+  if(!server->frameBuffer)
+    return 1;
   f=(uint16_t*)server->frameBuffer;
   for(j=0;j<300;j++)
     for(i=0;i<400;i++)

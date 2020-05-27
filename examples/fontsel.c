@@ -52,6 +52,9 @@ int main(int argc,char** argv)
     return 0;
 
   s->frameBuffer=(char*)malloc(640*480*3);
+  if(!s->frameBuffer)
+      return 1;
+
   rfbInitServer(s);
 
   for(j=0;j<480;j++)

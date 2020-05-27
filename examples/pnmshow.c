@@ -79,6 +79,8 @@ int main(int argc,char** argv)
 
   /* allocate picture and read it */
   rfbScreen->frameBuffer = (char*)malloc(paddedWidth*bytesPerPixel*height);
+  if(!rfbScreen->frameBuffer)
+      exit(1);
   fread(rfbScreen->frameBuffer,width*bitsPerPixelInFile/8,height,in);
   fclose(in);
 
@@ -87,6 +89,8 @@ int main(int argc,char** argv)
 	  rfbScreen->colourMap.count=256;
 	  rfbScreen->colourMap.is16=FALSE;
 	  rfbScreen->colourMap.data.bytes=malloc(256*3);
+	  if(!rfbScreen->colourMap.data.bytes)
+		  exit(1);
 	  for(i=0;i<256;i++)
 		  memset(rfbScreen->colourMap.data.bytes+3*i,i,3);
   }
