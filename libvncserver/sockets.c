@@ -836,6 +836,7 @@ rfbWriteExact(rfbClientPtr cl,
         } else if (n == 0) {
 
             rfbErr("WriteExact: write returned 0?\n");
+            UNLOCK(cl->outputMutex);
             return 0;
 
         } else {
