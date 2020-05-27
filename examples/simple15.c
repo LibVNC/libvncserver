@@ -17,7 +17,7 @@ int main(int argc,char** argv)
     for(i=0;i<400;i++)
       f[j*400+i]=/* red */ ((j*32/300) << 10) |
 		 /* green */ (((j+400-i)*32/700) << 5) |
-		 /* blue */ ((i*32/400));
+		 /* blue */ (i*32/400);
 
   rfbInitServer(server);           
   rfbRunEventLoop(server,-1,FALSE);
