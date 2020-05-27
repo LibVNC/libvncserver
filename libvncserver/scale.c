@@ -210,7 +210,7 @@ void rfbScaledScreenUpdateRect(rfbScreenInfoPtr screen, rfbScreenInfoPtr ptr, in
              default:
                /* fixme: endianness problem? */
                for (z = 0; z < bytesPerPixel; z++)
-                 pixel_value += (srcptr2[z] << (8 * z));
+                 pixel_value += ((unsigned long)srcptr2[z] << (8 * z));
                 break;
               }
               /*
