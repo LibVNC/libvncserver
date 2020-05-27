@@ -56,6 +56,11 @@ static void read_keys(void)
 	   j=j*16+k;
 	 if(keys[j&0x3ff]) {
 	    char* x=(char*)malloc(1+strlen(keys[j&0x3ff])+1+strlen(buffer+strlen("#define ")));
+	    if(!x) {
+	      memset(keys,0,0x400*sizeof(char*));
+	      fclose(keysyms);
+	      return;
+	    }
 	    strcpy(x,keys[j&0x3ff]);
 	    strcat(x,",");
 	    strcat(x,buffer+strlen("#define "));
