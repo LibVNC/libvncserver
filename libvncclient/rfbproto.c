@@ -1151,10 +1151,13 @@ rfbBool
 SetFormatAndEncodings(rfbClient* client)
 {
   rfbSetPixelFormatMsg spf;
-  char buf[sz_rfbSetEncodingsMsg + MAX_ENCODINGS * 4];
+  union {
+    char bytes[sz_rfbSetEncodingsMsg + MAX_ENCODINGS*4];
+    rfbSetEncodingsMsg msg;
+  } buf;
 
-  rfbSetEncodingsMsg *se = (rfbSetEncodingsMsg *)buf;
-  uint32_t *encs = (uint32_t *)(&buf[sz_rfbSetEncodingsMsg]);
+  rfbSetEncodingsMsg *se = &buf.msg;
+  uint32_t *encs = (uint32_t *)(&buf.bytes[sz_rfbSetEncodingsMsg]);
   int len = 0;
   rfbBool requestCompressLevel = FALSE;
   rfbBool requestQualityLevel = FALSE;
@@ -1354,7 +1357,7 @@ SetFormatAndEncodings(rfbClient* client)
 
   se->nEncodings = rfbClientSwap16IfLE(se->nEncodings);
 
-  if (!WriteToRFBServer(client, buf, len)) return FALSE;
+  if (!WriteToRFBServer(client, buf.bytes, len)) return FALSE;
 
   return TRUE;
 }

@@ -65,7 +65,7 @@ int main(int argc,char** argv)
   /* initialize data for vnc server */
   rfbScreen = rfbGetScreen(&argc,argv,paddedWidth,height,8,3,3);
   if(!rfbScreen)
-    return 0;
+    return 1;
   if(argc>1)
     rfbScreen->desktopName = argv[1];
   else
@@ -78,6 +78,8 @@ int main(int argc,char** argv)
 
   /* allocate picture and read it */
   rfbScreen->frameBuffer = (char*)malloc(paddedWidth*3*height);
+  if(!rfbScreen->frameBuffer)
+    return 1;
   fread(rfbScreen->frameBuffer,width*3,height,in);
   fclose(in);
 
