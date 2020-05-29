@@ -113,6 +113,7 @@ typedef int8_t rfbBool;
 #endif
 
 typedef uint32_t rfbKeySym;
+typedef uint32_t rfbKeyCode;
 typedef uint32_t rfbPixel;
 
 #ifdef LIBVNCSERVER_NEED_INADDR_T
@@ -427,6 +428,7 @@ typedef struct {
 /* SetDesktopSize client -> server message */
 #define rfbSetDesktopSize 251
 
+#define rfbQemuClientMessage 255
 
 
 
@@ -466,6 +468,9 @@ typedef struct {
 
 /* Xvp pseudo-encoding */
 #define rfbEncodingXvp 			 0xFFFFFECB
+
+	/* QemuKeyEvent pseudo-encoding */
+#define rfbEncodingQEMUKeyEvent		 0xFFFFFEFE
 
 /*
  * Special encoding numbers:
@@ -1490,6 +1495,16 @@ typedef struct _rfbSetSWMsg {
 #define sz_rfbSetSWMsg 6
 
 
+typedef struct _rfbQemuClientMsg {
+    uint8_t type;   /* always rfbQemuClientMessage */
+    uint8_t subtype;
+    uint16_t down_flag;
+    uint32_t keysym;
+    uint32_t keycode;
+} rfbQemuClientMsg;
+
+#define sz_rfbQemuClientMsg 12
+
 
 /*-----------------------------------------------------------------------------
  * Union of all client->server messages.
@@ -1512,6 +1527,7 @@ typedef union {
 	rfbTextChatMsg tc;
 	rfbXvpMsg xvp;
 	rfbSetDesktopSizeMsg sdm;
+        rfbQemuClientMsg qcm;
 } rfbClientToServerMsg;
 
 /* 
