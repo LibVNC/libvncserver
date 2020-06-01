@@ -680,7 +680,7 @@ endif(LIBVNCSERVER_WITH_WEBSOCKETS)
 
 add_test(NAME cargs COMMAND test_cargstest)
 if(UNIX)
-  add_test(NAME includetest COMMAND ${TESTS_DIR}/includetest.sh)
+  add_test(NAME includetest COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR})
 endif(UNIX)
 if(FOUND_LIBJPEG_TURBO)
     add_test(NAME turbojpeg COMMAND test_tjunittest)

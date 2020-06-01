@@ -3,6 +3,9 @@
 # This tests if using the **installed** headers works.
 #
 
+# expects install prefix like /usr as an argument
+PREFIX=$1
+
 TMPDIR=$(mktemp -d)
 
 make install DESTDIR=$TMPDIR
@@ -18,4 +21,4 @@ int main()
 }
 " > $TMPDIR/includetest.c
 
-cc -I $TMPDIR/usr/local/include $TMPDIR/includetest.c
+cc -I $TMPDIR/$PREFIX $TMPDIR/includetest.c
