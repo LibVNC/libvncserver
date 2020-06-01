@@ -64,7 +64,7 @@ typedef UINT32 in_addr_t;
 #endif
 #endif
 
-#include "threading.h"
+#include <rfb/threading.h>
 
 /* if you use pthreads, but don't define LIBVNCSERVER_HAVE_LIBPTHREAD, the structs
    get all mixed up. So this gives a linker error reminding you to compile

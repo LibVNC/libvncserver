@@ -722,6 +722,7 @@ if(LIBVNCSERVER_INSTALL)
   install(TARGETS vncclient DESTINATION ${CMAKE_INSTALL_LIBDIR})
   install(FILES
     rfb/keysym.h
+    rfb/threading.h
     rfb/rfb.h
     rfb/rfbclient.h
     ${CMAKE_CURRENT_BINARY_DIR}/rfb/rfbconfig.h

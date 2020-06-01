@@ -55,7 +55,7 @@
 #endif
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
-#include <common/threading.h>
+#include <rfb/threading.h>
 
 #ifdef LIBVNCSERVER_HAVE_SASL
 #include <sasl/sasl.h>
