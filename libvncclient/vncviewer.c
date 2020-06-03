@@ -275,9 +275,6 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->connectTimeout = DEFAULT_CONNECT_TIMEOUT;
   client->readTimeout = DEFAULT_READ_TIMEOUT;
 
-  client->CurrentKeyboardLedState = 0;
-  client->HandleKeyboardLedState = (HandleKeyboardLedStateProc)DummyPoint;
-
   /* default: use complete frame buffer */ 
   client->updateRect.x = -1;
  

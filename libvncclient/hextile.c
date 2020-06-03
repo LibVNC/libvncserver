@@ -32,7 +32,7 @@
 static rfbBool
 HandleHextileBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 {
-  CARDBPP bg, fg;
+  CARDBPP bg = 0, fg;
   int i;
   uint8_t *ptr;
   int x, y, w, h;

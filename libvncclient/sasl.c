@@ -301,7 +301,6 @@ HandleSASLAuth(rfbClient *client)
 
     rfbClientLog("Client start negotiation mechlist '%s'\n", mechlist);
 
- restart:
     /* Start the auth negotiation on the client end first */
     err = sasl_client_start(saslconn,
                             mechlist,
@@ -376,7 +375,6 @@ HandleSASLAuth(rfbClient *client)
      * Even if the server has completed, the client must *always* do at least one step
      * in this loop to verify the server isn't lying about something. Mutual auth */
     for (;;) {
-    restep:
         err = sasl_client_step(saslconn,
                                serverin,
                                serverinlen,

@@ -542,8 +542,6 @@ webSocketsDecodeHybi(ws_ctx_t *wsctx, char *dst, int len)
         wsctx->hybiDecodeState = hybiReturnData(dst, len, wsctx, &result);
         break;
       case WS_HYBI_STATE_DATA_NEEDED:
-        wsctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result, 0);
-        break;
       case WS_HYBI_STATE_CLOSE_REASON_PENDING:
         wsctx->hybiDecodeState = hybiReadAndDecode(wsctx, dst, len, &result, 0);
         break;
