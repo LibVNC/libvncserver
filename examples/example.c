@@ -152,8 +152,7 @@ static void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 	 /* we could get a selection like that:
 	  rfbGotXCutText(cl->screen,"Hallo",5);
 	  */
-      } else
-	cd->oldButton=0;
+      }
 
       cd->oldx=x; cd->oldy=y; cd->oldButton=buttonMask;
    }
@@ -227,7 +226,7 @@ static char exampleXCursor[]=
 static void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
 {
   int i,j,w=32,h=32;
-  rfbCursorPtr c = rfbScreen->cursor;
+  rfbCursorPtr c;
   char bitmap[]=
     "                                "
     "              xxxxxx            "

@@ -396,7 +396,7 @@ void rfbMakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor
    uint32_t background;
    char *back=(char*)&background;
    unsigned char bit;
-   int interp = 0, db = 0;
+   int interp = 0;
 
    if(cursor->source && cursor->cleanupSource)
        free(cursor->source);
@@ -427,7 +427,9 @@ void rfbMakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor
    g = (255 * (((format->greenMax << format->greenShift) & (*u)) >> format->greenShift)) / format->greenMax; \
    b = (255 * (((format->blueMax  << format->blueShift)  & (*u)) >> format->blueShift))  / format->blueMax;
 
-   if (db) fprintf(stderr, "interp: %d\n", interp);
+#ifdef DEBUG_CURSOR
+   fprintf(stderr, "interp: %d\n", interp);
+#endif
 
    for(j=0;j<cursor->height;j++) {
 	for(i=0,bit=0x80;i<cursor->width;i++,bit=(bit&1)?0x80:bit>>1) {
@@ -447,16 +449,20 @@ void rfbMakeXCursorFromRichCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor
 			grey = (r + g + b) / 3;
 			if (grey >= 128) {
 				cursor->source[j*w+i/8]|=bit;
-				if (db) fprintf(stderr, "1");
+#ifdef DEBUG_CURSOR
+				fprintf(stderr, "1");
 			} else {
-				if (db) fprintf(stderr, "0");
+				fprintf(stderr, "0");
+#endif
 			}
 			
 		} else if(memcmp(cursor->richSource+j*width+i*bpp, back, bpp)) {
 			cursor->source[j*w+i/8]|=bit;
 		}
 	}
-	if (db) fprintf(stderr, "\n");
+#ifdef DEBUG_CURSOR
+	fprintf(stderr, "\n");
+#endif
    }
 }
 

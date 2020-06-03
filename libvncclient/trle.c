@@ -253,7 +253,7 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
         if (type <= 16) {
           int i;
 
-          bpp = (type > 4 ? (type > 16 ? 8 : 4) : (type > 2 ? 2 : 1)),
+          bpp = (type > 4 ? 4 : (type > 2 ? 2 : 1)),
           mask = (1 << bpp) - 1, divider = (8 / bpp);
 
           if (!ReadFromRFBServer(client, (char *)buffer, type * REALBPP / 8))

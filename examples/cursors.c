@@ -239,10 +239,12 @@ static void SetAlphaCursor(rfbScreenInfoPtr screen,int mode)
 {
 	int i,j;
 	rfbCursorPtr c = screen->cursor;
-	int maskStride=(c->width+7)/8;
+	int maskStride;
 
 	if(!c)
 		return;
+
+	maskStride = (c->width+7)/8;
 
 	if(c->alphaSource) {
 		free(c->alphaSource);

@@ -191,6 +191,7 @@ static void startClient(int encodingIndex,rfbScreenInfo* server) {
 	clientData* cd;
 
 	client->clientData=malloc(sizeof(clientData));
+	if (!client->clientData) return;
 	client->MallocFrameBuffer=resize;
 	client->GotFrameBufferUpdate=update;
 	client->FinishedFrameBufferUpdate=update_finished;
@@ -199,6 +200,10 @@ static void startClient(int encodingIndex,rfbScreenInfo* server) {
 	cd->encodingIndex=encodingIndex;
 	cd->server=server;
 	cd->display=(char*)malloc(6);
+	if (!cd->display) {
+		free(client->clientData);
+		return;
+	}
 	sprintf(cd->display,":%d",server->port-5900);
 
 #if defined(LIBVNCSERVER_HAVE_LIBPTHREAD)
@@ -288,9 +293,12 @@ int main(int argc,char** argv)
 	/* Initialize server */
 	server=rfbGetScreen(&argc,argv,width,height,8,3,4);
         if(!server)
-          return 0;
+          return 1;
 
 	server->frameBuffer=malloc(400*300*4);
+	if (!server->frameBuffer)
+		return 1;
+
 	server->cursor=NULL;
 	for(j=0;j<400*300*4;j++)
 		server->frameBuffer[j]=j;
