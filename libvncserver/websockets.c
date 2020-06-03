@@ -331,6 +331,10 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     free(buf);
 
     wsctx = calloc(1, sizeof(ws_ctx_t));
+    if (!wsctx) {
+        rfbErr("webSocketsHandshake: could not allocate memory for context\n");
+        return FALSE;
+    }
     wsctx->encode = webSocketsEncodeHybi;
     wsctx->decode = webSocketsDecodeHybi;
     wsctx->ctxInfo.readFunc = ws_read;

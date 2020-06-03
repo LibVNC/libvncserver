@@ -6,6 +6,7 @@ static void FUNCTION(rfbScreenInfoPtr screen)
 	OUT_T* buffer = (OUT_T*)screen->frameBuffer;
 	int i, j, w = screen->width, h = screen->height;
 	OUT_T* newBuffer = (OUT_T*)malloc(w * h * sizeof(OUT_T));
+	if (!newBuffer) return;
 
 	for (j = 0; j < h; j++)
 		for (i = 0; i < w; i++)

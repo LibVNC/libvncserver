@@ -118,6 +118,7 @@ void rfbClientSetClientData(rfbClient* client, void* tag, void* data)
 		clientData = clientData->next;
 	if(clientData == NULL) {
 		clientData = calloc(sizeof(rfbClientData), 1);
+		if(clientData == NULL) return;
 		clientData->next = client->clientData;
 		client->clientData = clientData;
 		clientData->tag = tag;
@@ -297,6 +298,10 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     const char* magic="vncLog0.0";
     char buffer[10];
     rfbVNCRec* rec = (rfbVNCRec*)malloc(sizeof(rfbVNCRec));
+    if(!rec) {
+        rfbClientLog("Could not allocate rfbVNCRec memory\n");
+        return FALSE;
+    }
     client->vncRec = rec;
 
     rec->file = fopen(client->serverHost,"rb");
@@ -415,7 +420,7 @@ ReadReason(rfbClient* client)
       return;
     }
     reason = malloc(reasonLen+1);
-    if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
+    if (!reason || !ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
     reason[reasonLen]=0;
     rfbClientLog("VNC connection failed: %s\n",reason);
     free(reason);
@@ -877,9 +882,11 @@ SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size)
       for (size=0;authSchemes[size];size++) ;
     }
     client->clientAuthSchemes = (uint32_t*)malloc(sizeof(uint32_t)*(size+1));
-    for (i=0;i<size;i++)
-      client->clientAuthSchemes[i] = authSchemes[i];
-    client->clientAuthSchemes[size] = 0;
+    if (client->clientAuthSchemes) {
+      for (i=0;i<size;i++)
+        client->clientAuthSchemes[i] = authSchemes[i];
+      client->clientAuthSchemes[size] = 0;
+    }
   }
 }
 
@@ -1760,7 +1767,7 @@ HandleRFBServerMessage(rfbClient* client)
       if (rect.encoding == rfbEncodingServerIdentity) {
           char *buffer;
           buffer = malloc(rect.r.w+1);
-          if (!ReadFromRFBServer(client, buffer, rect.r.w))
+          if (!buffer || !ReadFromRFBServer(client, buffer, rect.r.w))
           {
               free(buffer);
               return FALSE;
@@ -2123,7 +2130,7 @@ HandleRFBServerMessage(rfbClient* client)
 
     buffer = malloc(msg.sct.length+1);
 
-    if (!ReadFromRFBServer(client, buffer, msg.sct.length)) {
+    if (!buffer || !ReadFromRFBServer(client, buffer, msg.sct.length)) {
       free(buffer);
       return FALSE;
     }
@@ -2165,7 +2172,7 @@ HandleRFBServerMessage(rfbClient* client)
 	  if(msg.tc.length > MAX_TEXTCHAT_SIZE)
 	      return FALSE;
           buffer=malloc(msg.tc.length+1);
-          if (!ReadFromRFBServer(client, buffer, msg.tc.length))
+          if (!buffer || !ReadFromRFBServer(client, buffer, msg.tc.length))
           {
               free(buffer);
               return FALSE;

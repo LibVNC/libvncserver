@@ -125,8 +125,9 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 	    sscanf(argv[++i],"%d.%d", &rfbScreen->protocolMajorVersion, &rfbScreen->protocolMinorVersion);
 	} else if (strcmp(argv[i], "-passwd") == 0) {  /* -passwd password */
 	    char **passwds = malloc(sizeof(char**)*2);
-	    if (i + 1 >= *argc) {
+	    if (!passwds || i + 1 >= *argc) {
 		rfbUsage();
+		free(passwds);
 		return FALSE;
 	    }
 	    passwds[0] = argv[++i];

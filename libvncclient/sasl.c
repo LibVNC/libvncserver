@@ -54,7 +54,9 @@
 static char *vnc_connection_addr_to_string(char *host, int port)
 {
     char * buf = (char *)malloc(strlen(host) + 7);
-    sprintf(buf, "%s;%hu", host, port);
+    if (buf) {
+        sprintf(buf, "%s;%hu", host, port);
+    }
     return buf;
 }
 
@@ -273,7 +275,7 @@ HandleSASLAuth(rfbClient *client)
     }
 
     mechlist = malloc(mechlistlen+1);
-    if (!ReadFromRFBServer(client, mechlist, mechlistlen)) {
+    if (!mechlist || !ReadFromRFBServer(client, mechlist, mechlistlen)) {
         free(mechlist);
         goto error;
     }
@@ -359,7 +361,7 @@ HandleSASLAuth(rfbClient *client)
     /* NB, distinction of NULL vs "" is *critical* in SASL */
     if (serverinlen) {
         serverin = malloc(serverinlen);
-        if (!ReadFromRFBServer(client, serverin, serverinlen)) goto error;
+        if (!serverin || !ReadFromRFBServer(client, serverin, serverinlen)) goto error;
         serverin[serverinlen-1] = '\0';
         serverinlen--;
     } else {
@@ -430,7 +432,7 @@ HandleSASLAuth(rfbClient *client)
     /* NB, distinction of NULL vs "" is *critical* in SASL */
         if (serverinlen) {
             serverin = malloc(serverinlen);
-            if (!ReadFromRFBServer(client, serverin, serverinlen)) goto error;
+            if (!serverin || !ReadFromRFBServer(client, serverin, serverinlen)) goto error;
             serverin[serverinlen-1] = '\0';
             serverinlen--;
         } else {
@@ -520,7 +522,10 @@ ReadFromSASL(rfbClient* client, char *out, unsigned int n)
 
         encodedLen = 8192;
         encoded = (char *)malloc(encodedLen);
-
+        if (!encoded) {
+            errno = EIO;
+            return -EIO;
+        }
         ret = read(client->sock, encoded, encodedLen);
         if (ret < 0) {
             free(encoded);

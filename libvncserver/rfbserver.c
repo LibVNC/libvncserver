@@ -168,9 +168,11 @@ rfbGetClientIterator(rfbScreenInfoPtr rfbScreen)
 {
   rfbClientIteratorPtr i =
     (rfbClientIteratorPtr)malloc(sizeof(struct rfbClientIterator));
-  i->next = NULL;
-  i->screen = rfbScreen;
-  i->closedToo = FALSE;
+  if(i) {
+    i->next = NULL;
+    i->screen = rfbScreen;
+    i->closedToo = FALSE;
+  }
   return i;
 }
 
@@ -179,9 +181,11 @@ rfbGetClientIteratorWithClosed(rfbScreenInfoPtr rfbScreen)
 {
   rfbClientIteratorPtr i =
     (rfbClientIteratorPtr)malloc(sizeof(struct rfbClientIterator));
-  i->next = NULL;
-  i->screen = rfbScreen;
-  i->closedToo = TRUE;
+  if(i) {
+    i->next = NULL;
+    i->screen = rfbScreen;
+    i->closedToo = TRUE;
+  }
   return i;
 }
 
@@ -203,6 +207,8 @@ rfbClientIteratorHead(rfbClientIteratorPtr i)
 rfbClientPtr
 rfbClientIteratorNext(rfbClientIteratorPtr i)
 {
+  if (!i)
+    return NULL;
   if(i->next == 0) {
     LOCK(rfbClientListMutex);
     i->next = i->screen->clientHead;
@@ -227,7 +233,7 @@ rfbClientIteratorNext(rfbClientIteratorPtr i)
 void
 rfbReleaseClientIterator(rfbClientIteratorPtr iterator)
 {
-  if(iterator->next) rfbDecrClientRef(iterator->next);
+  if(iterator && iterator->next) rfbDecrClientRef(iterator->next);
   free(iterator);
 }
 
@@ -307,6 +313,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     rfbProtocolExtension* extension;
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
+
+    if (!cl)
+        return NULL;
 
     cl->screen = rfbScreen;
     cl->sock = sock;
@@ -719,12 +728,14 @@ rfbClientSendString(rfbClientPtr cl, const char *reason)
     rfbLog("rfbClientSendString(\"%s\")\n", reason);
 
     buf = (char *)malloc(4 + len);
-    ((uint32_t *)buf)[0] = Swap32IfLE(len);
-    memcpy(buf + 4, reason, len);
+    if (buf) {
+        ((uint32_t *)buf)[0] = Swap32IfLE(len);
+        memcpy(buf + 4, reason, len);
 
-    if (rfbWriteExact(cl, buf, 4 + len) < 0)
-        rfbLogPerror("rfbClientSendString: write");
-    free(buf);
+        if (rfbWriteExact(cl, buf, 4 + len) < 0)
+            rfbLogPerror("rfbClientSendString: write");
+        free(buf);
+    }
 
     rfbCloseClient(cl);
 }
@@ -744,13 +755,15 @@ rfbClientConnFailed(rfbClientPtr cl,
     rfbLog("rfbClientConnFailed(\"%s\")\n", reason);
 
     buf = (char *)malloc(8 + len);
-    ((uint32_t *)buf)[0] = Swap32IfLE(rfbConnFailed);
-    ((uint32_t *)buf)[1] = Swap32IfLE(len);
-    memcpy(buf + 8, reason, len);
+    if (buf) {
+        ((uint32_t *)buf)[0] = Swap32IfLE(rfbConnFailed);
+        ((uint32_t *)buf)[1] = Swap32IfLE(len);
+        memcpy(buf + 8, reason, len);
 
-    if (rfbWriteExact(cl, buf, 8 + len) < 0)
-        rfbLogPerror("rfbClientConnFailed: write");
-    free(buf);
+        if (rfbWriteExact(cl, buf, 8 + len) < 0)
+            rfbLogPerror("rfbClientConnFailed: write");
+        free(buf);
+    }
 
     rfbCloseClient(cl);
 }
@@ -1719,6 +1732,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
               length = strlen(buffer);
               if (DB) rfbLog("rfbProcessFileTransfer() buffer is now: \"%s\"\n", buffer);
             }
+        } else {
+            statbuf.st_size = 0;
         }
 
         /* The viewer supports compression if size==1 */

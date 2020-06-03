@@ -127,7 +127,7 @@ rfbDecryptPasswdFromFile(char *fname)
     unsigned char *passwd = (unsigned char *)malloc(9);
     int out_len;
 
-    if ((fp = fopen(fname,"r")) == NULL) {
+    if (!passwd || (fp = fopen(fname,"r")) == NULL) {
 	free(passwd);
 	return NULL;
     }

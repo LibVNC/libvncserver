@@ -33,6 +33,7 @@ void sraSpanListDestroy(sraSpanList *list);
 static sraSpan *
 sraSpanCreate(int start, int end, const sraSpanList *subspan) {
   sraSpan *item = (sraSpan*)malloc(sizeof(sraSpan));
+  if (!item) return NULL;
   item->_next = item->_prev = NULL;
   item->start = start;
   item->end = end;
@@ -50,24 +51,30 @@ sraSpanDup(const sraSpan *src) {
 
 static void
 sraSpanInsertAfter(sraSpan *newspan, sraSpan *after) {
-  newspan->_next = after->_next;
-  newspan->_prev = after;
-  after->_next->_prev = newspan;
-  after->_next = newspan;
+  if(newspan && after) {
+    newspan->_next = after->_next;
+    newspan->_prev = after;
+    after->_next->_prev = newspan;
+    after->_next = newspan;
+  }
 }
 
 static void
 sraSpanInsertBefore(sraSpan *newspan, sraSpan *before) {
-  newspan->_next = before;
-  newspan->_prev = before->_prev;
-  before->_prev->_next = newspan;
-  before->_prev = newspan;
+  if(newspan && before) {
+    newspan->_next = before;
+    newspan->_prev = before->_prev;
+    before->_prev->_next = newspan;
+    before->_prev = newspan;
+  }
 }
 
 static void
 sraSpanRemove(sraSpan *span) {
-  span->_prev->_next = span->_next;
-  span->_next->_prev = span->_prev;
+  if(span) {
+    span->_prev->_next = span->_next;
+    span->_next->_prev = span->_prev;
+  }
 }
 
 static void
@@ -117,6 +124,7 @@ sraSpanPrint(const sraSpan *s) {
 static sraSpanList *
 sraSpanListCreate(void) {
   sraSpanList *item = (sraSpanList*)malloc(sizeof(sraSpanList));
+  if (!item) return NULL;
   item->front._next = &(item->back);
   item->front._prev = NULL;
   item->back._prev = &(item->front);
