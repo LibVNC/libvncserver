@@ -55,7 +55,7 @@ static char *vnc_connection_addr_to_string(char *host, int port)
 {
     char * buf = (char *)malloc(strlen(host) + 7);
     if (buf) {
-        sprintf(buf, "%s;%hu", host, port);
+        sprintf(buf, "%s;%hu", host, (unsigned short)port);
     }
     return buf;
 }
@@ -126,7 +126,7 @@ static int password_callback_adapt(sasl_conn_t *conn,
        return SASL_FAIL;
    }
 
-   strcpy(lsec->data, password);
+   strcpy((char *)lsec->data, password);
    lsec->len = strlen(password);
    client->saslSecret = lsec;
    *secret = lsec;

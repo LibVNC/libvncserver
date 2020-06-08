@@ -265,7 +265,7 @@ static void SetAlphaCursor(rfbScreenInfoPtr screen,int mode)
 		}
 	if(c->cleanupMask)
 		free(c->mask);
-	c->mask=rfbMakeMaskFromAlphaSource(c->width,c->height,c->alphaSource);
+	c->mask=(unsigned char*)rfbMakeMaskFromAlphaSource(c->width,c->height,c->alphaSource);
 	c->cleanupMask=TRUE;
 }
 
