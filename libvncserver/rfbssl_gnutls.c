@@ -90,7 +90,7 @@ struct rfbssl_ctx *rfbssl_init_global(char *key, char *cert)
     struct rfbssl_ctx *ctx = NULL;
 
     if (NULL == (ctx = malloc(sizeof(struct rfbssl_ctx)))) {
-	ret = GNUTLS_E_MEMORY_ERROR;
+	return NULL;
     } else if (GNUTLS_E_SUCCESS != (ret = gnutls_global_init())) {
 	/* */
     } else if (GNUTLS_E_SUCCESS != (ret = gnutls_certificate_allocate_credentials(&ctx->x509_cred))) {
