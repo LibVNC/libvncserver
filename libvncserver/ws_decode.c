@@ -258,11 +258,10 @@ hybiReadHeader(ws_ctx_t *wsctx, int *sockRet, int *nPayload)
     goto ret_header_pending;
   }
 
-  char *h = wsctx->codeBufDecode;
   int i;
   ws_dbg("Header:\n");
   for (i=0; i <10; i++) {
-    ws_dbg("0x%02X\n", (unsigned char)h[i]);
+    ws_dbg("0x%02X\n", (unsigned char)wsctx->codeBufDecode[i]);
   }
   ws_dbg("\n");
 

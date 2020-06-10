@@ -169,7 +169,6 @@ HandleSASLAuth(rfbClient *client)
     char *mechlist;
     char *wantmech;
     const char *mechname;
-    rfbBool ret;
 
     client->saslconn = NULL;
 

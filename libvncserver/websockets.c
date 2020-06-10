@@ -169,9 +169,8 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
 {
     char *buf, *response, *line;
     int n, linestart = 0, len = 0, llen, base64 = FALSE;
-    char prefix[5], trailer[17];
     char *path = NULL, *host = NULL, *origin = NULL, *protocol = NULL;
-    char *key1 = NULL, *key2 = NULL, *key3 = NULL;
+    char *key1 = NULL, *key2 = NULL;
     char *sec_ws_origin = NULL;
     char *sec_ws_key = NULL;
     char sec_ws_version = 0;
@@ -225,8 +224,6 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                         free(buf);
                         return FALSE;
                     }
-                    rfbLog("Got key3\n");
-                    key3 = buf+len;
                     len += 8;
                 } else {
                     buf[len] = '\0';
