@@ -797,7 +797,9 @@ DLLEXPORT int DLLCALL tjDecompress2(tjhandle handle, unsigned char *jpegBuf,
 	}
 	if(scaledw>width || scaledh>height)
 		_throw("tjDecompress2(): Could not scale down to desired image dimensions");
+	#ifndef JCS_EXTENSIONS
 	width=scaledw;  height=scaledh;
+	#endif
 	dinfo->scale_num=sf[i].num;
 	dinfo->scale_denom=sf[i].denom;
 
