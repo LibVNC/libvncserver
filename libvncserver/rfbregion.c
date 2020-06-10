@@ -151,26 +151,22 @@ sraSpanListDup(const sraSpanList *src) {
 
 void
 sraSpanListDestroy(sraSpanList *list) {
-  sraSpan *curr, *next;
+  sraSpan *curr;
   while (list->front._next != &(list->back)) {
     curr = list->front._next;
-    next = curr->_next;
     sraSpanRemove(curr);
     sraSpanDestroy(curr);
-    curr = next;
   }
   free(list);
 }
 
 static void
 sraSpanListMakeEmpty(sraSpanList *list) {
-  sraSpan *curr, *next;
+  sraSpan *curr;
   while (list->front._next != &(list->back)) {
     curr = list->front._next;
-    next = curr->_next;
     sraSpanRemove(curr);
     sraSpanDestroy(curr);
-    curr = next;
   }
   list->front._next = &(list->back);
   list->front._prev = NULL;
