@@ -53,11 +53,11 @@ typedef unsigned int uid_t;
 #endif /* WIN32 */
 
 
-pthread_mutex_t fileDownloadMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t fileDownloadMutex = PTHREAD_MUTEX_INITIALIZER;
 
-rfbBool fileTransferEnabled = TRUE;
-rfbBool fileTransferInitted = FALSE;
-char ftproot[PATH_MAX];
+static rfbBool fileTransferEnabled = TRUE;
+static rfbBool fileTransferInitted = FALSE;
+static char ftproot[PATH_MAX];
 
 
 /******************************************************************************
