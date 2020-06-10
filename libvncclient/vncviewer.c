@@ -507,7 +507,6 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 
 void rfbClientCleanup(rfbClient* client) {
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
   int i;
 
   for ( i = 0; i < 4; i++ ) {
@@ -523,7 +522,6 @@ void rfbClientCleanup(rfbClient* client) {
 	client->decompStream.msg != NULL)
       rfbClientLog("inflateEnd: %s\n", client->decompStream.msg );
   }
-#endif
 #endif
 
   if (client->ultra_buffer)
