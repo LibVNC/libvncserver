@@ -48,12 +48,7 @@ static rfbBool DummyPoint(rfbClient* client, int x, int y) {
 static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 }
 
-#ifdef WIN32
-static char* NoPassword(rfbClient* client) {
-  return strdup("");
-}
-#else
-#include <stdio.h>
+#ifndef WIN32
 #include <termios.h>
 #endif
 
