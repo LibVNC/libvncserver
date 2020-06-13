@@ -68,6 +68,7 @@ static char* ReadPassword(rfbClient* client) {
 	if(tcsetattr(fileno(stdin),TCSAFLUSH,&noecho)!=0) return p;
 #endif
 	fprintf(stderr,"Password: ");
+	fflush(stderr);
 	i=0;
 	while(1) {
 		int c=fgetc(stdin);
