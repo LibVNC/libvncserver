@@ -1,7 +1,7 @@
-# 2020-06-xx: Version 0.9.13
+# 2020-06-13: Version 0.9.13
 
 0.9.13 truly is a cross-platform release, the best we've ever done in that respect:
-Out of the [46 issues](https://github.com/LibVNC/libvncserver/issues?q=is%3Aclosed+milestone%3A%22Release+0.9.13%22)
+Out of the [49 issues](https://github.com/LibVNC/libvncserver/issues?q=is%3Aclosed+milestone%3A%22Release+0.9.13%22)
 closed with this release, 20 alone were related to MS Windows. The result is that 0.9.13
 is the first release with full support for Microsoft Windows! The cross-platform focused
 work did not end there tough: MacOS support was brought up from barebones to a fully working
