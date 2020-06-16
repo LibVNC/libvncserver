@@ -566,8 +566,10 @@ rfbClientConnectionGone(rfbClientPtr cl)
     }
 #endif
 
-    if(cl->sock != RFB_INVALID_SOCKET)
-	rfbCloseSocket(cl->sock);
+    if (!cl->screen->external_socket_management) {
+      if(cl->sock != RFB_INVALID_SOCKET)
+        rfbCloseSocket(cl->sock);
+    }
 
     if (cl->scaledScreen!=NULL)
         cl->scaledScreen->scaledScreenRefCount--;

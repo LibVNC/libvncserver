@@ -302,7 +302,8 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
     rfbScreen->socketState = RFB_SOCKET_SHUTDOWN;
 
     if(rfbScreen->inetdSock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->inetdSock);
+	if (!rfbScreen->external_socket_management)
+	  rfbCloseSocket(rfbScreen->inetdSock);
 	FD_CLR(rfbScreen->inetdSock,&rfbScreen->allFds);
 	rfbScreen->inetdSock=RFB_INVALID_SOCKET;
     }
@@ -567,9 +568,11 @@ rfbCloseClient(rfbClientPtr cl)
 	free(cl->wspath);
 #endif
 #ifndef __MINGW32__
-	shutdown(cl->sock,SHUT_RDWR);
+	if (!cl->screen->external_socket_management)
+	  shutdown(cl->sock,SHUT_RDWR);
 #endif
-	rfbCloseSocket(cl->sock);
+	if (!cl->screen->external_socket_management)
+	  rfbCloseSocket(cl->sock);
 	cl->sock = RFB_INVALID_SOCKET;
       }
     TSIGNAL(cl->updateCond);

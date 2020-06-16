@@ -251,6 +251,7 @@ typedef struct _rfbClient {
 	int serverPort; /**< if -1, then use file recorded by vncrec */
 	rfbBool listenSpecified;
 	int listenPort, flashPort;
+	rfbBool external_socket_management;
 
 	struct {
 		int x, y, w, h;

@@ -963,6 +963,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    screen->permitFileTransfer = FALSE;
 
+   screen->external_socket_management = FALSE;
+
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);
      return NULL;

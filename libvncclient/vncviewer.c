@@ -350,6 +350,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->listen6Sock = RFB_INVALID_SOCKET;
   client->listen6Address = NULL;
   client->clientAuthSchemes = NULL;
+  client->external_socket_management = FALSE;
 
 #ifdef LIBVNCSERVER_HAVE_SASL
   client->GetSASLMechanism = NULL;
@@ -534,8 +535,10 @@ void rfbClientCleanup(rfbClient* client) {
     client->clientData = next;
   }
 
-  if (client->sock != RFB_INVALID_SOCKET)
-    rfbCloseSocket(client->sock);
+  if (!client->external_socket_management) {
+    if (client->sock != RFB_INVALID_SOCKET)
+      rfbCloseSocket(client->sock);
+  }
   if (client->listenSock != RFB_INVALID_SOCKET)
     rfbCloseSocket(client->listenSock);
   free(client->desktopName);

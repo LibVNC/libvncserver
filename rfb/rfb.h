@@ -360,6 +360,8 @@ typedef struct _rfbScreenInfo
 	of file descriptors LibVNCServer uses before denying new client connections.
 	It is set to 0.5 per default. */
     float fdQuota;
+    /** External sockets management system, do not shutdown or close sockets. */
+    rfbBool external_socket_management;
 
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
