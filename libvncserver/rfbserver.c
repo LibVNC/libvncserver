@@ -554,7 +554,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
     UNLOCK(rfbClientListMutex);
 
 #if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
-    if(cl->screen->backgroundLoop) {
+    if (cl->screen->backgroundLoop) {
       int i;
       do {
 	LOCK(cl->refCountMutex);
@@ -626,7 +626,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
     TINI_MUTEX(cl->sendMutex);
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-    if(cl->screen->backgroundLoop != FALSE) {
+    if (cl->screen->backgroundLoop) {
         close(cl->pipe_notify_client_thread[0]);
         close(cl->pipe_notify_client_thread[1]);
     }
