@@ -5,10 +5,11 @@
 
 # expects install prefix like /usr as an argument
 PREFIX=$1
+CMAKE_MAKE_PROGRAM=$2
 
 TMPDIR=$(mktemp -d)
 
-make install DESTDIR=$TMPDIR
+DESTDIR="$TMPDIR" $CMAKE_MAKE_PROGRAM install
 
 echo \
 "
@@ -19,6 +20,6 @@ int main()
 {
     return 0;
 }
-" > $TMPDIR/includetest.c
+" > "$TMPDIR"/includetest.c
 
-cc -I $TMPDIR/$PREFIX $TMPDIR/includetest.c
+cc -I "$TMPDIR/$PREFIX" "$TMPDIR"/includetest.c
