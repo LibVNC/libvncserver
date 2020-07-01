@@ -24,7 +24,20 @@ least, 0.9.13 comes with the usual assortment of bugfixes and security improveme
 	Microsoft Windows. Building is supported with Visual Studio as well as MingGW.
   * The separate crypto routines used by LibVNCClient and LibVNCServer were refactored
 	into an implementation common to both libraries.
-  * Several security issues got fixed.
+  * Several security issues got fixed, namely:
+     - CVE-2018-21247: When connecting to a repeater, only send initialised string
+     - CVE-2019-20839: libvncclient: bail out if unix socket name would overflow
+     - CVE-2019-20840: fix crash because of unaligned accesses in hybiReadAndDecode()
+     - CVE-2020-14396: libvncclient/tls_openssl: do not deref a NULL pointer
+     - CVE-2020-14397: libvncserver: add missing NULL pointer checks
+     - CVE-2020-14398: libvncclient: handle half-open TCP connections
+     - CVE-2020-14399: libvncclient: fix pointer aliasing/alignment issue
+     - CVE-2020-14400: libvncserver: fix pointer aliasing/alignment issue
+     - CVE-2020-14401: libvncserver: scale: cast to 64 bit before shifting
+     - CVE-2020-14402: libvncserver: encodings: prevent OOB accesses
+     - CVE-2020-14403: encodings: prevent OOB accesses
+     - CVE-2020-14404: libvncserver: encodings: prevent OOB accesses
+     - CVE-2020-14405: libvncclient/rfbproto: limit max textchat size
   * The bundled noVNC client is now at version 1.1.0 and included via a git submodule.
 
 ## LibVNCClient:
