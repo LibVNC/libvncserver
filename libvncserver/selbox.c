@@ -245,6 +245,8 @@ int rfbSelectBox(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
    selData.okY = y2-border;
 
    frameBufferBackup = (char*)malloc(bpp*(x2-x1)*(y2-y1));
+   if (!frameBufferBackup)
+       return(-1);
 
    selData.state = SELECTING;
    selData.screen = rfbScreen;

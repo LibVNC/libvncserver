@@ -152,8 +152,7 @@ static void doptr(int buttonMask,int x,int y,rfbClientPtr cl)
 	 /* we could get a selection like that:
 	  rfbGotXCutText(cl->screen,"Hallo",5);
 	  */
-      } else
-	cd->oldButton=0;
+      }
 
       cd->oldx=x; cd->oldy=y; cd->oldButton=buttonMask;
    }
@@ -227,7 +226,7 @@ static char exampleXCursor[]=
 static void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
 {
   int i,j,w=32,h=32;
-  rfbCursorPtr c = rfbScreen->cursor;
+  rfbCursorPtr c;
   char bitmap[]=
     "                                "
     "              xxxxxx            "
@@ -265,6 +264,8 @@ static void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
   c->xhot = 16; c->yhot = 24;
 
   c->richSource = (unsigned char*)malloc(w*h*bpp);
+  if(!c->richSource)
+      return;
   c->cleanupRichSource = TRUE;
   for(j=0;j<h;j++) {
     for(i=0;i<w;i++) {
@@ -282,7 +283,7 @@ int main(int argc,char** argv)
 {
   rfbScreenInfoPtr rfbScreen = rfbGetScreen(&argc,argv,maxx,maxy,8,3,bpp);
   if(!rfbScreen)
-    return 0;
+    return 1;
   rfbScreen->desktopName = "LibVNCServer Example";
   rfbScreen->frameBuffer = (char*)malloc(maxx*maxy*bpp);
   rfbScreen->alwaysShared = TRUE;
@@ -320,8 +321,8 @@ int main(int argc,char** argv)
   rfbRunEventLoop(rfbScreen,40000,FALSE);
 #endif /* OWN LOOP */
 #else
-#if !defined(LIBVNCSERVER_HAVE_LIBPTHREAD)
-#error "I need pthreads for that."
+#if !defined(LIBVNCSERVER_HAVE_LIBPTHREAD) && !defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+#error "I need pthreads or win32 threads for that."
 #endif
 
   /* this is the non-blocking event loop; a background thread is started */

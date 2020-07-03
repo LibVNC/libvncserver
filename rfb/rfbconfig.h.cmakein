@@ -9,6 +9,9 @@
 /* work around when write() returns ENOENT but does not mean it */
 #cmakedefine LIBVNCSERVER_ENOENT_WORKAROUND 1
 
+/* Define to 1 if you have the <dirent.h> header file. */
+#cmakedefine LIBVNCSERVER_HAVE_DIRENT_H 1
+
 /* Define to 1 if you have the <endian.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_ENDIAN_H 1
 
@@ -69,6 +72,9 @@
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #cmakedefine LIBVNCSERVER_HAVE_LIBPTHREAD  1 
 
+/* Define to 1 if you have win32 threads. */
+#cmakedefine LIBVNCSERVER_HAVE_WIN32THREADS 1
+
 /* Define to 1 if you have the `z' library (-lz). */
 #cmakedefine LIBVNCSERVER_HAVE_LIBZ  1 
 
@@ -98,6 +104,9 @@
 
 /* Define to 1 if you have <sys/uio.h> */
 #cmakedefine LIBVNCSERVER_HAVE_SYS_UIO_H  1 
+
+/* Define to 1 if you have <sys/resource.h> */
+#cmakedefine LIBVNCSERVER_HAVE_SYS_RESOURCE_H  1
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_UNISTD_H  1 
@@ -133,17 +142,17 @@
 #cmakedefine LIBVNCSERVER_NEED_INADDR_T 1
 
 /* Define to the full name and version of this package. */
-#define LIBVNCSERVER_PACKAGE_STRING  "@FULL_PACKAGE_NAME@ @PACKAGE_VERSION@"
+#define LIBVNCSERVER_PACKAGE_STRING  "@FULL_PACKAGE_NAME@ @LibVNCServer_VERSION@"
 
 /* Define to the version of this package. */
-#define LIBVNCSERVER_PACKAGE_VERSION  "@PACKAGE_VERSION@"
-#define LIBVNCSERVER_VERSION "@PACKAGE_VERSION@"
-#define LIBVNCSERVER_VERSION_MAJOR "@VERSION_MAJOR@"
-#define LIBVNCSERVER_VERSION_MINOR "@VERSION_MINOR@"
-#define LIBVNCSERVER_VERSION_PATCHLEVEL "@VERSION_PATCHLEVEL@"
+#define LIBVNCSERVER_PACKAGE_VERSION  "@LibVNCServer_VERSION@"
+#define LIBVNCSERVER_VERSION "@LibVNCServer_VERSION@"
+#define LIBVNCSERVER_VERSION_MAJOR "@LibVNCServer_VERSION_MAJOR@"
+#define LIBVNCSERVER_VERSION_MINOR "@LibVNCServer_VERSION_MINOR@"
+#define LIBVNCSERVER_VERSION_PATCHLEVEL "@LibVNCServer_VERSION_PATCH@"
 
 /* Define to 1 if libgcrypt is present */
-#cmakedefine LIBVNCSERVER_WITH_CLIENT_GCRYPT 1
+#cmakedefine LIBVNCSERVER_HAVE_LIBGCRYPT 1
 
 /* Define to 1 if GnuTLS is present */
 #cmakedefine LIBVNCSERVER_HAVE_GNUTLS 1

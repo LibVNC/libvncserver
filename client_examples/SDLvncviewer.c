@@ -1,5 +1,6 @@
 /**
  * @example SDLvncviewer.c
+ * Once built, you can run it via `SDLvncviewer <remote-host>`.
  */
 
 #include <SDL.h>

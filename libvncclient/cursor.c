@@ -28,6 +28,8 @@
 #define OPER_SAVE     0
 #define OPER_RESTORE  1
 
+#define MAX_CURSOR_SIZE 1024
+
 #define RGB24_TO_PIXEL(bpp,r,g,b)                                       \
    ((((uint##bpp##_t)(r) & 0xFF) * client->format.redMax + 127) / 255             \
     << client->format.redShift |                                              \
@@ -53,6 +55,9 @@ rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int h
 
   if (width * height == 0)
     return TRUE;
+
+  if (width >= MAX_CURSOR_SIZE || height >= MAX_CURSOR_SIZE)
+    return FALSE;
 
   /* Allocate memory for pixel data and temporary mask data. */
   if(client->rcSource)

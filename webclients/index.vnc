@@ -1,5 +1,5 @@
-<!-- index.vnc - default html page for Java VNC viewer applet.  On any file
-     ending in .vnc, the HTTP server embedded in Xvnc will substitute the
+<!-- index.vnc - VNC viewer template page.  On any file ending in .vnc,
+     the HTTP server embedded in LibVNCServer will substitute the
      following variables when preceded by a dollar: USER, DESKTOP, DISPLAY,
      APPLETWIDTH, APPLETHEIGHT, WIDTH, HEIGHT, PORT, PARAMS.  Use two dollar
      signs ($$) to get a dollar sign in the generated html. -->
@@ -10,18 +10,14 @@
 $USER's $DESKTOP desktop ($DISPLAY)
 </TITLE>
 </head> 
-<APPLET CODE=VncViewer.class ARCHIVE=java-applet/VncViewer.jar
-        WIDTH=$APPLETWIDTH HEIGHT=$APPLETHEIGHT>
-<param name=PORT value=$PORT>
-<param name="Open New Window" value=yes>
-</APPLET>
+<br/>
+This page shows how to connect to a VNC server with a web browser. The buttons below
+fire up an instance of the <a href="https://novnc.com/">noVNC</a> HTML5 viewer.
 <br/>
 <br/>
-
-If the above Java applet does not work, you can also try the new JavaScript-only <a href="https://novnc.com/">noVNC</a> viewer. You will need a HTML5-capable browser though.
 <script language="JavaScript">
     <!--
-    function start_novnc(){
+    function start_novnc(do_encrypt){
 	var host = document.location.hostname;
 	// If there are at least two colons in there, it is likely an IPv6 address. Check for square brackets and add them if missing.
 	if(host.search(/^.*:.*:.*$/) != -1) {
@@ -30,13 +26,17 @@ If the above Java applet does not work, you can also try the new JavaScript-only
 	   if(host.charAt(host.length-1) != "]")
 	      host = host + "]";
 	}
-	open("novnc/vnc.html?autoconnect=true&host=" + host + "&port=$PORT");
+	open("novnc/vnc.html?autoconnect=true&host=" + host + "&port=$PORT&encrypt=" + (do_encrypt ? "1" : "0"));
     }
     -->
 </script>
 <form name="novnc_button_form">
-  <input type="button" name="novnc_button" value="Click here to connect using noVNC" onClick='start_novnc()'>
+  <input type="button" name="novnc_button" value="Click here to connect using noVNC" onClick='start_novnc(false)'>
 </form>
+<form name="novnc_button_form">
+  <input type="button" name="novnc_button" value="Click here to connect using noVNC using an encrypted connection" onClick='start_novnc(true)'>
+</form>
+
 
 <br/>
 <br/>

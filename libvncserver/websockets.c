@@ -50,7 +50,7 @@
 #endif
 #include "rfb/rfbconfig.h"
 #include "rfbssl.h"
-#include "rfbcrypto.h"
+#include "crypto.h"
 #include "ws_decode.h"
 #include "base64.h"
 
@@ -106,14 +106,11 @@ min (int a, int b) {
 
 static void webSocketsGenSha1Key(char *target, int size, char *key)
 {
-    struct iovec iov[2];
-    unsigned char hash[20];
-
-    iov[0].iov_base = key;
-    iov[0].iov_len = strlen(key);
-    iov[1].iov_base = GUID;
-    iov[1].iov_len = sizeof(GUID) - 1;
-    digestsha1(iov, 2, hash);
+    unsigned char hash[SHA1_HASH_SIZE];
+    char tmp[strlen(key) + sizeof(GUID) - 1];
+    memcpy(tmp, key, strlen(key));
+    memcpy(tmp + strlen(key), GUID, sizeof(GUID) - 1);
+    hash_sha1(hash, tmp, sizeof(tmp));
     if (-1 == rfbBase64NtoP(hash, sizeof(hash), target, size))
 	rfbErr("rfbBase64NtoP failed\n");
 }
@@ -171,10 +168,9 @@ static rfbBool
 webSocketsHandshake(rfbClientPtr cl, char *scheme)
 {
     char *buf, *response, *line;
-    int n, linestart = 0, len = 0, llen, base64 = TRUE;
-    char prefix[5], trailer[17];
+    int n, linestart = 0, len = 0, llen, base64 = FALSE;
     char *path = NULL, *host = NULL, *origin = NULL, *protocol = NULL;
-    char *key1 = NULL, *key2 = NULL, *key3 = NULL;
+    char *key1 = NULL, *key2 = NULL;
     char *sec_ws_origin = NULL;
     char *sec_ws_key = NULL;
     char sec_ws_version = 0;
@@ -215,7 +211,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         if (((llen >= 2)) && (buf[len-1] == '\n')) {
             line = buf+linestart;
             if ((llen == 2) && (strncmp("\r\n", line, 2) == 0)) {
-                if (key1 && key2) {
+                if (key1 && key2 && len+8 < WEBSOCKETS_MAX_HANDSHAKE_LEN) {
                     if ((n = rfbReadExact(cl, buf+len, 8)) <= 0) {
                         if ((n < 0) && (errno == ETIMEDOUT)) {
                             break;
@@ -228,8 +224,6 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                         free(buf);
                         return FALSE;
                     }
-                    rfbLog("Got key3\n");
-                    key3 = buf+len;
                     len += 8;
                 } else {
                     buf[len] = '\0';
@@ -294,15 +288,14 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         return FALSE;
     }
 
-    if ((protocol) && (strstr(protocol, "binary"))) {
-        rfbLog("  - webSocketsHandshake: using binary/raw encoding\n");
-        base64 = FALSE;
-        protocol = "binary";
-    } else {
+    if ((protocol) && (strstr(protocol, "base64"))) {
         rfbLog("  - webSocketsHandshake: using base64 encoding\n");
         base64 = TRUE;
-        if ((protocol) && (strstr(protocol, "base64"))) {
-            protocol = "base64";
+        protocol = "base64";
+    } else {
+        rfbLog("  - webSocketsHandshake: using binary/raw encoding\n");
+        if ((protocol) && (strstr(protocol, "binary"))) {
+            protocol = "binary";
         } else {
             protocol = "";
         }
@@ -335,6 +328,10 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     free(buf);
 
     wsctx = calloc(1, sizeof(ws_ctx_t));
+    if (!wsctx) {
+        rfbErr("webSocketsHandshake: could not allocate memory for context\n");
+        return FALSE;
+    }
     wsctx->encode = webSocketsEncodeHybi;
     wsctx->decode = webSocketsDecodeHybi;
     wsctx->ctxInfo.readFunc = ws_read;

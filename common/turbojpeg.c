@@ -616,7 +616,7 @@ DLLEXPORT int DLLCALL tjCompress(tjhandle handle, unsigned char *srcBuf,
 	int width, int pitch, int height, int pixelSize, unsigned char *jpegBuf,
 	unsigned long *jpegSize, int jpegSubsamp, int jpegQual, int flags)
 {
-	int retval=0;  unsigned long size;
+	int retval=0;  unsigned long size = 0;
 	retval=tjCompress2(handle, srcBuf, width, pitch, height,
 		getPixelFormat(pixelSize, flags), &jpegBuf, &size, jpegSubsamp, jpegQual,
 		flags);
@@ -797,7 +797,9 @@ DLLEXPORT int DLLCALL tjDecompress2(tjhandle handle, unsigned char *jpegBuf,
 	}
 	if(scaledw>width || scaledh>height)
 		_throw("tjDecompress2(): Could not scale down to desired image dimensions");
+	#ifndef JCS_EXTENSIONS
 	width=scaledw;  height=scaledh;
+	#endif
 	dinfo->scale_num=sf[i].num;
 	dinfo->scale_denom=sf[i].denom;
 

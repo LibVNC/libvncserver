@@ -58,12 +58,16 @@ rfbSendOneRectEncodingUltra(rfbClientPtr cl,
 
     maxRawSize = (w * h * (cl->format.bitsPerPixel / 8));
 
-    if (cl->beforeEncBufSize < maxRawSize) {
-	cl->beforeEncBufSize = maxRawSize;
-	if (cl->beforeEncBuf == NULL)
-	    cl->beforeEncBuf = (char *)malloc(cl->beforeEncBufSize);
-	else
-	    cl->beforeEncBuf = (char *)realloc(cl->beforeEncBuf, cl->beforeEncBufSize);
+    if (!cl->beforeEncBuf || cl->beforeEncBufSize < maxRawSize) {
+        if (cl->beforeEncBuf == NULL)
+            cl->beforeEncBuf = (char *)malloc(maxRawSize);
+        else {
+            char *reallocedBeforeEncBuf = (char *)realloc(cl->beforeEncBuf, maxRawSize);
+            if (!reallocedBeforeEncBuf) return FALSE;
+            cl->beforeEncBuf = reallocedBeforeEncBuf;
+        }
+        if(cl->beforeEncBuf)
+            cl->beforeEncBufSize = maxRawSize;
     }
 
     /*
@@ -72,12 +76,22 @@ rfbSendOneRectEncodingUltra(rfbClientPtr cl,
      */
     maxCompSize = (maxRawSize + maxRawSize / 16 + 64 + 3);
 
-    if (cl->afterEncBufSize < (int)maxCompSize) {
-	cl->afterEncBufSize = maxCompSize;
-	if (cl->afterEncBuf == NULL)
-	    cl->afterEncBuf = (char *)malloc(cl->afterEncBufSize);
-	else
-	    cl->afterEncBuf = (char *)realloc(cl->afterEncBuf, cl->afterEncBufSize);
+    if (!cl->afterEncBuf || cl->afterEncBufSize < (int)maxCompSize) {
+        if (cl->afterEncBuf == NULL)
+            cl->afterEncBuf = (char *)malloc(maxCompSize);
+        else {
+            char *reallocedAfterEncBuf = (char *)realloc(cl->afterEncBuf, maxCompSize);
+            if (!reallocedAfterEncBuf) return FALSE;
+            cl->afterEncBuf = reallocedAfterEncBuf;
+        }
+        if(cl->afterEncBuf)
+            cl->afterEncBufSize = maxCompSize;
+    }
+
+    if (!cl->beforeEncBuf || !cl->afterEncBuf)
+    {
+        rfbLog("rfbSendOneRectEncodingUltra: failed to allocate memory\n");
+        return FALSE;
     }
 
     /* 
@@ -96,7 +110,7 @@ rfbSendOneRectEncodingUltra(rfbClientPtr cl,
     }
 
     /* Perform the compression here. */
-    deflateResult = lzo1x_1_compress((unsigned char *)cl->beforeEncBuf, (lzo_uint)(w * h * (cl->format.bitsPerPixel / 8)), (unsigned char *)cl->afterEncBuf, &maxCompSize, cl->lzoWrkMem);
+    deflateResult = lzo1x_1_compress((unsigned char *)cl->beforeEncBuf, (lzo_uint)w * h * (cl->format.bitsPerPixel / 8), (unsigned char *)cl->afterEncBuf, &maxCompSize, cl->lzoWrkMem);
     /* maxCompSize now contains the compressed size */
 
     /* Find the total size of the resulting compressed data. */

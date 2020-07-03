@@ -19,6 +19,14 @@
  *  USA.
  */
 
+/**
+  @example storepasswd.c
+  storepasswd is the original program to save a vnc style password in a file.
+  Unfortunately, authentication as every vncviewer speaks it means the server
+  has to know the plain password. You really should tunnel via ssh or use
+  your own PasswordCheck to build a PIN/TAN system.
+ */
+
 #include <stdio.h>
 #include <rfb/rfb.h>
 

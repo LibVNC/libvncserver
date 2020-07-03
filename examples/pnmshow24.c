@@ -1,5 +1,9 @@
 /**
- * @example pnmshow24.c
+   @example pnmshow24.c
+   pnmshow24 is like pnmshow, but it uses 3 bytes/pixel internally, which is not
+   as efficient as 4 bytes/pixel for translation, because there is no native data
+   type of that size, so you have to memcpy pixels and be real cautious with
+   endianness. Anyway, it works.
  */
 
 #include <stdio.h>
@@ -61,7 +65,7 @@ int main(int argc,char** argv)
   /* initialize data for vnc server */
   rfbScreen = rfbGetScreen(&argc,argv,paddedWidth,height,8,3,3);
   if(!rfbScreen)
-    return 0;
+    return 1;
   if(argc>1)
     rfbScreen->desktopName = argv[1];
   else
@@ -74,6 +78,8 @@ int main(int argc,char** argv)
 
   /* allocate picture and read it */
   rfbScreen->frameBuffer = (char*)malloc(paddedWidth*3*height);
+  if(!rfbScreen->frameBuffer)
+    return 1;
   fread(rfbScreen->frameBuffer,width*3,height,in);
   fclose(in);
 

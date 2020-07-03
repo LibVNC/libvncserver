@@ -25,14 +25,15 @@
 #define true -1
 #endif
 
+#ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+
 #ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
 
-#ifndef WIN32
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
+#ifdef LIBVNCSERVER_HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
 
@@ -41,7 +42,7 @@
 
 static int extMutex_initialized = 0;
 static int logMutex_initialized = 0;
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 static MUTEX(logMutex);
 static MUTEX(extMutex);
 #endif
@@ -171,6 +172,8 @@ rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
 			return FALSE;
 
 	extData = calloc(sizeof(rfbExtensionData),1);
+	if(!extData)
+		return FALSE;
 	extData->extension = extension;
 	extData->data = data;
 	extData->next = cl->extensions;
@@ -452,7 +455,6 @@ void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
 
 
 
-
 static void doMcast(rfbClientPtr cl)
 {
   /* Sends cursor shape, cursor position, newFBsize and copyRect updates
@@ -502,10 +504,9 @@ static void doMcast(rfbClientPtr cl)
 }
 
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-#include <unistd.h>
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 
-static void *
+static THREAD_ROUTINE_RETURN_TYPE
 clientOutput(void *data)
 {
     rfbClientPtr cl = (rfbClientPtr)data;
@@ -516,13 +517,13 @@ clientOutput(void *data)
     while (1) {
         haveUpdate = false;
         while (!haveUpdate) {
-		if (cl->sock == -1) {
+		if (cl->sock == RFB_INVALID_SOCKET) {
 			/* Client has disconnected. */
-			return NULL;
+			return THREAD_ROUTINE_RETURN_VALUE;
 		}
 		if (cl->state != RFB_NORMAL || cl->onHold) {
 			/* just sleep until things get normal */
-			usleep(cl->screen->deferUpdateTime * 1000);
+		        THREAD_SLEEP_MS(cl->screen->deferUpdateTime);
 			continue;
 		}
 
@@ -565,7 +566,7 @@ clientOutput(void *data)
 
         /* OK, now, to save bandwidth, wait a little while for more
            updates to come along. */
-        usleep(cl->screen->deferUpdateTime * 1000);
+	THREAD_SLEEP_MS(cl->screen->deferUpdateTime);
 
         /* Now, get the region we're going to update, and remove
            it from cl->modifiedRegion _before_ we send the update.
@@ -588,29 +589,35 @@ clientOutput(void *data)
     }
 
     /* Not reached. */
-    return NULL;
+    return THREAD_ROUTINE_RETURN_VALUE;
 }
 
-static void *
+static THREAD_ROUTINE_RETURN_TYPE
 clientInput(void *data)
 {
     rfbClientPtr cl = (rfbClientPtr)data;
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_t output_thread;
     pthread_create(&output_thread, NULL, clientOutput, (void *)cl);
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    uintptr_t output_thread = _beginthread(clientOutput, 0, cl);
+#endif
 
     while (1) {
 	fd_set rfds, wfds, efds;
 	struct timeval tv;
 	int n;
 
-	if (cl->sock == -1) {
+	if (cl->sock == RFB_INVALID_SOCKET) {
 	  /* Client has disconnected. */
             break;
         }
 
 	FD_ZERO(&rfds);
 	FD_SET(cl->sock, &rfds);
+#ifndef WIN32
 	FD_SET(cl->pipe_notify_client_thread[0], &rfds);
+#endif
 	FD_ZERO(&efds);
 	FD_SET(cl->sock, &efds);
 
@@ -619,8 +626,12 @@ clientInput(void *data)
 	if ((cl->fileTransfer.fd!=-1) && (cl->fileTransfer.sending==1))
 	    FD_SET(cl->sock, &wfds);
 
+#ifndef WIN32
 	int nfds = cl->pipe_notify_client_thread[0] > cl->sock ? cl->pipe_notify_client_thread[0] : cl->sock;
-	
+#else
+	int nfds = cl->sock;
+#endif
+
 	tv.tv_sec = 60; /* 1 minute */
 	tv.tv_usec = 0;
 
@@ -640,12 +651,14 @@ clientInput(void *data)
         if (FD_ISSET(cl->sock, &wfds))
             rfbSendFileTransferChunk(cl);
 
+#ifndef WIN32
 	if (FD_ISSET(cl->pipe_notify_client_thread[0], &rfds))
 	{
 	    /* Reset the pipe */
 	    char buf;
 	    while (read(cl->pipe_notify_client_thread[0], &buf, sizeof(buf)) == sizeof(buf));
 	}
+#endif
 
         if (FD_ISSET(cl->sock, &rfds) || FD_ISSET(cl->sock, &efds))
         {
@@ -663,14 +676,15 @@ clientInput(void *data)
     LOCK(cl->updateMutex);
     TSIGNAL(cl->updateCond);
     UNLOCK(cl->updateMutex);
-    IF_PTHREADS(pthread_join(output_thread, NULL));
+    THREAD_JOIN(output_thread);
 
     rfbClientConnectionGone(cl);
 
-    return NULL;
+    return THREAD_ROUTINE_RETURN_VALUE;
 }
 
-static void*
+
+static THREAD_ROUTINE_RETURN_TYPE
 listenerRun(void *data)
 {
     rfbScreenInfoPtr screen=(rfbScreenInfoPtr)data;
@@ -685,14 +699,14 @@ listenerRun(void *data)
     while (1) {
         client_fd = -1;
         FD_ZERO(&listen_fds);
-	if(screen->listenSock >= 0) 
+	if(screen->listenSock != RFB_INVALID_SOCKET)
 	  FD_SET(screen->listenSock, &listen_fds);
-	if(screen->listen6Sock >= 0) 
+	if(screen->listen6Sock != RFB_INVALID_SOCKET)
 	  FD_SET(screen->listen6Sock, &listen_fds);
 
         if (select(screen->maxFd+1, &listen_fds, NULL, NULL, NULL) == -1) {
             rfbLogPerror("listenerRun: error in select");
-            return NULL;
+            return THREAD_ROUTINE_RETURN_VALUE;
         }
 	
 	/* there is something on the listening sockets, handle new connections */
@@ -707,7 +721,7 @@ listenerRun(void *data)
 	if (cl && !cl->onHold )
 	  rfbStartOnHoldClient(cl);
     }
-    return(NULL);
+    return THREAD_ROUTINE_RETURN_VALUE;
 }
 
 #endif
@@ -718,13 +732,18 @@ rfbStartOnHoldClient(rfbClientPtr cl)
     cl->onHold = FALSE;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     if(cl->screen->backgroundLoop) {
+#ifndef WIN32
         if (pipe(cl->pipe_notify_client_thread) == -1) {
             cl->pipe_notify_client_thread[0] = -1;
             cl->pipe_notify_client_thread[1] = -1;
         }
         fcntl(cl->pipe_notify_client_thread[0], F_SETFL, O_NONBLOCK);
-
+#endif
         pthread_create(&cl->client_thread, NULL, clientInput, (void *)cl);
+    }
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    if(cl->screen->backgroundLoop) {
+	cl->client_thread = _beginthread(clientInput, 0, cl);
     }
 #endif
 }
@@ -870,6 +889,32 @@ static enum rfbNewClientAction rfbDefaultNewClientHook(rfbClientPtr cl)
 	return RFB_CLIENT_ACCEPT;
 }
 
+static int rfbDefaultNumberOfExtDesktopScreens(rfbClientPtr cl)
+{
+    return 1;
+}
+
+static rfbBool rfbDefaultGetExtDesktopScreen(int seqnumber, rfbExtDesktopScreen* s, rfbClientPtr cl)
+{
+    if (seqnumber != 0)
+        return FALSE;
+
+    /* Populate the provided rfbExtDesktopScreen structure */
+    s->id = 1;
+    s->width = cl->scaledScreen->width;
+    s->height = cl->scaledScreen->height;
+    s->x = 0;
+    s->y = 0;
+    s->flags = 0;
+
+    return TRUE;
+}
+
+static int rfbDefaultSetDesktopSize(int width, int height, int numScreens, rfbExtDesktopScreen* extDesktopScreens, rfbClientPtr cl)
+{
+    return rfbExtDesktopSize_ResizeProhibited;
+}
+
 /*
  * Update server's pixel format in screenInfo structure. This
  * function is called from rfbGetScreen() and rfbNewFramebuffer().
@@ -921,6 +966,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
  int bytesPerPixel)
 {
    rfbScreenInfoPtr screen=calloc(sizeof(rfbScreenInfo),1);
+   if (!screen)
+       return NULL;
 
    if (! logMutex_initialized) {
      INIT_MUTEX(logMutex);
@@ -939,9 +986,9 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->socketState=RFB_SOCKET_INIT;
 
    screen->inetdInitDone = FALSE;
-   screen->inetdSock=-1;
+   screen->inetdSock=RFB_INVALID_SOCKET;
 
-   screen->udpSock=-1;
+   screen->udpSock=RFB_INVALID_SOCKET;
    screen->udpSockConnected=FALSE;
    screen->udpPort=0;
    screen->udpClient=NULL;
@@ -964,17 +1011,19 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->multicastUpdateRegion = sraRgnCreateRect(0, 0, width, height);
 
    screen->maxFd=0;
-   screen->listenSock=-1;
-   screen->listen6Sock=-1;
+   screen->listenSock=RFB_INVALID_SOCKET;
+   screen->listen6Sock=RFB_INVALID_SOCKET;
+
+   screen->fdQuota = 0.5;
 
    screen->httpInitDone=FALSE;
    screen->httpEnableProxyConnect=FALSE;
    screen->httpPort=0;
    screen->http6Port=0;
    screen->httpDir=NULL;
-   screen->httpListenSock=-1;
-   screen->httpListen6Sock=-1;
-   screen->httpSock=-1;
+   screen->httpListenSock=RFB_INVALID_SOCKET;
+   screen->httpListen6Sock=RFB_INVALID_SOCKET;
+   screen->httpSock=RFB_INVALID_SOCKET;
 
    screen->desktopName = "LibVNCServer";
    screen->alwaysShared = FALSE;
@@ -1034,7 +1083,9 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->cursor = &myCursor;
    INIT_MUTEX(screen->cursorMutex);
 
-   IF_PTHREADS(screen->backgroundLoop = FALSE);
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+   screen->backgroundLoop = FALSE;
+#endif
 
    /* proc's and hook's */
 
@@ -1049,6 +1100,9 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->displayFinishedHook = NULL;
    screen->getKeyboardLedStateHook = NULL;
    screen->xvpHook = NULL;
+   screen->setDesktopSizeHook = rfbDefaultSetDesktopSize;
+   screen->numberOfExtDesktopScreensHook = rfbDefaultNumberOfExtDesktopScreens;
+   screen->getExtDesktopScreenHook = rfbDefaultGetExtDesktopScreen;
 
    /* initialize client list and iterator mutex */
    rfbClientListInit(screen);
@@ -1154,8 +1208,8 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   FREE_IF(colourMap.data.bytes);
   FREE_IF(underCursorBuffer);
   TINI_MUTEX(screen->cursorMutex);
-  if(screen->cursor && screen->cursor->cleanup)
-    rfbFreeCursor(screen->cursor);
+
+  rfbFreeCursor(screen->cursor);
 
   TINI_MUTEX(screen->multicastOutputMutex);
   TINI_MUTEX(screen->multicastUpdateMutex);
@@ -1186,6 +1240,7 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
 
 void rfbInitServer(rfbScreenInfoPtr screen)
 {
+
   if(screen->multicastVNC) {
     /* if smaller than minimum allowed by IP (576-60) or bigger than the max UDP payload, use default value. */
     if(screen->multicastPacketSize < 516 || screen->multicastPacketSize > 65507)
@@ -1204,18 +1259,7 @@ void rfbInitServer(rfbScreenInfoPtr screen)
       screen->multicastMaxSendRate = MULTICAST_MAXSENDRATE_RATE_START;
     screen->multicastMaxSendRateIncrement = MULTICAST_MAXSENDRATE_INCREMENT_START;
   }
-#ifdef WIN32
-  WSADATA trash;
-  static rfbBool WSAinitted=FALSE;
-  if(!WSAinitted) {
-    int i=WSAStartup(MAKEWORD(2,0),&trash);
-    if(i!=0) {
-      rfbErr("Couldn't init Windows Sockets\n");
-      return;
-    }
-    WSAinitted=TRUE;
-  }
-#endif
+
   rfbInitSockets(screen);
   rfbHttpInitSockets(screen);
 #ifndef WIN32
@@ -1231,12 +1275,13 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
 
     while(currentCl) {
       nextCl = rfbClientIteratorNext(iter);
-      if (currentCl->sock > -1) {
+      if (currentCl->sock != RFB_INVALID_SOCKET) {
         /* we don't care about maxfd here, because the server goes away */
         rfbCloseClient(currentCl);
       }
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+    if(currentCl->screen->backgroundLoop) {
       /*
 	Notify the thread. This simply writes a NULL byte to the notify pipe in order to get past the select()
 	in clientInput(), the loop in there will then break because the rfbCloseClient() above has set
@@ -1245,6 +1290,9 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
       write(currentCl->pipe_notify_client_thread[1], "\x00", 1);
       /* And wait for it to finish. */
       pthread_join(currentCl->client_thread, NULL);
+    } else {
+      rfbClientConnectionGone(currentCl);
+    }
 #else
       rfbClientConnectionGone(currentCl);
 #endif
@@ -1255,21 +1303,22 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
     rfbReleaseClientIterator(iter);
   }
 
-  rfbShutdownSockets(screen);
   rfbHttpShutdownSockets(screen);
 
   if(screen->multicastUpdateBuf) {
     free(screen->multicastUpdateBuf);
     screen->multicastUpdateBuf = NULL;
   }
+
+  rfbShutdownSockets(screen);
 }
 
-#ifndef LIBVNCSERVER_HAVE_GETTIMEOFDAY
+#if !defined LIBVNCSERVER_HAVE_GETTIMEOFDAY && defined WIN32
 #include <fcntl.h>
 #include <conio.h>
 #include <sys/timeb.h>
 
-void gettimeofday(struct timeval* tv,char* dummy)
+static void gettimeofday(struct timeval* tv,char* dummy)
 {
    SYSTEMTIME t;
    GetSystemTime(&t);
@@ -1299,7 +1348,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
     result = rfbUpdateClient(cl);
     clPrev=cl;
     cl=rfbClientIteratorNext(i);
-    if(clPrev->sock==-1) {
+    if(clPrev->sock==RFB_INVALID_SOCKET) {
       rfbClientConnectionGone(clPrev);
       result=TRUE;
     }
@@ -1316,7 +1365,7 @@ rfbUpdateClient(rfbClientPtr cl)
   rfbBool result=FALSE;
   rfbScreenInfoPtr screen = cl->screen;
 
-  if (cl->sock >= 0 && !cl->onHold && FB_UPDATE_PENDING(cl) &&
+  if (cl->sock != RFB_INVALID_SOCKET && !cl->onHold && FB_UPDATE_PENDING(cl) &&
         !sraRgnEmpty(cl->requestedRegion)) {
       result=TRUE;
       if(screen->deferUpdateTime == 0) {
@@ -1395,6 +1444,10 @@ void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground
 
        pthread_create(&listener_thread, NULL, listenerRun, screen);
     return;
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+       screen->backgroundLoop = TRUE;
+       _beginthread(listenerRun, 0, screen);
+       return;
 #else
     rfbErr("Can't run in background, because I don't have PThreads!\n");
     return;

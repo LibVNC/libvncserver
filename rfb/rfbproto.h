@@ -62,8 +62,7 @@
 
 #include <stdint.h>
 
-#if defined(WIN32) && !defined(__MINGW32__)
-#define LIBVNCSERVER_WORDS_BIGENDIAN
+#if defined(WIN32)
 typedef int8_t rfbBool;
 #include <sys/timeb.h>
 #include <winsock2.h>
@@ -91,14 +90,21 @@ typedef int8_t rfbBool;
 #endif
 
 #define rfbMax(a,b) (((a)>(b))?(a):(b))
-#if !defined(WIN32) || defined(__MINGW32__)
+#ifdef WIN32
+#define rfbSocket SOCKET
+#define RFB_INVALID_SOCKET INVALID_SOCKET
+#define rfbCloseSocket closesocket
+#else
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
 #ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
 #include <netinet/in.h>
 #endif
-#define SOCKET int
+#define rfbSocket int
+#define SOCKET int /* LibVNCServer versions older than 0.9.13 defined this for non-Windows, so keep it here */
+#define RFB_INVALID_SOCKET (-1)
+#define rfbCloseSocket close
 typedef int8_t rfbBool;
 #undef FALSE
 #define FALSE 0
@@ -423,6 +429,8 @@ typedef struct {
 #define rfbMulticastFramebufferUpdateNACK 240
 /* Xvp message - bidirectional */
 #define rfbXvp 250
+/* SetDesktopSize client -> server message */
+#define rfbSetDesktopSize 251
 
 
 
@@ -502,6 +510,7 @@ typedef struct {
 
 #define rfbEncodingLastRect           0xFFFFFF20
 #define rfbEncodingNewFBSize          0xFFFFFF21
+#define rfbEncodingExtDesktopSize     0xFFFFFECC
 
 #define rfbEncodingQualityLevel0   0xFFFFFFE0
 #define rfbEncodingQualityLevel1   0xFFFFFFE1
@@ -1182,6 +1191,64 @@ typedef struct {
 #define rfbXvp_Reboot 3
 #define rfbXvp_Reset 4
 
+/*-----------------------------------------------------------------------------
+ * ExtendedDesktopSize server -> client message
+ *
+ * Informs the client of (re)size of framebuffer, provides information about
+ * physical screens attached, and lets the client knows it can request
+ * resolution changes using SetDesktopSize.
+ */
+
+typedef struct rfbExtDesktopSizeMsg {
+    uint8_t numberOfScreens;
+    uint8_t pad[3];
+
+    /* Followed by rfbExtDesktopScreen[numberOfScreens] */
+} rfbExtDesktopSizeMsg;
+
+typedef struct rfbExtDesktopScreen {
+    uint32_t id;
+    uint16_t x;
+    uint16_t y;
+    uint16_t width;
+    uint16_t height;
+    uint32_t flags;
+} rfbExtDesktopScreen;
+
+#define sz_rfbExtDesktopSizeMsg (4)
+#define sz_rfbExtDesktopScreen (16)
+
+/* x - reason for the change */
+#define rfbExtDesktopSize_GenericChange 0
+#define rfbExtDesktopSize_ClientRequestedChange 1
+#define rfbExtDesktopSize_OtherClientRequestedChange 2
+
+/* y - status code for change */
+#define rfbExtDesktopSize_Success 0
+#define rfbExtDesktopSize_ResizeProhibited 1
+#define rfbExtDesktopSize_OutOfResources 2
+#define rfbExtDesktopSize_InvalidScreenLayout 3
+
+/*-----------------------------------------------------------------------------
+ * SetDesktopSize client -> server message
+ *
+ * Allows the client to request that the framebuffer and physical screen
+ * resolutions are changed.
+ */
+
+typedef struct rfbSetDesktopSizeMsg {
+    uint8_t type;                       /* always rfbSetDesktopSize */
+    uint8_t pad1;
+    uint16_t width;
+    uint16_t height;
+    uint8_t numberOfScreens;
+    uint8_t pad2;
+
+    /* Followed by rfbExtDesktopScreen[numberOfScreens] */
+} rfbSetDesktopSizeMsg;
+
+#define sz_rfbSetDesktopSizeMsg (8)
+
 
 /*-----------------------------------------------------------------------------
  * Modif sf@2002
@@ -1236,7 +1303,8 @@ typedef union {
 	rfbPalmVNCReSizeFrameBufferMsg prsfb; 
 	rfbFileTransferMsg ft;
 	rfbTextChatMsg tc;
-        rfbXvpMsg xvp;
+	rfbXvpMsg xvp;
+	rfbExtDesktopSizeMsg eds;
         rfbMulticastFramebufferUpdateMsg mfu;
 } rfbServerToClientMsg;
 
@@ -1526,7 +1594,8 @@ typedef union {
 	rfbFileTransferMsg ft;
 	rfbSetSWMsg sw;
 	rfbTextChatMsg tc;
-        rfbXvpMsg xvp;
+	rfbXvpMsg xvp;
+	rfbSetDesktopSizeMsg sdm;
         rfbMulticastFramebufferUpdateRequestMsg mfur;
         rfbMulticastFramebufferUpdateNACKMsg mfun;
 } rfbClientToServerMsg;

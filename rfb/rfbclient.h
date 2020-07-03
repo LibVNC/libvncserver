@@ -34,6 +34,9 @@
 
 #ifdef WIN32
 #define WIN32_LEAN_AND_MEAN /* Prevent loading any Winsock 1.x headers from windows.h */
+#ifdef _MSC_VER
+#pragma warning(disable:4996)
+#endif
 #endif
 
 #if defined(ANDROID) || defined(LIBVNCSERVER_HAVE_ANDROID)
@@ -52,6 +55,7 @@
 #endif
 #include <rfb/rfbproto.h>
 #include <rfb/keysym.h>
+#include <rfb/threading.h>
 
 #ifdef LIBVNCSERVER_HAVE_SASL
 #include <sasl/sasl.h>
@@ -80,6 +84,9 @@
 #define LISTEN_PORT_OFFSET 5500
 #define TUNNEL_PORT_OFFSET 5500
 #define SERVER_PORT_OFFSET 5900
+
+#define DEFAULT_CONNECT_TIMEOUT 60
+#define DEFAULT_READ_TIMEOUT 0
 
 #define DEFAULT_SSH_CMD "/usr/bin/ssh"
 #define DEFAULT_TUNNEL_CMD  \
@@ -223,8 +230,8 @@ typedef void (*GotCopyRectProc)(struct _rfbClient* client, int src_x, int src_y,
 typedef void (*GotFillRectProc)(struct _rfbClient* client, int x, int y, int w, int h, uint32_t colour);
 typedef void (*GotBitmapProc)(struct _rfbClient* client, const uint8_t* buffer, int x, int y, int w, int h);
 typedef rfbBool (*GotJpegProc)(struct _rfbClient* client, const uint8_t* buffer, int length, int x, int y, int w, int h);
-typedef rfbBool (*LockWriteToTLSProc)(struct _rfbClient* client);
-typedef rfbBool (*UnlockWriteToTLSProc)(struct _rfbClient* client);
+typedef rfbBool (*LockWriteToTLSProc)(struct _rfbClient* client);   /** @deprecated */
+typedef rfbBool (*UnlockWriteToTLSProc)(struct _rfbClient* client); /** @deprecated */
 
 #ifdef LIBVNCSERVER_HAVE_SASL
 typedef char* (*GetUserProc)(struct _rfbClient* client);
@@ -259,7 +266,7 @@ typedef struct _rfbClient {
 
 	/* rfbproto.c */
 
-	int sock;
+	rfbSocket sock;
 	rfbBool canUseCoRRE;
 	rfbBool canUseHextile;
 	char *desktopName;
@@ -270,7 +277,7 @@ typedef struct _rfbClient {
 #define RFB_BUF_SIZE 8192
 	char buf[RFB_BUF_SIZE];
 	char *bufoutptr;
-	int buffered;
+	unsigned int buffered;
 
 	/* The zlib encoding requires expansion/decompression/deflation of the
 	   compressed data in the "buffer" above into another, result buffer.
@@ -396,20 +403,25 @@ typedef struct _rfbClient {
 	HandleXvpMsgProc           HandleXvpMsg;
 
 	/* listen.c */
-        int listenSock;
+        rfbSocket listenSock;
 
 	FinishedFrameBufferUpdateProc FinishedFrameBufferUpdate;
 
 	char *listenAddress;
         /* IPv6 listen socket, address and port*/
-        int listen6Sock;
+        rfbSocket listen6Sock;
         char* listen6Address;
         int listen6Port;
 
         /* Output Window ID. When set, client application enables libvncclient to perform direct rendering in its window */
         unsigned long outputWindow;
 
-	/** Hooks for optional protection WriteToTLS() by mutex */
+	/** 
+	 * These lock/unlock hooks are not used anymore. LibVNCClient will now use 
+	 * platform-specific synchronization library to protect concurrent TLS R/W.
+	 *  
+	 * @deprecated
+	 */
 	LockWriteToTLSProc LockWriteToTLS;
 	UnlockWriteToTLSProc UnlockWriteToTLS;
 
@@ -447,6 +459,18 @@ typedef struct _rfbClient {
 
 #endif
 #endif
+	/* timeout in seconds for select() after connect() */
+	unsigned int connectTimeout;
+
+	/* timeout in seconds when reading from half-open connections in
+	 * ReadFromRFBServer() - keep at 0 to disable timeout detection and handling */
+	unsigned int readTimeout;
+
+	/**
+	 * Mutex to protect concurrent TLS read/write.
+	 * For internal use only.
+	 */
+	MUTEX(tlsRwMutex);
 
         /** Counts bytes received by this client. */
         size_t  bytesRcvd;
@@ -681,19 +705,60 @@ extern rfbBool errorMessageOnReadFailure;
 
 extern rfbBool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
 extern rfbBool ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n);
-extern rfbBool WriteToRFBServer(rfbClient* client, char *buf, int n);
+extern rfbBool WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n);
 extern int FindFreeTcpPort(void);
-extern int ListenAtTcpPort(int port);
-extern int ListenAtTcpPortAndAddress(int port, const char *address);
-extern int ConnectClientToTcpAddr(unsigned int host, int port);
-extern int ConnectClientToTcpAddr6(const char *hostname, int port);
-extern int ConnectClientToUnixSock(const char *sockFile);
-extern int AcceptTcpConnection(int listenSock);
-extern rfbBool SetNonBlocking(int sock);
-extern rfbBool SetDSCP(int sock, int dscp);
+extern rfbSocket ListenAtTcpPort(int port);
+extern rfbSocket ListenAtTcpPortAndAddress(int port, const char *address);
+/**
+   Tries to connect to an IPv4 host.
+   @param host Binary IPv4 address
+   @param port Port
+   @return A blocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
+extern rfbSocket ConnectClientToTcpAddr(unsigned int host, int port);
+/**
+   Tries to connect to an IPv4 or IPv6 host.
+   @param hostname A hostname or IP address
+   @param port Port
+   @return A blocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
+extern rfbSocket ConnectClientToTcpAddr6(const char *hostname, int port);
+/**
+   Tries to connect to a Unix socket.
+   @param sockFile Path of the socket file
+   @return A blocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
+extern rfbSocket ConnectClientToUnixSock(const char *sockFile);
+/**
+   Tries to connect to an IPv4 host using the given timeout value.
+   @param host Binary IPv4 address
+   @param port Port
+   @param timeout The time in seconds to wait for a connection
+   @return A nonblocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
+extern rfbSocket ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int timeout);
+/**
+   Tries to connect to an IPv4 or IPv6 host using the given timeout value.
+   @param hostname A hostname or IP address
+   @param port Port
+   @param timeout The time in seconds to wait for a connection
+   @return A nonblocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
+extern rfbSocket ConnectClientToTcpAddr6WithTimeout(const char *hostname, int port, unsigned int timeout);
+/**
+   Tries to connect to a Unix socket using the given timeout value.
+   @param sockFile Path of the socket file
+   @param timeout The time in seconds to wait for a connection
+   @return A nonblocking socket or RFB_INVALID_SOCKET if the connection failed
+*/
+extern rfbSocket ConnectClientToUnixSockWithTimeout(const char *sockFile, unsigned int timeout);
+extern rfbSocket AcceptTcpConnection(rfbSocket listenSock);
+extern rfbBool SetNonBlocking(rfbSocket sock);
+extern rfbBool SetBlocking(rfbSocket sock);
+extern rfbBool SetDSCP(rfbSocket sock, int dscp);
 
 extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
-extern rfbBool SameMachine(int sock);
+extern rfbBool SameMachine(rfbSocket sock);
 /**
  * Waits for an RFB message to arrive from the server. Before handling a message
  * with HandleRFBServerMessage(), you must wait for your client to receive one.

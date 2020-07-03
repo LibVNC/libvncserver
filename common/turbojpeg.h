@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C)2009-2012 D. R. Commander.  All Rights Reserved.
  *
@@ -35,6 +36,10 @@
 #define DLLEXPORT
 #endif
 #define DLLCALL
+
+#ifdef _MSC_VER
+#pragma warning(disable:4996)
+#endif
 
 
 /**

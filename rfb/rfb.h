@@ -53,59 +53,18 @@ extern "C"
 #endif
 
 #ifdef WIN32
-#undef SOCKET
 typedef UINT32 in_addr_t;
 #include <winsock2.h>
 #ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
 #undef socklen_t
 #include <ws2tcpip.h>
 #endif
+#ifdef _MSC_VER
+#pragma warning(disable:4996)
+#endif
 #endif
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-#include <pthread.h>
-#if 0 /* debugging */
-#define LOCK(mutex) (rfbLog("%s:%d LOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_lock(&(mutex)))
-#define UNLOCK(mutex) (rfbLog("%s:%d UNLOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_unlock(&(mutex)))
-#define MUTEX(mutex) pthread_mutex_t (mutex)
-#define INIT_MUTEX(mutex) (rfbLog("%s:%d INIT_MUTEX(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_init(&(mutex),NULL))
-#define TINI_MUTEX(mutex) (rfbLog("%s:%d TINI_MUTEX(%s)\n",__FILE__,__LINE__,#mutex), pthread_mutex_destroy(&(mutex)))
-#define TSIGNAL(cond) (rfbLog("%s:%d TSIGNAL(%s)\n",__FILE__,__LINE__,#cond), pthread_cond_signal(&(cond)))
-#define WAIT(cond,mutex) (rfbLog("%s:%d WAIT(%s,%s)\n",__FILE__,__LINE__,#cond,#mutex), pthread_cond_wait(&(cond),&(mutex)))
-#define COND(cond) pthread_cond_t (cond)
-#define INIT_COND(cond) (rfbLog("%s:%d INIT_COND(%s)\n",__FILE__,__LINE__,#cond), pthread_cond_init(&(cond),NULL))
-#define TINI_COND(cond) (rfbLog("%s:%d TINI_COND(%s)\n",__FILE__,__LINE__,#cond), pthread_cond_destroy(&(cond)))
-#define IF_PTHREADS(x) x
-#else
-#if !NONETWORK
-#define LOCK(mutex) pthread_mutex_lock(&(mutex));
-#define UNLOCK(mutex) pthread_mutex_unlock(&(mutex));
-#endif
-#define MUTEX(mutex) pthread_mutex_t (mutex)
-#define INIT_MUTEX(mutex) pthread_mutex_init(&(mutex),NULL)
-#define TINI_MUTEX(mutex) pthread_mutex_destroy(&(mutex))
-#define TSIGNAL(cond) pthread_cond_signal(&(cond))
-#define WAIT(cond,mutex) pthread_cond_wait(&(cond),&(mutex))
-#define COND(cond) pthread_cond_t (cond)
-#define INIT_COND(cond) pthread_cond_init(&(cond),NULL)
-#define TINI_COND(cond) pthread_cond_destroy(&(cond))
-#define IF_PTHREADS(x) x
-#endif
-#else
-#define LOCK(mutex)
-#define UNLOCK(mutex)
-#define MUTEX(mutex)
-#define INIT_MUTEX(mutex)
-#define TINI_MUTEX(mutex)
-#define TSIGNAL(cond)
-#define WAIT(cond,mutex) this_is_unsupported
-#define COND(cond)
-#define INIT_COND(cond)
-#define TINI_COND(cond)
-#define IF_PTHREADS(x)
-#endif
-
-/* end of stuff for autoconf */
+#include <rfb/threading.h>
 
 /* if you use pthreads, but don't define LIBVNCSERVER_HAVE_LIBPTHREAD, the structs
    get all mixed up. So this gives a linker error reminding you to compile
@@ -159,6 +118,9 @@ typedef void (*rfbDisplayFinishedHookPtr)(struct _rfbClientRec* cl, int result);
 /** support the capability to view the caps/num/scroll states of the X server */
 typedef int  (*rfbGetKeyboardLedStateHookPtr)(struct _rfbScreenInfo* screen);
 typedef rfbBool (*rfbXvpHookPtr)(struct _rfbClientRec* cl, uint8_t, uint8_t);
+typedef int (*rfbSetDesktopSizeHookPtr)(int width, int height, int numScreens, struct rfbExtDesktopScreen* extDesktopScreens, struct _rfbClientRec* cl);
+typedef int (*rfbNumberOfExtDesktopScreensPtr)(struct _rfbClientRec* cl);
+typedef rfbBool (*rfbGetExtDesktopScreenPtr)(int seqnumber, struct rfbExtDesktopScreen *extDesktopScreen, struct _rfbClientRec* cl);
 /**
  * If x==1 and y==1 then set the whole display
  * else find the window underneath x and y and set the framebuffer to the dimensions
@@ -270,7 +232,7 @@ typedef struct _rfbScreenInfo
 
     rfbBool autoPort;
     int port;
-    SOCKET listenSock;
+    rfbSocket listenSock;
     int maxSock;
     int maxFd;
 #ifdef WIN32
@@ -280,11 +242,11 @@ typedef struct _rfbScreenInfo
 #endif
 
     enum rfbSocketState socketState;
-    SOCKET inetdSock;
+    rfbSocket inetdSock;
     rfbBool inetdInitDone;
 
     int udpPort;
-    SOCKET udpSock;
+    rfbSocket udpSock;
     struct _rfbClientRec* udpClient;
     rfbBool udpSockConnected;
     struct sockaddr_in udpRemoteAddr;
@@ -296,8 +258,8 @@ typedef struct _rfbScreenInfo
     rfbBool httpEnableProxyConnect;
     int httpPort;
     char* httpDir;
-    SOCKET httpListenSock;
-    SOCKET httpSock;
+    rfbSocket httpListenSock;
+    rfbSocket httpSock;
 
     rfbPasswordCheckProcPtr passwordCheck;
     void* authPasswdData;
@@ -350,7 +312,7 @@ typedef struct _rfbScreenInfo
     /** These hooks are called to pass keyboard state back to the client */
     rfbGetKeyboardLedStateHookPtr getKeyboardLedStateHook;
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     MUTEX(cursorMutex);
     rfbBool backgroundLoop;
 #endif
@@ -390,10 +352,21 @@ typedef struct _rfbScreenInfo
     /* We have an additional IPv6 listen socket since there are systems that
        don't support dual binding sockets under *any* circumstances, for
        instance OpenBSD */
-    SOCKET listen6Sock;
+    rfbSocket listen6Sock;
     int http6Port;
-    SOCKET httpListen6Sock;
+    rfbSocket httpListen6Sock;
+    /** hook to let client set resolution */
+    rfbSetDesktopSizeHookPtr setDesktopSizeHook;
+    /** Optional hooks to query ExtendedDesktopSize screen information.
+     * If not set it is assumed only one screen is present spanning entire fb */
+    rfbNumberOfExtDesktopScreensPtr numberOfExtDesktopScreensHook;
+    rfbGetExtDesktopScreenPtr getExtDesktopScreenHook;
+    /** This value between 0 and 1.0 defines which fraction of the maximum number
+	of file descriptors LibVNCServer uses before denying new client connections.
+	It is set to 0.5 per default. */
+    float fdQuota;
 
+    
     /*
       multicast stuff 
     */
@@ -401,7 +374,7 @@ typedef struct _rfbScreenInfo
     char*   multicastAddr;
     int     multicastPort;
     char    multicastTTL;
-    SOCKET  multicastSock;
+    rfbSocket  multicastSock;
     struct sockaddr_storage multicastSockAddr;
     uint16_t multicastPacketSize;
 #define MULTICAST_DFLT_PACKETSIZE 1452
@@ -454,6 +427,7 @@ typedef void (*rfbTranslateFnType)(char *table, rfbPixelFormat *in,
  */
 
 typedef void (*ClientGoneHookPtr)(struct _rfbClientRec* cl);
+typedef void (*ClientFramebufferUpdateRequestHookPtr)(struct _rfbClientRec* cl, rfbFramebufferUpdateRequestMsg* furMsg);
 
 typedef struct _rfbFileTransferData {
   int fd;
@@ -499,7 +473,7 @@ typedef struct _rfbClientRec {
     void* clientData;
     ClientGoneHookPtr clientGoneHook;
 
-    SOCKET sock;
+    rfbSocket sock;
     char *host;
 
     /* RFB protocol minor version number */
@@ -508,6 +482,8 @@ typedef struct _rfbClientRec {
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_t client_thread;
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    uintptr_t client_thread;
 #endif
 
     /* Note that the RFB_INITIALISATION_SHARED state is provided to support
@@ -678,7 +654,7 @@ typedef struct _rfbClientRec {
     struct _rfbClientRec *prev;
     struct _rfbClientRec *next;
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     /** whenever a client is referenced, the refCount has to be incremented
        and afterwards decremented, so that the client is not cleaned up
        while being referenced.
@@ -710,7 +686,7 @@ typedef struct _rfbClientRec {
     void *paletteHelper;
 
     /** for thread safety for rfbSendFBUpdate() */
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 #define LIBVNCSERVER_SEND_MUTEX
     MUTEX(sendMutex);
 #endif
@@ -737,6 +713,16 @@ typedef struct _rfbClientRec {
     int pipe_notify_client_thread[2];
 #endif
 
+    /**
+     * clientFramebufferUpdateRequestHook is called when a client requests a frame
+     * buffer update.
+     */
+    ClientFramebufferUpdateRequestHookPtr clientFramebufferUpdateRequestHook;
+
+    rfbBool useExtDesktopSize;
+    int requestedDesktopSizeChange;
+    int lastDesktopSizeChangeError;
+
     /* multicast stuff */
     rfbBool  enableMulticastVNC;      /* client supports multicast FramebufferUpdates messages */
     rfbBool  useMulticastVNC;         /* framebuffer updates should be sent via multicast socket*/
@@ -755,6 +741,7 @@ typedef struct _rfbClientRec {
     void* multicastPartUpdRgnBuf;      /**< a ringbuffer holding partial update <-> region mappings.
 					this is allocated on the heap and shared by all clients
 					with the same pixelformat and encoding*/
+
 } rfbClientRec, *rfbClientPtr;
 
 /**
@@ -816,13 +803,13 @@ extern int rfbPeekExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
 extern int rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char *buf, int len);
 extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
-extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
-extern int rfbConnectToTcpAddr(char* host, int port);
-extern int rfbListenOnTCPPort(int port, in_addr_t iface);
-extern int rfbListenOnTCP6Port(int port, const char* iface);
-extern int rfbListenOnUDPPort(int port, in_addr_t iface);
+extern rfbSocket rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
+extern rfbSocket rfbConnectToTcpAddr(char* host, int port);
+extern rfbSocket rfbListenOnTCPPort(int port, in_addr_t iface);
+extern rfbSocket rfbListenOnTCP6Port(int port, const char* iface);
+extern rfbSocket rfbListenOnUDPPort(int port, in_addr_t iface);
 extern int rfbStringToAddr(char* string,in_addr_t* addr);
-extern rfbBool rfbSetNonBlocking(int sock);
+extern rfbBool rfbSetNonBlocking(rfbSocket sock);
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 /* websockets.c */
@@ -847,14 +834,14 @@ extern void rfbReleaseClientIterator(rfbClientIteratorPtr iterator);
 extern void rfbIncrClientRef(rfbClientPtr cl);
 extern void rfbDecrClientRef(rfbClientPtr cl);
 
-extern void rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,int sock);
-extern rfbClientPtr rfbNewClient(rfbScreenInfoPtr rfbScreen,int sock);
+extern void rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,rfbSocket sock);
+extern rfbClientPtr rfbNewClient(rfbScreenInfoPtr rfbScreen,rfbSocket sock);
 extern rfbClientPtr rfbNewUDPClient(rfbScreenInfoPtr rfbScreen);
 extern rfbClientPtr rfbReverseConnection(rfbScreenInfoPtr rfbScreen,char *host, int port);
 extern void rfbClientConnectionGone(rfbClientPtr cl);
 extern void rfbProcessClientMessage(rfbClientPtr cl);
 extern void rfbClientConnFailed(rfbClientPtr cl, const char *reason);
-extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,int sock);
+extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,rfbSocket sock);
 extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
 extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
 extern rfbBool rfbSendMulticastFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
@@ -868,6 +855,7 @@ extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
 extern rfbBool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
 extern rfbBool rfbSendLastRectMarker(rfbClientPtr cl);
 extern rfbBool rfbSendNewFBSize(rfbClientPtr cl, int w, int h);
+extern rfbBool rfbSendExtDesktopSize(rfbClientPtr cl, int w, int h);
 extern rfbBool rfbSendSetColourMapEntries(rfbClientPtr cl, int firstColour, int nColours);
 extern void rfbSendBell(rfbScreenInfoPtr rfbScreen);
 

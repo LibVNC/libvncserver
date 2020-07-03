@@ -346,13 +346,20 @@ SendRectEncodingTight(rfbClientPtr cl,
 
     /* Make sure we can write at least one pixel into tightBeforeBuf. */
 
-    if (tightBeforeBufSize < 4) {
-        tightBeforeBufSize = 4;
+    if (!tightBeforeBuf || tightBeforeBufSize < 4) {
         if (tightBeforeBuf == NULL)
-            tightBeforeBuf = (char *)malloc(tightBeforeBufSize);
-        else
-            tightBeforeBuf = (char *)realloc(tightBeforeBuf,
-                                             tightBeforeBufSize);
+            tightBeforeBuf = (char *)malloc(4);
+        else {
+            char *reallocedBeforeEncBuf = (char *)realloc(tightBeforeBuf, 4);
+            if (!reallocedBeforeEncBuf) return FALSE;
+            tightBeforeBuf = reallocedBeforeEncBuf;
+        }
+        if(!tightBeforeBuf)
+        {
+            rfbLog("SendRectEncodingTight: failed to allocate memory\n");
+            return FALSE;
+        }
+        tightBeforeBufSize = 4;
     }
 
     /* Calculate maximum number of rows in one non-solid rectangle. */
@@ -627,22 +634,34 @@ SendRectSimple(rfbClientPtr cl, int x, int y, int w, int h)
     maxBeforeSize = maxRectSize * (cl->format.bitsPerPixel / 8);
     maxAfterSize = maxBeforeSize + (maxBeforeSize + 99) / 100 + 12;
 
-    if (tightBeforeBufSize < maxBeforeSize) {
-        tightBeforeBufSize = maxBeforeSize;
+    if (!tightBeforeBuf || tightBeforeBufSize < maxBeforeSize) {
         if (tightBeforeBuf == NULL)
-            tightBeforeBuf = (char *)malloc(tightBeforeBufSize);
-        else
-            tightBeforeBuf = (char *)realloc(tightBeforeBuf,
-                                             tightBeforeBufSize);
+            tightBeforeBuf = (char *)malloc(maxBeforeSize);
+        else {
+            char *reallocedBeforeEncBuf = (char *)realloc(tightBeforeBuf, maxBeforeSize);
+            if (!reallocedBeforeEncBuf) return FALSE;
+            tightBeforeBuf = reallocedBeforeEncBuf;
+        }
+        if (tightBeforeBuf)
+            tightBeforeBufSize = maxBeforeSize;
     }
 
-    if (tightAfterBufSize < maxAfterSize) {
-        tightAfterBufSize = maxAfterSize;
+    if (!tightAfterBuf || tightAfterBufSize < maxAfterSize) {
         if (tightAfterBuf == NULL)
-            tightAfterBuf = (char *)malloc(tightAfterBufSize);
-        else
-            tightAfterBuf = (char *)realloc(tightAfterBuf,
-                                            tightAfterBufSize);
+            tightAfterBuf = (char *)malloc(maxAfterSize);
+        else {
+            char *reallocedAfterEncBuf = (char *)realloc(tightAfterBuf, maxAfterSize);
+            if (!reallocedAfterEncBuf) return FALSE;
+            tightAfterBuf = reallocedAfterEncBuf;
+        }
+        if(tightAfterBuf)
+            tightAfterBufSize = maxAfterSize;
+    }
+
+    if (!tightBeforeBuf || !tightAfterBuf)
+    {
+        rfbLog("SendRectSimple: failed to allocate memory\n");
+        return FALSE;
     }
 
     if (w > maxRectWidth || w * h > maxRectSize) {
@@ -1577,15 +1596,18 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
         }
     }
 
-    if (tightAfterBufSize < TJBUFSIZE(w, h)) {
+    if (!tightAfterBuf || tightAfterBufSize < TJBUFSIZE(w, h)) {
         if (tightAfterBuf == NULL)
             tightAfterBuf = (char *)malloc(TJBUFSIZE(w, h));
-        else
-            tightAfterBuf = (char *)realloc(tightAfterBuf,
-                                            TJBUFSIZE(w, h));
-        if (!tightAfterBuf) {
-            rfbLog("Memory allocation failure!\n");
-            return 0;
+        else {
+            char *reallocedAfterEncBuf = (char *)realloc(tightAfterBuf, TJBUFSIZE(w, h));
+            if (!reallocedAfterEncBuf) return FALSE;
+            tightAfterBuf = reallocedAfterEncBuf;
+        }
+        if (!tightAfterBuf)
+        {
+            rfbLog("SendJpegRect: failed to allocate memory\n");
+            return FALSE;
         }
         tightAfterBufSize = TJBUFSIZE(w, h);
     }
@@ -1863,6 +1885,13 @@ static rfbBool SendPngRect(rfbClientPtr cl, int x, int y, int w, int h) {
 
     png_write_info(png_ptr, info_ptr);
     buf = malloc(w * 3);
+    if (buf == NULL)
+    {
+        pngFree(png_ptr, png_palette);
+        png_destroy_write_struct(&png_ptr, &info_ptr);
+        return FALSE;
+    }
+
     for (dy = 0; dy < h; dy++)
     {
 #if 0
@@ -1880,9 +1909,7 @@ static rfbBool SendPngRect(rfbClientPtr cl, int x, int y, int w, int h) {
 
     png_write_end(png_ptr, NULL);
 
-    if (color_type == PNG_COLOR_TYPE_PALETTE) {
-        pngFree(png_ptr, png_palette);
-    }
+    pngFree(png_ptr, png_palette);
 
     png_destroy_write_struct(&png_ptr, &info_ptr);
 

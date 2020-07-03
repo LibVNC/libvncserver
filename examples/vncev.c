@@ -56,6 +56,11 @@ static void read_keys(void)
 	   j=j*16+k;
 	 if(keys[j&0x3ff]) {
 	    char* x=(char*)malloc(1+strlen(keys[j&0x3ff])+1+strlen(buffer+strlen("#define ")));
+	    if(!x) {
+	      memset(keys,0,0x400*sizeof(char*));
+	      fclose(keysyms);
+	      return;
+	    }
 	    strcpy(x,keys[j&0x3ff]);
 	    strcat(x,",");
 	    strcat(x,buffer+strlen("#define "));
@@ -115,7 +120,7 @@ int main(int argc,char** argv)
 {
    rfbScreenInfoPtr s=rfbGetScreen(&argc,argv,width,height,8,1,1);
    if(!s)
-     return 0;
+     return 1;
    s->colourMap.is16=FALSE;
    s->colourMap.count=2;
    s->colourMap.data.bytes=(unsigned char*)"\xd0\xd0\xd0\x30\x01\xe0";

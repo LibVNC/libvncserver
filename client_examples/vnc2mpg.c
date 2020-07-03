@@ -415,7 +415,9 @@ int main(int argc, char **argv)
     client->format.blueShift=0; client->format.blueMax=31;
 
     /* Initialize libavcodec, and register all codecs and formats. */
+#if LIBAVUTIL_VERSION_MAJOR < 56 /* deprecrated in FFMPEG 4.0 */
     av_register_all();
+#endif
 
     /* Parse command line. */
     for(i=1;i<argc;i++) {

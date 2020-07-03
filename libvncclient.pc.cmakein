@@ -5,9 +5,9 @@ includedir=@CMAKE_INSTALL_PREFIX@/include
 
 Name: LibVNCClient
 Description: A library for easy implementation of a VNC client.
-Version: @PACKAGE_VERSION@
+Version: @LibVNCServer_VERSION@
 Requires:
-Requires.private: zlib
+Requires.private:
 Libs: -L${libdir} -lvncclient
 Libs.private: @PRIVATE_LIBS@
 Cflags: -I${includedir}

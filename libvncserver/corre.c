@@ -96,20 +96,34 @@ rfbSendSmallRectEncodingCoRRE(rfbClientPtr cl,
     int maxRawSize = (cl->scaledScreen->width * cl->scaledScreen->height
                       * (cl->format.bitsPerPixel / 8));
 
-    if (cl->beforeEncBufSize < maxRawSize) {
-        cl->beforeEncBufSize = maxRawSize;
+    if (!cl->beforeEncBuf || cl->beforeEncBufSize < maxRawSize) {
         if (cl->beforeEncBuf == NULL)
-            cl->beforeEncBuf = (char *)malloc(cl->beforeEncBufSize);
-        else
-            cl->beforeEncBuf = (char *)realloc(cl->beforeEncBuf, cl->beforeEncBufSize);
+            cl->beforeEncBuf = (char *)malloc(maxRawSize);
+        else {
+            char *reallocedBeforeEncBuf = (char *)realloc(cl->beforeEncBuf, maxRawSize);
+            if (!reallocedBeforeEncBuf) return FALSE;
+            cl->beforeEncBuf = reallocedBeforeEncBuf;
+        }
+        if(cl->beforeEncBuf)
+            cl->beforeEncBufSize = maxRawSize;
     }
 
-    if (cl->afterEncBufSize < maxRawSize) {
-        cl->afterEncBufSize = maxRawSize;
+    if (!cl->afterEncBuf || cl->afterEncBufSize < maxRawSize) {
         if (cl->afterEncBuf == NULL)
-            cl->afterEncBuf = (char *)malloc(cl->afterEncBufSize);
-        else
-            cl->afterEncBuf = (char *)realloc(cl->afterEncBuf, cl->afterEncBufSize);
+            cl->afterEncBuf = (char *)malloc(maxRawSize);
+        else {
+            char *reallocedAfterEncBuf = (char *)realloc(cl->afterEncBuf, maxRawSize);
+            if (!reallocedAfterEncBuf) return FALSE;
+            cl->afterEncBuf = reallocedAfterEncBuf;
+        }
+        if(cl->afterEncBuf)
+            cl->afterEncBufSize = maxRawSize;
+    }
+
+    if (!cl->beforeEncBuf || !cl->afterEncBuf)
+    {
+        rfbLog("rfbSendSmallRectEncodingCoRRE: failed to allocate memory\n");
+        return FALSE;
     }
 
     (*cl->translateFn)(cl->translateLookupTable,&(cl->screen->serverFormat),
@@ -233,7 +247,7 @@ subrectEncode##bpp(rfbClientPtr client, uint##bpp##_t *data, int w, int h) {    
             seg = data+(j*w);                                                 \
             if (seg[x] != cl) {break;}                                        \
             i = x;                                                            \
-            while ((seg[i] == cl) && (i < w)) i += 1;                         \
+            while ((i < w) && (seg[i] == cl)) i += 1;                         \
             i -= 1;                                                           \
             if (j == y) vx = hx = i;                                          \
             if (i < vx) vx = i;                                               \
@@ -327,10 +341,12 @@ getBgColour(char *data, int size, int bpp)
 
   for (j=0; j<size; j++) {
     k = (int)(((uint8_t *)data)[j]);
+#if NUMCLRS != 256
     if (k >= NUMCLRS) {
       rfbLog("getBgColour: unusual colour = %d\n", k);
       return 0;
     }
+#endif
     counts[k] += 1;
     if (counts[k] > maxcount) {
       maxcount = counts[k];

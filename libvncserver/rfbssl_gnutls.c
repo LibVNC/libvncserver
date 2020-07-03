@@ -52,11 +52,11 @@ static int rfbssl_init_session(struct rfbssl_ctx *ctx, int fd)
     gnutls_session_t session;
     int ret;
 
-    if (!GNUTLS_E_SUCCESS == (ret = gnutls_init(&session, GNUTLS_SERVER))) {
+    if (GNUTLS_E_SUCCESS != (ret = gnutls_init(&session, GNUTLS_SERVER))) {
       /* */
-    } else if (!GNUTLS_E_SUCCESS == (ret = gnutls_priority_set_direct(session, "EXPORT", NULL))) {
+    } else if (GNUTLS_E_SUCCESS != (ret = gnutls_set_default_priority(session))) {
       /* */
-    } else if (!GNUTLS_E_SUCCESS == (ret = gnutls_credentials_set(session, GNUTLS_CRD_CERTIFICATE, ctx->x509_cred))) {
+    } else if (GNUTLS_E_SUCCESS != (ret = gnutls_credentials_set(session, GNUTLS_CRD_CERTIFICATE, ctx->x509_cred))) {
       /* */
     } else {
       gnutls_session_enable_compatibility_mode(session);
@@ -90,19 +90,19 @@ struct rfbssl_ctx *rfbssl_init_global(char *key, char *cert)
     struct rfbssl_ctx *ctx = NULL;
 
     if (NULL == (ctx = malloc(sizeof(struct rfbssl_ctx)))) {
-	ret = GNUTLS_E_MEMORY_ERROR;
-    } else if (!GNUTLS_E_SUCCESS == (ret = gnutls_global_init())) {
+	return NULL;
+    } else if (GNUTLS_E_SUCCESS != (ret = gnutls_global_init())) {
 	/* */
-    } else if (!GNUTLS_E_SUCCESS == (ret = gnutls_certificate_allocate_credentials(&ctx->x509_cred))) {
+    } else if (GNUTLS_E_SUCCESS != (ret = gnutls_certificate_allocate_credentials(&ctx->x509_cred))) {
 	/* */
     } else if ((ret = gnutls_certificate_set_x509_trust_file(ctx->x509_cred, cert, GNUTLS_X509_FMT_PEM)) < 0) {
 	/* */
-    } else if (!GNUTLS_E_SUCCESS == (ret = gnutls_certificate_set_x509_key_file(ctx->x509_cred, cert, key, GNUTLS_X509_FMT_PEM))) {
+    } else if (GNUTLS_E_SUCCESS != (ret = gnutls_certificate_set_x509_key_file(ctx->x509_cred, cert, key, GNUTLS_X509_FMT_PEM))) {
 	/* */
-    } else if (!GNUTLS_E_SUCCESS == (ret = generate_dh_params(ctx))) {
+    } else if (GNUTLS_E_SUCCESS != (ret = generate_dh_params(ctx))) {
 	/* */
 #ifdef I_LIKE_RSA_PARAMS_THAT_MUCH
-    } else if (!GNUTLS_E_SUCCESS == (ret = generate_rsa_params(ctx))) {
+    } else if (GNUTLS_E_SUCCESS != (ret = generate_rsa_params(ctx))) {
 	/* */
 #endif
     } else {

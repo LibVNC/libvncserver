@@ -18,10 +18,7 @@
  *  USA.
  */
 
-#ifndef _MSC_VER
-#define _XOPEN_SOURCE 500
-#endif
-
+#include <stdio.h>
 #include <rfb/rfbclient.h>
 #include <errno.h>
 
@@ -29,54 +26,30 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/rand.h>
-#include <openssl/x509.h>
-
-#ifdef _MSC_VER
-typedef CRITICAL_SECTION MUTEX_TYPE;
-#define MUTEX_INIT(mutex) InitializeCriticalSection(&mutex)
-#define MUTEX_FREE(mutex) DeleteCriticalSection(&mutex)
-#define MUTEX_LOCK(mutex) EnterCriticalSection(&mutex)
-#define MUTEX_UNLOCK(mutex) LeaveCriticalSection(&mutex)
-#define CURRENT_THREAD_ID GetCurrentThreadId()
-#else
-typedef pthread_mutex_t MUTEX_TYPE;
-#define MUTEX_INIT(mutex) {\
-	pthread_mutexattr_t mutexAttr;\
-	pthread_mutexattr_init(&mutexAttr);\
-	pthread_mutexattr_settype(&mutexAttr, PTHREAD_MUTEX_RECURSIVE);\
-	pthread_mutex_init(&mutex, &mutexAttr);\
-}
-#define MUTEX_FREE(mutex) pthread_mutex_destroy(&mutex)
-#define MUTEX_LOCK(mutex) pthread_mutex_lock(&mutex)
-#define MUTEX_UNLOCK(mutex) pthread_mutex_unlock(&mutex)
-#define CURRENT_THREAD_ID pthread_self()
-#endif
-
-#ifndef _MSC_VER
-#include <pthread.h>
-#endif
 
 #include "tls.h"
 
 #ifdef _MSC_VER
-#include <BaseTsd.h> // That's for SSIZE_T
-typedef SSIZE_T ssize_t;
 #define snprintf _snprintf
 #endif
 
 static rfbBool rfbTLSInitialized = FALSE;
-static MUTEX_TYPE *mutex_buf = NULL;
+
+// Locking callbacks are only initialized if we have mutex support.
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+
+static MUTEX(*mutex_buf) = NULL;
 
 struct CRYPTO_dynlock_value {
-	MUTEX_TYPE mutex;
+	MUTEX(mutex);
 };
 
 static void locking_function(int mode, int n, const char *file, int line)
 {
 	if (mode & CRYPTO_LOCK)
-		MUTEX_LOCK(mutex_buf[n]);
+		LOCK(mutex_buf[n]);
 	else
-		MUTEX_UNLOCK(mutex_buf[n]);
+		UNLOCK(mutex_buf[n]);
 }
 
 static unsigned long id_function(void)
@@ -92,7 +65,7 @@ static struct CRYPTO_dynlock_value *dyn_create_function(const char *file, int li
 		malloc(sizeof(struct CRYPTO_dynlock_value));
 	if (!value)
 		goto err;
-	MUTEX_INIT(value->mutex);
+	INIT_MUTEX(value->mutex);
 
 	return value;
 
@@ -103,24 +76,49 @@ err:
 static void dyn_lock_function (int mode, struct CRYPTO_dynlock_value *l, const char *file, int line)
 {
 	if (mode & CRYPTO_LOCK)
-		MUTEX_LOCK(l->mutex);
+		LOCK(l->mutex);
 	else
-		MUTEX_UNLOCK(l->mutex);
+		UNLOCK(l->mutex);
 }
 
 
 static void
 dyn_destroy_function(struct CRYPTO_dynlock_value *l, const char *file, int line)
 {
-	MUTEX_FREE(l->mutex);
+	TINI_MUTEX(l->mutex);
 	free(l);
 }
 
+static rfbBool InitLockingCb()
+{
+  mutex_buf = malloc(CRYPTO_num_locks() * MUTEX_SIZE);
+  if (mutex_buf == NULL) {
+    rfbClientLog("Failed to initialized OpenSSL: memory.\n");
+    return FALSE;
+  }
+
+  int i;
+  for (i = 0; i < CRYPTO_num_locks(); i++)
+    INIT_MUTEX(mutex_buf[i]);
+
+  CRYPTO_set_locking_callback(locking_function);
+  CRYPTO_set_id_callback(id_function);
+  CRYPTO_set_dynlock_create_callback(dyn_create_function);
+  CRYPTO_set_dynlock_lock_callback(dyn_lock_function);
+  CRYPTO_set_dynlock_destroy_callback(dyn_destroy_function);
+
+  return TRUE;
+}
+
+#else
+//If mutex support is not available, locking initialization is a no-op.
+static rfbBool InitLockingCb() { return TRUE; }
+#endif
 
 static int
-ssl_errno (SSL *ssl, int ret)
+ssl_error_to_errno (int ssl_error)
 {
-	switch (SSL_get_error (ssl, ret)) {
+	switch (ssl_error) {
 	case SSL_ERROR_NONE:
 		return 0;
 	case SSL_ERROR_ZERO_RETURN:
@@ -146,24 +144,12 @@ ssl_errno (SSL *ssl, int ret)
 static rfbBool
 InitializeTLS(void)
 {
-  int i;
+  if (rfbTLSInitialized)
+    return TRUE;
 
-  if (rfbTLSInitialized) return TRUE;
+  if (!InitLockingCb())
+    return FALSE;
 
-  mutex_buf = malloc(CRYPTO_num_locks() * sizeof(MUTEX_TYPE));
-  if (mutex_buf == NULL) {
-    rfbClientLog("Failed to initialized OpenSSL: memory.\n");
-    return (-1);
-  }
-
-  for (i = 0; i < CRYPTO_num_locks(); i++)
-    MUTEX_INIT(mutex_buf[i]);
-
-  CRYPTO_set_locking_callback(locking_function);
-  CRYPTO_set_id_callback(id_function);
-  CRYPTO_set_dynlock_create_callback(dyn_create_function);
-  CRYPTO_set_dynlock_lock_callback(dyn_lock_function);
-  CRYPTO_set_dynlock_destroy_callback(dyn_destroy_function);
   SSL_load_error_strings();
   SSLeay_add_ssl_algorithms();
   RAND_load_file("/dev/urandom", 1024);
@@ -227,7 +213,6 @@ static rfbBool
 load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
 {
   X509_STORE *st;
-  X509_CRL *crl;
   int i;
   int count = 0;
   BIO *bio;
@@ -235,8 +220,6 @@ load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
   X509_INFO *xi;
 
   st = SSL_CTX_get_cert_store(ssl_ctx);
-
-    int rv = 0;
 
   bio = BIO_new_file(file, "r");
   if (bio == NULL)
@@ -271,7 +254,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
   SSL *ssl = NULL;
   int n, finished = 0;
   X509_VERIFY_PARAM *param;
-  uint8_t verify_crls = cred->x509Credential.x509CrlVerifyMode;
+  uint8_t verify_crls;
 
   if (!(ssl_ctx = SSL_CTX_new(SSLv23_client_method())))
   {
@@ -284,6 +267,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
   /* Setup verification if not anonymous */
   if (!anonTLS)
   {
+    verify_crls = cred->x509Credential.x509CrlVerifyMode;
     if (cred->x509Credential.x509CACertFile)
     {
       if (!SSL_CTX_load_verify_locations(ssl_ctx, cred->x509Credential.x509CACertFile, NULL))
@@ -341,6 +325,22 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
       goto error_free_ctx;
     }
     SSL_CTX_set1_param(ssl_ctx, param);
+    SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
+  } else { /* anonTLS here */
+      /* Need ADH cipher for anonTLS, see https://github.com/LibVNC/libvncserver/issues/347#issuecomment-597477103 */
+      SSL_CTX_set_cipher_list(ssl_ctx, "ADH");
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined LIBRESSL_VERSION_NUMBER
+      /*
+	See https://www.openssl.org/docs/man1.1.0/man3/SSL_set_security_level.html
+	Not specifying 0 here makes LibVNCClient fail connecting to some servers.
+      */
+      SSL_CTX_set_security_level(ssl_ctx, 0);
+      /*
+	Specifying a maximum protocol version of 1.2 gets us ADH cipher on OpenSSL 1.1.x,
+	see https://github.com/LibVNC/libvncserver/issues/347#issuecomment-597974313
+       */
+      SSL_CTX_set_max_proto_version(ssl_ctx, TLS1_2_VERSION);
+#endif
   }
 
   if (!(ssl = SSL_new (ssl_ctx)))
@@ -348,9 +348,6 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
     rfbClientLog("Could not create a new SSL session.\n");
     goto error_free_ctx;
   }
-
-  /* TODO: finetune this list, take into account anonTLS bool */
-  SSL_set_cipher_list(ssl, "ALL");
 
   SSL_set_fd (ssl, sockfd);
   SSL_CTX_set_app_data (ssl_ctx, client);
@@ -394,6 +391,8 @@ InitializeTLSSession(rfbClient* client, rfbBool anonTLS, rfbCredential *cred)
 
   if (!client->tlsSession)
     return FALSE;
+
+  INIT_MUTEX(client->tlsRwMutex);
 
   rfbClientLog("TLS session initialized.\n");
 
@@ -454,12 +453,6 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
     if (count==0)
     {
         rfbClientLog("List of security types is ZERO. Giving up.\n");
-        return FALSE;
-    }
-
-    if (count>sizeof(tAuth))
-    {
-        rfbClientLog("%d security types are too many; maximum is %d\n", count, sizeof(tAuth));
         return FALSE;
     }
 
@@ -622,15 +615,20 @@ HandleVeNCryptAuth(rfbClient* client)
 int
 ReadFromTLS(rfbClient* client, char *out, unsigned int n)
 {
-  ssize_t ret;
+  int ret = 0;
+  int ssl_error = SSL_ERROR_NONE;
 
+  LOCK(client->tlsRwMutex);
   ret = SSL_read (client->tlsSession, out, n);
+
+  if (ret < 0)
+      ssl_error = SSL_get_error(client->tlsSession, ret);
+  UNLOCK(client->tlsRwMutex);
 
   if (ret >= 0)
     return ret;
   else {
-    errno = ssl_errno (client->tlsSession, ret);
-
+    errno = ssl_error_to_errno(ssl_error);
     if (errno != EAGAIN) {
       rfbClientLog("Error reading from TLS: -.\n");
     }
@@ -643,19 +641,22 @@ int
 WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 {
   unsigned int offset = 0;
-  ssize_t ret;
+  int ret = 0;
+  int ssl_error = SSL_ERROR_NONE;
 
   while (offset < n)
   {
-
+    LOCK(client->tlsRwMutex);
     ret = SSL_write (client->tlsSession, buf + offset, (size_t)(n-offset));
 
     if (ret < 0)
-      errno = ssl_errno (client->tlsSession, ret);
+      ssl_error = SSL_get_error (client->tlsSession, ret);
+    UNLOCK(client->tlsRwMutex);
 
     if (ret == 0) continue;
     if (ret < 0)
     {
+      errno = ssl_error_to_errno(ssl_error);
       if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
       rfbClientLog("Error writing to TLS: -\n");
       return -1;
@@ -667,23 +668,12 @@ WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 
 void FreeTLS(rfbClient* client)
 {
-  int i;
-
-  if (mutex_buf != NULL) {
-    CRYPTO_set_dynlock_create_callback(NULL);
-    CRYPTO_set_dynlock_lock_callback(NULL);
-    CRYPTO_set_dynlock_destroy_callback(NULL);
-
-    CRYPTO_set_locking_callback(NULL);
-    CRYPTO_set_id_callback(NULL);
-
-    for (i = 0; i < CRYPTO_num_locks(); i++)
-      MUTEX_FREE(mutex_buf[i]);
-    free(mutex_buf);
-    mutex_buf = NULL;
+  if (client->tlsSession)
+  {
+    SSL_free(client->tlsSession);
+    client->tlsSession = NULL;
+    TINI_MUTEX(client->tlsRwMutex);
   }
-
-  SSL_free(client->tlsSession);
 }
 
 #ifdef LIBVNCSERVER_HAVE_SASL

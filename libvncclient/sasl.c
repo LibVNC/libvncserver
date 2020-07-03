@@ -38,24 +38,7 @@
 #include <errno.h>
 #include <rfb/rfbclient.h>
 
-#ifdef WIN32
-#undef SOCKET
-#include <winsock2.h>
-#ifdef EWOULDBLOCK
-#undef EWOULDBLOCK
-#endif
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define socklen_t int
-#define close closesocket
-#define read(sock,buf,len) recv(sock,buf,len,0)
-#define write(sock,buf,len) send(sock,buf,len,0)
-#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
-#undef socklen_t
-#include <ws2tcpip.h>
-#endif /* LIBVNCSERVER_HAVE_WS2TCPIP_H */
-#else /* WIN32 */
-#include <arpa/inet.h>
-#endif /* WIN32 */
+#include "sockets.h"
 
 #include "sasl.h"
 
@@ -71,7 +54,9 @@
 static char *vnc_connection_addr_to_string(char *host, int port)
 {
     char * buf = (char *)malloc(strlen(host) + 7);
-    sprintf(buf, "%s;%hu", host, port);
+    if (buf) {
+        sprintf(buf, "%s;%hu", host, (unsigned short)port);
+    }
     return buf;
 }
 
@@ -141,7 +126,7 @@ static int password_callback_adapt(sasl_conn_t *conn,
        return SASL_FAIL;
    }
 
-   strcpy(lsec->data, password);
+   strcpy((char *)lsec->data, password);
    lsec->len = strlen(password);
    client->saslSecret = lsec;
    *secret = lsec;
@@ -184,7 +169,6 @@ HandleSASLAuth(rfbClient *client)
     char *mechlist;
     char *wantmech;
     const char *mechname;
-    rfbBool ret;
 
     client->saslconn = NULL;
 
@@ -290,7 +274,7 @@ HandleSASLAuth(rfbClient *client)
     }
 
     mechlist = malloc(mechlistlen+1);
-    if (!ReadFromRFBServer(client, mechlist, mechlistlen)) {
+    if (!mechlist || !ReadFromRFBServer(client, mechlist, mechlistlen)) {
         free(mechlist);
         goto error;
     }
@@ -316,7 +300,6 @@ HandleSASLAuth(rfbClient *client)
 
     rfbClientLog("Client start negotiation mechlist '%s'\n", mechlist);
 
- restart:
     /* Start the auth negotiation on the client end first */
     err = sasl_client_start(saslconn,
                             mechlist,
@@ -376,7 +359,7 @@ HandleSASLAuth(rfbClient *client)
     /* NB, distinction of NULL vs "" is *critical* in SASL */
     if (serverinlen) {
         serverin = malloc(serverinlen);
-        if (!ReadFromRFBServer(client, serverin, serverinlen)) goto error;
+        if (!serverin || !ReadFromRFBServer(client, serverin, serverinlen)) goto error;
         serverin[serverinlen-1] = '\0';
         serverinlen--;
     } else {
@@ -391,7 +374,6 @@ HandleSASLAuth(rfbClient *client)
      * Even if the server has completed, the client must *always* do at least one step
      * in this loop to verify the server isn't lying about something. Mutual auth */
     for (;;) {
-    restep:
         err = sasl_client_step(saslconn,
                                serverin,
                                serverinlen,
@@ -447,7 +429,7 @@ HandleSASLAuth(rfbClient *client)
     /* NB, distinction of NULL vs "" is *critical* in SASL */
         if (serverinlen) {
             serverin = malloc(serverinlen);
-            if (!ReadFromRFBServer(client, serverin, serverinlen)) goto error;
+            if (!serverin || !ReadFromRFBServer(client, serverin, serverinlen)) goto error;
             serverin[serverinlen-1] = '\0';
             serverinlen--;
         } else {
@@ -537,7 +519,10 @@ ReadFromSASL(rfbClient* client, char *out, unsigned int n)
 
         encodedLen = 8192;
         encoded = (char *)malloc(encodedLen);
-
+        if (!encoded) {
+            errno = EIO;
+            return -EIO;
+        }
         ret = read(client->sock, encoded, encodedLen);
         if (ret < 0) {
             free(encoded);

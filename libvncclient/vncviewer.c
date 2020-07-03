@@ -22,7 +22,6 @@
  */
 
 #ifdef WIN32
-#undef SOCKET
 #include <winsock2.h>
 #endif
 
@@ -50,30 +49,22 @@ static rfbBool DummyPoint(rfbClient* client, int x, int y) {
 static void DummyRect(rfbClient* client, int x, int y, int w, int h) {
 }
 
-#ifdef WIN32
-static char* NoPassword(rfbClient* client) {
-  return strdup("");
-}
-#define close closesocket
-#else
-#include <stdio.h>
+#ifndef WIN32
 #include <termios.h>
 #endif
 
 static char* ReadPassword(rfbClient* client) {
-#ifdef WIN32
-	/* FIXME */
-	rfbClientErr("ReadPassword on Windows NOT IMPLEMENTED\n");
-	return NoPassword(client);
-#else
 	int i;
-	char* p=malloc(9);
+	char* p=calloc(1,9);
+	if (!p) return p;
+#ifndef WIN32
 	struct termios save,noecho;
-	p[0]=0;
 	if(tcgetattr(fileno(stdin),&save)!=0) return p;
 	noecho=save; noecho.c_lflag &= ~ECHO;
 	if(tcsetattr(fileno(stdin),TCSAFLUSH,&noecho)!=0) return p;
+#endif
 	fprintf(stderr,"Password: ");
+	fflush(stderr);
 	i=0;
 	while(1) {
 		int c=fgetc(stdin);
@@ -85,9 +76,10 @@ static char* ReadPassword(rfbClient* client) {
 			p[i]=0;
 		}
 	}
+#ifndef WIN32
 	tcsetattr(fileno(stdin),TCSAFLUSH,&save);
-	return p;
 #endif
+	return p;
 }
 static rfbBool MallocFrameBuffer(rfbClient* client) {
   uint64_t allocSize;
@@ -254,11 +246,20 @@ static void initAppData(AppData* data) {
 
 rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 			int bytesPerPixel) {
+#ifdef WIN32
+    WSADATA unused;
+#endif
   rfbClient* client=(rfbClient*)calloc(sizeof(rfbClient),1);
   if(!client) {
     rfbClientErr("Couldn't allocate client structure!\n");
     return NULL;
   }
+#ifdef WIN32
+  if((errno = WSAStartup(MAKEWORD(2,0), &unused)) != 0) {
+      rfbClientErr("Could not init Windows Sockets: %s\n", strerror(errno));
+      return NULL;
+  }
+#endif
   initAppData(&client->appData);
   client->endianTest = 1;
   client->programName="";
@@ -268,8 +269,8 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->destHost = NULL;
   client->destPort = 5900;
   
-  client->CurrentKeyboardLedState = 0;
-  client->HandleKeyboardLedState = (HandleKeyboardLedStateProc)DummyPoint;
+  client->connectTimeout = DEFAULT_CONNECT_TIMEOUT;
+  client->readTimeout = DEFAULT_READ_TIMEOUT;
 
   /* default: use complete frame buffer */ 
   client->updateRect.x = -1;
@@ -345,11 +346,10 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 
   client->LockWriteToTLS = NULL;
   client->UnlockWriteToTLS = NULL;
-
-  client->sock = -1;
-  client->listenSock = -1;
+  client->sock = RFB_INVALID_SOCKET;
+  client->listenSock = RFB_INVALID_SOCKET;
   client->listenAddress = NULL;
-  client->listen6Sock = -1;
+  client->listen6Sock = RFB_INVALID_SOCKET;
   client->listen6Address = NULL;
 
   client->multicastSock = -1;
@@ -474,21 +474,23 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
         client->destPort = 5900;
 
 	client->destHost = strdup(argv[i+1]);
-	if(colon) {
+	if(client->destHost && colon) {
 	  client->destHost[(int)(colon-argv[i+1])] = '\0';
 	  client->destPort = atoi(colon+1);
 	}
         j+=2;
       } else {
-	char* colon=strchr(argv[i],':');
+	char* colon=strrchr(argv[i],':');
 
 	if(client->serverHost)
 	  free(client->serverHost);
 
 	if(colon) {
 	  client->serverHost = strdup(argv[i]);
-	  client->serverHost[(int)(colon-argv[i])] = '\0';
-	  client->serverPort = atoi(colon+1);
+	  if(client->serverHost) {
+	    client->serverHost[(int)(colon-argv[i])] = '\0';
+	    client->serverPort = atoi(colon+1);
+	  }
 	} else {
 	  client->serverHost = strdup(argv[i]);
 	}
@@ -514,7 +516,6 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 
 void rfbClientCleanup(rfbClient* client) {
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
   int i;
 
   for ( i = 0; i < 4; i++ ) {
@@ -531,7 +532,6 @@ void rfbClientCleanup(rfbClient* client) {
       rfbClientLog("inflateEnd: %s\n", client->decompStream.msg );
   }
 #endif
-#endif
 
   if (client->ultra_buffer)
     free(client->ultra_buffer);
@@ -547,13 +547,14 @@ void rfbClientCleanup(rfbClient* client) {
     client->clientData = next;
   }
 
-  if (client->sock >= 0)
-    close(client->sock);
-  if (client->listenSock >= 0)
-    close(client->listenSock);
-  if (client->multicastSock >= 0)
+  if (client->sock != RFB_INVALID_SOCKET)
+    rfbCloseSocket(client->sock);
+  if (client->listenSock != RFB_INVALID_SOCKET)
+    rfbCloseSocket(client->listenSock);
+  if (client->multicastSock != RFB_INVALID_SOCKET)
     close(client->multicastSock);
   ghpringbuf_destroy(client->multicastPacketBuf);
+
   free(client->desktopName);
   free(client->serverHost);
   if (client->destHost)
@@ -565,6 +566,13 @@ void rfbClientCleanup(rfbClient* client) {
   if (client->saslSecret)
     free(client->saslSecret);
 #endif /* LIBVNCSERVER_HAVE_SASL */
+
+#ifdef WIN32
+  if(WSACleanup() != 0) {
+      errno=WSAGetLastError();
+      rfbClientErr("Could not terminate Windows Sockets: %s\n", strerror(errno));
+  }
+#endif
 
   free(client);
 }

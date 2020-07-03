@@ -510,7 +510,7 @@ void usage(char *progname)
 
 int main(int argc, char *argv[])
 {
-	unsigned char *srcbuf=NULL;  int w, h, i, j;
+	unsigned char *srcbuf=NULL;  int w = 0, h = 0, i, j;
 	int minqual=-1, maxqual=-1;  char *temp;
 	int minarg=2;  int retval=0;
 
@@ -602,7 +602,7 @@ int main(int argc, char *argv[])
 				}
 				else usage(argv[0]);
 			}
-			if(!strcasecmp(argv[i], "-benchtime") && i<argc-1)
+			if(i<argc-1 && !strcasecmp(argv[i], "-benchtime"))
 			{
 				double temp=atof(argv[++i]);
 				if(temp>0.0) benchtime=temp;

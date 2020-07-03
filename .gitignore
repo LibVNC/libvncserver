@@ -1,15 +1,9 @@
 *.swp
 *~
 Makefile
-Makefile.in
-LibVNCServer.spec.in
-LibVNCServer.spec
-libvncserver-config
 *.pc
 LibVNCServer*.tar.gz
-config.h.in
 rfbconfig.h
-rfbconfig.h.in
 *.o
 *.a
 *.so
@@ -20,10 +14,12 @@ client_examples/gtkvncviewer
 client_examples/ppmtest
 client_examples/vnc2mpg
 build/
+doc/
 examples/zippy
 examples/backchannel
 examples/blooptest
 examples/camera
+examples/cursors
 examples/colourmaptest
 examples/example
 examples/filetransfer
@@ -41,7 +37,6 @@ examples/vncev
 test/blooptest
 test/cargstest
 test/copyrecttest
-test/cursortest
 test/encodingstest
 test/wstest
 /test/tjbench
@@ -58,3 +53,6 @@ CMakeCache.txt
 /rfbproto.rst
 /vencrypt.txt
 /INSTALL
+.ccls-cache
+.log
+compile_commands.json

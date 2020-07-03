@@ -170,15 +170,21 @@ rfbFontDataPtr rfbLoadConsoleFont(char *filename)
   if(!f) return NULL;
 
   p=(rfbFontDataPtr)malloc(sizeof(rfbFontData));
+  if(!p) {
+      fclose(f);
+      return NULL;
+  }
+
   p->data=(unsigned char*)malloc(4096);
-  if(1!=fread(p->data,4096,1,f)) {
+  p->metaData=(int*)malloc(256*5*sizeof(int));
+  if(!p->data || !p->metaData || 1!=fread(p->data,4096,1,f)) {
     free(p->data);
+    free(p->metaData);
     free(p);
     fclose(f);
     return NULL;
   }
   fclose(f);
-  p->metaData=(int*)malloc(256*5*sizeof(int));
   for(i=0;i<256;i++) {
     p->metaData[i*5+0]=i*16; /* offset */
     p->metaData[i*5+1]=8; /* width */

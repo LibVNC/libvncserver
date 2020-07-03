@@ -52,12 +52,12 @@
 
 static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
   int x, y, w, h;
-  uint8_t type, last_type;
+  uint8_t type, last_type = 0;
   int min_buffer_size = 16 * 16 * (REALBPP / 8) * 2;
   uint8_t *buffer;
   CARDBPP palette[128];
-  int bpp, mask, divider;
-  CARDBPP color;
+  int bpp = 0, mask = 0, divider = 0;
+  CARDBPP color = 0;
 
   /* First make sure we have a large enough raw buffer to hold the
    * decompressed data.  In practice, with a fixed REALBPP, fixed frame
@@ -86,15 +86,14 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
       if (ry + rh - y < 16)
         h = ry + rh - y;
 
-      if (!ReadFromRFBServer(client, &type, 1))
+      if (!ReadFromRFBServer(client, (char *)(&type), 1))
         return FALSE;
 
-      buffer = client->raw_buffer;
+      buffer = (uint8_t*)(client->raw_buffer);
 
       switch (type) {
-      case_0:
       case 0: {
-        if (!ReadFromRFBServer(client, buffer, w * h * REALBPP / 8))
+        if (!ReadFromRFBServer(client, (char *)buffer, w * h * REALBPP / 8))
           return FALSE;
 #if REALBPP != BPP
         int i, j;
@@ -110,7 +109,7 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
         break;
       }
       case 1: {
-        if (!ReadFromRFBServer(client, buffer, REALBPP / 8))
+        if (!ReadFromRFBServer(client, (char *)buffer, REALBPP / 8))
           return FALSE;
 
         color = UncompressCPixel(buffer);
@@ -142,7 +141,7 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
           if (last_type <= 16) {
             int i, j, shift;
 
-            if (!ReadFromRFBServer(client, buffer,
+            if (!ReadFromRFBServer(client, (char*)buffer,
                                    (w + divider - 1) / divider * h))
               return FALSE;
 
@@ -172,14 +171,14 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
         while (j < h) {
           int color, length;
           /* read color */
-          if (!ReadFromRFBServer(client, buffer, REALBPP / 8 + 1))
+          if (!ReadFromRFBServer(client, (char*)buffer, REALBPP / 8 + 1))
             return FALSE;
           color = UncompressCPixel(buffer);
           buffer += REALBPP / 8;
           /* read run length */
           length = 1;
           while (*buffer == 0xff) {
-            if (!ReadFromRFBServer(client, buffer + 1, 1))
+            if (!ReadFromRFBServer(client, (char*)buffer + 1, 1))
               return FALSE;
             length += *buffer;
             buffer++;
@@ -212,17 +211,17 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
         while (j < h) {
           int color, length;
           /* read color */
-          if (!ReadFromRFBServer(client, buffer, 1))
+          if (!ReadFromRFBServer(client, (char *)buffer, 1))
             return FALSE;
           color = palette[(*buffer) & 0x7f];
           length = 1;
           if (*buffer & 0x80) {
-            if (!ReadFromRFBServer(client, buffer + 1, 1))
+            if (!ReadFromRFBServer(client, (char *)buffer + 1, 1))
               return FALSE;
             buffer++;
             /* read run length */
             while (*buffer == 0xff) {
-              if (!ReadFromRFBServer(client, buffer + 1, 1))
+              if (!ReadFromRFBServer(client, (char *)buffer + 1, 1))
                 return FALSE;
               length += *buffer;
               buffer++;
@@ -254,10 +253,10 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
         if (type <= 16) {
           int i;
 
-          bpp = (type > 4 ? (type > 16 ? 8 : 4) : (type > 2 ? 2 : 1)),
+          bpp = (type > 4 ? 4 : (type > 2 ? 2 : 1)),
           mask = (1 << bpp) - 1, divider = (8 / bpp);
 
-          if (!ReadFromRFBServer(client, buffer, type * REALBPP / 8))
+          if (!ReadFromRFBServer(client, (char *)buffer, type * REALBPP / 8))
             return FALSE;
 
           /* read palette */
@@ -269,7 +268,7 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
         } else if (type >= 130) {
           int i;
 
-          if (!ReadFromRFBServer(client, buffer, (type - 128) * REALBPP / 8))
+          if (!ReadFromRFBServer(client, (char *)buffer, (type - 128) * REALBPP / 8))
             return FALSE;
 
           /* read palette */

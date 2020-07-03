@@ -26,7 +26,7 @@
 #ifndef FILE_TRANSFER_MSG_H
 #define FILE_TRANSFER_MSG_H
 
-#ifdef _MSC_VER
+#ifdef WIN32
 #pragma push_macro("CreateDirectory")
 #undef CreateDirectory /* Prevent macro clashes under Windows */
 #endif /* _MSC_VER */

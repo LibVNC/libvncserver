@@ -39,7 +39,6 @@
 #include <errno.h>
 #include <rfb/rfbclient.h>
 #ifdef WIN32
-#undef SOCKET
 #undef socklen_t
 #endif
 #ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
@@ -62,9 +61,7 @@
 #include <stdarg.h>
 #include <time.h>
 
-#ifdef LIBVNCSERVER_WITH_CLIENT_GCRYPT
-#include <gcrypt.h>
-#endif
+#include "crypto.h"
 
 #include "sasl.h"
 #ifdef LIBVNCSERVER_HAVE_LZO
@@ -76,9 +73,7 @@
 #include "ghpringbuf.h"
 #include "packet.h"
 
-#ifdef _MSC_VER
-#  define snprintf _snprintf /* MSVC went straight to the underscored syntax */
-#endif
+#define MAX_TEXTCHAT_SIZE 10485760 /* 10MB */
 
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
@@ -131,6 +126,7 @@ void rfbClientSetClientData(rfbClient* client, void* tag, void* data)
 		clientData = clientData->next;
 	if(clientData == NULL) {
 		clientData = calloc(sizeof(rfbClientData), 1);
+		if(clientData == NULL) return;
 		clientData->next = client->clientData;
 		client->clientData = clientData;
 		clientData->tag = tag;
@@ -226,13 +222,13 @@ SetServer2Client(rfbClient* client, int messageType)
 void
 ClearClient2Server(rfbClient* client, int messageType)
 {
-  client->supportedMessages.client2server[((messageType & 0xFF)/8)] &= (!(1<<(messageType % 8)));
+  client->supportedMessages.client2server[((messageType & 0xFF)/8)] &= ~(1<<(messageType % 8));
 }
 
 void
 ClearServer2Client(rfbClient* client, int messageType)
 {
-  client->supportedMessages.server2client[((messageType & 0xFF)/8)] &= (!(1<<(messageType % 8)));
+  client->supportedMessages.server2client[((messageType & 0xFF)/8)] &= ~(1<<(messageType % 8));
 }
 
 
@@ -314,6 +310,10 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     const char* magic="vncLog0.0";
     char buffer[10];
     rfbVNCRec* rec = (rfbVNCRec*)malloc(sizeof(rfbVNCRec));
+    if(!rec) {
+        rfbClientLog("Could not allocate rfbVNCRec memory\n");
+        return FALSE;
+    }
     client->vncRec = rec;
 
     rec->file = fopen(client->serverHost,"rb");
@@ -332,34 +332,32 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
       fclose(rec->file);
       return FALSE;
     }
-    client->sock = -1;
+    client->sock = RFB_INVALID_SOCKET;
     return TRUE;
   }
 
 #ifndef WIN32
   if(IsUnixSocket(hostname))
     /* serverHost is a UNIX socket. */
-    client->sock = ConnectClientToUnixSock(hostname);
+    client->sock = ConnectClientToUnixSockWithTimeout(hostname, client->connectTimeout);
   else
 #endif
   {
 #ifdef LIBVNCSERVER_IPv6
-    client->sock = ConnectClientToTcpAddr6(hostname, port);
-    if (client->sock == -1)
-#endif
-    {
-      unsigned int host;
+    client->sock = ConnectClientToTcpAddr6WithTimeout(hostname, port, client->connectTimeout);
+#else
+    unsigned int host;
 
-      /* serverHost is a hostname */
-      if (!StringToIPAddr(hostname, &host)) {
-        rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
-        return FALSE;
-      }
-      client->sock = ConnectClientToTcpAddr(host, port);
+    /* serverHost is a hostname */
+    if (!StringToIPAddr(hostname, &host)) {
+      rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
+      return FALSE;
     }
+    client->sock = ConnectClientToTcpAddrWithTimeout(host, port, client->connectTimeout);
+#endif
   }
 
-  if (client->sock < 0) {
+  if (client->sock == RFB_INVALID_SOCKET) {
     rfbClientLog("Unable to connect to VNC server\n");
     return FALSE;
   }
@@ -367,7 +365,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
   if(client->QoS_DSCP && !SetDSCP(client->sock, client->QoS_DSCP))
      return FALSE;
 
-  return SetNonBlocking(client->sock);
+  return TRUE;
 }
 
 /*
@@ -379,29 +377,23 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
   rfbProtocolVersionMsg pv;
   int major,minor;
   char tmphost[250];
-  int tmphostlen;
 
 #ifdef LIBVNCSERVER_IPv6
-  client->sock = ConnectClientToTcpAddr6(repeaterHost, repeaterPort);
-  if (client->sock == -1)
-#endif
-  {
-    unsigned int host;
-    if (!StringToIPAddr(repeaterHost, &host)) {
-      rfbClientLog("Couldn't convert '%s' to host address\n", repeaterHost);
-      return FALSE;
-    }
-
-    client->sock = ConnectClientToTcpAddr(host, repeaterPort);
+  client->sock = ConnectClientToTcpAddr6WithTimeout(repeaterHost, repeaterPort, client->connectTimeout);
+#else
+  unsigned int host;
+  if (!StringToIPAddr(repeaterHost, &host)) {
+    rfbClientLog("Couldn't convert '%s' to host address\n", repeaterHost);
+    return FALSE;
   }
 
-  if (client->sock < 0) {
+  client->sock = ConnectClientToTcpAddrWithTimeout(host, repeaterPort, client->connectTimeout);
+#endif
+
+  if (client->sock == RFB_INVALID_SOCKET) {
     rfbClientLog("Unable to connect to VNC repeater\n");
     return FALSE;
   }
-
-  if (!SetNonBlocking(client->sock))
-    return FALSE;
 
   if (!ReadFromRFBServer(client, pv, sz_rfbProtocolVersionMsg))
     return FALSE;
@@ -415,11 +407,10 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 
   rfbClientLog("Connected to VNC repeater, using protocol version %d.%d\n", major, minor);
 
-  tmphostlen = snprintf(tmphost, sizeof(tmphost), "%s:%d", destHost, destPort);
-  if(tmphostlen < 0 || tmphostlen >= (int)sizeof(tmphost))
-    return FALSE; /* snprintf error or output truncated */
-
-  if (!WriteToRFBServer(client, tmphost, tmphostlen + 1))
+  memset(tmphost, 0, sizeof(tmphost));
+  if(snprintf(tmphost, sizeof(tmphost), "%s:%d", destHost, destPort) >= (int)sizeof(tmphost))
+    return FALSE; /* output truncated */
+  if (!WriteToRFBServer(client, tmphost, sizeof(tmphost)))
     return FALSE;
 
   return TRUE;
@@ -441,7 +432,7 @@ ReadReason(rfbClient* client)
       return;
     }
     reason = malloc(reasonLen+1);
-    if (!ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
+    if (!reason || !ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
     reason[reasonLen]=0;
     rfbClientLog("VNC connection failed: %s\n",reason);
     free(reason);
@@ -523,13 +514,12 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
         if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth ||
 			extAuthHandler ||
 #if defined(LIBVNCSERVER_HAVE_GNUTLS) || defined(LIBVNCSERVER_HAVE_LIBSSL)
-            tAuth[loop]==rfbVeNCrypt ||
+	    (!subAuth && (tAuth[loop]==rfbTLS || tAuth[loop]==rfbVeNCrypt)) ||
 #endif
 #ifdef LIBVNCSERVER_HAVE_SASL
             tAuth[loop]==rfbSASL ||
 #endif /* LIBVNCSERVER_HAVE_SASL */
-            (tAuth[loop]==rfbARD && client->GetCredential) ||
-            (!subAuth && (tAuth[loop]==rfbTLS || (tAuth[loop]==rfbVeNCrypt && client->GetCredential))))
+            (tAuth[loop]==rfbARD && client->GetCredential))
         {
             if (!subAuth && client->clientAuthSchemes)
             {
@@ -731,9 +721,9 @@ HandleMSLogonAuth(rfbClient *client)
   }
 
   memset(username, 0, sizeof(username));
-  strncpy((char *)username, cred->userCredential.username, sizeof(username));
+  strncpy((char *)username, cred->userCredential.username, sizeof(username)-1);
   memset(password, 0, sizeof(password));
-  strncpy((char *)password, cred->userCredential.password, sizeof(password));
+  strncpy((char *)password, cred->userCredential.password, sizeof(password)-1);
   FreeUserCredential(cred);
 
   srand(time(NULL));
@@ -758,217 +748,128 @@ HandleMSLogonAuth(rfbClient *client)
   return TRUE;
 }
 
-#ifdef LIBVNCSERVER_WITH_CLIENT_GCRYPT
-static rfbBool
-rfbMpiToBytes(const gcry_mpi_t value, uint8_t *result, size_t size)
-{
-  gcry_error_t error;
-  size_t len;
-  int i;
-
-  error = gcry_mpi_print(GCRYMPI_FMT_USG, result, size, &len, value);
-  if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
-  {
-    rfbClientLog("gcry_mpi_print error: %s\n", gcry_strerror(error));
-    return FALSE;
-  }
-  for (i=size-1;i>(int)size-1-(int)len;--i)
-    result[i] = result[i-size+len];
-  for (;i>=0;--i)
-    result[i] = 0;
-  return TRUE;
-}
 
 static rfbBool
 HandleARDAuth(rfbClient *client)
 {
   uint8_t gen[2], len[2];
   size_t keylen;
-  uint8_t *mod = NULL, *resp, *pub, *key, *shared;
-  gcry_mpi_t genmpi = NULL, modmpi = NULL, respmpi = NULL;
-  gcry_mpi_t privmpi = NULL, pubmpi = NULL, keympi = NULL;
-  gcry_md_hd_t md5 = NULL;
-  gcry_cipher_hd_t aes = NULL;
-  gcry_error_t error;
+  uint8_t *mod = NULL, *resp = NULL, *priv = NULL, *pub = NULL, *key = NULL, *shared = NULL;
   uint8_t userpass[128], ciphertext[128];
+  int ciphertext_len;
   int passwordLen, usernameLen;
   rfbCredential *cred = NULL;
   rfbBool result = FALSE;
 
-  if (!gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P))
-  {
-    /* Application did not initialize gcrypt, so we should */
-    if (!gcry_check_version(GCRYPT_VERSION))
-    {
-      /* Older version of libgcrypt is installed on system than compiled against */
-      rfbClientLog("libgcrypt version mismatch.\n");
-    }
+  /* Step 1: Read the authentication material from the socket.
+     A two-byte generator value, a two-byte key length value. */
+  if (!ReadFromRFBServer(client, (char *)gen, 2)) {
+      rfbClientErr("HandleARDAuth: reading generator value failed\n");
+      goto out;
+  }
+  if (!ReadFromRFBServer(client, (char *)len, 2)) {
+      rfbClientErr("HandleARDAuth: reading key length failed\n");
+      goto out;
+  }
+  keylen = 256*len[0]+len[1]; /* convert from char[] to int */
+
+  mod = (uint8_t*)malloc(keylen*5); /* the block actually contains mod, resp, pub, priv and key */
+  if (!mod)
+      goto out;
+
+  resp = mod+keylen;
+  pub = resp+keylen;
+  priv = pub+keylen;
+  key = priv+keylen;
+
+  /* Step 1: Read the authentication material from the socket.
+     The prime modulus (keylen bytes) and the peer's generated public key (keylen bytes). */
+  if (!ReadFromRFBServer(client, (char *)mod, keylen)) {
+      rfbClientErr("HandleARDAuth: reading prime modulus failed\n");
+      goto out;
+  }
+  if (!ReadFromRFBServer(client, (char *)resp, keylen)) {
+      rfbClientErr("HandleARDAuth: reading peer's generated public key failed\n");
+      goto out;
   }
 
-  while (1)
-  {
-    if (!ReadFromRFBServer(client, (char *)gen, 2))
-      break;
-    if (!ReadFromRFBServer(client, (char *)len, 2))
-      break;
+  /* Step 2: Generate own Diffie-Hellman public-private key pair. */
+  if(!dh_generate_keypair(priv, pub, gen, 2, mod, keylen)) {
+      rfbClientErr("HandleARDAuth: generating keypair failed\n");
+      goto out;
+  }
 
-    if (!client->GetCredential)
-    {
-      rfbClientLog("GetCredential callback is not set.\n");
-      break;
-    }
-    cred = client->GetCredential(client, rfbCredentialTypeUser);
-    if (!cred)
-    {
-      rfbClientLog("Reading credential failed\n");
-      break;
-    }
+  /* Step 3: Perform Diffie-Hellman key agreement, using the generator (gen),
+     prime (mod), and the peer's public key. The output will be a shared
+     secret known to both us and the peer. */
+  if(!dh_compute_shared_key(key, priv, resp, mod, keylen)) {
+      rfbClientErr("HandleARDAuth: creating shared key failed\n");
+      goto out;
+  }
 
-    keylen = 256*len[0]+len[1];
-    mod = (uint8_t*)malloc(keylen*4);
-    if (!mod)
-    {
-      rfbClientLog("malloc out of memory\n");
-      break;
-    }
-    resp = mod+keylen;
-    pub = resp+keylen;
-    key = pub+keylen;
+  /* Step 4: Perform an MD5 hash of the shared secret.
+     This 128-bit (16-byte) value will be used as the AES key. */
+  shared = malloc(MD5_HASH_SIZE);
+  if(!hash_md5(shared, key, keylen)) {
+      rfbClientErr("HandleARDAuth: hashing shared key failed\n");
+      goto out;
+  }
 
-    if (!ReadFromRFBServer(client, (char *)mod, keylen))
-      break;
-    if (!ReadFromRFBServer(client, (char *)resp, keylen))
-      break;
-
-    error = gcry_mpi_scan(&genmpi, GCRYMPI_FMT_USG, gen, 2, NULL);
-    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
-    {
-      rfbClientLog("gcry_mpi_scan error: %s\n", gcry_strerror(error));
-      break;
-    }
-    error = gcry_mpi_scan(&modmpi, GCRYMPI_FMT_USG, mod, keylen, NULL);
-    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
-    {
-      rfbClientLog("gcry_mpi_scan error: %s\n", gcry_strerror(error));
-      break;
-    }
-    error = gcry_mpi_scan(&respmpi, GCRYMPI_FMT_USG, resp, keylen, NULL);
-    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
-    {
-      rfbClientLog("gcry_mpi_scan error: %s\n", gcry_strerror(error));
-      break;
-    }
-
-    privmpi = gcry_mpi_new(keylen);
-    if (!privmpi)
-    {
-      rfbClientLog("gcry_mpi_new out of memory\n");
-      break;
-    }
-    gcry_mpi_randomize(privmpi, (keylen/8)*8, GCRY_STRONG_RANDOM);
-
-    pubmpi = gcry_mpi_new(keylen);
-    if (!pubmpi)
-    {
-      rfbClientLog("gcry_mpi_new out of memory\n");
-      break;
-    }
-    gcry_mpi_powm(pubmpi, genmpi, privmpi, modmpi);
-
-    keympi = gcry_mpi_new(keylen);
-    if (!keympi)
-    {
-      rfbClientLog("gcry_mpi_new out of memory\n");
-      break;
-    }
-    gcry_mpi_powm(keympi, respmpi, privmpi, modmpi);
-
-    if (!rfbMpiToBytes(pubmpi, pub, keylen))
-      break;
-    if (!rfbMpiToBytes(keympi, key, keylen))
-      break;
-
-    error = gcry_md_open(&md5, GCRY_MD_MD5, 0);
-    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
-    {
-      rfbClientLog("gcry_md_open error: %s\n", gcry_strerror(error));
-      break;
-    }
-    gcry_md_write(md5, key, keylen);
-    error = gcry_md_final(md5);
-    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
-    {
-      rfbClientLog("gcry_md_final error: %s\n", gcry_strerror(error));
-      break;
-    }
-    shared = gcry_md_read(md5, GCRY_MD_MD5);
-
-    passwordLen = strlen(cred->userCredential.password)+1;
-    usernameLen = strlen(cred->userCredential.username)+1;
-    if (passwordLen > sizeof(userpass)/2)
+  /* Step 5: Pack the username and password into a 128-byte
+     plaintext "userpass" structure: { username[64], password[64] }.
+     Null-terminate each. Fill the unused bytes with random characters
+     so that the encryption output is less predictable. */
+  if(!client->GetCredential) {
+      rfbClientErr("HandleARDAuth: GetCredential callback is not set\n");
+      goto out;
+  }
+  cred = client->GetCredential(client, rfbCredentialTypeUser);
+  if(!cred) {
+      rfbClientErr("HandleARDAuth: reading credential failed\n");
+      goto out;
+  }
+  passwordLen = strlen(cred->userCredential.password)+1;
+  usernameLen = strlen(cred->userCredential.username)+1;
+  if (passwordLen > sizeof(userpass)/2)
       passwordLen = sizeof(userpass)/2;
-    if (usernameLen > sizeof(userpass)/2)
+  if (usernameLen > sizeof(userpass)/2)
       usernameLen = sizeof(userpass)/2;
+  random_bytes(userpass, sizeof(userpass));
+  memcpy(userpass, cred->userCredential.username, usernameLen);
+  memcpy(userpass+sizeof(userpass)/2, cred->userCredential.password, passwordLen);
 
-    gcry_randomize(userpass, sizeof(userpass), GCRY_STRONG_RANDOM);
-    memcpy(userpass, cred->userCredential.username, usernameLen);
-    memcpy(userpass+sizeof(userpass)/2, cred->userCredential.password, passwordLen);
-
-    error = gcry_cipher_open(&aes, GCRY_CIPHER_AES128, GCRY_CIPHER_MODE_ECB, 0);
-    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
-    {
-      rfbClientLog("gcry_cipher_open error: %s\n", gcry_strerror(error));
-      break;
-    }
-    error = gcry_cipher_setkey(aes, shared, 16);
-    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
-    {
-      rfbClientLog("gcry_cipher_setkey error: %s\n", gcry_strerror(error));
-      break;
-    }
-    error = gcry_cipher_encrypt(aes, ciphertext, sizeof(ciphertext), userpass, sizeof(userpass));
-    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
-    {
-      rfbClientLog("gcry_cipher_encrypt error: %s\n", gcry_strerror(error));
-      break;
-    }
-
-    if (!WriteToRFBServer(client, (char *)ciphertext, sizeof(ciphertext)))
-      break;
-    if (!WriteToRFBServer(client, (char *)pub, keylen))
-      break;
-
-    /* Handle the SecurityResult message */
-    if (!rfbHandleAuthResult(client))
-      break;
-
-    result = TRUE;
-    break;
+  /* Step 6: Encrypt the plaintext credentials with the 128-bit MD5 hash
+     from step 4, using the AES 128-bit symmetric cipher in electronic
+     codebook (ECB) mode. Use no further padding for this block cipher. */
+  if(!encrypt_aes128ecb(ciphertext, &ciphertext_len, shared, userpass, sizeof(userpass))) {
+      rfbClientErr("HandleARDAuth: encrypting credentials failed\n");
+      goto out;
   }
 
+  /* Step 7: Write the ciphertext from step 6 to the stream.
+     Write the generated DH public key to the stream. */
+  if (!WriteToRFBServer(client, (char *)ciphertext, sizeof(ciphertext)))
+      goto out;
+  if (!WriteToRFBServer(client, (char *)pub, keylen))
+      goto out;
+
+  /* Handle the SecurityResult message */
+  if (!rfbHandleAuthResult(client))
+      goto out;
+
+  result = TRUE;
+
+ out:
   if (cred)
     FreeUserCredential(cred);
-  if (mod)
-    free(mod);
-  if (genmpi)
-    gcry_mpi_release(genmpi);
-  if (modmpi)
-    gcry_mpi_release(modmpi);
-  if (respmpi)
-    gcry_mpi_release(respmpi);
-  if (privmpi)
-    gcry_mpi_release(privmpi);
-  if (pubmpi)
-    gcry_mpi_release(pubmpi);
-  if (keympi)
-    gcry_mpi_release(keympi);
-  if (md5)
-    gcry_md_close(md5);
-  if (aes)
-    gcry_cipher_close(aes);
+
+  free(mod);
+  free(shared);
+
   return result;
 }
-#endif
+
+
 
 /*
  * SetClientAuthSchemes.
@@ -993,9 +894,11 @@ SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size)
       for (size=0;authSchemes[size];size++) ;
     }
     client->clientAuthSchemes = (uint32_t*)malloc(sizeof(uint32_t)*(size+1));
-    for (i=0;i<size;i++)
-      client->clientAuthSchemes[i] = authSchemes[i];
-    client->clientAuthSchemes[size] = 0;
+    if (client->clientAuthSchemes) {
+      for (i=0;i<size;i++)
+        client->clientAuthSchemes[i] = authSchemes[i];
+      client->clientAuthSchemes[size] = 0;
+    }
   }
 }
 
@@ -1019,7 +922,6 @@ InitialiseRFBConnection(rfbClient* client)
     errorMessageOnReadFailure = FALSE;
 
   if (!ReadFromRFBServer(client, pv, sz_rfbProtocolVersionMsg)) return FALSE;
-  pv[sz_rfbProtocolVersionMsg]=0;
 
   errorMessageOnReadFailure = TRUE;
 
@@ -1118,12 +1020,7 @@ InitialiseRFBConnection(rfbClient* client)
     break;
 
   case rfbARD:
-#ifndef LIBVNCSERVER_WITH_CLIENT_GCRYPT
-    rfbClientLog("GCrypt support was not compiled in\n");
-    return FALSE;
-#else
     if (!HandleARDAuth(client)) return FALSE;
-#endif
     break;
 
   case rfbTLS:
@@ -1272,10 +1169,13 @@ rfbBool
 SetFormatAndEncodings(rfbClient* client)
 {
   rfbSetPixelFormatMsg spf;
-  char buf[sz_rfbSetEncodingsMsg + MAX_ENCODINGS * 4];
+  union {
+    char bytes[sz_rfbSetEncodingsMsg + MAX_ENCODINGS*4];
+    rfbSetEncodingsMsg msg;
+  } buf;
 
-  rfbSetEncodingsMsg *se = (rfbSetEncodingsMsg *)buf;
-  uint32_t *encs = (uint32_t *)(&buf[sz_rfbSetEncodingsMsg]);
+  rfbSetEncodingsMsg *se = &buf.msg;
+  uint32_t *encs = (uint32_t *)(&buf.bytes[sz_rfbSetEncodingsMsg]);
   int len = 0;
   rfbBool requestCompressLevel = FALSE;
   rfbBool requestQualityLevel = FALSE;
@@ -1481,7 +1381,7 @@ SetFormatAndEncodings(rfbClient* client)
 
   se->nEncodings = rfbClientSwap16IfLE(se->nEncodings);
 
-  if (!WriteToRFBServer(client, buf, len)) return FALSE;
+  if (!WriteToRFBServer(client, buf.bytes, len)) return FALSE;
 
   return TRUE;
 }
@@ -2120,7 +2020,7 @@ HandleRFBServerMessage(rfbClient* client)
       if (rect.encoding == rfbEncodingServerIdentity) {
           char *buffer;
           buffer = malloc(rect.r.w+1);
-          if (!ReadFromRFBServer(client, buffer, rect.r.w))
+          if (!buffer || !ReadFromRFBServer(client, buffer, rect.r.w))
           {
               free(buffer);
               return FALSE;
@@ -2562,7 +2462,7 @@ HandleRFBServerMessage(rfbClient* client)
 
     buffer = malloc(msg.sct.length+1);
 
-    if (!ReadFromRFBServer(client, buffer, msg.sct.length)) {
+    if (!buffer || !ReadFromRFBServer(client, buffer, msg.sct.length)) {
       free(buffer);
       return FALSE;
     }
@@ -2601,8 +2501,10 @@ HandleRFBServerMessage(rfbClient* client)
               client->HandleTextChat(client, (int)rfbTextChatFinished, NULL);
           break;
       default:
+	  if(msg.tc.length > MAX_TEXTCHAT_SIZE)
+	      return FALSE;
           buffer=malloc(msg.tc.length+1);
-          if (!ReadFromRFBServer(client, buffer, msg.tc.length))
+          if (!buffer || !ReadFromRFBServer(client, buffer, msg.tc.length))
           {
               free(buffer);
               return FALSE;
@@ -2801,4 +2703,3 @@ PrintPixelFormat(rfbPixelFormat *format)
 #define rfbUseKey rfbClientUseKey
 
 #include "vncauth.c"
-#include "d3des.c"

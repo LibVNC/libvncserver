@@ -47,25 +47,12 @@
 #endif
 
 #ifdef WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
 #include <io.h>
-#define write(sock,buf,len) send(sock,buf,len,0)
 #else
-#ifdef LIBVNCSERVER_HAVE_UNISTD_H
-#include <unistd.h>
-#endif
 #include <pwd.h>
-#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
-#include <sys/socket.h>
 #endif
-#ifdef LIBVNCSERVER_HAVE_NETINET_IN_H
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#endif
-#endif
+
+#include "sockets.h"
 
 #ifdef DEBUGPROTO
 #undef DEBUGPROTO
@@ -74,7 +61,7 @@
 #define DEBUGPROTO(x)
 #endif
 #include <stdarg.h>
-#include <scale.h>
+#include "scale.h"
 /* stst() */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -99,7 +86,6 @@
 #endif
 
 #ifdef _MSC_VER
-#define snprintf _snprintf /* Missing in MSVC */
 /* Prevent POSIX deprecation warnings */
 #define close _close
 #define strdup _strdup 
@@ -145,7 +131,7 @@ static int rfbPutMulticastRectEncodingPreferred(rfbClientPtr cl, int x, int y, i
 
 #define MULTICAST_FLAG_BUFFER_DIRTY 11
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 void rfbIncrClientRef(rfbClientPtr cl)
 {
   LOCK(cl->refCountMutex);
@@ -166,7 +152,7 @@ void rfbIncrClientRef(rfbClientPtr cl) {}
 void rfbDecrClientRef(rfbClientPtr cl) {}
 #endif
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 static MUTEX(rfbClientListMutex);
 #endif
 
@@ -194,9 +180,11 @@ rfbGetClientIterator(rfbScreenInfoPtr rfbScreen)
 {
   rfbClientIteratorPtr i =
     (rfbClientIteratorPtr)malloc(sizeof(struct rfbClientIterator));
-  i->next = NULL;
-  i->screen = rfbScreen;
-  i->closedToo = FALSE;
+  if(i) {
+    i->next = NULL;
+    i->screen = rfbScreen;
+    i->closedToo = FALSE;
+  }
   return i;
 }
 
@@ -205,16 +193,18 @@ rfbGetClientIteratorWithClosed(rfbScreenInfoPtr rfbScreen)
 {
   rfbClientIteratorPtr i =
     (rfbClientIteratorPtr)malloc(sizeof(struct rfbClientIterator));
-  i->next = NULL;
-  i->screen = rfbScreen;
-  i->closedToo = TRUE;
+  if(i) {
+    i->next = NULL;
+    i->screen = rfbScreen;
+    i->closedToo = TRUE;
+  }
   return i;
 }
 
 rfbClientPtr
 rfbClientIteratorHead(rfbClientIteratorPtr i)
 {
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
   if(i->next != 0) {
     rfbDecrClientRef(i->next);
     rfbIncrClientRef(i->screen->clientHead);
@@ -229,17 +219,19 @@ rfbClientIteratorHead(rfbClientIteratorPtr i)
 rfbClientPtr
 rfbClientIteratorNext(rfbClientIteratorPtr i)
 {
+  if (!i)
+    return NULL;
   if(i->next == 0) {
     LOCK(rfbClientListMutex);
     i->next = i->screen->clientHead;
     UNLOCK(rfbClientListMutex);
   } else {
-    IF_PTHREADS(rfbClientPtr cl = i->next);
+    rfbClientPtr cl = i->next;
     i->next = i->next->next;
-    IF_PTHREADS(rfbDecrClientRef(cl));
+    rfbDecrClientRef(cl);
   }
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     if(!i->closedToo)
       while(i->next && i->next->sock<0)
         i->next = i->next->next;
@@ -253,7 +245,7 @@ rfbClientIteratorNext(rfbClientIteratorPtr i)
 void
 rfbReleaseClientIterator(rfbClientIteratorPtr iterator)
 {
-  IF_PTHREADS(if(iterator->next) rfbDecrClientRef(iterator->next));
+  if(iterator && iterator->next) rfbDecrClientRef(iterator->next);
   free(iterator);
 }
 
@@ -265,7 +257,7 @@ rfbReleaseClientIterator(rfbClientIteratorPtr iterator)
 
 void
 rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,
-                       int sock)
+                       rfbSocket sock)
 {
     rfbNewClient(rfbScreen,sock);
 }
@@ -281,7 +273,7 @@ rfbReverseConnection(rfbScreenInfoPtr rfbScreen,
                      char *host,
                      int port)
 {
-    int sock;
+    rfbSocket sock;
     rfbClientPtr cl;
 
     if ((sock = rfbConnect(rfbScreen, host, port)) < 0)
@@ -318,7 +310,7 @@ rfbSetProtocolVersion(rfbScreenInfoPtr rfbScreen, int major_, int minor_)
 
 static rfbClientPtr
 rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
-                     int sock,
+                     rfbSocket sock,
                      rfbBool isUDP)
 {
     rfbProtocolVersionMsg pv;
@@ -333,6 +325,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     rfbProtocolExtension* extension;
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
+
+    if (!cl)
+        return NULL;
 
     cl->screen = rfbScreen;
     cl->sock = sock;
@@ -353,6 +348,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 		char host[1024];
 #endif
       int one=1;
+      size_t otherClientsCount = 0;
 
       getpeername(sock, (struct sockaddr *)&addr, &addrlen);
 #ifdef LIBVNCSERVER_IPv6
@@ -366,15 +362,14 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->host = strdup(inet_ntoa(addr.sin_addr));
 #endif
 
-      rfbLog("  other clients:\n");
       iterator = rfbGetClientIterator(rfbScreen);
-      while ((cl_ = rfbClientIteratorNext(iterator)) != NULL) {
-        rfbLog("     %s\n",cl_->host);
-      }
+      while ((cl_ = rfbClientIteratorNext(iterator)) != NULL)
+	  ++otherClientsCount;
       rfbReleaseClientIterator(iterator);
+      rfbLog("  %lu other clients\n", (unsigned long) otherClientsCount);
 
       if(!rfbSetNonBlocking(sock)) {
-	close(sock);
+	rfbCloseSocket(sock);
 	return NULL;
       }
 
@@ -421,8 +416,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->translateLookupTable = NULL;
 
       LOCK(rfbClientListMutex);
-
-      IF_PTHREADS(cl->refCount = 0);
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+      cl->refCount = 0;
+#endif
       cl->next = rfbScreen->clientHead;
       cl->prev = NULL;
       if (rfbScreen->clientHead)
@@ -460,6 +456,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->cursorX = rfbScreen->cursorX;
       cl->cursorY = rfbScreen->cursorY;
       cl->useNewFBSize = FALSE;
+      cl->useExtDesktopSize = FALSE;
+      cl->requestedDesktopSizeChange = 0;
+      cl->lastDesktopSizeChangeError = 0;
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
       cl->compStreamInited = FALSE;
@@ -477,6 +476,11 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->extensions = NULL;
 
       cl->lastPtrX = -1;
+
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+      cl->pipe_notify_client_thread[0] = -1;
+      cl->pipe_notify_client_thread[1] = -1;
+#endif
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
       /*
@@ -529,7 +533,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
 rfbClientPtr
 rfbNewClient(rfbScreenInfoPtr rfbScreen,
-             int sock)
+             rfbSocket sock)
 {
   return(rfbNewTCPOrUDPClient(rfbScreen,sock,FALSE));
 }
@@ -564,8 +568,8 @@ rfbClientConnectionGone(rfbClientPtr cl)
 
     UNLOCK(rfbClientListMutex);
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-    if(cl->screen->backgroundLoop != FALSE) {
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    if (cl->screen->backgroundLoop) {
       int i;
       do {
 	LOCK(cl->refCountMutex);
@@ -577,8 +581,8 @@ rfbClientConnectionGone(rfbClientPtr cl)
     }
 #endif
 
-    if(cl->sock>=0)
-	close(cl->sock);
+    if(cl->sock != RFB_INVALID_SOCKET)
+	rfbCloseSocket(cl->sock);
 
     if (cl->scaledScreen!=NULL)
         cl->scaledScreen->scaledScreenRefCount--;
@@ -593,7 +597,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
     free(cl->beforeEncBuf);
     free(cl->afterEncBuf);
 
-    if(cl->sock>=0)
+    if(cl->sock != RFB_INVALID_SOCKET)
        FD_CLR(cl->sock,&(cl->screen->allFds));
 
     cl->clientGoneHook(cl);
@@ -657,8 +661,10 @@ rfbClientConnectionGone(rfbClientPtr cl)
     TINI_MUTEX(cl->sendMutex);
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-    close(cl->pipe_notify_client_thread[0]);
-    close(cl->pipe_notify_client_thread[1]);
+    if (cl->screen->backgroundLoop) {
+        close(cl->pipe_notify_client_thread[0]);
+        close(cl->pipe_notify_client_thread[1]);
+    }
 #endif
 
     rfbPrintStats(cl);
@@ -759,12 +765,14 @@ rfbClientSendString(rfbClientPtr cl, const char *reason)
     rfbLog("rfbClientSendString(\"%s\")\n", reason);
 
     buf = (char *)malloc(4 + len);
-    ((uint32_t *)buf)[0] = Swap32IfLE(len);
-    memcpy(buf + 4, reason, len);
+    if (buf) {
+        ((uint32_t *)buf)[0] = Swap32IfLE(len);
+        memcpy(buf + 4, reason, len);
 
-    if (rfbWriteExact(cl, buf, 4 + len) < 0)
-        rfbLogPerror("rfbClientSendString: write");
-    free(buf);
+        if (rfbWriteExact(cl, buf, 4 + len) < 0)
+            rfbLogPerror("rfbClientSendString: write");
+        free(buf);
+    }
 
     rfbCloseClient(cl);
 }
@@ -784,13 +792,15 @@ rfbClientConnFailed(rfbClientPtr cl,
     rfbLog("rfbClientConnFailed(\"%s\")\n", reason);
 
     buf = (char *)malloc(8 + len);
-    ((uint32_t *)buf)[0] = Swap32IfLE(rfbConnFailed);
-    ((uint32_t *)buf)[1] = Swap32IfLE(len);
-    memcpy(buf + 8, reason, len);
+    if (buf) {
+        ((uint32_t *)buf)[0] = Swap32IfLE(rfbConnFailed);
+        ((uint32_t *)buf)[1] = Swap32IfLE(len);
+        memcpy(buf + 8, reason, len);
 
-    if (rfbWriteExact(cl, buf, 8 + len) < 0)
-        rfbLogPerror("rfbClientConnFailed: write");
-    free(buf);
+        if (rfbWriteExact(cl, buf, 8 + len) < 0)
+            rfbLogPerror("rfbClientConnFailed: write");
+        free(buf);
+    }
 
     rfbCloseClient(cl);
 }
@@ -1005,6 +1015,7 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     rfbSetBit(msgs.server2client, rfbServerCutText);
     rfbSetBit(msgs.server2client, rfbResizeFrameBuffer);
     rfbSetBit(msgs.server2client, rfbPalmVNCReSizeFrameBuffer);
+    rfbSetBit(msgs.client2server, rfbSetDesktopSize);
 
     rfbSetBit(msgs.server2client, rfbMulticastFramebufferUpdate);
 
@@ -1059,6 +1070,7 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 	rfbEncodingPointerPos,
 	rfbEncodingLastRect,
 	rfbEncodingNewFBSize,
+	rfbEncodingExtDesktopSize,
 	rfbEncodingKeyboardLedState,
 	rfbEncodingSupportedMessages,
 	rfbEncodingSupportedEncodings,
@@ -1601,7 +1613,7 @@ char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length)
                     rfbLogPerror("rfbProcessFileTransferReadBuffer: read");
                 rfbCloseClient(cl);
                 /* NOTE: don't forget to free(buffer) if you return early! */
-                if (buffer!=NULL) free(buffer);
+                free(buffer);
                 return NULL;
             }
             /* Null Terminate */
@@ -1615,7 +1627,7 @@ char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length)
 rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
 {
     /* Allocate buffer for compression */
-    unsigned char readBuf[sz_rfbBlockSize];
+    char readBuf[sz_rfbBlockSize];
     int bytesRead=0;
     int retval=0;
     fd_set wfds;
@@ -1687,11 +1699,11 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
                 rfbLog("rfbSendFileTransferChunk(): Read %d bytes\n", bytesRead);
                 */
                 if (!cl->fileTransfer.compressionEnabled)
-                    return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, (char *)readBuf);
+                    return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, readBuf);
                 else
                 {
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-                    nRetC = compress(compBuf, &nMaxCompSize, readBuf, bytesRead);
+                    nRetC = compress(compBuf, &nMaxCompSize, (unsigned char *)readBuf, bytesRead);
                     /*
                     rfbLog("Compressed the packet from %d -> %d bytes\n", nMaxCompSize, bytesRead);
                     */
@@ -1699,10 +1711,10 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
                     if ((nRetC==0) && (nMaxCompSize<bytesRead))
                         return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 1, nMaxCompSize, (char *)compBuf);
                     else
-                        return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, (char *)readBuf);
+                        return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, readBuf);
 #else
                     /* We do not support compression of the data stream */
-                    return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, (char *)readBuf);
+                    return  rfbSendFileTransferMessage(cl, rfbFilePacket, 0, 0, bytesRead, readBuf);
 #endif
                 }
             }
@@ -1762,7 +1774,6 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
             filename2[3]=0;
             filename2[4]=0;
             retval = rfbSendFileTransferMessage(cl, rfbDirPacket, rfbADrivesList, 0, 5, filename2);
-            if (buffer!=NULL) free(buffer);
             return retval;
             break;
         case rfbRDirContent: /* Client requests the content of a directory */
@@ -1771,7 +1782,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
             */
             if ((buffer = rfbProcessFileTransferReadBuffer(cl, length))==NULL) return FALSE;
             retval = rfbSendDirContent(cl, length, buffer);
-            if (buffer!=NULL) free(buffer);
+            free(buffer);
             return retval;
         }
         break;
@@ -1831,6 +1842,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
               length = strlen(buffer);
               if (DB) rfbLog("rfbProcessFileTransfer() buffer is now: \"%s\"\n", buffer);
             }
+        } else {
+            statbuf.st_size = 0;
         }
 
         /* The viewer supports compression if size==1 */
@@ -1845,7 +1858,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
 
         if (cl->fileTransfer.fd==-1)
         {
-            if (buffer!=NULL) free(buffer);
+            free(buffer);
             return retval;
         }
         /* setup filetransfer stuff */
@@ -1861,7 +1874,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
           rfbLogPerror("rfbProcessFileTransfer: write");
           rfbCloseClient(cl);
           UNLOCK(cl->sendMutex);
-          if (buffer!=NULL) free(buffer);
+          free(buffer);
           return FALSE;
         }
         UNLOCK(cl->sendMutex);
@@ -1916,7 +1929,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
                 rfbLogPerror("rfbProcessFileTransfer: read sizeHtmp");
             rfbCloseClient(cl);
             /* NOTE: don't forget to free(buffer) if you return early! */
-            if (buffer!=NULL) free(buffer);
+            free(buffer);
             return FALSE;
         }
         sizeHtmp = Swap32IfLE(sizeHtmp);
@@ -2058,7 +2071,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
             /*
             */
             retval = rfbSendFileTransferMessage(cl, rfbCommandReturn, rfbADirCreate, retval, length, buffer);
-            if (buffer!=NULL) free(buffer);
+            free(buffer);
             return retval;
         case rfbCFileDelete: /* Client requests the deletion of a file */
             if (!rfbFilenameTranslate2UNIX(cl, buffer, filename1, sizeof(filename1)))
@@ -2072,7 +2085,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
             }
             else retval=-1;
             retval = rfbSendFileTransferMessage(cl, rfbCommandReturn, rfbAFileDelete, retval, length, buffer);
-            if (buffer!=NULL) free(buffer);
+            free(buffer);
             return retval;
         case rfbCFileRename: /* Client requests the Renaming of a file/directory */
             p = strrchr(buffer, '*');
@@ -2091,7 +2104,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
                 /* Restore the buffer so the reply is good */
                 *p = '*';
                 retval = rfbSendFileTransferMessage(cl, rfbCommandReturn, rfbAFileRename, retval, length, buffer);
-                if (buffer!=NULL) free(buffer);
+                free(buffer);
                 return retval;
             }
             break;
@@ -2101,11 +2114,11 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
     }
 
     /* NOTE: don't forget to free(buffer) if you return early! */
-    if (buffer!=NULL) free(buffer);
+    free(buffer);
     return TRUE;
 
 fail:
-    if (buffer!=NULL) free(buffer);
+    free(buffer);
     return FALSE;
 }
 
@@ -2126,6 +2139,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     uint32_t lastPreferredMulticastEncoding = -1;
     char encBuf[64];
     char encBuf2[64];
+    rfbExtDesktopScreen *extDesktopScreens;
+    rfbClientIteratorPtr iterator;
+    rfbClientPtr clp;
 
     if ((n = rfbReadExact(cl, (char *)&msg, 1)) <= 0) {
         if (n != 0)
@@ -2221,10 +2237,10 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->preferredMulticastEncoding=-1;
         cl->useCopyRect              = FALSE;
         cl->useNewFBSize             = FALSE;
+        cl->useExtDesktopSize        = FALSE;
         cl->cursorWasChanged         = FALSE;
         cl->useRichCursorEncoding    = FALSE;
         cl->enableCursorPosUpdates   = FALSE;
-        cl->enableCursorShapeUpdates = FALSE;
         cl->enableCursorShapeUpdates = FALSE;
         cl->enableLastRectEncoding   = FALSE;
         cl->enableKeyboardLedState   = FALSE;
@@ -2332,6 +2348,14 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		    cl->useNewFBSize = TRUE;
 		}
 		break;
+            case rfbEncodingExtDesktopSize:
+                if (!cl->useExtDesktopSize) {
+                    rfbLog("Enabling ExtDesktopSize protocol extension for client "
+                           "%s\n", cl->host);
+                    cl->useExtDesktopSize = TRUE;
+                    cl->useNewFBSize = TRUE;
+                }
+                break;
             case rfbEncodingKeyboardLedState:
                 if (!cl->enableKeyboardLedState) {
                   rfbLog("Enabling KeyboardLedState protocol extension for client "
@@ -2559,8 +2583,10 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	        rfbLog("Warning, ignoring rfbFramebufferUpdateRequest: %dXx%dY-%dWx%dH\n",msg.fur.x, msg.fur.y, msg.fur.w, msg.fur.h);
 		return;
         }
- 
-        
+
+        if (cl->clientFramebufferUpdateRequestHook)
+            cl->clientFramebufferUpdateRequestHook(cl, &msg.fur);
+
 	tmpRegion =
 	  sraRgnCreateRect(msg.fur.x,
 			   msg.fur.y,
@@ -2586,6 +2612,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
        if (!msg.fur.incremental) {
 	    sraRgnOr(cl->modifiedRegion,tmpRegion);
 	    sraRgnSubtract(cl->copyRegion,tmpRegion);
+            if (cl->useExtDesktopSize)
+                cl->newFBSizePending = TRUE;
        }
        TSIGNAL(cl->updateCond);
        UNLOCK(cl->updateMutex);
@@ -3038,6 +3066,74 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
       }
       return;
 
+    case rfbSetDesktopSize:
+
+        if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
+            sz_rfbSetDesktopSizeMsg - 1)) <= 0) {
+            if (n != 0)
+              rfbLogPerror("rfbProcessClientNormalMessage: read");
+            rfbCloseClient(cl);
+            return;
+        }
+
+        if (msg.sdm.numberOfScreens == 0) {
+            rfbLog("Ignoring setDesktopSize message from client that defines zero screens\n");
+            return;
+        }
+
+        extDesktopScreens = (rfbExtDesktopScreen *) malloc(msg.sdm.numberOfScreens * sz_rfbExtDesktopScreen);
+        if (extDesktopScreens == NULL) {
+                rfbLogPerror("rfbProcessClientNormalMessage: not enough memory");
+                rfbCloseClient(cl);
+                return;
+        }
+
+        if ((n = rfbReadExact(cl, ((char *)extDesktopScreens), msg.sdm.numberOfScreens * sz_rfbExtDesktopScreen)) <= 0) {
+            if (n != 0)
+                rfbLogPerror("rfbProcessClientNormalMessage: read");
+            free(extDesktopScreens);
+            rfbCloseClient(cl);
+            return;
+        }
+        rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbSetDesktopSizeMsg + msg.sdm.numberOfScreens * sz_rfbExtDesktopScreen,
+                                 sz_rfbSetDesktopSizeMsg + msg.sdm.numberOfScreens * sz_rfbExtDesktopScreen);
+
+        for (i=0; i < msg.sdm.numberOfScreens; i++) {
+            extDesktopScreens[i].id = Swap32IfLE(extDesktopScreens[i].id);
+            extDesktopScreens[i].x = Swap16IfLE(extDesktopScreens[i].x);
+            extDesktopScreens[i].y = Swap16IfLE(extDesktopScreens[i].y);
+            extDesktopScreens[i].width = Swap16IfLE(extDesktopScreens[i].width);
+            extDesktopScreens[i].height = Swap16IfLE(extDesktopScreens[i].height);
+            extDesktopScreens[i].flags = Swap32IfLE(extDesktopScreens[i].flags);
+        }
+        msg.sdm.width = Swap16IfLE(msg.sdm.width);
+        msg.sdm.height = Swap16IfLE(msg.sdm.height);
+
+        rfbLog("Client requested resolution change to (%dx%d)\n", msg.sdm.width, msg.sdm.height);
+        cl->requestedDesktopSizeChange = rfbExtDesktopSize_ClientRequestedChange;
+        cl->lastDesktopSizeChangeError = cl->screen->setDesktopSizeHook(msg.sdm.width, msg.sdm.height, msg.sdm.numberOfScreens,
+                                           extDesktopScreens, cl);
+
+        if (cl->lastDesktopSizeChangeError == 0) {
+            /* Let other clients know it was this client that requested the change */
+            iterator = rfbGetClientIterator(cl->screen);
+            while ((clp = rfbClientIteratorNext(iterator)) != NULL) {
+                LOCK(clp->updateMutex);
+                if (clp != cl)
+                    clp->requestedDesktopSizeChange = rfbExtDesktopSize_OtherClientRequestedChange;
+                UNLOCK(clp->updateMutex);
+            }
+        }
+        else
+        {
+            /* Force ExtendedDesktopSize message to be sent with result code in case of error.
+               (In case of success, it is delayed until the new framebuffer is created) */
+            cl->newFBSizePending = TRUE;
+        }
+
+        free(extDesktopScreens);
+        return;
+
     default:
 	{
 	    rfbExtensionData *e,*next;
@@ -3105,7 +3201,15 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
       fu->type = rfbFramebufferUpdate;
       fu->nRects = Swap16IfLE(1);
       cl->ublen = sz_rfbFramebufferUpdateMsg;
-      if (!rfbSendNewFBSize(cl, cl->scaledScreen->width, cl->scaledScreen->height)) {
+
+      if (cl->useExtDesktopSize) {
+        if (!rfbSendExtDesktopSize(cl, cl->scaledScreen->width, cl->scaledScreen->height)) {
+          if(cl->screen->displayFinishedHook)
+            cl->screen->displayFinishedHook(cl, FALSE);
+          return FALSE;
+        }
+      }
+      else if (!rfbSendNewFBSize(cl, cl->scaledScreen->width, cl->scaledScreen->height)) {
 	if(cl->screen->displayFinishedHook)
 	  cl->screen->displayFinishedHook(cl, FALSE);
         return FALSE;
@@ -4181,6 +4285,9 @@ rfbSendRectEncodingRaw(rfbClientPtr cl,
     char *fbptr = (cl->scaledScreen->frameBuffer + (cl->scaledScreen->paddedWidthInBytes * y)
                    + (x * (cl->scaledScreen->bitsPerPixel / 8)));
 
+    if(!h || !w)
+	return TRUE; /* nothing to send */
+
     /* Flush the buffer to guarantee correct alignment for translateFn(). */
     if (cl->ublen > 0) {
         if (!rfbSendUpdateBuf(cl))
@@ -4356,6 +4463,101 @@ rfbSendNewFBSize(rfbClientPtr cl,
     return TRUE;
 }
 
+/*
+ * Send ExtDesktopSize pseudo-rectangle. This message is used:
+ * - to tell the client to change its framebuffer size
+ * - at the start of the session to inform the client we support size changes through setDesktopSize
+ * - in response to setDesktopSize commands to indicate success or failure
+ */
+
+rfbBool
+rfbSendExtDesktopSize(rfbClientPtr cl,
+                 int w,
+                 int h)
+{
+    rfbFramebufferUpdateRectHeader rect;
+    rfbExtDesktopSizeMsg edsHdr;
+    rfbExtDesktopScreen eds;
+    int i;
+    char *logmsg;
+    int numScreens = cl->screen->numberOfExtDesktopScreensHook(cl);
+
+    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader
+            + sz_rfbExtDesktopSizeMsg
+            + sz_rfbExtDesktopScreen * numScreens > UPDATE_BUF_SIZE) {
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
+    }
+
+    rect.encoding = Swap32IfLE(rfbEncodingExtDesktopSize);
+    rect.r.w = Swap16IfLE(w);
+    rect.r.h = Swap16IfLE(h);
+    rect.r.x = Swap16IfLE(cl->requestedDesktopSizeChange);
+    rect.r.y = Swap16IfLE(cl->lastDesktopSizeChangeError);
+
+    logmsg = "";
+
+    if (cl->requestedDesktopSizeChange == rfbExtDesktopSize_ClientRequestedChange)
+    {
+        /* our client requested the resize through setDesktopSize */
+
+        switch (cl->lastDesktopSizeChangeError)
+        {
+        case rfbExtDesktopSize_Success:
+            logmsg = "resize successful";
+            break;
+        case rfbExtDesktopSize_ResizeProhibited:
+            logmsg = "resize prohibited";
+            break;
+        case rfbExtDesktopSize_OutOfResources:
+            logmsg = "resize failed: out of resources";
+            break;
+        case rfbExtDesktopSize_InvalidScreenLayout:
+            logmsg = "resize failed: invalid screen layout";
+            break;
+        default:
+            break;
+        }
+    }
+
+    cl->requestedDesktopSizeChange = 0;
+    cl->lastDesktopSizeChangeError = 0;
+
+    rfbLog("Sending rfbEncodingExtDesktopSize for size (%dx%d) %s\n", w, h, logmsg);
+
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+           sz_rfbFramebufferUpdateRectHeader);
+    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    edsHdr.numberOfScreens = numScreens;
+    edsHdr.pad[0] = edsHdr.pad[1] = edsHdr.pad[2] = 0;
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&edsHdr,
+           sz_rfbExtDesktopSizeMsg);
+    cl->ublen += sz_rfbExtDesktopSizeMsg;
+
+    for (i=0; i<numScreens; i++) {
+        if (!cl->screen->getExtDesktopScreenHook(i, &eds, cl))
+        {
+            rfbErr("Error getting ExtendedDesktopSize information for screen #%d\n", i);
+            return FALSE;
+        }
+        eds.id = Swap32IfLE(eds.id);
+        eds.x = Swap16IfLE(eds.x);
+        eds.y = Swap16IfLE(eds.y);
+        eds.width = Swap16IfLE(eds.width);
+        eds.height = Swap16IfLE(eds.height);
+        eds.flags = Swap32IfLE(eds.flags);
+        memcpy(&cl->updateBuf[cl->ublen], (char *)&eds,
+               sz_rfbExtDesktopScreen);
+        cl->ublen += sz_rfbExtDesktopScreen;
+    }
+
+    rfbStatRecordEncodingSent(cl, rfbEncodingExtDesktopSize,
+                              sz_rfbFramebufferUpdateRectHeader + sz_rfbExtDesktopSizeMsg + sz_rfbExtDesktopScreen * numScreens,
+                              sz_rfbFramebufferUpdateRectHeader + sz_rfbExtDesktopSizeMsg + sz_rfbExtDesktopScreen * numScreens);
+
+    return TRUE;
+}
 
 /*
  * Send the contents of cl->updateBuf.  Returns 1 if successful, -1 if
@@ -4513,6 +4715,8 @@ rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len)
     rfbServerCutTextMsg sct;
     rfbClientIteratorPtr iterator;
 
+    memset((char *)&sct, 0, sizeof(sct));
+
     iterator = rfbGetClientIterator(rfbScreen);
     while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
         sct.type = rfbServerCutText;
@@ -4547,7 +4751,7 @@ static unsigned char ptrAcceleration = 50;
 
 void
 rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,
-                    int sock)
+                    rfbSocket sock)
 {
   if (write(sock, (char*) &ptrAcceleration, 1) < 0) {
 	rfbLogPerror("rfbNewUDPConnection: write");

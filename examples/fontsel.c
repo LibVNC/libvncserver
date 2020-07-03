@@ -1,3 +1,10 @@
+/**
+   @example fontsel.c
+   fontsel is a test for rfbSelectBox and rfbLoadConsoleFont. If you have Linux
+   console fonts, you can browse them via VNC. Directory browsing not implemented
+   yet :-(
+*/
+
 #include <rfb/rfb.h>
 
 #define FONTDIR "/usr/lib/kbd/consolefonts/"
@@ -42,9 +49,12 @@ int main(int argc,char** argv)
   int i,j;
 
   if(!s)
-    return 0;
+    return 1;
 
   s->frameBuffer=(char*)malloc(640*480*3);
+  if(!s->frameBuffer)
+      return 1;
+
   rfbInitServer(s);
 
   for(j=0;j<480;j++)
@@ -61,7 +71,7 @@ int main(int argc,char** argv)
     exit(1);
   }
   
-  for(j=0;j<0 && rfbIsActive(s);j++)
+  for(j=0;j<10 && rfbIsActive(s);j++)
     rfbProcessEvents(s,900000);
 
   i = rfbSelectBox(s,font,fontlist,10,20,200,300,0xffdfdf,0x602040,2,showFont);

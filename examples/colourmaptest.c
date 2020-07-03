@@ -8,7 +8,7 @@ int main(int argc,char** argv)
 
   rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,256,256,8,1,1);
   if(!server)
-    return 0;
+    return 1;
   server->serverFormat.trueColour=FALSE;
   server->colourMap.count=256;
   server->colourMap.is16=FALSE;
@@ -23,6 +23,9 @@ int main(int argc,char** argv)
   server->colourMap.data.bytes=bytes;
 
   server->frameBuffer=(char*)malloc(256*256);
+  if(!server->frameBuffer)
+      return 1;
+
   for(i=0;i<256*256;i++)
      server->frameBuffer[i]=(i/256);
 
