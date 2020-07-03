@@ -1056,16 +1056,13 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 }
 
 
-int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recvbuf)
+rfbSocket CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recvbuf)
 {
-  int sock; 
+  rfbSocket sock; 
   struct sockaddr_storage localAddr;
   int optval;
   socklen_t optval_len = sizeof(optval);
   int dfltrcvbuf;
-
-  if (!initSockets())
-    return -1;
 
   localAddr = multicastSockAddr;
   /* set source addr of localAddr to ANY, 
@@ -1078,7 +1075,7 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
     else
       {
 	rfbClientErr("CreateMulticastSocket: neither IPv4 nor IPv6 address received\n");
-	return -1;
+	return RFB_INVALID_SOCKET;
       }
 
  
@@ -1089,7 +1086,7 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
       errno=WSAGetLastError();
 #endif
       rfbClientErr("CreateMulticastSocket: error creating socket: %s\n", strerror(errno));
-      return -1;
+      return RFB_INVALID_SOCKET;
     }
 
   optval = 1;
@@ -1099,8 +1096,8 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
       errno=WSAGetLastError();
 #endif
       rfbClientErr("CreateMulticastSocket: error setting reuse addr: %s\n", strerror(errno));
-      close(sock);
-      return -1;
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
     } 
 
   /* get/set socket receive buffer */
@@ -1110,8 +1107,8 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
       errno=WSAGetLastError();
 #endif
       rfbClientErr("CreateMulticastSocket: error getting rcv buf size: %s\n", strerror(errno));
-      close(sock);
-      return -1;
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
     } 
   dfltrcvbuf = optval;
   optval = so_recvbuf;
@@ -1121,8 +1118,8 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
       errno=WSAGetLastError();
 #endif
       rfbClientErr("CreateMulticastSocket: error setting rcv buf size: %s\n", strerror(errno));
-      close(sock);
-      return -1;
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
     } 
   if(getsockopt(sock, SOL_SOCKET, SO_RCVBUF,(char*)&optval, &optval_len) <0)
     {
@@ -1130,8 +1127,8 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
       errno=WSAGetLastError();
 #endif
       rfbClientErr("CreateMulticastSocket: error getting set rcv buf size: %s\n", strerror(errno));
-      close(sock);
-      return -1;
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
     } 
   rfbClientLog("MulticastVNC: tried to set socket receive buffer from %d to %d, got %d\n",
 	       dfltrcvbuf, so_recvbuf, optval);
@@ -1143,8 +1140,8 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
       errno=WSAGetLastError();
 #endif
       rfbClientErr("CreateMulticastSocket: error binding socket: %s\n", strerror(errno));
-      close(sock);
-      return -1;
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
     }
 
   
@@ -1165,8 +1162,8 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
 	  errno=WSAGetLastError();
 #endif
 	  rfbClientErr("CreateMulticastSocket: error joining IPv4 multicast group: %s\n", strerror(errno));
-	  close(sock);
-	  return -1;
+	  rfbCloseSocket(sock);
+	  return RFB_INVALID_SOCKET;
         }
     }
   else 
@@ -1186,21 +1183,21 @@ int CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recv
   	    errno=WSAGetLastError();
 #endif
 	    rfbClientErr("CreateMulticastSocket: error joining IPv6 multicast group: %s\n", strerror(errno));
-	    close(sock);
-	    return -1;
+	    rfbCloseSocket(sock);
+	    return RFB_INVALID_SOCKET;
 	  }
       }
     else
       {
 	rfbClientErr("CreateMulticastSocket: neither IPv6 nor IPv6 specified");
-	close(sock);
-	return -1;
+	rfbCloseSocket(sock);
+	return RFB_INVALID_SOCKET;
       }
 
   /* this is important for ReadFromRFBServerMulticast() */
   if(!SetNonBlocking(sock)) {
-    close(sock);
-    return -1;
+    rfbCloseSocket(sock);
+    return RFB_INVALID_SOCKET;
   }
     
   return sock;
