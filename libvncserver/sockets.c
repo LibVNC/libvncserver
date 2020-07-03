@@ -107,14 +107,14 @@ int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
   Returns socket fd on success, -1 on failure.
  */
 
-static int
+static rfbSocket
 rfbCreateMulticastSocket(char *addr,
 			 int port,
 			 int ttl,
 			 in_addr_t iface,
 			 struct sockaddr_storage* sockAddr)
 {
-  int sock;
+  rfbSocket sock;
   int r;
   struct addrinfo *multicastAddrInfo;
   struct addrinfo hints;
@@ -131,7 +131,7 @@ rfbCreateMulticastSocket(char *addr,
   if(r != 0)
     {
       rfbLog("rfbCreateMulticastSocket: %s", gai_strerror(r));
-      return -1;
+      return RFB_INVALID_SOCKET;
     }
 
   /* save multicast address and port */
@@ -145,7 +145,7 @@ rfbCreateMulticastSocket(char *addr,
 #endif
       rfbLogPerror("rfbCreateMulticastSocket: error creating socket");
       freeaddrinfo(multicastAddrInfo);  
-      return -1;
+      return RFB_INVALID_SOCKET;
     }
 
   /* set multicast TTL */
@@ -159,8 +159,8 @@ rfbCreateMulticastSocket(char *addr,
 #endif
       rfbLogPerror("rfbCreateMulticastSocket: error setting TTL");
       freeaddrinfo(multicastAddrInfo);  
-      closesocket(sock);
-      return -1;
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
     }
    
   /* connect the socket */
@@ -171,8 +171,8 @@ rfbCreateMulticastSocket(char *addr,
 #endif
       rfbLogPerror("rfbCreateMulticastSocket: error connecting socket");
       freeaddrinfo(multicastAddrInfo);  
-      closesocket(sock);
-      return -1;
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
     }
 
   /* set the sending interface */
@@ -187,8 +187,8 @@ rfbCreateMulticastSocket(char *addr,
 #endif
       rfbLogPerror("rfbCreateMulticastSocket: error setting interface");
       freeaddrinfo(multicastAddrInfo);  
-      closesocket(sock);
-      return -1;
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
     }
 
  
