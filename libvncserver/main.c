@@ -1110,7 +1110,8 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   FREE_IF(underCursorBuffer);
   TINI_MUTEX(screen->cursorMutex);
 
-  rfbFreeCursor(screen->cursor);
+  if(screen->cursor != &myCursor)
+      rfbFreeCursor(screen->cursor);
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
   rfbZlibCleanup(screen);
