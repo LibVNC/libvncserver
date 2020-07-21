@@ -619,21 +619,35 @@ listenerRun(void *data)
     socklen_t len;
     fd_set listen_fds;  /* temp file descriptor list for select() */
 
-    /* TODO: this thread won't die by restarting the server */
     /* TODO: HTTP is not handled */
-    while (1) {
+    while (rfbIsActive(screen)) {
         client_fd = -1;
         FD_ZERO(&listen_fds);
 	if(screen->listenSock != RFB_INVALID_SOCKET)
 	  FD_SET(screen->listenSock, &listen_fds);
 	if(screen->listen6Sock != RFB_INVALID_SOCKET)
 	  FD_SET(screen->listen6Sock, &listen_fds);
+#ifndef WIN32
+	FD_SET(screen->pipe_notify_listener_thread[0], &listen_fds);
+	screen->maxFd = rfbMax(screen->maxFd, screen->pipe_notify_listener_thread[0]);
+#endif
 
         if (select(screen->maxFd+1, &listen_fds, NULL, NULL, NULL) == -1) {
             rfbLogPerror("listenerRun: error in select");
             return THREAD_ROUTINE_RETURN_VALUE;
         }
-	
+
+#ifndef WIN32
+	if (FD_ISSET(screen->pipe_notify_listener_thread[0], &listen_fds))
+	{
+	    /* Reset the pipe */
+	    char buf;
+	    while (read(screen->pipe_notify_listener_thread[0], &buf, sizeof(buf)) == sizeof(buf));
+	    /* Go on with loop */
+	    continue;
+	}
+#endif
+
 	/* there is something on the listening sockets, handle new connections */
 	len = sizeof (peer);
 	if (FD_ISSET(screen->listenSock, &listen_fds)) 
@@ -921,6 +935,10 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->maxFd=0;
    screen->listenSock=RFB_INVALID_SOCKET;
    screen->listen6Sock=RFB_INVALID_SOCKET;
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+   screen->pipe_notify_listener_thread[0] = -1;
+   screen->pipe_notify_listener_thread[1] = -1;
+#endif
 
    screen->fdQuota = 0.5;
 
@@ -1180,6 +1198,21 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
 
   rfbHttpShutdownSockets(screen);
   rfbShutdownSockets(screen);
+
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+  if (screen->backgroundLoop) {
+      /*
+	Notify the listener thread. This simply writes a NULL byte to the notify pipe in order to get past the select()
+	in listenerRun, the loop in there will then break because the rfbShutdownSockets() above has set screen->socketState.
+      */
+      write(screen->pipe_notify_listener_thread[1], "\x00", 1);
+      /* And wait for it to finish. */
+      pthread_join(screen->listener_thread, NULL);
+      /* Now we can close the pipe */
+      close(screen->pipe_notify_listener_thread[0]);
+      close(screen->pipe_notify_listener_thread[1]);
+  }
+#endif
 }
 
 #if !defined LIBVNCSERVER_HAVE_GETTIMEOFDAY && defined WIN32
@@ -1287,15 +1320,19 @@ void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground
 {
   if(runInBackground) {
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-       pthread_t listener_thread;
-
        screen->backgroundLoop = TRUE;
-
-       pthread_create(&listener_thread, NULL, listenerRun, screen);
+#ifndef WIN32
+        if (pipe(screen->pipe_notify_listener_thread) == -1) {
+            screen->pipe_notify_listener_thread[0] = -1;
+            screen->pipe_notify_listener_thread[1] = -1;
+        }
+        fcntl(screen->pipe_notify_listener_thread[0], F_SETFL, O_NONBLOCK);
+#endif
+       pthread_create(&screen->listener_thread, NULL, listenerRun, screen);
     return;
 #elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
        screen->backgroundLoop = TRUE;
-       _beginthread(listenerRun, 0, screen);
+       screen->listener_thread = _beginthread(listenerRun, 0, screen);
        return;
 #else
     rfbErr("Can't run in background, because I don't have PThreads!\n");

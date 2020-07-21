@@ -360,7 +360,12 @@ typedef struct _rfbScreenInfo
 	of file descriptors LibVNCServer uses before denying new client connections.
 	It is set to 0.5 per default. */
     float fdQuota;
-
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+    pthread_t listener_thread;
+    int pipe_notify_listener_thread[2];
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    uintptr_t listener_thread;
+#endif
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
