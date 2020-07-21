@@ -571,10 +571,6 @@ clientInput(void *data)
             rfbSendFileTransferChunk(cl);
 	    continue;
         }
-        
-        /* We have some space on the transmit queue, send some data */
-        if (FD_ISSET(cl->sock, &wfds))
-            rfbSendFileTransferChunk(cl);
 
 #ifndef WIN32
 	if (FD_ISSET(cl->pipe_notify_client_thread[0], &rfds))
@@ -582,8 +578,13 @@ clientInput(void *data)
 	    /* Reset the pipe */
 	    char buf;
 	    while (read(cl->pipe_notify_client_thread[0], &buf, sizeof(buf)) == sizeof(buf));
+	    continue; /* Go on with loop */
 	}
 #endif
+
+        /* We have some space on the transmit queue, send some data */
+        if (FD_ISSET(cl->sock, &wfds))
+            rfbSendFileTransferChunk(cl);
 
         if (FD_ISSET(cl->sock, &rfds) || FD_ISSET(cl->sock, &efds))
         {
