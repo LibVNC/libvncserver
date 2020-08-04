@@ -809,8 +809,7 @@ HandleFileUploadDataRequest(rfbClientPtr cl, rfbTightClientPtr rtcp)
 	msg.fud.realSize = Swap16IfLE(msg.fud.realSize);
 	msg.fud.compressedSize = Swap16IfLE(msg.fud.compressedSize);
 	if((msg.fud.realSize == 0) && (msg.fud.compressedSize == 0)) {
-		if((n = rfbReadExact(cl, (char*)&(rtcp->rcft.rcfu.mTime), sizeof(unsigned 
-		long))) <= 0) {
+		if((n = rfbReadExact(cl, (char*)&(rtcp->rcft.rcfu.mTime), 4)) <= 0) {
 			
 			if (n < 0)
 				rfbLog("File [%s]: Method [%s]: Error while reading FileUploadRequestMsg\n",
