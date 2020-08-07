@@ -345,7 +345,9 @@ HandleFileListRequest(rfbClientPtr cl, rfbTightClientRec* data)
     	return;
 	}	
 
+    LOCK(cl->sendMutex);
     rfbWriteExact(cl, fileListMsg.data, fileListMsg.length); 
+    UNLOCK(cl->sendMutex);
 
     FreeFileTransferMsg(fileListMsg);
 }
@@ -489,7 +491,9 @@ SendFileDownloadLengthErrMsg(rfbClientPtr cl)
 		return;
 	}
 
+	LOCK(cl->sendMutex);
 	rfbWriteExact(cl, fileDownloadErrMsg.data, fileDownloadErrMsg.length);
+	UNLOCK(cl->sendMutex);
 
 	FreeFileTransferMsg(fileDownloadErrMsg);
 }
@@ -513,12 +517,15 @@ RunFileDownloadThread(void* client)
 		pthread_mutex_unlock(&fileDownloadMutex);
 		
 		if((fileDownloadMsg.data != NULL) && (fileDownloadMsg.length != 0)) {
+		        LOCK(cl->sendMutex);
 			if(rfbWriteExact(cl, fileDownloadMsg.data, fileDownloadMsg.length) < 0)  {
 				rfbLog("File [%s]: Method [%s]: Error while writing to socket \n"
 						, __FILE__, __FUNCTION__);
 				FreeFileTransferMsg(fileDownloadMsg);
+				UNLOCK(cl->sendMutex);
 				return NULL;
 			}
+			UNLOCK(cl->sendMutex);
 			FreeFileTransferMsg(fileDownloadMsg);
 		}
 	} while(rtcp->rcft.rcfd.downloadInProgress == TRUE);
@@ -534,7 +541,9 @@ HandleFileDownload(rfbClientPtr cl, rfbTightClientPtr rtcp)
 	memset(&fileDownloadMsg, 0, sizeof(FileTransferMsg));
 	fileDownloadMsg = ChkFileDownloadErr(cl, rtcp);
 	if((fileDownloadMsg.data != NULL) && (fileDownloadMsg.length != 0)) {
+	        LOCK(cl->sendMutex);
 		rfbWriteExact(cl, fileDownloadMsg.data, fileDownloadMsg.length);
+		UNLOCK(cl->sendMutex);
 		FreeFileTransferMsg(fileDownloadMsg);
 		return;
 	}
@@ -548,7 +557,9 @@ HandleFileDownload(rfbClientPtr cl, rfbTightClientPtr rtcp)
 				__FILE__, __FUNCTION__);
 		
 		if((ftm.data != NULL) && (ftm.length != 0)) {
+		        LOCK(cl->sendMutex);
 			rfbWriteExact(cl, ftm.data, ftm.length);
+			UNLOCK(cl->sendMutex);
 			FreeFileTransferMsg(ftm);
 			return;
 		}
@@ -752,7 +763,9 @@ SendFileUploadLengthErrMsg(rfbClientPtr cl)
 		return;
 	}
 
+	LOCK(cl->sendMutex);
 	rfbWriteExact(cl, fileUploadErrMsg.data, fileUploadErrMsg.length);
+	UNLOCK(cl->sendMutex);
 	FreeFileTransferMsg(fileUploadErrMsg);
 }
 
@@ -768,7 +781,9 @@ HandleFileUpload(rfbClientPtr cl, rfbTightClientPtr rtcp)
 
 	fileUploadErrMsg = ChkFileUploadErr(cl, rtcp);
 	if((fileUploadErrMsg.data != NULL) && (fileUploadErrMsg.length != 0)) {
+	        LOCK(cl->sendMutex);
 		rfbWriteExact(cl, fileUploadErrMsg.data, fileUploadErrMsg.length);
+		UNLOCK(cl->sendMutex);
 		FreeFileTransferMsg(fileUploadErrMsg);
 	}
 }
@@ -850,7 +865,9 @@ HandleFileUploadDataRequest(rfbClientPtr cl, rfbTightClientPtr rtcp)
 		ftm = GetFileUploadCompressedLevelErrMsg();
 
 		if((ftm.data != NULL) && (ftm.length != 0)) {
+		        LOCK(cl->sendMutex);
 			rfbWriteExact(cl, ftm.data, ftm.length);
+			UNLOCK(cl->sendMutex);
 			FreeFileTransferMsg(ftm);
 		}
 
@@ -885,7 +902,9 @@ HandleFileUploadWrite(rfbClientPtr cl, rfbTightClientPtr rtcp, char* pBuf)
 	ftm = ChkFileUploadWriteErr(cl, rtcp, pBuf);
 
 	if((ftm.data != NULL) && (ftm.length != 0)) {
+	        LOCK(cl->sendMutex);
 		rfbWriteExact(cl, ftm.data, ftm.length);
+		UNLOCK(cl->sendMutex);
 		FreeFileTransferMsg(ftm);
 	}
 }
