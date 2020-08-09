@@ -212,9 +212,11 @@ rfbSendSecurityTypeList(rfbClientPtr cl, int primaryType)
     /* Fill in the list of security types in the client structure. (NOTE: Not really in the client structure) */
     switch (primaryType) {
     case rfbSecTypeNone:
+	rfbUnregisterSecurityHandler(&VncSecurityHandlerVncAuth);
         rfbRegisterSecurityHandler(&VncSecurityHandlerNone);
         break;
     case rfbSecTypeVncAuth:
+	rfbUnregisterSecurityHandler(&VncSecurityHandlerNone);
         rfbRegisterSecurityHandler(&VncSecurityHandlerVncAuth);
         break;
     }
