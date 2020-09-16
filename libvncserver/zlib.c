@@ -64,11 +64,13 @@ void rfbZlibCleanup(rfbScreenInfoPtr screen)
 {
   if (zlibBeforeBufSize) {
     free(zlibBeforeBuf);
+    zlibBeforeBuf = NULL;
     zlibBeforeBufSize=0;
   }
   if (zlibAfterBufSize) {
     zlibAfterBufSize=0;
     free(zlibAfterBuf);
+    zlibAfterBuf = NULL;
   }
 }
 
