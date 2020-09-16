@@ -6,6 +6,10 @@ os:
   - linux
   - osx
 
+arch:
+  - amd64
+  - ppc64le
+
 env:
   - CMAKE_OPTIONS="-DWITH_OPENSSL=ON  -DWITH_GNUTLS=OFF -DWITH_GCRYPT=OFF" # build with OpenSSL
   - CMAKE_OPTIONS="-DWITH_OPENSSL=OFF -DWITH_GNUTLS=ON  -DWITH_GCRYPT=ON"  # build with GnuTLS and Libgrypt
@@ -16,9 +20,12 @@ jobs:
   exclude:
     - os: osx
       env: CMAKE_OPTIONS="-DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake" # don't test MinGW from OSX
+    - os: linux
+      env: CMAKE_OPTIONS="-DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake" # don't test MinGW from ppc64le
+      arch: ppc64le
 
 before_install:
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get update; sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev liblzo2-dev gnutls-dev libgcrypt-dev wine; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get update; sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev liblzo2-dev gnutls-dev libgcrypt-dev ; if [ "$TRAVIS_ARCH" = "amd64" ]; then sudo apt-get --no-install-suggests --no-install-recommends install wine; fi ; fi
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update; brew install sdl2 lzo; fi
 
 script:
