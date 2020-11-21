@@ -534,6 +534,8 @@ void rfbClientCleanup(rfbClient* client) {
     client->clientData = next;
   }
 
+  free(client->vncRec);
+
   if (client->sock != RFB_INVALID_SOCKET)
     rfbCloseSocket(client->sock);
   if (client->listenSock != RFB_INVALID_SOCKET)
