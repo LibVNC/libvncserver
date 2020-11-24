@@ -309,6 +309,9 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		}
 
 		break;
+		case SDL_WINDOWEVENT_RESIZED:
+			SendExtDesktopSize(cl, e->window.data1, e->window.data2);
+		break;
 	    case SDL_WINDOWEVENT_FOCUS_LOST:
 		if (rightAltKeyDown) {
 			SendKeyEvent(cl, XK_Alt_R, FALSE);

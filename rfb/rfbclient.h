@@ -471,6 +471,8 @@ typedef struct _rfbClient {
 	 * For internal use only.
 	 */
 	MUTEX(tlsRwMutex);
+	rfbBool requestedResize;
+	rfbExtDesktopScreen screen;
 } rfbClient;
 
 /* cursor.c */
@@ -570,6 +572,12 @@ extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
  * @return true if the key event was send successfully, false otherwise
  */
 extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
+
+/**
+ * Sends a SetDesktopSize event to the server
+ */
+extern rfbBool SendExtDesktopSize(rfbClient* client, uint16_t width, uint16_t height);
+
 /**
  * Places a string on the server's clipboard. Use this function if you want to
  * be able to copy and paste between the server and your application. For
