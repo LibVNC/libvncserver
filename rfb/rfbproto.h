@@ -426,6 +426,7 @@ typedef struct {
 #define rfbXvp 250
 /* SetDesktopSize client -> server message */
 #define rfbSetDesktopSize 251
+#define rfbQemuEvent 255
 
 
 
@@ -517,6 +518,8 @@ typedef struct {
 #define rfbEncodingQualityLevel7   0xFFFFFFE7
 #define rfbEncodingQualityLevel8   0xFFFFFFE8
 #define rfbEncodingQualityLevel9   0xFFFFFFE9
+
+#define rfbEncodingQemuExtendedKeyEvent 0xFFFFFEFE /* -258 */
 
 
 /* LibVNCServer additions.   We claim 0xFFFE0000 - 0xFFFE00FF */
@@ -1390,6 +1393,17 @@ typedef struct {
 } rfbKeyEventMsg;
 
 #define sz_rfbKeyEventMsg 8
+
+
+typedef struct {
+    uint8_t type;     /* always rfbQemuEvent */
+    uint8_t subtype;  /* always 0 */
+    uint16_t down;
+    uint32_t keysym;  /* keysym is specified as an X keysym, may be 0 */
+    uint32_t keycode; /* keycode is specified as XT key code */
+} rfbQemuExtendedKeyEventMsg;
+
+#define sz_rfbQemuExtendedKeyEventMsg 12
 
 
 /*-----------------------------------------------------------------------------
