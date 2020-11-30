@@ -1350,6 +1350,9 @@ SetFormatAndEncodings(rfbClient* client)
   if (se->nEncodings < MAX_ENCODINGS)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingXvp);
 
+  if (se->nEncodings < MAX_ENCODINGS)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingQemuExtendedKeyEvent);
+
   /* client extensions */
   for(e = rfbClientExtensions; e; e = e->next)
     if(e->encodings) {
@@ -1583,6 +1586,31 @@ SendKeyEvent(rfbClient* client, uint32_t key, rfbBool down)
   ke.down = down ? 1 : 0;
   ke.key = rfbClientSwap32IfLE(key);
   return WriteToRFBServer(client, (char *)&ke, sz_rfbKeyEventMsg);
+}
+
+
+/*
+ * SendExtendedKeyEvent.
+ */
+
+rfbBool
+SendExtendedKeyEvent(rfbClient* client, uint32_t keysym, uint32_t keycode, rfbBool down)
+{
+  rfbQemuExtendedKeyEventMsg ke;
+
+  /* FIXME: rfbQemuEvent also covers audio events, but this model for checking
+   * for supported messages is somewhat limited, so I'll leave this as is for
+   * now.
+   */
+  if (!SupportsClient2Server(client, rfbQemuEvent)) return FALSE;
+
+  memset(&ke, 0, sizeof(ke));
+  ke.type = rfbQemuEvent;
+  ke.subtype = 0; /* key event subtype */
+  ke.down = rfbClientSwap16IfLE(!!down);
+  ke.keysym = rfbClientSwap32IfLE(keysym);
+  ke.keycode = rfbClientSwap32IfLE(keycode);
+  return WriteToRFBServer(client, (char *)&ke, sz_rfbQemuExtendedKeyEventMsg);
 }
 
 
@@ -2072,6 +2100,10 @@ HandleRFBServerMessage(rfbClient* client)
      }
 
 #endif
+
+      case rfbEncodingQemuExtendedKeyEvent:
+        SetClient2Server(client, rfbQemuEvent);
+        break;
 
       default:
 	 {

@@ -571,6 +571,17 @@ extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
  */
 extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
 /**
+ * The same as SendKeyEvent, except a key code will be sent along with the
+ * symbol if the server supports extended key events.
+ * @param client The client through which to send the key event
+ * @param keysym An rfbKeySym defined in rfb/keysym.h
+ * @param keycode An XT key code
+ * @param down true if this was a key down event, false otherwise
+ * @return true if the extended key event is supported and was sent
+ * successfully, false otherwise
+ */
+extern rfbBool SendExtendedKeyEvent(rfbClient* client, uint32_t keysym, uint32_t keycode, rfbBool down);
+/**
  * Places a string on the server's clipboard. Use this function if you want to
  * be able to copy and paste between the server and your application. For
  * instance, when your application is notified that the user copied some text
