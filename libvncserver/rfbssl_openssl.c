@@ -1,5 +1,5 @@
 /*
- * rfbssl_openssl.c - Secure socket funtions (openssl version)
+ * rfbssl_openssl.c - Secure socket functions (openssl version)
  */
 
 /*

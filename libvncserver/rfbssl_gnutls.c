@@ -1,5 +1,5 @@
 /*
- * rfbssl_gnutls.c - Secure socket funtions (gnutls version)
+ * rfbssl_gnutls.c - Secure socket functions (gnutls version)
  */
 
 /*
