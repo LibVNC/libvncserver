@@ -718,22 +718,65 @@ get_link_libraries(PRIVATE_LIBS vncclient)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
 
 if(LIBVNCSERVER_INSTALL)
-  install(TARGETS vncserver DESTINATION ${CMAKE_INSTALL_LIBDIR})
-  install(TARGETS vncclient DESTINATION ${CMAKE_INSTALL_LIBDIR})
-  install(FILES
-    rfb/keysym.h
-    rfb/threading.h
-    rfb/rfb.h
-    rfb/rfbclient.h
-    ${CMAKE_CURRENT_BINARY_DIR}/rfb/rfbconfig.h
-    rfb/rfbproto.h
-    rfb/rfbregion.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rfb
-    )
-
-  install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc
-    ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
-    )
+    set(INSTALL_HEADER_FILES
+        rfb/keysym.h
+        rfb/threading.h
+        rfb/rfb.h
+        rfb/rfbclient.h
+        ${CMAKE_CURRENT_BINARY_DIR}/rfb/rfbconfig.h
+        rfb/rfbproto.h
+        rfb/rfbregion.h
+        )
+    
+    set_property(TARGET vncclient PROPERTY PUBLIC_HEADER ${INSTALL_HEADER_FILES})
+    set_property(TARGET vncserver PROPERTY PUBLIC_HEADER ${INSTALL_HEADER_FILES})
+    if(WIN32)
+        INSTALL(TARGETS vncclient vncserver
+            EXPORT LibVNCServerTargets
+            RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            LIBRARY DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rfb
+            INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            )
+    else()
+        INSTALL(TARGETS vncclient vncserver
+            EXPORT LibVNCServerTargets
+            RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rfb
+            INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            )
+    endif()
+    
+    # Install cmake configure files
+    install(EXPORT LibVNCServerTargets
+        NAMESPACE
+            "LibVNCServer::"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibVNCServer"
+        )
+    
+    include(CMakePackageConfigHelpers)
+    configure_package_config_file(
+      ${PROJECT_SOURCE_DIR}/cmake/Modules/LibVNCServerConfig.cmake.in
+      ${CMAKE_BINARY_DIR}/LibVNCServerConfig.cmake
+      INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibVNCServer"
+      )
+    # Install cmake version configure file
+    write_basic_package_version_file(
+        "${CMAKE_BINARY_DIR}/LibVNCServerConfigVersion.cmake"
+        VERSION ${PARA_VERSION}
+        COMPATIBILITY AnyNewerVersion)
+    install(FILES
+        "${CMAKE_BINARY_DIR}/LibVNCServerConfigVersion.cmake"
+        "${CMAKE_BINARY_DIR}/LibVNCServerConfig.cmake"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibVNCServer")
+    
+  
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc
+        ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+        )
 endif()
