@@ -215,12 +215,12 @@ static int PaletteInsert (uint32_t rgb, int numPixels, int bpp);
 static void Pack24 (rfbClientPtr cl, char *buf, rfbPixelFormat *fmt,
                     int count);
 
-static void EncodeIndexedRect16 (uint8_t *buf, int count);
-static void EncodeIndexedRect32 (uint8_t *buf, int count);
+static void EncodeIndexedRect16 (uint8_t *buf, int count, uint16_t mask);
+static void EncodeIndexedRect32 (uint8_t *buf, int count, uint32_t mask);
 
-static void EncodeMonoRect8 (uint8_t *buf, int w, int h);
-static void EncodeMonoRect16 (uint8_t *buf, int w, int h);
-static void EncodeMonoRect32 (uint8_t *buf, int w, int h);
+static void EncodeMonoRect8 (uint8_t *buf, int w, int h, uint8_t mask);
+static void EncodeMonoRect16 (uint8_t *buf, int w, int h, uint16_t mask);
+static void EncodeMonoRect32 (uint8_t *buf, int w, int h, uint32_t mask);
 
 static rfbBool SendJpegRect (rfbClientPtr cl, int x, int y, int w, int h,
                              int quality);
@@ -854,6 +854,7 @@ SendMonoRect(rfbClientPtr cl,
 {
     int streamId = 1;
     int paletteLen, dataLen;
+    uint32_t mask;
 
 #ifdef LIBVNCSERVER_HAVE_LIBPNG
     if (CanSendPngRect(cl, w, h)) {
@@ -882,11 +883,23 @@ SendMonoRect(rfbClientPtr cl,
     cl->updateBuf[cl->ublen++] = rfbTightFilterPalette;
     cl->updateBuf[cl->ublen++] = 1;
 
+    if (cl->translateFn != rfbTranslateNone &&
+        cl->screen->serverFormat.trueColour)
+    {
+        mask = cl->screen->serverFormat.redMax
+            << cl->screen->serverFormat.redShift;
+        mask |= cl->screen->serverFormat.greenMax
+             << cl->screen->serverFormat.greenShift;
+        mask |= cl->screen->serverFormat.blueMax
+             << cl->screen->serverFormat.blueShift;
+    } else
+        mask = ~0;
+
     /* Prepare palette, convert image. */
     switch (cl->format.bitsPerPixel) {
 
     case 32:
-        EncodeMonoRect32((uint8_t *)tightBeforeBuf, w, h);
+        EncodeMonoRect32((uint8_t *)tightBeforeBuf, w, h, mask);
 
         ((uint32_t *)tightAfterBuf)[0] = monoBackground;
         ((uint32_t *)tightAfterBuf)[1] = monoForeground;
@@ -902,7 +915,7 @@ SendMonoRect(rfbClientPtr cl,
         break;
 
     case 16:
-        EncodeMonoRect16((uint8_t *)tightBeforeBuf, w, h);
+        EncodeMonoRect16((uint8_t *)tightBeforeBuf, w, h, mask);
 
         ((uint16_t *)tightAfterBuf)[0] = (uint16_t)monoBackground;
         ((uint16_t *)tightAfterBuf)[1] = (uint16_t)monoForeground;
@@ -913,7 +926,7 @@ SendMonoRect(rfbClientPtr cl,
         break;
 
     default:
-        EncodeMonoRect8((uint8_t *)tightBeforeBuf, w, h);
+        EncodeMonoRect8((uint8_t *)tightBeforeBuf, w, h, mask);
 
         cl->updateBuf[cl->ublen++] = (char)monoBackground;
         cl->updateBuf[cl->ublen++] = (char)monoForeground;
@@ -934,6 +947,7 @@ SendIndexedRect(rfbClientPtr cl,
 {
     int streamId = 2;
     int i, entryLen;
+    uint32_t mask;
 
 #ifdef LIBVNCSERVER_HAVE_LIBPNG
     if (CanSendPngRect(cl, w, h)) {
@@ -958,11 +972,23 @@ SendIndexedRect(rfbClientPtr cl,
     cl->updateBuf[cl->ublen++] = rfbTightFilterPalette;
     cl->updateBuf[cl->ublen++] = (char)(paletteNumColors - 1);
 
+    if (cl->translateFn != rfbTranslateNone &&
+        cl->screen->serverFormat.trueColour)
+    {
+        mask = cl->screen->serverFormat.redMax
+            << cl->screen->serverFormat.redShift;
+        mask |= cl->screen->serverFormat.greenMax
+             << cl->screen->serverFormat.greenShift;
+        mask |= cl->screen->serverFormat.blueMax
+             << cl->screen->serverFormat.blueShift;
+    } else
+        mask = ~0;
+
     /* Prepare palette, convert image. */
     switch (cl->format.bitsPerPixel) {
 
     case 32:
-        EncodeIndexedRect32((uint8_t *)tightBeforeBuf, w * h);
+        EncodeIndexedRect32((uint8_t *)tightBeforeBuf, w * h, mask);
 
         for (i = 0; i < paletteNumColors; i++) {
             ((uint32_t *)tightAfterBuf)[i] =
@@ -982,7 +1008,7 @@ SendIndexedRect(rfbClientPtr cl,
         break;
 
     case 16:
-        EncodeIndexedRect16((uint8_t *)tightBeforeBuf, w * h);
+        EncodeIndexedRect16((uint8_t *)tightBeforeBuf, w * h, mask);
 
         for (i = 0; i < paletteNumColors; i++) {
             ((uint16_t *)tightAfterBuf)[i] =
@@ -1481,7 +1507,7 @@ static void Pack24(rfbClientPtr cl,
 #define DEFINE_IDX_ENCODE_FUNCTION(bpp)                                 \
                                                                         \
 static void                                                             \
-EncodeIndexedRect##bpp(uint8_t *buf, int count) {                       \
+EncodeIndexedRect##bpp(uint8_t *buf, int count, uint##bpp##_t mask) {   \
     COLOR_LIST *pnode;                                                  \
     uint##bpp##_t *src;                                                 \
     uint##bpp##_t rgb;                                                  \
@@ -1490,8 +1516,8 @@ EncodeIndexedRect##bpp(uint8_t *buf, int count) {                       \
     src = (uint##bpp##_t *) buf;                                        \
                                                                         \
     while (count--) {                                                   \
-        rgb = *src++;                                                   \
-        while (count && *src == rgb) {                                  \
+        rgb = *src++ & mask;                                            \
+        while (count && (*src & mask) == rgb) {                         \
             rep++, src++, count--;                                      \
         }                                                               \
         pnode = palette.hash[HASH_FUNC##bpp(rgb)];                      \
@@ -1516,7 +1542,7 @@ DEFINE_IDX_ENCODE_FUNCTION(32)
 #define DEFINE_MONO_ENCODE_FUNCTION(bpp)                                \
                                                                         \
 static void                                                             \
-EncodeMonoRect##bpp(uint8_t *buf, int w, int h) {                       \
+EncodeMonoRect##bpp(uint8_t *buf, int w, int h, uint##bpp##_t msk) {    \
     uint##bpp##_t *ptr;                                                 \
     uint##bpp##_t bg;                                                   \
     unsigned int value, mask;                                           \
@@ -1530,7 +1556,7 @@ EncodeMonoRect##bpp(uint8_t *buf, int w, int h) {                       \
     for (y = 0; y < h; y++) {                                           \
         for (x = 0; x < aligned_width; x += 8) {                        \
             for (bg_bits = 0; bg_bits < 8; bg_bits++) {                 \
-                if (*ptr++ != bg)                                       \
+                if ((*ptr++ & msk) != bg)                               \
                     break;                                              \
             }                                                           \
             if (bg_bits == 8) {                                         \
@@ -1541,7 +1567,7 @@ EncodeMonoRect##bpp(uint8_t *buf, int w, int h) {                       \
             value = mask;                                               \
             for (bg_bits++; bg_bits < 8; bg_bits++) {                   \
                 mask >>= 1;                                             \
-                if (*ptr++ != bg) {                                     \
+                if ((*ptr++ & msk) != bg) {                             \
                     value |= mask;                                      \
                 }                                                       \
             }                                                           \
@@ -1554,7 +1580,7 @@ EncodeMonoRect##bpp(uint8_t *buf, int w, int h) {                       \
             continue;                                                   \
                                                                         \
         for (; x < w; x++) {                                            \
-            if (*ptr++ != bg) {                                         \
+            if ((*ptr++ & msk) != bg) {                                 \
                 value |= mask;                                          \
             }                                                           \
             mask >>= 1;                                                 \
