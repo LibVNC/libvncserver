@@ -493,6 +493,7 @@ extern rfbBool rfbEnableClientLogging;
 typedef void (*rfbClientLogProc)(const char *format, ...);
 extern rfbClientLogProc rfbClientLog,rfbClientErr;
 extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
+extern rfbBool ReverseConnectToRFBServer(rfbClient* client,const char *hostname, int port);
 extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
 extern void SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size);
 extern rfbBool InitialiseRFBConnection(rfbClient* client);

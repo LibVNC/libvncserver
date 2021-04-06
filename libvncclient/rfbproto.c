@@ -356,6 +356,82 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
   return TRUE;
 }
 
+
+rfbBool
+ReverseConnectToRFBServer(rfbClient* client,const char *hostname, int port)
+{
+  if (client->serverPort==-1) {
+    /* serverHost is a file recorded by vncrec. */
+    const char* magic="vncLog0.0";
+    char buffer[10];
+    rfbVNCRec* rec = (rfbVNCRec*)malloc(sizeof(rfbVNCRec));
+    if(!rec) {
+        rfbClientLog("Could not allocate rfbVNCRec memory\n");
+        return FALSE;
+    }
+    client->vncRec = rec;
+
+    rec->file = fopen(client->serverHost,"rb");
+    rec->tv.tv_sec = 0;
+    rec->readTimestamp = FALSE;
+    rec->doNotSleep = FALSE;
+
+    if (!rec->file) {
+      rfbClientLog("Could not open %s.\n",client->serverHost);
+      return FALSE;
+    }
+    setbuf(rec->file,NULL);
+
+    if (fread(buffer,1,strlen(magic),rec->file) != strlen(magic) || strncmp(buffer,magic,strlen(magic))) {
+      rfbClientLog("File %s was not recorded by vncrec.\n",client->serverHost);
+      fclose(rec->file);
+      return FALSE;
+    }
+    client->sock = RFB_INVALID_SOCKET;
+    return TRUE;
+  }
+
+  // TODO, for now the address is ignored
+  // It might be a good idea to store the adresse of the connecting server in it if it is null
+  // or use ListenAtTcpPortAndAddress otherwise
+#ifndef WIN32
+  if(IsUnixSocket(hostname)){
+    /* serverHost is a UNIX socket. */
+    // This will fail anyway so I didn't bother adapting it to reverse connections
+    client->sock = ConnectClientToUnixSockWithTimeout(hostname, client->connectTimeout);
+  }
+  else
+#endif
+  {
+#ifdef LIBVNCSERVER_IPv6
+
+    //TODO Should there be a difference for ipv6?
+    rfbSocket tmp_socket = ListenAtTcpPort(port);
+    client->sock = AcceptTcpConnection(tmp_socket);
+#else
+    unsigned int host;
+
+    /* serverHost is a hostname */
+    if (!StringToIPAddr(hostname, &host)) {
+      rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
+      return FALSE;
+    }
+    rfbSocket tmp_socket = ListenAtTcpPort(port);
+    client->sock = AcceptTcpConnection(tmp_socket);
+#endif
+  }
+
+  if (client->sock == RFB_INVALID_SOCKET) {
+    rfbClientLog("Unable to connect to VNC server\n");
+    return FALSE;
+  }
+
+  if(client->QoS_DSCP && !SetDSCP(client->sock, client->QoS_DSCP))
+     return FALSE;
+
+  return TRUE;
+}
+
 /*
  * ConnectToRFBRepeater.
  */
