@@ -1,5 +1,7 @@
 /**
  * @example filetransfer.c
+ * Demonstrates a server capable of TightVNC-1.3.x file transfer.
+ * NB That TightVNC-2.x uses a different, incompatible file transfer protocol.
  */
 
 #include <rfb/rfb.h>
