@@ -1048,8 +1048,15 @@ extern void rfbRunEventLoop(rfbScreenInfoPtr screenInfo, long usec, rfbBool runI
 extern rfbBool rfbProcessEvents(rfbScreenInfoPtr screenInfo,long usec);
 extern rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo);
 
-/* TightVNC file transfer extension */
+/**
+ * Register the TightVNC-1.3.x file transfer extension.
+ * NB That TightVNC-2.x uses a different, incompatible file transfer protocol.
+ */
 void rfbRegisterTightVNCFileTransferExtension();
+/**
+ * Unregister the TightVNC-1.3.x file transfer extension.
+ * NB That TightVNC-2.x uses a different, incompatible file transfer protocol.
+ */
 void rfbUnregisterTightVNCFileTransferExtension();
 
 /* Statistics */
