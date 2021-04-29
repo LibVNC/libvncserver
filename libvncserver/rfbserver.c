@@ -479,6 +479,14 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       }
 #endif
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+      cl->enableExtendedClipboard = FALSE;
+      cl->extClipboardUserCap = 0x1B000007; /* text, rtf, html, request, notify, provide */
+      cl->extClipboardMaxUnsolicitedSize = 20 * (1 << 20); /* 20 MiB */
+      cl->extClipboardData = NULL;
+      cl->extClipboardDataSize = 0;
+#endif
+
       sprintf(pv,rfbProtocolVersionFormat,rfbScreen->protocolMajorVersion, 
               rfbScreen->protocolMinorVersion);
 
@@ -594,6 +602,10 @@ rfbClientConnectionGone(rfbClientPtr cl)
     /* Release the compression state structures if any. */
     if ( cl->compStreamInited ) {
 	deflateEnd( &(cl->compStream) );
+    }
+
+    if (cl->extClipboardData != NULL) {
+        free(cl->extClipboardData);
     }
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
@@ -1036,6 +1048,9 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 	rfbEncodingSupportedMessages,
 	rfbEncodingSupportedEncodings,
 	rfbEncodingServerIdentity,
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    rfbEncodingExtendedClipboard,
+#endif
     };
     uint32_t nEncodings = sizeof(supported) / sizeof(supported[0]), i;
 
@@ -2013,6 +2028,170 @@ fail:
     return FALSE;
 }
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+static rfbBool
+rfbSendExtendedClipboardCapability(rfbClientPtr cl) {
+    char buf[16] = {
+        0x03, 0x00, 0x00, 0x00,
+        0xFF, 0xFF, 0xFF, 0xF8, /* -8 */
+        0x17, 0x00, 0x00, 0x01, /* text, request, peek, provide */
+        0x00, 0x10, 0x00, 0x00, /* max size is 1MiB */
+    };
+    if (rfbWriteExact(cl, buf, sizeof(buf)) < 0) {
+        rfbLogPerror("rfbSendExtendedClipboardCapability: write");
+        rfbCloseClient(cl);
+        return FALSE;
+    }
+    rfbStatRecordMessageSent(cl, rfbServerCutText, 16, 16);
+    return TRUE;
+}
+
+static rfbBool
+rfbSendExtendedClipboardNotify(rfbClientPtr cl) {
+    char buf[16] = {
+        0x03, 0x00, 0x00, 0x00,
+        0xFF, 0xFF, 0xFF, 0xFC, /* -4 */
+        0x08, 0x00, 0x00, 0x01, /* only text */
+    };
+    if (rfbWriteExact(cl, buf, sizeof(buf)) < 0) {
+        rfbLogPerror("rfbSendExtendedClipboardNotify: write");
+        rfbCloseClient(cl);
+        return FALSE;
+    }
+    rfbStatRecordMessageSent(cl, rfbServerCutText, 12, 12);
+    return TRUE;
+}
+
+static rfbBool
+rfbSendExtendedServerCutTextData(rfbClientPtr cl, const char *data, int len) {
+    int i;
+    unsigned long size;
+    uint32_t tmpInt;
+    char *bufBeforeZlib;
+    char *bufAfterZlib;
+    bufBeforeZlib = (char *)malloc(len + 4);
+    if (bufBeforeZlib == NULL) {
+        rfbLogPerror("rfbSendExtendedClipboardCapability: failed to allocate memory");
+        rfbCloseClient(cl);
+        return FALSE;
+    }
+    tmpInt = Swap32IfLE(len);
+    memcpy(bufBeforeZlib, &tmpInt, 4);
+    memcpy(bufBeforeZlib + 4, data, len);
+    size = compressBound(len + 4);
+    bufAfterZlib = (char *)malloc(12 + size);
+    if (bufAfterZlib == NULL) {
+        rfbLogPerror("rfbSendExtendedClipboardCapability: failed to allocate memory");
+        free(bufBeforeZlib);
+        rfbCloseClient(cl);
+        return FALSE;
+    }
+    if (compress(bufAfterZlib + 12, &size, bufBeforeZlib, len + 4) != Z_OK) {
+        rfbLogPerror("rfbSendExtendedClipboardCapability: zlib deflation error");
+        free(bufBeforeZlib);
+        free(bufAfterZlib);
+        rfbCloseClient(cl);
+        return FALSE;
+    }
+    bufAfterZlib[0] = 3;
+    bufAfterZlib[1] = 0;
+    bufAfterZlib[2] = 0;
+    bufAfterZlib[3] = 0;
+    tmpInt = Swap32IfLE(-(4 + size));
+    memcpy(bufAfterZlib + 4, &tmpInt, 4);
+    tmpInt = Swap32IfLE(rfbExtendedClipboard_Provide | rfbExtendedClipboard_Text);
+    memcpy(bufAfterZlib + 8, &tmpInt, 4);
+    if (rfbWriteExact(cl, bufAfterZlib, 12 + size) < 0) {
+        rfbLogPerror("rfbSendExtendedClipboardCapability: write");
+        free(bufBeforeZlib);
+        free(bufAfterZlib);
+        rfbCloseClient(cl);
+        return FALSE;
+    }
+    rfbStatRecordMessageSent(cl, rfbServerCutText, 12 + size, 12 + size);
+    free(bufBeforeZlib);
+    free(bufAfterZlib);
+    return TRUE;
+}
+
+static int
+rfbProcessExtendedServerCutTextData(rfbClientPtr cl, uint32_t flags, const char *data, int len) {
+    int i;
+    uint32_t size;
+    char *buf = NULL;
+    z_stream stream;
+    stream.zalloc = NULL;
+    stream.zfree = NULL;
+    stream.opaque = NULL;
+    stream.avail_in = 0;
+    stream.next_in = NULL;
+    if (inflateInit(&stream) != Z_OK) {
+        rfbLogPerror("rfbProcessExtendedServerCutTextData: zlib stream initialization error");
+        rfbCloseClient(cl);
+        return FALSE;
+    }
+    stream.avail_in = len;
+    stream.next_in = data;
+    for (i = 0; i < 16; i++) {
+        if (!(flags & (1 << i))) {
+            continue;
+        }
+        stream.avail_out = 4;
+        stream.next_out = (unsigned char *)&size;
+        int err = inflate(&stream, Z_NO_FLUSH);
+        if (err != Z_OK) {
+            rfbLogPerror("rfbProcessExtendedServerCutTextData: zlib inflation error");
+            if (buf != NULL) {
+                free(buf);
+            }
+            inflateEnd(&stream);
+            rfbCloseClient(cl);
+            return FALSE;
+        }
+        size = Swap32IfLE(size);
+        if (buf != NULL) {
+            free(buf);
+            buf = NULL;
+        }
+        if (size > (1 << 20)) {
+            rfbLog("rfbProcessExtendedServerCutTextData: too big requested: %u B > 1 MB\n", (unsigned int)size);
+            inflateEnd(&stream);
+            rfbCloseClient(cl);
+            return FALSE;
+        }
+        buf = (char *)malloc(size);
+        if (buf == NULL) {
+            rfbLogPerror("rfbProcessExtendedServerCutTextData: failed to allocate memory");
+            inflateEnd(&stream);
+            rfbCloseClient(cl);
+            return FALSE;
+        }
+        stream.avail_out = size;
+        stream.next_out = buf;
+        if (inflate(&stream, Z_NO_FLUSH) != Z_OK) {
+            rfbLogPerror("rfbProcessExtendedServerCutTextData: zlib inflation error");
+            if (buf != NULL) {
+                free(buf);
+            }
+            inflateEnd(&stream);
+            rfbCloseClient(cl);
+            return FALSE;
+        }
+        if (i == 0) {
+            /* text */
+            if (!cl->viewOnly) {
+                cl->screen->setXCutTextUTF8(buf, size, cl);
+            }
+        }
+    }
+    if (buf != NULL) {
+        free(buf);
+    }
+    inflateEnd(&stream);
+    return TRUE;
+}
+#endif
+
 /*
  * rfbProcessClientNormalMessage is called when the client has sent a normal
  * protocol message.
@@ -2032,6 +2211,11 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     rfbExtDesktopScreen *extDesktopScreens;
     rfbClientIteratorPtr iterator;
     rfbClientPtr clp;
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    rfbBool isExtendedCutText = FALSE;
+    uint32_t extClipboardFlags;
+    int extClipboardFormats = 0;
+#endif
 
     if ((n = rfbReadExact(cl, (char *)&msg, 1)) <= 0) {
         if (n != 0)
@@ -2267,6 +2451,19 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                   }
                 }
                 break;
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+            case rfbEncodingExtendedClipboard:
+                if (!cl->enableExtendedClipboard) {
+                    rfbLog("Enabling ExtendedClipboard extension for client "
+                           "%s\n", cl->host);
+                    cl->enableExtendedClipboard = TRUE;
+                }
+                /* send the capabilities we support, currently only text */
+                if (!rfbSendExtendedClipboardCapability(cl)) {
+                    return;
+                }
+                break;
+#endif
             default:
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
 		if ( enc >= (uint32_t)rfbEncodingCompressLevel0 &&
@@ -2621,6 +2818,13 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	msg.cct.length = Swap32IfLE(msg.cct.length);
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    if (cl->enableExtendedClipboard && (msg.cct.length & 0x80000000)) {
+        msg.cct.length = -msg.cct.length;
+        isExtendedCutText = TRUE;
+    }
+#endif
+
 	/* uint32_t input is passed to malloc()'s size_t argument,
 	 * to rfbReadExact()'s int argument, to rfbStatRecordMessageRcvd()'s int
 	 * argument increased of sz_rfbClientCutTextMsg, and to setXCutText()'s int
@@ -2651,10 +2855,74 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    return;
 	}
 	rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbClientCutTextMsg+msg.cct.length, sz_rfbClientCutTextMsg+msg.cct.length);
-	if(!cl->viewOnly) {
-	    cl->screen->setXCutText(str, msg.cct.length, cl);
-	}
-	free(str);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    if (isExtendedCutText) {
+        if (msg.cct.length < 4) {
+            rfbLogPerror("rfbClientCutText: extended clipboard message is corrupted");
+            rfbCloseClient(cl);
+            free(str);
+            return;
+        }
+        memcpy(&extClipboardFlags, str, 4);
+        extClipboardFlags = Swap32IfLE(extClipboardFlags);
+        if (extClipboardFlags & rfbExtendedClipboard_Caps) {
+            cl->extClipboardUserCap = extClipboardFlags;
+            for (i = 0; i < 16; i++) {
+                if (extClipboardFlags & (1 << i)) {
+                    extClipboardFormats++;
+                }
+            }
+            if (extClipboardFormats == 0) {
+                cl->enableExtendedClipboard = FALSE;
+            } else if (msg.cct.length != 4 + extClipboardFormats * 4) {
+                rfbLogPerror("rfbProcessClientNormalMessage: extended clipboard message is corrupted");
+                rfbCloseClient(cl);
+                free(str);
+                return;
+            }
+            if (extClipboardFlags & rfbExtendedClipboard_Text) {
+                memcpy(&cl->extClipboardMaxUnsolicitedSize, str + 4, 4);
+                cl->extClipboardMaxUnsolicitedSize = Swap32IfLE(cl->extClipboardMaxUnsolicitedSize);
+            } else {
+                cl->enableExtendedClipboard = FALSE;
+            }
+            free(str);
+            return;
+        } else if (extClipboardFlags & rfbExtendedClipboard_Request) {
+            if ((cl->extClipboardUserCap & rfbExtendedClipboard_Provide) &&
+                cl->extClipboardData != NULL && cl->extClipboardDataSize > 0) {
+                if (!rfbSendExtendedServerCutTextData(cl, cl->extClipboardData, cl->extClipboardDataSize)) {
+                    free(str);
+                    return;
+                }
+            }
+        } else if (extClipboardFlags & rfbExtendedClipboard_Peek) {
+            if ((cl->extClipboardUserCap & rfbExtendedClipboard_Notify) &&
+                cl->extClipboardData != NULL && cl->extClipboardDataSize > 0) {
+                if (!rfbSendExtendedClipboardNotify(cl)) {
+                    free(str);
+                    return;
+                }
+            }
+        } else if (extClipboardFlags & rfbExtendedClipboard_Provide) {
+            if (!rfbProcessExtendedServerCutTextData(cl, extClipboardFlags, str + 4, msg.cct.length - 4)) {
+                free(str);
+                return;
+            }
+        }
+        free(str);
+    } else {
+        if(!cl->viewOnly) {
+            cl->screen->setXCutText(str, msg.cct.length, cl);
+        }
+        free(str);
+    }
+#else
+    if(!cl->viewOnly) {
+        cl->screen->setXCutText(str, msg.cct.length, cl);
+    }
+    free(str);
+#endif
 
         return;
 
@@ -3752,6 +4020,68 @@ rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len)
     }
     rfbReleaseClientIterator(iterator);
 }
+
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+void
+rfbSendServerCutTextUTF8(rfbScreenInfoPtr rfbScreen,char *str, int len, char *fallbackLatin1Str, int latin1Len)
+{
+    rfbClientPtr cl;
+    rfbServerCutTextMsg sct;
+    rfbClientIteratorPtr iterator;
+
+    memset((char *)&sct, 0, sizeof(sct));
+
+    iterator = rfbGetClientIterator(rfbScreen);
+    while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
+        sct.type = rfbServerCutText;
+        sct.length = Swap32IfLE(len);
+        LOCK(cl->sendMutex);
+        if (cl->enableExtendedClipboard) {
+            if (cl->extClipboardData != NULL) {
+                free(cl->extClipboardData);
+                cl->extClipboardData = NULL;
+            }
+            cl->extClipboardData = (char *)malloc(len + 1);
+            if (cl->extClipboardData == NULL) {
+                rfbLogPerror("rfbSendServerCutText: failed to allocate memory");
+                rfbCloseClient(cl);
+                UNLOCK(cl->sendMutex);
+                continue;
+            }
+            cl->extClipboardDataSize = len + 1;
+            memcpy(cl->extClipboardData, str, len);
+            cl->extClipboardData[len] = 0; /* null terminated */
+            if ((cl->extClipboardUserCap & rfbExtendedClipboard_Provide) && len <= cl->extClipboardMaxUnsolicitedSize) {
+                if (!rfbSendExtendedServerCutTextData(cl, cl->extClipboardData, len + 1)) {
+                    UNLOCK(cl->sendMutex);
+                    continue;
+                }
+            } else if (cl->extClipboardUserCap & rfbExtendedClipboard_Notify) {
+                if (!rfbSendExtendedClipboardNotify(cl)) {
+                    UNLOCK(cl->sendMutex);
+                    continue;
+                }
+            }
+            UNLOCK(cl->sendMutex);
+        } else if (fallbackLatin1Str != NULL) {
+            if (rfbWriteExact(cl, (char *)&sct,
+                        sz_rfbServerCutTextMsg) < 0) {
+                rfbLogPerror("rfbSendServerCutText: write");
+                rfbCloseClient(cl);
+                UNLOCK(cl->sendMutex);
+                continue;
+            }
+            if (rfbWriteExact(cl, fallbackLatin1Str, latin1Len) < 0) {
+                rfbLogPerror("rfbSendServerCutText: write");
+                rfbCloseClient(cl);
+            }
+            UNLOCK(cl->sendMutex);
+            rfbStatRecordMessageSent(cl, rfbServerCutText, sz_rfbServerCutTextMsg+len, sz_rfbServerCutTextMsg+len);
+        }
+    }
+    rfbReleaseClientIterator(iterator);
+}
+#endif
 
 /*****************************************************************************
  *

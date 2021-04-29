@@ -1020,6 +1020,9 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->kbdReleaseAllKeys = rfbDoNothingWithClient;
    screen->ptrAddEvent = rfbDefaultPtrAddEvent;
    screen->setXCutText = rfbDefaultSetXCutText;
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+   screen->setXCutTextUTF8 = rfbDefaultSetXCutText;
+#endif
    screen->getCursorPtr = rfbDefaultGetCursorPtr;
    screen->setTranslateFunction = rfbSetTranslateFunction;
    screen->newClientHook = rfbDefaultNewClientHook;

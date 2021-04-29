@@ -520,7 +520,7 @@ typedef struct {
 #define rfbEncodingQualityLevel9   0xFFFFFFE9
 
 #define rfbEncodingQemuExtendedKeyEvent 0xFFFFFEFE /* -258 */
-
+#define rfbEncodingExtendedClipboard 0xC0A1E5CE
 
 /* LibVNCServer additions.   We claim 0xFFFE0000 - 0xFFFE00FF */
 #define rfbEncodingKeyboardLedState   0xFFFE0000
@@ -1442,6 +1442,16 @@ typedef struct {
     /* followed by char text[length] */
 } rfbClientCutTextMsg;
 
+#define rfbExtendedClipboard_Text 1
+#define rfbExtendedClipboard_RTF 2
+#define rfbExtendedClipboard_HTML 4
+#define rfbExtendedClipboard_DIB 8
+#define rfbExtendedClipboard_Files 16
+#define rfbExtendedClipboard_Caps (1 << 24)
+#define rfbExtendedClipboard_Request (1 << 25)
+#define rfbExtendedClipboard_Peek (1 << 26)
+#define rfbExtendedClipboard_Notify (1 << 27)
+#define rfbExtendedClipboard_Provide (1 << 28)
 #define sz_rfbClientCutTextMsg 8
 
 
