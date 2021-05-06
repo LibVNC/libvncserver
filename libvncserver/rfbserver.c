@@ -319,6 +319,10 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
     cl->screen = rfbScreen;
     cl->sock = sock;
+    cl->readFromSocket = rfbDefaultReadFromSocket;
+    cl->peekAtSocket = rfbDefaultPeekAtSocket;
+    cl->hasPendingOnSocket = rfbDefaultHasPendingOnSocket;
+    cl->writeToSocket = rfbDefaultWriteToSocket;
     cl->viewOnly = FALSE;
     /* setup pseudo scaling */
     cl->scaledScreen = rfbScreen;
@@ -650,6 +654,7 @@ rfbProcessClientMessage(rfbClientPtr cl)
     case RFB_PROTOCOL_VERSION:
         rfbProcessClientProtocolVersion(cl);
         return;
+    case RFB_CHANNEL_SECURITY_TYPE:
     case RFB_SECURITY_TYPE:
         rfbProcessClientSecurityType(cl);
         return;

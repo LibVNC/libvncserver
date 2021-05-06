@@ -144,6 +144,11 @@ typedef struct {
   } data; /**< there have to be count*3 entries */
 } rfbColourMap;
 
+enum rfbSecurityTag {
+    RFB_SECURITY_TAG_NONE = 0,
+    RFB_SECURITY_TAG_CHANNEL = 1 << 0
+};
+
 /**
  * Security handling (RFB protocol version 3.7)
  */
@@ -152,6 +157,7 @@ typedef struct _rfbSecurity {
 	uint8_t type;
 	void (*handler)(struct _rfbClientRec* cl);
 	struct _rfbSecurity* next;
+	enum rfbSecurityTag securityTags;
 } rfbSecurityHandler;
 
 /**
@@ -392,6 +398,14 @@ typedef struct sraRegion* sraRegionPtr;
 typedef void (*ClientGoneHookPtr)(struct _rfbClientRec* cl);
 typedef void (*ClientFramebufferUpdateRequestHookPtr)(struct _rfbClientRec* cl, rfbFramebufferUpdateRequestMsg* furMsg);
 
+typedef int (*ClientReadFromSocket)(struct _rfbClientRec* cl,
+                                    char *buf, int len);
+typedef int (*ClientPeekAtSocket)(struct _rfbClientRec* cl,
+                                  char *buf, int len);
+typedef rfbBool (*ClientHasPendingOnSocket)(struct _rfbClientRec* cl);
+typedef int (*ClientWriteToSocket)(struct _rfbClientRec* cl,
+                                   const char *buf, int len);
+
 typedef struct _rfbFileTransferData {
   int fd;
   int compressionEnabled;
@@ -477,7 +491,7 @@ typedef struct _rfbClientRec {
                                 /** Possible client states: */
     enum {
         RFB_PROTOCOL_VERSION,   /**< establishing protocol version */
-	RFB_SECURITY_TYPE,      /**< negotiating security (RFB v.3.7) */
+        RFB_SECURITY_TYPE,      /**< negotiating security (RFB v.3.7) */
         RFB_AUTHENTICATION,     /**< authenticating */
         RFB_INITIALISATION,     /**< sending initialisation messages */
         RFB_NORMAL,             /**< normal protocol messages */
@@ -485,7 +499,9 @@ typedef struct _rfbClientRec {
         /* Ephemeral internal-use states that will never be seen by software
          * using LibVNCServer to provide services: */
 
-        RFB_INITIALISATION_SHARED /**< sending initialisation messages with implicit shared-flag already true */
+        RFB_INITIALISATION_SHARED, /**< sending initialisation messages with implicit shared-flag already true */
+
+        RFB_CHANNEL_SECURITY_TYPE, /**< negotiating security (RFB v.3.7) */
     } state;
 
     rfbBool reverseConnection;
@@ -685,6 +701,11 @@ typedef struct _rfbClientRec {
     rfbBool useExtDesktopSize;
     int requestedDesktopSizeChange;
     int lastDesktopSizeChangeError;
+
+    ClientReadFromSocket readFromSocket;         /* Read data from socket */
+    ClientPeekAtSocket peekAtSocket;             /* Peek at data from socket */
+    ClientHasPendingOnSocket hasPendingOnSocket; /* Peek at data from socket */
+    ClientWriteToSocket writeToSocket;           /* Write data to socket */
 } rfbClientRec, *rfbClientPtr;
 
 /**
@@ -737,8 +758,12 @@ extern void rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen);
 extern void rfbCloseClient(rfbClientPtr cl);
 extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
 extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
+extern int rfbDefaultReadFromSocket(rfbClientPtr cl, char *buf, int len);
 extern int rfbPeekExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
+extern int rfbDefaultPeekAtSocket(rfbClientPtr cl, char *buf, int len);
+extern rfbBool rfbDefaultHasPendingOnSocket(rfbClientPtr cl);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
+extern int rfbDefaultWriteToSocket(rfbClientPtr cl, const char *buf, int len);
 extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern rfbSocket rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern rfbSocket rfbConnectToTcpAddr(char* host, int port);
@@ -828,6 +853,9 @@ extern void rfbProcessClientSecurityType(rfbClientPtr cl);
 extern void rfbAuthProcessClientMessage(rfbClientPtr cl);
 extern void rfbRegisterSecurityHandler(rfbSecurityHandler* handler);
 extern void rfbUnregisterSecurityHandler(rfbSecurityHandler* handler);
+extern void rfbRegisterChannelSecurityHandler(rfbSecurityHandler* handler);
+extern void rfbUnregisterChannelSecurityHandler(rfbSecurityHandler* handler);
+extern void rfbSendSecurityTypeList(rfbClientPtr cl, enum rfbSecurityTag exclude);
 
 /* rre.c */
 
