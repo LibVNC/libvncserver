@@ -79,6 +79,7 @@ char *messageNameClient2Server(uint32_t type, char *buf, int len) {
     case rfbPalmVNCSetScaleFactor:    snprintf(buf, len, "PalmVNCSetScale"); break;
     case rfbXvp:                      snprintf(buf, len, "XvpClientMessage"); break;
     case rfbSetDesktopSize:           snprintf(buf, len, "SetDesktopSize"); break;
+    case rfbQemuClientMessage:        snprintf(buf, len, "QemuClientMessage"); break;
     default:
         snprintf(buf, len, "cli2svr-0x%08X", type);
 
@@ -128,6 +129,7 @@ char *encodingName(uint32_t type, char *buf, int len) {
     case rfbEncodingSupportedMessages:  snprintf(buf, len, "SupportedMessage");  break;
     case rfbEncodingSupportedEncodings: snprintf(buf, len, "SupportedEncoding"); break;
     case rfbEncodingServerIdentity:     snprintf(buf, len, "ServerIdentify");    break;
+    case rfbEncodingQEMUKeyEvent:       snprintf(buf, len, "QEMUKeyEvent");    break;
 
     /* The following lookups do not report in stats */
     case rfbEncodingCompressLevel0: snprintf(buf, len, "CompressLevel0");  break;

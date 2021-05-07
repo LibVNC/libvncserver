@@ -980,6 +980,8 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     rfbSetBit(msgs.server2client, rfbPalmVNCReSizeFrameBuffer);
     rfbSetBit(msgs.client2server, rfbSetDesktopSize);
 
+    rfbSetBit(msgs.server2client, rfbQemuClientMessage);
+
     if (cl->screen->xvpHook) {
         rfbSetBit(msgs.client2server, rfbXvp);
         rfbSetBit(msgs.server2client, rfbXvp);
@@ -1036,8 +1038,10 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 	rfbEncodingSupportedMessages,
 	rfbEncodingSupportedEncodings,
 	rfbEncodingServerIdentity,
+	rfbEncodingQEMUKeyEvent,
     };
     uint32_t nEncodings = sizeof(supported) / sizeof(supported[0]), i;
+
 
     /* think rfbSetEncodingsMsg */
 
@@ -1126,6 +1130,38 @@ rfbSendServerIdentity(rfbClientPtr cl)
         sz_rfbFramebufferUpdateRectHeader+strlen(buffer)+1,
         sz_rfbFramebufferUpdateRectHeader+strlen(buffer)+1);
     
+
+    if (!rfbSendUpdateBuf(cl))
+        return FALSE;
+
+    return TRUE;
+}
+
+/*
+ * Send rfbEncodingQEMUKeyEvent.
+ */
+
+rfbBool
+rfbSendQemuKeyEvent(rfbClientPtr cl)
+{
+    rfbFramebufferUpdateRectHeader rect;
+
+    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
+    }
+
+    rect.encoding = Swap32IfLE(rfbEncodingQEMUKeyEvent);
+    rect.r.x = 0;
+    rect.r.y = 0;
+    rect.r.w = 0;
+    rect.r.h = 0;
+
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+        sz_rfbFramebufferUpdateRectHeader);
+    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    rfbStatRecordEncodingSent(cl, rfbEncodingQEMUKeyEvent, sz_rfbFramebufferUpdateRectHeader, sz_rfbFramebufferUpdateRectHeader);
 
     if (!rfbSendUpdateBuf(cl))
         return FALSE;
@@ -2130,6 +2166,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->enableSupportedMessages  = FALSE;
         cl->enableSupportedEncodings = FALSE;
         cl->enableServerIdentity     = FALSE;
+        cl->enableQemuKeyEvent       = FALSE;
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
         cl->tightQualityLevel        = -1;
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
@@ -2267,6 +2304,13 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                   }
                 }
                 break;
+            case rfbEncodingQEMUKeyEvent:
+                if (!cl->enableQemuKeyEvent) {
+                  rfbLog("Enabling Qemu Key Event extension for client "
+                          "%s\n", cl->host);
+                  cl->enableQemuKeyEvent = TRUE;
+                }
+		break;
             default:
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
 		if ( enc >= (uint32_t)rfbEncodingCompressLevel0 &&
@@ -2457,10 +2501,27 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbKeyEventMsg, sz_rfbKeyEventMsg);
 
 	if(!cl->viewOnly) {
-	    cl->screen->kbdAddEvent(msg.ke.down, (rfbKeySym)Swap32IfLE(msg.ke.key), cl);
+	    cl->screen->kbdAddEvent(msg.ke.down, (rfbKeySym)Swap32IfLE(msg.ke.key), 0, cl);
 	}
 
         return;
+
+    case rfbQemuClientMessage:
+	if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
+			   sz_rfbQemuClientMsg - 1)) <= 0) {
+	    if (n != 0)
+		rfbLogPerror("rfbProcessClientNormalMessage: read");
+	    rfbCloseClient(cl);
+	    return;
+	}
+	rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbQemuClientMsg, sz_rfbQemuClientMsg);
+
+	if(!cl->viewOnly) {
+	    if (msg.qcm.subtype == 0 ) {
+	        cl->screen->kbdAddEvent(msg.qcm.down_flag ? 1 : 0, (rfbKeySym)Swap32IfLE(msg.qcm.keysym), (rfbKeyCode)Swap32IfLE(msg.qcm.keycode), cl);
+	    }
+	}
+	return;
 
 
     case rfbPointerEvent:
@@ -2842,6 +2903,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     rfbBool sendSupportedMessages = FALSE;
     rfbBool sendSupportedEncodings = FALSE;
     rfbBool sendServerIdentity = FALSE;
+    rfbBool sendQemuKeyEvent = FALSE;
     rfbBool result = TRUE;
     
 
@@ -2945,6 +3007,15 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         cl->enableServerIdentity = FALSE;
     }
 
+    if (cl->enableQemuKeyEvent)
+    {
+        sendQemuKeyEvent = TRUE;
+        /* We only send this message ONCE <per setEncodings message received>
+         * (We disable it here)
+         */
+        cl->enableQemuKeyEvent = FALSE;
+    }
+
     LOCK(cl->updateMutex);
 
     /*
@@ -2989,7 +3060,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
        (cl->enableCursorShapeUpdates ||
 	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY)) &&
        !sendCursorShape && !sendCursorPos && !sendKeyboardLedState &&
-       !sendSupportedMessages && !sendSupportedEncodings && !sendServerIdentity) {
+       !sendSupportedMessages && !sendSupportedEncodings && !sendServerIdentity && !sendQemuKeyEvent) {
       sraRgnDestroy(updateRegion);
       UNLOCK(cl->updateMutex);
       if(cl->screen->displayFinishedHook)
@@ -3181,7 +3252,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	fu->nRects = Swap16IfLE((uint16_t)(sraRgnCountRects(updateCopyRegion) +
 					   nUpdateRegionRects +
 					   !!sendCursorShape + !!sendCursorPos + !!sendKeyboardLedState +
-					   !!sendSupportedMessages + !!sendSupportedEncodings + !!sendServerIdentity));
+					   !!sendSupportedMessages + !!sendSupportedEncodings + !!sendServerIdentity + !!sendQemuKeyEvent));
     } else {
 	fu->nRects = 0xFFFF;
     }
@@ -3214,6 +3285,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
    }
    if (sendServerIdentity) {
        if (!rfbSendServerIdentity(cl))
+           goto updateFailed;
+   }
+   if (sendQemuKeyEvent) {
+       if (!rfbSendQemuKeyEvent(cl))
            goto updateFailed;
    }
 
@@ -3805,8 +3880,18 @@ rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen)
 	    rfbDisconnectUDPSock(rfbScreen);
 	    return;
 	}
-	cl->screen->kbdAddEvent(msg.ke.down, (rfbKeySym)Swap32IfLE(msg.ke.key), cl);
+	cl->screen->kbdAddEvent(msg.ke.down, (rfbKeySym)Swap32IfLE(msg.ke.key), 0, cl);
 	break;
+
+    case rfbQemuClientMessage:
+	if (n != sz_rfbQemuClientMsg) {
+	    rfbErr("rfbProcessUDPInput: key event incorrect length\n");
+	    rfbDisconnectUDPSock(rfbScreen);
+	    return;
+	}
+	if (msg.qcm.subtype == 0 )
+		cl->screen->kbdAddEvent(msg.qcm.down_flag, (rfbKeySym)Swap32IfLE(msg.qcm.keysym), (rfbKeyCode)Swap32IfLE(msg.qcm.keycode), cl);
+	return;
 
     case rfbPointerEvent:
 	if (n != sz_rfbPointerEventMsg) {

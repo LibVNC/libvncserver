@@ -100,7 +100,7 @@ enum rfbSocketState {
 	RFB_SOCKET_SHUTDOWN
 };
 
-typedef void (*rfbKbdAddEventProcPtr) (rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl);
+typedef void (*rfbKbdAddEventProcPtr) (rfbBool down, rfbKeySym keySym, rfbKeyCode keyCode, struct _rfbClientRec* cl);
 typedef void (*rfbKbdReleaseAllKeysProcPtr) (struct _rfbClientRec* cl);
 typedef void (*rfbPtrAddEventProcPtr) (int buttonMask, int x, int y, struct _rfbClientRec* cl);
 typedef void (*rfbSetXCutTextProcPtr) (char* str,int len, struct _rfbClientRec* cl);
@@ -608,6 +608,7 @@ typedef struct _rfbClientRec {
     rfbBool useRichCursorEncoding;    /**< rfbEncodingRichCursor is preferred */
     rfbBool cursorWasChanged;         /**< cursor shape update should be sent */
     rfbBool cursorWasMoved;           /**< cursor position update should be sent */
+    rfbBool enableQemuKeyEvent;       /**< client supports QemuKeyEvent */
     int cursorX,cursorY;	      /**< the coordinates of the cursor,
 					 if enableCursorShapeUpdates = FALSE */
 
