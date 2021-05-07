@@ -604,9 +604,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
 	deflateEnd( &(cl->compStream) );
     }
 
-    if (cl->extClipboardData != NULL) {
-        free(cl->extClipboardData);
-    }
+    free(cl->extClipboardData);
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
     for (i = 0; i < 4; i++) {
@@ -2042,13 +2040,13 @@ rfbSendExtendedClipboardCapability(rfbClientPtr cl) {
         rfbCloseClient(cl);
         return FALSE;
     }
-    rfbStatRecordMessageSent(cl, rfbServerCutText, 16, 16);
+    rfbStatRecordMessageSent(cl, rfbServerCutText, sizeof(buf), sizeof(buf));
     return TRUE;
 }
 
 static rfbBool
 rfbSendExtendedClipboardNotify(rfbClientPtr cl) {
-    char buf[16] = {
+    char buf[12] = {
         0x03, 0x00, 0x00, 0x00,
         0xFF, 0xFF, 0xFF, 0xFC, /* -4 */
         0x08, 0x00, 0x00, 0x01, /* only text */
@@ -2058,7 +2056,7 @@ rfbSendExtendedClipboardNotify(rfbClientPtr cl) {
         rfbCloseClient(cl);
         return FALSE;
     }
-    rfbStatRecordMessageSent(cl, rfbServerCutText, 12, 12);
+    rfbStatRecordMessageSent(cl, rfbServerCutText, sizeof(buf), sizeof(buf));
     return TRUE;
 }
 
@@ -2170,9 +2168,7 @@ rfbProcessExtendedServerCutTextData(rfbClientPtr cl, uint32_t flags, const char 
         stream.next_out = buf;
         if (inflate(&stream, Z_NO_FLUSH) != Z_OK) {
             rfbLogPerror("rfbProcessExtendedServerCutTextData: zlib inflation error");
-            if (buf != NULL) {
-                free(buf);
-            }
+            free(buf);
             inflateEnd(&stream);
             rfbCloseClient(cl);
             return FALSE;
@@ -2184,9 +2180,7 @@ rfbProcessExtendedServerCutTextData(rfbClientPtr cl, uint32_t flags, const char 
             }
         }
     }
-    if (buf != NULL) {
-        free(buf);
-    }
+    free(buf);
     inflateEnd(&stream);
     return TRUE;
 }
@@ -2819,6 +2813,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	msg.cct.length = Swap32IfLE(msg.cct.length);
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
+    /* when extended clipboard extention is enabled, a negative value of length
+     * indicates that the extended message format is used and abs(length) is the real length
+     */
     if (cl->enableExtendedClipboard && (msg.cct.length & 0x80000000)) {
         msg.cct.length = -msg.cct.length;
         isExtendedCutText = TRUE;
