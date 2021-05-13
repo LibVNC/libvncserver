@@ -104,6 +104,9 @@ typedef void (*rfbKbdAddEventProcPtr) (rfbBool down, rfbKeySym keySym, struct _r
 typedef void (*rfbKbdReleaseAllKeysProcPtr) (struct _rfbClientRec* cl);
 typedef void (*rfbPtrAddEventProcPtr) (int buttonMask, int x, int y, struct _rfbClientRec* cl);
 typedef void (*rfbSetXCutTextProcPtr) (char* str,int len, struct _rfbClientRec* cl);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+typedef void (*rfbSetXCutTextUTF8ProcPtr) (char* str,int len, struct _rfbClientRec* cl);
+#endif
 typedef struct rfbCursor* (*rfbGetCursorProcPtr) (struct _rfbClientRec* pScreen);
 typedef rfbBool (*rfbSetTranslateFunctionProcPtr)(struct _rfbClientRec* cl);
 typedef rfbBool (*rfbPasswordCheckProcPtr)(struct _rfbClientRec* cl,const char* encryptedPassWord,int len);
@@ -292,6 +295,9 @@ typedef struct _rfbScreenInfo
     rfbKbdReleaseAllKeysProcPtr kbdReleaseAllKeys;
     rfbPtrAddEventProcPtr ptrAddEvent;
     rfbSetXCutTextProcPtr setXCutText;
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    rfbSetXCutTextUTF8ProcPtr setXCutTextUTF8;
+#endif
     rfbGetCursorProcPtr getCursorPtr;
     rfbSetTranslateFunctionProcPtr setTranslateFunction;
     rfbSetSingleWindowProcPtr setSingleWindow;
@@ -685,6 +691,14 @@ typedef struct _rfbClientRec {
     rfbBool useExtDesktopSize;
     int requestedDesktopSizeChange;
     int lastDesktopSizeChangeError;
+
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    rfbBool enableExtendedClipboard;
+    uint32_t extClipboardUserCap;
+    uint32_t extClipboardMaxUnsolicitedSize;
+    char *extClipboardData;
+    int extClipboardDataSize;
+#endif
 } rfbClientRec, *rfbClientPtr;
 
 /**
@@ -784,6 +798,9 @@ extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegi
 extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+extern void rfbSendServerCutTextUTF8(rfbScreenInfoPtr rfbScreen,char *str, int len, char *fallbackLatin1Str, int latin1Len);
+#endif
 extern rfbBool rfbSendCopyRegion(rfbClientPtr cl,sraRegionPtr reg,int dx,int dy);
 extern rfbBool rfbSendLastRectMarker(rfbClientPtr cl);
 extern rfbBool rfbSendNewFBSize(rfbClientPtr cl, int w, int h);
@@ -1156,7 +1173,8 @@ rfbBool rfbUpdateClient(rfbClientPtr cl);
  This tells LibVNCServer to send updates to all connected clients.
 
  There exist the following IO functions as members of rfbScreen:
- rfbScreenInfo::kbdAddEvent(), rfbScreenInfo::kbdReleaseAllKeys(), rfbScreenInfo::ptrAddEvent() and rfbScreenInfo::setXCutText()
+ rfbScreenInfo::kbdAddEvent(), rfbScreenInfo::kbdReleaseAllKeys(), rfbScreenInfo::ptrAddEvent(),
+ rfbScreenInfo::setXCutText() and rfbScreenInfo::setXCutTextUTF8()
 
  rfbScreenInfo::kbdAddEvent()
    is called when a key is pressed.
@@ -1169,6 +1187,8 @@ rfbBool rfbUpdateClient(rfbClientPtr cl);
    in your own function. This sets the coordinates of the cursor.
  rfbScreenInfo::setXCutText()
    is called when the selection changes.
+ rfbScreenInfo::setXCutTextUTF8()
+   is called when the selection changes and the ExtendedClipboard extension is enabled.
 
  There are only two hooks:
  rfbScreenInfo::newClientHook()
