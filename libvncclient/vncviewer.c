@@ -83,8 +83,10 @@ static char* ReadPassword(rfbClient* client) {
 static rfbBool MallocFrameBuffer(rfbClient* client) {
   uint64_t allocSize;
 
-  if(client->frameBuffer)
+  if(client->frameBuffer) {
     free(client->frameBuffer);
+    client->frameBuffer = NULL;
+  }
 
   /* SECURITY: promote 'width' into uint64_t so that the multiplication does not overflow
      'width' and 'height' are 16-bit integers per RFB protocol design
