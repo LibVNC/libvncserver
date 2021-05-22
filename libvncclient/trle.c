@@ -169,19 +169,21 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
       case 128: {
         int i = 0, j = 0;
         while (j < h) {
-          int color, length;
+	  int color, length, buffer_pos = 0;
           /* read color */
           if (!ReadFromRFBServer(client, (char*)buffer, REALBPP / 8 + 1))
             return FALSE;
           color = UncompressCPixel(buffer);
           buffer += REALBPP / 8;
+	  buffer_pos += REALBPP / 8;
           /* read run length */
           length = 1;
-          while (*buffer == 0xff) {
+          while (*buffer == 0xff && buffer_pos < client->raw_buffer_size-1) {
             if (!ReadFromRFBServer(client, (char*)buffer + 1, 1))
               return FALSE;
             length += *buffer;
             buffer++;
+	    buffer_pos++;
           }
           length += *buffer;
           buffer++;
