@@ -1347,7 +1347,7 @@ rfbBool rfbFilenameTranslate2DOS(rfbClientPtr cl, char *unixPath, char *path)
 
 rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer)
 {
-    char retfilename[MAX_PATH];
+    char retfilename[MAX_PATH*2];
     char path[MAX_PATH];
     struct stat statbuf;
     RFB_FIND_DATA win32filename;
