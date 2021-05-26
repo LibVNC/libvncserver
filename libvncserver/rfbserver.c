@@ -2084,7 +2084,7 @@ rfbSendExtendedServerCutTextData(rfbClientPtr cl, const char *data, int len) {
         rfbCloseClient(cl);
         return FALSE;
     }
-    if (compress(bufAfterZlib + 12, &size, bufBeforeZlib, len + 4) != Z_OK) {
+    if (compress((unsigned char *)bufAfterZlib + 12, &size, (unsigned char *)bufBeforeZlib, len + 4) != Z_OK) {
         rfbLogPerror("rfbSendExtendedClipboardCapability: zlib deflation error");
         free(bufBeforeZlib);
         free(bufAfterZlib);
@@ -2165,7 +2165,7 @@ rfbProcessExtendedServerCutTextData(rfbClientPtr cl, uint32_t flags, const char 
             return FALSE;
         }
         stream.avail_out = size;
-        stream.next_out = buf;
+        stream.next_out = (unsigned char *)buf;
         if (inflate(&stream, Z_NO_FLUSH) != Z_OK) {
             rfbLogPerror("rfbProcessExtendedServerCutTextData: zlib inflation error");
             free(buf);
