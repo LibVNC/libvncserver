@@ -108,7 +108,7 @@ if(WITH_JPEG)
 
     if(NOT FOUND_LIBJPEG_TURBO)
       # last-resort grep check (when using LibVNCServer as a CMake subdir together with turbojpeg CMake subdir, the build check above fails since turbojpeg is not yet built when LibVNCServer is configured)
-      if(JPEG_INCLUDE_DIR MATCHES "\..*") # is relative?
+      if(JPEG_INCLUDE_DIR MATCHES "^\\.\\..*$") # is relative?
         set(JPEGLIB_H_PATH "${CMAKE_SOURCE_DIR}/${JPEG_INCLUDE_DIR}/jpeglib.h")
       else()
 	set(JPEGLIB_H_PATH "${JPEG_INCLUDE_DIR}/jpeglib.h")
