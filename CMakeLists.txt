@@ -108,11 +108,8 @@ if(WITH_JPEG)
 
     if(NOT FOUND_LIBJPEG_TURBO)
       # last-resort grep check (when using LibVNCServer as a CMake subdir together with turbojpeg CMake subdir, the build check above fails since turbojpeg is not yet built when LibVNCServer is configured)
-      if(JPEG_INCLUDE_DIR MATCHES "^\\.\\..*$") # is relative?
-        set(JPEGLIB_H_PATH "${CMAKE_SOURCE_DIR}/${JPEG_INCLUDE_DIR}/jpeglib.h")
-      else()
-	set(JPEGLIB_H_PATH "${JPEG_INCLUDE_DIR}/jpeglib.h")
-      endif()
+      get_filename_component(JPEGLIB_H_PATH "${JPEG_INCLUDE_DIR}/jpeglib.h" REALPATH BASE_DIR "${CMAKE_SOURCE_DIR}")
+      message(STATUS "Runtime check for libjpeg-turbo failed, inspecting ${JPEGLIB_H_PATH}")
       file(STRINGS ${JPEGLIB_H_PATH} FOUND_LIBJPEG_TURBO REGEX "JCS_EXT_RGB")
       if(NOT FOUND_LIBJPEG_TURBO)
 	message(WARNING "*** The libjpeg library you are building against is not libjpeg-turbo.  Performance will be reduced.  You can obtain libjpeg-turbo from:  https://sourceforge.net/projects/libjpeg-turbo/files/ ***")
