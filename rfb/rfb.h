@@ -100,6 +100,11 @@ enum rfbSocketState {
 	RFB_SOCKET_SHUTDOWN
 };
 
+enum rfbHandshakeType {
+	RFB_HANDSHAKE_AUTO,
+	RFB_HANDSHAKE_WEBSOCKET,
+};
+
 typedef void (*rfbKbdAddEventProcPtr) (rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl);
 typedef void (*rfbKbdReleaseAllKeysProcPtr) (struct _rfbClientRec* cl);
 typedef void (*rfbPtrAddEventProcPtr) (int buttonMask, int x, int y, struct _rfbClientRec* cl);
@@ -372,6 +377,9 @@ typedef struct _rfbScreenInfo
 #elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     uintptr_t listener_thread;
 #endif
+
+    enum rfbHandshakeType handshake_type;
+
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
