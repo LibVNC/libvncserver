@@ -215,14 +215,6 @@ check_symbol_exists(OSSwapHostToBigInt64 "libkern/OSByteOrder.h" LIBVNCSERVER_HA
 if(WITH_THREADS AND Threads_FOUND)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 endif(WITH_THREADS AND Threads_FOUND)
-if(LZO_FOUND)
-  set(LIBVNCSERVER_HAVE_LZO 1)
-else()
-  unset(LZO_LIBRARIES CACHE) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
-endif()
-if(NOT OPENSSL_FOUND)
-    unset(OPENSSL_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
-endif()
 if(SYSTEMD_FOUND)
   add_definitions(-DLIBVNCSERVER_WITH_SYSTEMD)
   include_directories(${SYSTEMD_INCLUDE_DIRS})
@@ -231,16 +223,16 @@ endif(SYSTEMD_FOUND)
 
 # common crypto used by both libvncserver and libvncclient
 if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
-  message(STATUS "Building crypto with Libgcrypt")
-  set(CRYPTO_LIBRARIES ${LIBGCRYPT_LIBRARIES})
-  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt)
+    message(STATUS "Building crypto with Libgcrypt")
+    list(APPEND COMMON_LIBS ${LIBGCRYPT_LIBRARIES})
+    set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt)
 elseif(OPENSSL_FOUND)
-  message(STATUS "Building crypto with OpenSSL")
-  set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
-  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl)
+    message(STATUS "Building crypto with OpenSSL")
+    list(APPEND COMMON_LIBS OpenSSL::Crypto)
+    set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl)
 else()
-  message(STATUS "Building crypto with builtin functions, only including SHA1 and D3DES")
-  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_included.c ${COMMON_DIR}/sha1.c ${COMMON_DIR}/d3des.c)
+    message(STATUS "Building crypto with builtin functions, only including SHA1 and D3DES")
+    set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_included.c ${COMMON_DIR}/sha1.c ${COMMON_DIR}/d3des.c)
 endif()
 
 if(WITH_WEBSOCKETS AND (LIBVNCSERVER_HAVE_HTOBE64 OR LIBVNCSERVER_HAVE_OSSWAPHOSTTOBIGINT64))
@@ -256,8 +248,8 @@ if(GNUTLS_FOUND)
 endif(GNUTLS_FOUND)
 
 if(OPENSSL_FOUND)
-  include_directories(${OPENSSL_INCLUDE_DIR})
-  set(LIBVNCSERVER_HAVE_LIBSSL 1)
+    set(LIBVNCSERVER_DEPENDENS "${LIBVNCSERVER_DEPENDENS} OpenSSL")
+    list(APPEND LIBVNCSERVER_DEFINES LIBVNCSERVER_HAVE_LIBSSL)
 endif(OPENSSL_FOUND)
 
 if(WITH_IPv6)
@@ -377,26 +369,22 @@ if(GNUTLS_FOUND)
     )
   include_directories(${GNUTLS_INCLUDE_DIR})
 elseif(OPENSSL_FOUND)
-  message(STATUS "Building TLS with OpenSSL")
-  set(LIBVNCCLIENT_SOURCES
-    ${LIBVNCCLIENT_SOURCES}
-    ${LIBVNCCLIENT_DIR}/tls_openssl.c
-  )
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
-    ${LIBVNCSERVER_DIR}/rfbssl_openssl.c
-  )
-  include_directories(${OPENSSL_INCLUDE_DIR})
+    message(STATUS "Building TLS with OpenSSL")
+    list(APPEND LIBVNCCLIENT_SOURCES
+        ${LIBVNCCLIENT_DIR}/tls_openssl.c
+        )
+    list(APPEND LIBVNCSERVER_SOURCES
+        ${LIBVNCSERVER_DIR}/rfbssl_openssl.c
+        )
+    list(APPEND COMMON_LIBS OpenSSL::SSL)
 else()
-  message(STATUS "Building without TLS")
-  set(LIBVNCCLIENT_SOURCES
-    ${LIBVNCCLIENT_SOURCES}
-    ${LIBVNCCLIENT_DIR}/tls_none.c
-  )
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
-    ${LIBVNCSERVER_DIR}/rfbssl_none.c
-  )
+    message(STATUS "Building without TLS")
+    list(APPEND LIBVNCCLIENT_SOURCES
+        ${LIBVNCCLIENT_DIR}/tls_none.c
+        )
+    list(APPEND LIBVNCSERVER_SOURCES
+        ${LIBVNCSERVER_DIR}/rfbssl_none.c
+        )
 endif()
 
 if(LIBVNCSERVER_HAVE_SASL)
@@ -407,32 +395,33 @@ if(LIBVNCSERVER_HAVE_SASL)
 endif()
 
 if(ZLIB_FOUND)
-  list(APPEND LIBVNCSERVER_DEFINES LIBVNCSERVER_HAVE_LIBZ)
-  list(APPEND COMMON_LIBS ZLIB::ZLIB)
-  #include_directories(${ZLIB_INCLUDE_DIR})
-  list(APPEND LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_DIR}/zlib.c
-    ${LIBVNCSERVER_DIR}/zrle.c
-    ${LIBVNCSERVER_DIR}/zrleoutstream.c
-    ${LIBVNCSERVER_DIR}/zrlepalettehelper.c
-  )
+    set(LIBVNCSERVER_DEPENDENS "${LIBVNCSERVER_DEPENDENS} ZLIB")
+    list(APPEND LIBVNCSERVER_DEFINES LIBVNCSERVER_HAVE_LIBZ)
+    list(APPEND COMMON_LIBS ZLIB::ZLIB)
+    #include_directories(${ZLIB_INCLUDE_DIR})
+    list(APPEND LIBVNCSERVER_SOURCES
+        ${LIBVNCSERVER_DIR}/zlib.c
+        ${LIBVNCSERVER_DIR}/zrle.c
+        ${LIBVNCSERVER_DIR}/zrleoutstream.c
+        ${LIBVNCSERVER_DIR}/zrlepalettehelper.c
+        )
 endif(ZLIB_FOUND)
 
 if(LZO_FOUND)
-  add_definitions(-DLIBVNCSERVER_HAVE_LZO)
-  include_directories(${LZO_INCLUDE_DIR})
+    set(LIBVNCSERVER_DEPENDENS "${LIBVNCSERVER_DEPENDENS} LZO")
+    list(APPEND LIBVNCSERVER_DEFINES LIBVNCSERVER_HAVE_LZO)
+    list(APPEND COMMON_LIBS LZO::LZO)
 else()
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
-    ${COMMON_DIR}/minilzo.c
-  )
-  set(LIBVNCCLIENT_SOURCES
-    ${LIBVNCCLIENT_SOURCES}
-    ${COMMON_DIR}/minilzo.c
-  )
+    list(APPEND LIBVNCSERVER_SOURCES
+        ${COMMON_DIR}/minilzo.c
+        )
+    list(APPEND LIBVNCCLIENT_SOURCES
+        ${COMMON_DIR}/minilzo.c
+        )
 endif()
 
 if(JPEG_FOUND)
+    set(LIBVNCSERVER_DEPENDENS "${LIBVNCSERVER_DEPENDENS} JPEG")
     list(APPEND LIBVNCSERVER_DEFINES LIBVNCSERVER_HAVE_LIBJPEG)
     list(APPEND COMMON_LIBS JPEG::JPEG)
     list(APPEND LIBVNCCLIENT_SOURCES
@@ -445,6 +434,7 @@ if(JPEG_FOUND)
 endif(JPEG_FOUND)
 
 if(PNG_FOUND)
+    set(LIBVNCSERVER_DEPENDENS "${LIBVNCSERVER_DEPENDENS} PNG")
     list(APPEND SERVER_LIBS PNG::PNG)
     list(APPEND LIBVNCSERVER_DEFINES LIBVNCSERVER_HAVE_LIBPNG)
 endif(PNG_FOUND)
@@ -484,19 +474,13 @@ list(APPEND CLIENT_LIBS ${COMMON_LIBS})
 target_link_libraries(vncclient PUBLIC
     ${ADDITIONAL_LIBS}
     ${CLIENT_LIBS}
-    ${LZO_LIBRARIES}
-    ${CRYPTO_LIBRARIES}
     ${GNUTLS_LIBRARIES}
-    ${OPENSSL_LIBRARIES}
     )
 list(APPEND SERVER_LIBS ${COMMON_LIBS})
 target_link_libraries(vncserver PUBLIC
     ${ADDITIONAL_LIBS}
     ${SERVER_LIBS}
-    ${LZO_LIBRARIES}
-    ${CRYPTO_LIBRARIES}
     ${GNUTLS_LIBRARIES}
-    ${OPENSSL_LIBRARIES}
     )
 
 SET_TARGET_PROPERTIES(vncclient vncserver
@@ -733,7 +717,6 @@ if(LIBVNCSERVER_INSTALL)
     # Install cmake version configure file
     write_basic_package_version_file(
         "${CMAKE_BINARY_DIR}/LibVNCServerConfigVersion.cmake"
-        VERSION ${PARA_VERSION}
         COMPATIBILITY AnyNewerVersion)
     install(FILES
         "${CMAKE_BINARY_DIR}/LibVNCServerConfigVersion.cmake"
