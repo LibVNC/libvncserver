@@ -10,5 +10,5 @@ Requires:
 Requires.private:
 Libs: -L${libdir} -lvncclient
 Libs.private: @PRIVATE_LIBS@
-Cflags: -I${includedir}
+Cflags: -I${includedir} @PC_CONFIG_DEFINES@
 
