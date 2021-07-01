@@ -10,4 +10,4 @@ Requires:
 Requires.private:
 Libs: -L${libdir} -lvncserver
 Libs.private: @PRIVATE_LIBS@
-Cflags: -I${includedir} @PC_CONFIG_DEFINES@
+Cflags: -I${includedir} @PC_DEFINES@
