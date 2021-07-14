@@ -45,6 +45,11 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   toRead = rfbClientSwap32IfLE(hdr.nBytes);
   if (toRead==0) return TRUE;
 
+  if (toRead < 0) {
+      rfbClientErr("ultra error: remote sent negative payload size\n");
+      return FALSE;
+  }
+
   if (uncompressedBytes==0)
   {
       rfbClientLog("ultra error: rectangle has 0 uncomressed bytes ((%dw * %dh) * (%d / 8))\n", rw, rh, BPP); 
@@ -130,6 +135,11 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   toRead = rfbClientSwap32IfLE(hdr.nBytes);
 
   if (toRead==0) return TRUE;
+
+  if (toRead < 0) {
+      rfbClientErr("ultrazip error: remote sent negative payload size\n");
+      return FALSE;
+  }
 
   if (uncompressedBytes==0)
   {
