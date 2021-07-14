@@ -225,6 +225,11 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     return FALSE;
   }
   if (readUncompressed) {
+    if (compressedLen > RFB_BUFFER_SIZE) {
+	rfbClientErr("Received uncompressed byte count exceeds our buffer size.\n");
+	return FALSE;
+    }
+
     if (!ReadFromRFBServer(client, (char*)client->buffer, compressedLen))
       return FALSE;
 
