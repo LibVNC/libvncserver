@@ -296,7 +296,7 @@ static int HandleZRLETile(rfbClient* client,
 		}
 		else if( type <= 127 ) /* packed Palette */
 		{
-			CARDBPP palette[16];
+			CARDBPP palette[128];
 			int i,j,shift,
 				bpp=(type>4?(type>16?8:4):(type>2?2:1)),
 				mask=(1<<bpp)-1,
