@@ -233,6 +233,10 @@ typedef void (*GotBitmapProc)(struct _rfbClient* client, const uint8_t* buffer, 
 typedef rfbBool (*GotJpegProc)(struct _rfbClient* client, const uint8_t* buffer, int length, int x, int y, int w, int h);
 typedef rfbBool (*LockWriteToTLSProc)(struct _rfbClient* client);   /** @deprecated */
 typedef rfbBool (*UnlockWriteToTLSProc)(struct _rfbClient* client); /** @deprecated */
+typedef rfbSocket (*ConnectToRFBServerProc)(struct _rfbClient* client, const char* hostname, int port);
+typedef int (*ReadFromSocketProc)(struct _rfbClient* client, char* buf, unsigned int len);
+typedef int (*WriteToSocketProc)(struct _rfbClient* client, const char* buf, unsigned int len);
+typedef void (*CloseSocketProc)(struct _rfbClient* client);
 
 #ifdef LIBVNCSERVER_HAVE_SASL
 typedef char* (*GetUserProc)(struct _rfbClient* client);
@@ -466,6 +470,12 @@ typedef struct _rfbClient {
 	/* timeout in seconds when reading from half-open connections in
 	 * ReadFromRFBServer() - keep at 0 to disable timeout detection and handling */
 	unsigned int readTimeout;
+
+	/** hooks for custom socket I/O */
+	ConnectToRFBServerProc ConnectToRFBServer;
+	ReadFromSocketProc ReadFromSocket;
+	WriteToSocketProc WriteToSocket;
+	CloseSocketProc CloseSocket;
 
 	/**
 	 * Mutex to protect concurrent TLS read/write.
