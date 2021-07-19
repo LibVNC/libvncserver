@@ -211,7 +211,7 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
         /* read palettized pixels */
         i = j = 0;
         while (j < h) {
-          int color, length;
+	  int color, length, buffer_pos = 0;
           /* read color */
           if (!ReadFromRFBServer(client, (char *)buffer, 1))
             return FALSE;
@@ -221,12 +221,14 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
             if (!ReadFromRFBServer(client, (char *)buffer + 1, 1))
               return FALSE;
             buffer++;
+	    buffer_pos++;
             /* read run length */
-            while (*buffer == 0xff) {
+            while (*buffer == 0xff && buffer_pos < client->raw_buffer_size-1) {
               if (!ReadFromRFBServer(client, (char *)buffer + 1, 1))
                 return FALSE;
               length += *buffer;
               buffer++;
+	      buffer_pos++;
             }
             length += *buffer;
           }
