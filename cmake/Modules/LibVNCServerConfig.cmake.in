@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+foreach(dependens_lib @LIBVNCSERVER_DEPENDENS@)
+    find_dependency(${dependens_lib})
+endforeach()
+
+include("${CMAKE_CURRENT_LIST_DIR}/LibVNCServerTargets.cmake")
+
+check_required_components(
+  vncclient
+  vncserver
+  )
