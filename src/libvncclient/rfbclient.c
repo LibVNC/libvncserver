@@ -324,6 +324,11 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     return TRUE;
   }
 
+  if(client->ConnectToRFBServer)
+  {
+      client->sock = client->ConnectToRFBServer(client, hostname, port);
+  }
+  else
 #ifndef WIN32
   if(IsUnixSocket(hostname))
     /* serverHost is a UNIX socket. */
