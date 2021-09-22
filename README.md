@@ -40,6 +40,7 @@ RFB Protocol Support Status
 |Apple ARD          |         30 |              |            ✔ |
 |TLS                |         18 |              |            ✔ |
 |VeNCrypt           |         19 |              |            ✔ |
+|UltraVNC MSLogonII |        113 |              |            ✔ |
 
 ## [Encodings](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#76encodings)
 
