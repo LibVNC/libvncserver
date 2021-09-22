@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/LibVNC/libvncserver.svg?branch=master)](https://travis-ci.org/LibVNC/libvncserver)
+[![Build Status](https://app.travis-ci.com/LibVNC/libvncserver.svg?branch=master)](https://app.travis-ci.com/LibVNC/libvncserver)
 [![Build status](https://ci.appveyor.com/api/projects/status/fao6m1md3q4g2bwn/branch/master?svg=true)](https://ci.appveyor.com/project/bk138/libvncserver/branch/master)
 [![Help making this possible](https://img.shields.io/badge/liberapay-donate-yellow.png)](https://liberapay.com/LibVNC/donate) [![Join the chat at https://gitter.im/LibVNC/libvncserver](https://badges.gitter.im/LibVNC/libvncserver.svg)](https://gitter.im/LibVNC/libvncserver?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
