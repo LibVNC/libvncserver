@@ -507,7 +507,7 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
 #ifdef LIBVNCSERVER_HAVE_SASL
             tAuth[loop]==rfbSASL ||
 #endif /* LIBVNCSERVER_HAVE_SASL */
-            (tAuth[loop]==rfbARD && client->GetCredential))
+            ((tAuth[loop]==rfbARD || tAuth[loop]==rfbUltraMSLogonII) && client->GetCredential))
         {
             if (!subAuth && client->clientAuthSchemes)
             {
@@ -678,6 +678,60 @@ rfbPowM64(uint64_t b, uint64_t e, uint64_t m)
     b=rfbMulM64(b,b,m);
   }
   return r;
+}
+
+static rfbBool
+HandleUltraMSLogonIIAuth(rfbClient *client)
+{
+  uint8_t gen[8], mod[8], resp[8], pub[8], priv[8];
+  uint8_t username[256], password[64], key[8];
+  rfbCredential *cred;
+
+  if (!ReadFromRFBServer(client, (char *)gen, sizeof(gen))) return FALSE;
+  if (!ReadFromRFBServer(client, (char *)mod, sizeof(mod))) return FALSE;
+  if (!ReadFromRFBServer(client, (char *)resp, sizeof(resp))) return FALSE;
+
+  if(!dh_generate_keypair(priv, pub, gen, sizeof(gen), mod, sizeof(priv))) {
+      rfbClientErr("HandleUltraMSLogonIIAuth: generating keypair failed\n");
+      return FALSE;
+  }
+
+  if(!dh_compute_shared_key(key, priv, resp, mod, sizeof(key))) {
+      rfbClientErr("HandleUltraMSLogonIIAuth: creating shared key failed\n");
+      return FALSE;
+  }
+
+  if (!client->GetCredential)
+  {
+    rfbClientLog("GetCredential callback is not set.\n");
+    return FALSE;
+  }
+  rfbClientLog("WARNING! MSLogon security type has very low password encryption! "\
+    "Use it only with SSH tunnel or trusted network.\n");
+  cred = client->GetCredential(client, rfbCredentialTypeUser);
+  if (!cred)
+  {
+    rfbClientLog("Reading credential failed\n");
+    return FALSE;
+  }
+
+  memset(username, 0, sizeof(username));
+  strncpy((char *)username, cred->userCredential.username, sizeof(username)-1);
+  memset(password, 0, sizeof(password));
+  strncpy((char *)password, cred->userCredential.password, sizeof(password)-1);
+  FreeUserCredential(cred);
+
+  rfbClientEncryptBytes2(username, sizeof(username), (unsigned char *)key);
+  rfbClientEncryptBytes2(password, sizeof(password), (unsigned char *)key);
+
+  if (!WriteToRFBServer(client, (char *)pub, sizeof(pub))) return FALSE;
+  if (!WriteToRFBServer(client, (char *)username, sizeof(username))) return FALSE;
+  if (!WriteToRFBServer(client, (char *)password, sizeof(password))) return FALSE;
+
+  /* Handle the SecurityResult message */
+  if (!rfbHandleAuthResult(client)) return FALSE;
+
+  return TRUE;
 }
 
 static rfbBool
@@ -1002,6 +1056,10 @@ InitialiseRFBConnection(rfbClient* client)
     if (!HandleSASLAuth(client)) return FALSE;
     break;
 #endif /* LIBVNCSERVER_HAVE_SASL */
+
+  case rfbUltraMSLogonII:
+    if (!HandleUltraMSLogonIIAuth(client)) return FALSE;
+    break;
 
   case rfbMSLogon:
     if (!HandleMSLogonAuth(client)) return FALSE;

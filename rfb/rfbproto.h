@@ -294,6 +294,8 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 #define rfbVeNCrypt 19
 #define rfbSASL 20
 #define rfbARD 30
+#define rfbUltraMSLogonI 0x70	/* UNIMPLEMENTED */
+#define rfbUltraMSLogonII 0x71
 #define rfbMSLogon 0xfffffffa
 
 #define rfbVeNCryptPlain 256
