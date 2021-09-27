@@ -132,6 +132,30 @@ In case you prefer to learn LibVNCServer by example, have a look at the servers 
 
 For LibVNCClient, examples can be found in [client_examples](client_examples).
 
+Incorporating LibVNCServer/LibVNCClient into your build system
+--------------------------------------------------------------
+
+The install process installs [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/)
+.pc files for LibVNCServer as well as LibVNCClient which you can use in your build
+system via the usual `pkg-config --cflags libvncserver` et al.
+
+If using CMake, LibVNCServer versions > 0.9.13 provide CMake configure files so
+in your project's CMakeLists.txt, you can say:
+
+```cmake
+find_package(LibVNCServer)
+if(LibVNCServer_FOUND)
+	# libs and headers location are now accessible via properties, but you only
+	# need to add the respective export target to your project's target_link_libraries,
+	# cmake will automatically add libs and headers
+	# eg: add client (YOUR_PROJECT_TARGET being a placeholder for your real target -
+	# it must be defined by add_executable or add_library):
+	target_link_libraries(YOUR_PROJECT_TARGET LibVNCServer::vncclient)
+	# add server:
+	target_link_libraries(YOUR_PROJECT_TARGET LibVNCServer::vncserver)
+endif()
+```
+
 Using Websockets
 ----------------
 
