@@ -33,6 +33,7 @@ int hash_md5(void *out, const void *in, const size_t in_len)
     return 0;
 }
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 int hash_sha1(void *out, const void *in, const size_t in_len)
 {
     SHA1Context sha1;
@@ -45,6 +46,7 @@ int hash_sha1(void *out, const void *in, const size_t in_len)
 
     return 1;
 }
+#endif /* LIBVNCSERVER_WITH_WEBSOCKETS */
 
 void random_bytes(void *out, size_t len)
 {

@@ -74,6 +74,7 @@ int hash_md5(void *out, const void *in, const size_t in_len)
     return result;
 }
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 int hash_sha1(void *out, const void *in, const size_t in_len)
 {
     int result = 0;
@@ -98,6 +99,7 @@ int hash_sha1(void *out, const void *in, const size_t in_len)
     gcry_md_close(sha1);
     return result;
 }
+#endif /* LIBVNCSERVER_WITH_WEBSOCKETS */
 
 void random_bytes(void *out, size_t len)
 {
