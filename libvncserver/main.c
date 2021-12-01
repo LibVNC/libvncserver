@@ -145,7 +145,7 @@ rfbUnregisterProtocolExtension(rfbProtocolExtension* extension)
 	rfbUnregisterProtocolExtension(extension->next);
 }
 
-rfbProtocolExtension* rfbGetExtensionIterator()
+rfbProtocolExtension* rfbGetExtensionIterator(void)
 {
 	if (! extMutex_initialized) {
 		INIT_MUTEX(extMutex);
@@ -156,7 +156,7 @@ rfbProtocolExtension* rfbGetExtensionIterator()
 	return rfbExtensionHead;
 }
 
-void rfbReleaseExtensionIterator()
+void rfbReleaseExtensionIterator(void)
 {
 	UNLOCK(extMutex);
 }

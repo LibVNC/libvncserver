@@ -536,13 +536,13 @@ static rfbSecurityHandler tightVncSecurityHandler = {
 	NULL
 };
 
-void rfbRegisterTightVNCFileTransferExtension() {
+void rfbRegisterTightVNCFileTransferExtension(void) {
 	rfbRegisterProtocolExtension(&tightVncFileTransferExtension);
 	rfbRegisterSecurityHandler(&tightVncSecurityHandler);
 }
 
 void 
-rfbUnregisterTightVNCFileTransferExtension() {
+rfbUnregisterTightVNCFileTransferExtension(void) {
 	rfbUnregisterProtocolExtension(&tightVncFileTransferExtension);
 	rfbUnregisterSecurityHandler(&tightVncSecurityHandler);
 }
