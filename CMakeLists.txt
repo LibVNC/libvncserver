@@ -59,6 +59,7 @@ option(WITH_IPv6 "Enable IPv6 Support" ON)
 option(WITH_WEBSOCKETS "Build with websockets support" ON)
 option(WITH_SASL "Build with SASL support" ON)
 option(WITH_EXAMPLES "Build examples" ON)
+option(WITH_TEST "Build test" ON)
 
 
 
@@ -526,88 +527,87 @@ SET_TARGET_PROPERTIES(vncclient vncserver
 		PROPERTIES SOVERSION "${VERSION_SO}" VERSION "${LibVNCServer_VERSION}" C_STANDARD 90
 )
 
-if(WITH_EXAMPLES)
 
-  # EXAMPLES
-  set(LIBVNCSERVER_EXAMPLES
-      backchannel
-      camera
-      cursors
-      colourmaptest
-      example
-      fontsel
-      pnmshow
-      pnmshow24
-      regiontest
-      repeater
-      rotate
-      simple
-      simple15
-      storepasswd
-      vncev
-    )
-
-  if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
-    set(LIBVNCSERVER_EXAMPLES
-      ${LIBVNCSERVER_EXAMPLES}
-      blooptest
-    )
-  endif(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
-
-  if(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
-    set(LIBVNCSERVER_EXAMPLES
-      ${LIBVNCSERVER_EXAMPLES}
-      filetransfer
-    )
-  endif(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
-
-  if(APPLE AND NOT IOS AND WITH_THREADS AND CMAKE_USE_PTHREADS_INIT)
-    set(LIBVNCSERVER_EXAMPLES
-      ${LIBVNCSERVER_EXAMPLES}
-      mac
-    )
-    find_library(CARBON_LIBRARY Carbon)
-    find_library(IOKIT_LIBRARY IOKit)
-    find_library(IOSURFACE_LIBRARY IOSurface)
-  endif(APPLE AND NOT IOS AND WITH_THREADS AND CMAKE_USE_PTHREADS_INIT)
-
-  if(ANDROID)
-    set(LIBVNCSERVER_EXAMPLES
-      ${LIBVNCSERVER_EXAMPLES}
-      androidvncserver
-    )
-  endif(ANDROID)
-
-  set(LIBVNCCLIENT_EXAMPLES
-      backchannel
-      ppmtest
+# EXAMPLES
+set(LIBVNCSERVER_EXAMPLES
+    backchannel
+    camera
+    cursors
+    colourmaptest
+    example
+    fontsel
+    pnmshow
+    pnmshow24
+    regiontest
+    repeater
+    rotate
+    simple
+    simple15
+    storepasswd
+    vncev
   )
 
-  if(SDL2_FOUND)
-    include_directories(${SDL2_INCLUDE_DIR})
-    set(LIBVNCCLIENT_EXAMPLES
-      ${LIBVNCCLIENT_EXAMPLES}
-      SDLvncviewer
-    )
-  endif(SDL2_FOUND)
+if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
+  set(LIBVNCSERVER_EXAMPLES
+    ${LIBVNCSERVER_EXAMPLES}
+    blooptest
+  )
+endif(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
 
-  if(GTK2_FOUND)
-    include_directories(${GTK2_INCLUDE_DIRS})
-    set(LIBVNCCLIENT_EXAMPLES
-      ${LIBVNCCLIENT_EXAMPLES}
-      gtkvncviewer
-    )
-  endif(GTK2_FOUND)
+if(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
+  set(LIBVNCSERVER_EXAMPLES
+    ${LIBVNCSERVER_EXAMPLES}
+    filetransfer
+  )
+endif(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
+
+if(APPLE AND NOT IOS AND WITH_THREADS AND CMAKE_USE_PTHREADS_INIT)
+  set(LIBVNCSERVER_EXAMPLES
+    ${LIBVNCSERVER_EXAMPLES}
+    mac
+  )
+  find_library(CARBON_LIBRARY Carbon)
+  find_library(IOKIT_LIBRARY IOKit)
+  find_library(IOSURFACE_LIBRARY IOSurface)
+endif(APPLE AND NOT IOS AND WITH_THREADS AND CMAKE_USE_PTHREADS_INIT)
+
+if(ANDROID)
+  set(LIBVNCSERVER_EXAMPLES
+    ${LIBVNCSERVER_EXAMPLES}
+    androidvncserver
+  )
+endif(ANDROID)
+
+set(LIBVNCCLIENT_EXAMPLES
+    backchannel
+    ppmtest
+)
+
+if(SDL2_FOUND)
+  include_directories(${SDL2_INCLUDE_DIR})
+  set(LIBVNCCLIENT_EXAMPLES
+    ${LIBVNCCLIENT_EXAMPLES}
+    SDLvncviewer
+  )
+endif(SDL2_FOUND)
+
+if(GTK2_FOUND)
+  include_directories(${GTK2_INCLUDE_DIRS})
+  set(LIBVNCCLIENT_EXAMPLES
+    ${LIBVNCCLIENT_EXAMPLES}
+    gtkvncviewer
+  )
+endif(GTK2_FOUND)
 
 
-  if(FFMPEG_FOUND)
-    set(LIBVNCCLIENT_EXAMPLES
-      ${LIBVNCCLIENT_EXAMPLES}
-      vnc2mpg
-    )
-  endif(FFMPEG_FOUND)
+if(FFMPEG_FOUND)
+  set(LIBVNCCLIENT_EXAMPLES
+    ${LIBVNCCLIENT_EXAMPLES}
+    vnc2mpg
+  )
+endif(FFMPEG_FOUND)
 
-
+if(WITH_EXAMPLES)
   foreach(e ${LIBVNCSERVER_EXAMPLES})
     add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
     set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
@@ -621,11 +621,12 @@ if(WITH_EXAMPLES)
     set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
     target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES})
   endforeach(e ${LIBVNCCLIENT_EXAMPLES})
+endif(WITH_EXAMPLES)
 
-
-  #
-  # them tests
-  #
+#
+# them tests
+#
+if(WITH_TEST)
 
   if(UNIX)
       set(ADDITIONAL_TEST_LIBS m)
@@ -698,7 +699,7 @@ if(WITH_EXAMPLES)
       add_test(NAME wstest COMMAND test_wstest)
   endif(LIBVNCSERVER_WITH_WEBSOCKETS)
 
-endif(WITH_EXAMPLES)
+endif(WITH_TEST)
 
 #
 # this gets the libraries needed by TARGET in "-libx -liby ..." form
