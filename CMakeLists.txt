@@ -527,7 +527,6 @@ SET_TARGET_PROPERTIES(vncclient vncserver
 		PROPERTIES SOVERSION "${VERSION_SO}" VERSION "${LibVNCServer_VERSION}" C_STANDARD 90
 )
 
-
 # EXAMPLES
 set(LIBVNCSERVER_EXAMPLES
     backchannel
@@ -626,6 +625,7 @@ endif(WITH_EXAMPLES)
 #
 # them tests
 #
+
 if(WITH_TEST)
 
   if(UNIX)
