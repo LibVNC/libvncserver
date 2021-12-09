@@ -633,15 +633,15 @@ if(UNIX)
 endif(UNIX)
 
 set(SIMPLETESTS
-  cargstest
-  copyrecttest
+   cargstest
+   copyrecttest
 )
 
 if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
   set(SIMPLETESTS
       ${SIMPLETESTS}
       encodingstest
-    )
+     )
 endif(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
 
 foreach(t ${SIMPLETESTS})
@@ -653,24 +653,24 @@ endforeach(t ${SIMPLETESTS})
 
 if(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
   add_executable(test_tjunittest
-                ${TESTS_DIR}/tjunittest.c
-                ${TESTS_DIR}/tjutil.c
-                ${TESTS_DIR}/tjutil.h
-                ${COMMON_DIR}/turbojpeg.c
-                ${COMMON_DIR}/turbojpeg.h
+                 ${TESTS_DIR}/tjunittest.c
+                 ${TESTS_DIR}/tjutil.c
+                 ${TESTS_DIR}/tjutil.h
+                 ${COMMON_DIR}/turbojpeg.c
+                 ${COMMON_DIR}/turbojpeg.h
                 )
   set_target_properties(test_tjunittest PROPERTIES OUTPUT_NAME tjunittest)
   set_target_properties(test_tjunittest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
   target_link_libraries(test_tjunittest vncserver vncclient ${ADDITIONAL_TEST_LIBS})
 
   add_executable(test_tjbench
-                ${TESTS_DIR}/tjbench.c
-                ${TESTS_DIR}/tjutil.c
-                ${TESTS_DIR}/tjutil.h
-                ${TESTS_DIR}/bmp.c
-                ${TESTS_DIR}/bmp.h
-                ${COMMON_DIR}/turbojpeg.c
-                ${COMMON_DIR}/turbojpeg.h
+                 ${TESTS_DIR}/tjbench.c
+                 ${TESTS_DIR}/tjutil.c
+                 ${TESTS_DIR}/tjutil.h
+                 ${TESTS_DIR}/bmp.c
+                 ${TESTS_DIR}/bmp.h
+                 ${COMMON_DIR}/turbojpeg.c
+                 ${COMMON_DIR}/turbojpeg.h
                 )
   set_target_properties(test_tjbench PROPERTIES OUTPUT_NAME tjbench)
   set_target_properties(test_tjbench PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
