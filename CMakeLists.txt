@@ -58,6 +58,8 @@ option(WITH_24BPP "Allow 24 bpp" ON)
 option(WITH_IPv6 "Enable IPv6 Support" ON)
 option(WITH_WEBSOCKETS "Build with websockets support" ON)
 option(WITH_SASL "Build with SASL support" ON)
+option(WITH_EXAMPLES "Build examples" ON)
+option(WITH_TESTS "Build tests" ON)
 
 
 
@@ -604,25 +606,27 @@ if(FFMPEG_FOUND)
   )
 endif(FFMPEG_FOUND)
 
+if(WITH_EXAMPLES)
+  foreach(e ${LIBVNCSERVER_EXAMPLES})
+    add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
+    set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
+    set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
+    target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY})
+  endforeach(e ${LIBVNCSERVER_EXAMPLES})
 
-foreach(e ${LIBVNCSERVER_EXAMPLES})
-  add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
-  set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
-  set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
-  target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY})
-endforeach(e ${LIBVNCSERVER_EXAMPLES})
-
-foreach(e ${LIBVNCCLIENT_EXAMPLES})
-  add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
-  set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
-  set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
-  target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES})
-endforeach(e ${LIBVNCCLIENT_EXAMPLES})
-
+  foreach(e ${LIBVNCCLIENT_EXAMPLES})
+    add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
+    set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
+    set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
+    target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES})
+  endforeach(e ${LIBVNCCLIENT_EXAMPLES})
+endif(WITH_EXAMPLES)
 
 #
 # them tests
 #
+
+if(WITH_TESTS)
 
 if(UNIX)
     set(ADDITIONAL_TEST_LIBS m)
@@ -694,6 +698,8 @@ endif(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
 if(LIBVNCSERVER_WITH_WEBSOCKETS)
     add_test(NAME wstest COMMAND test_wstest)
 endif(LIBVNCSERVER_WITH_WEBSOCKETS)
+
+endif(WITH_TESTS)
 
 #
 # this gets the libraries needed by TARGET in "-libx -liby ..." form
