@@ -18,9 +18,6 @@ rfbClientPtr rfbClientIteratorHead(rfbClientIteratorPtr i);
 extern void rfbTightCleanup(rfbScreenInfoPtr screen);
 #endif
 
-/* from zlib.c */
-extern void rfbZlibCleanup(rfbScreenInfoPtr screen);
-
 /* from zrle.c */
 void rfbFreeZrleData(rfbClientPtr cl);
 

@@ -33,47 +33,12 @@
 #include <rfb/rfb.h>
 
 /*
- * zlibBeforeBuf contains pixel data in the client's format.
- * zlibAfterBuf contains the zlib (deflated) encoding version.
+ * cl->beforeEncBuf contains pixel data in the client's format.
+ * cl->afterEncBuf contains the zlib (deflated) encoding version.
  * If the zlib compressed/encoded version is
- * larger than the raw data or if it exceeds zlibAfterBufSize then
+ * larger than the raw data or if it exceeds cl->afterEncBufSize then
  * raw encoding is used instead.
  */
-
-/*
- * Out of lazyiness, we use thread local storage for zlib as we did for
- * tight.  N.B. ZRLE does it the traditional way with per-client storage
- * (and so at least ZRLE will work threaded on older systems.)
- */
-#if defined(__GNUC__)
-#define TLS __thread
-#elif defined(_MSC_VER)
-#define TLS __declspec(thread)
-#else
-#define TLS
-#endif
-
-static TLS int zlibBeforeBufSize = 0;
-static TLS char *zlibBeforeBuf = NULL;
-
-static TLS int zlibAfterBufSize = 0;
-static TLS char *zlibAfterBuf = NULL;
-static TLS int zlibAfterBufLen = 0;
-
-void rfbZlibCleanup(rfbScreenInfoPtr screen)
-{
-  if (zlibBeforeBufSize) {
-    free(zlibBeforeBuf);
-    zlibBeforeBuf = NULL;
-    zlibBeforeBufSize=0;
-  }
-  if (zlibAfterBufSize) {
-    zlibAfterBufSize=0;
-    free(zlibAfterBuf);
-    zlibAfterBuf = NULL;
-  }
-}
-
 
 /*
  * rfbSendOneRectEncodingZlib - send a given rectangle using one Zlib
@@ -101,16 +66,16 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
     maxRawSize = (cl->scaledScreen->width * cl->scaledScreen->height
                   * (cl->format.bitsPerPixel / 8));
 
-    if (!zlibBeforeBuf || zlibBeforeBufSize < maxRawSize) {
-        if (zlibBeforeBuf == NULL)
-            zlibBeforeBuf = (char *)malloc(maxRawSize);
+    if (!cl->beforeEncBuf || cl->beforeEncBufSize < maxRawSize) {
+        if (cl->beforeEncBuf == NULL)
+            cl->beforeEncBuf = (char *)malloc(maxRawSize);
         else {
-            char *reallocedBeforeEncBuf = (char *)realloc(zlibBeforeBuf, maxRawSize);
+            char *reallocedBeforeEncBuf = (char *)realloc(cl->beforeEncBuf, maxRawSize);
             if (!reallocedBeforeEncBuf) return FALSE;
-            zlibBeforeBuf = reallocedBeforeEncBuf;
+            cl->beforeEncBuf = reallocedBeforeEncBuf;
         }
-        if(zlibBeforeBuf)
-            zlibBeforeBufSize = maxRawSize;
+        if(cl->beforeEncBuf)
+            cl->beforeEncBufSize = maxRawSize;
     }
 
     /* zlib compression is not useful for very small data sets.
@@ -145,19 +110,19 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
      */
     maxCompSize = maxRawSize + (( maxRawSize + 99 ) / 100 ) + 12;
 
-    if (!zlibAfterBuf || zlibAfterBufSize < maxCompSize) {
-        if (zlibAfterBuf == NULL)
-            zlibAfterBuf = (char *)malloc(maxCompSize);
+    if (!cl->afterEncBuf || cl->afterEncBufSize < maxCompSize) {
+        if (cl->afterEncBuf == NULL)
+            cl->afterEncBuf = (char *)malloc(maxCompSize);
         else {
-            char *reallocedAfterEncBuf = (char *)realloc(zlibAfterBuf, maxCompSize);
+            char *reallocedAfterEncBuf = (char *)realloc(cl->afterEncBuf, maxCompSize);
             if (!reallocedAfterEncBuf) return FALSE;
-            zlibAfterBuf = reallocedAfterEncBuf;
+            cl->afterEncBuf = reallocedAfterEncBuf;
         }
-        if(zlibAfterBuf)
-            zlibAfterBufSize = maxCompSize;
+        if(cl->afterEncBuf)
+            cl->afterEncBufSize = maxCompSize;
     }
 
-    if (!zlibBeforeBuf || !zlibAfterBuf)
+    if (!cl->beforeEncBuf || !cl->afterEncBuf)
     {
         rfbLog("rfbSendOneRectEncodingZlib: failed to allocate memory\n");
         return FALSE;
@@ -167,12 +132,12 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
      * Convert pixel data to client format.
      */
     (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
-		       &cl->format, fbptr, zlibBeforeBuf,
+               &cl->format, fbptr, cl->beforeEncBuf,
 		       cl->scaledScreen->paddedWidthInBytes, w, h);
 
-    cl->compStream.next_in = ( Bytef * )zlibBeforeBuf;
+    cl->compStream.next_in = ( Bytef * )cl->beforeEncBuf;
     cl->compStream.avail_in = w * h * (cl->format.bitsPerPixel / 8);
-    cl->compStream.next_out = ( Bytef * )zlibAfterBuf;
+    cl->compStream.next_out = ( Bytef * )cl->afterEncBuf;
     cl->compStream.avail_out = maxCompSize;
     cl->compStream.data_type = Z_BINARY;
 
@@ -203,7 +168,7 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
     deflateResult = deflate( &(cl->compStream), Z_SYNC_FLUSH );
 
     /* Find the total size of the resulting compressed data. */
-    zlibAfterBufLen = cl->compStream.total_out - previousOut;
+    cl->afterEncBufLen = cl->compStream.total_out - previousOut;
 
     if ( deflateResult != Z_OK ) {
         rfbErr("zlib deflation error: %s\n", cl->compStream.msg);
@@ -218,7 +183,7 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
      */
 
     /* Update statics */
-    rfbStatRecordEncodingSent(cl, rfbEncodingZlib, sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader + zlibAfterBufLen,
+    rfbStatRecordEncodingSent(cl, rfbEncodingZlib, sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader + cl->afterEncBufLen,
         + w * (cl->format.bitsPerPixel / 8) * h);
 
     if (cl->ublen + sz_rfbFramebufferUpdateRectHeader + sz_rfbZlibHeader
@@ -238,20 +203,20 @@ rfbSendOneRectEncodingZlib(rfbClientPtr cl,
 	   sz_rfbFramebufferUpdateRectHeader);
     cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-    hdr.nBytes = Swap32IfLE(zlibAfterBufLen);
+    hdr.nBytes = Swap32IfLE(cl->afterEncBufLen);
 
     memcpy(&cl->updateBuf[cl->ublen], (char *)&hdr, sz_rfbZlibHeader);
     cl->ublen += sz_rfbZlibHeader;
 
-    for (i = 0; i < zlibAfterBufLen;) {
+    for (i = 0; i < cl->afterEncBufLen;) {
 
 	int bytesToCopy = UPDATE_BUF_SIZE - cl->ublen;
 
-	if (i + bytesToCopy > zlibAfterBufLen) {
-	    bytesToCopy = zlibAfterBufLen - i;
+    if (i + bytesToCopy > cl->afterEncBufLen) {
+        bytesToCopy = cl->afterEncBufLen - i;
 	}
 
-	memcpy(&cl->updateBuf[cl->ublen], &zlibAfterBuf[i], bytesToCopy);
+    memcpy(&cl->updateBuf[cl->ublen], &cl->afterEncBuf[i], bytesToCopy);
 
 	cl->ublen += bytesToCopy;
 	i += bytesToCopy;

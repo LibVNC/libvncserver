@@ -1136,7 +1136,6 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
       rfbFreeCursor(screen->cursor);
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-  rfbZlibCleanup(screen);
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
   rfbTightCleanup(screen);
 #endif
