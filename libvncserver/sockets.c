@@ -178,7 +178,7 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
     rfbScreen->socketState = RFB_SOCKET_READY;
 
 #ifdef LIBVNCSERVER_WITH_SYSTEMD
-    if (sd_listen_fds(0) == 1)
+    if (sd_listen_fds(0) == 1 || sd_listen_fds(0) == 2)
     {
         rfbSocket sock = SD_LISTEN_FDS_START + 0;
         if (sd_is_socket(sock, AF_UNSPEC, 0, 0))
@@ -202,7 +202,6 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
             rfbScreen->listenSock = sock;
             FD_SET(rfbScreen->listenSock, &(rfbScreen->allFds));
             rfbScreen->maxFd = rfbScreen->listenSock;
-            rfbProcessNewConnection(rfbScreen);
         }
         return;
     }

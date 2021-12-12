@@ -63,6 +63,10 @@
 #include <tcpd.h>
 #endif
 
+#ifdef LIBVNCSERVER_WITH_SYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
+
 
 #define NOT_FOUND_STR "HTTP/1.0 404 Not found\r\nConnection: close\r\n\r\n" \
     "<HEAD><TITLE>File Not Found</TITLE></HEAD>\n" \
@@ -99,6 +103,32 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
 
     if (!rfbScreen->httpDir)
 	return;
+
+#ifdef LIBVNCSERVER_WITH_SYSTEMD
+    if (sd_listen_fds(0) == 2) {
+        rfbSocket sock = SD_LISTEN_FDS_START + 1;
+        if (sd_is_socket(sock, AF_UNSPEC, 0, 0)) {
+            rfbErr("Systemd socket activation passed 'accept=yes' inetd style socket. Only passing listening sockets is supported for http socket\n");
+        } else if (sd_is_socket(sock, AF_UNSPEC, 0, 1)) {
+            struct sockaddr_storage sa;
+            int sa_len = sizeof(sa);
+            char hoststr[NI_MAXHOST];
+            char portstr[NI_MAXSERV];
+
+            if (getsockname(sock, (struct sockaddr *) &sa, &sa_len) == 0
+                && getnameinfo((struct sockaddr *)&sa, sa_len, hoststr, sizeof(hoststr),
+                                portstr, sizeof(portstr), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+                rfbLog("Socket activation through systemd. Listening for HTTP connections on %s:%s\n", hoststr, portstr);
+            } else {
+                rfbLogPerror("Error retrieving nameinfo of socket received from systemd\n");
+            }
+
+            rfbScreen->httpListenSock = sock;
+        }
+
+        return;
+    }
+#endif
 
     if (rfbScreen->httpPort == 0) {
 	rfbScreen->httpPort = rfbScreen->port-100;
