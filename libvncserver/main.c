@@ -1136,9 +1136,6 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
       rfbFreeCursor(screen->cursor);
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
-  rfbTightCleanup(screen);
-#endif
 
   /* free all 'scaled' versions of this screen */
   while (screen->scaledScreenNext!=NULL)

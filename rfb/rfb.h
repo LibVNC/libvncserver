@@ -698,6 +698,13 @@ typedef struct _rfbClientRec {
     uint32_t extClipboardMaxUnsolicitedSize;
     char *extClipboardData;
     int extClipboardDataSize;
+
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+    /* Tight encoding internal variables, stored per-client for thread safety */
+    rfbBool tightUsePixelFormat24;
+    void *tightTJ;
+    int tightPngDstDataLen;
+#endif
 #endif
 } rfbClientRec, *rfbClientPtr;
 
