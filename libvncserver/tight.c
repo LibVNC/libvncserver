@@ -931,7 +931,7 @@ SendIndexedRect(palettePtr palette,
             entryLen = 4;
 
         memcpy(&cl->updateBuf[cl->ublen], cl->afterEncBuf,
-               palette->numColors * entryLen);
+               (size_t) palette->numColors * entryLen);
         cl->ublen += palette->numColors * entryLen;
         rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding,
                                      3 + palette->numColors * entryLen);
