@@ -183,8 +183,27 @@ rfbInitSockets(rfbScreenInfoPtr rfbScreen)
         rfbSocket sock = SD_LISTEN_FDS_START + 0;
         if (sd_is_socket(sock, AF_UNSPEC, 0, 0))
             rfbNewConnectionFromSock(rfbScreen, sock);
-        else if (sd_is_socket(sock, AF_UNSPEC, 0, 1))
+        else if (sd_is_socket(sock, AF_UNSPEC, 0, 1)) {
+            struct sockaddr_storage sa;
+            int sa_len = sizeof(sa);
+            char hoststr[NI_MAXHOST];
+            char portstr[NI_MAXSERV];
+
+            if (getsockname(sock, (struct sockaddr *) &sa, &sa_len) == 0
+                && getnameinfo((struct sockaddr *)&sa, sa_len, hoststr, sizeof(hoststr),
+                                portstr, sizeof(portstr), NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+                rfbLog("Socket activation through systemd. Listening for VNC connections on %s:%s\n", hoststr, portstr);
+                rfbScreen->port = atoi(portstr);
+            } else {
+                rfbLogPerror("Error retrieving nameinfo of socket received from systemd\n");
+            }
+
+            FD_ZERO(&(rfbScreen->allFds));
+            rfbScreen->listenSock = sock;
+            FD_SET(rfbScreen->listenSock, &(rfbScreen->allFds));
+            rfbScreen->maxFd = rfbScreen->listenSock;
             rfbProcessNewConnection(rfbScreen);
+        }
         return;
     }
     else
