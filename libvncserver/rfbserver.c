@@ -301,7 +301,8 @@ rfbSetProtocolVersion(rfbScreenInfoPtr rfbScreen, int major_, int minor_)
 static rfbClientPtr
 rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
                      rfbSocket sock,
-                     rfbBool isUDP)
+                     rfbBool isUDP,
+                     const char *httpHeaders)
 {
     rfbProtocolVersionMsg pv;
     rfbClientIteratorPtr iterator;
@@ -470,10 +471,18 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 #endif
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+      if (httpHeaders) {
+          /* Do websocket handshake with HTTP headers previously read */
+          if (!webSocketsHandshake(cl, "ws", httpHeaders)) {
+              rfbCloseClient(cl);
+              rfbClientConnectionGone(cl);
+              return NULL;
+          }
+      }
       /*
        * Wait a few ms for the client to send WebSockets connection (TLS/SSL or plain)
        */
-      if (!webSocketsCheck(cl)) {
+      else if (!webSocketsCheck(cl)) {
         /* Error reporting handled in webSocketsHandshake */
         rfbCloseClient(cl);
         rfbClientConnectionGone(cl);
@@ -530,14 +539,20 @@ rfbClientPtr
 rfbNewClient(rfbScreenInfoPtr rfbScreen,
              rfbSocket sock)
 {
-  return(rfbNewTCPOrUDPClient(rfbScreen,sock,FALSE));
+  return(rfbNewTCPOrUDPClient(rfbScreen,sock,FALSE,NULL));
 }
 
 rfbClientPtr
 rfbNewUDPClient(rfbScreenInfoPtr rfbScreen)
 {
   return((rfbScreen->udpClient=
-	  rfbNewTCPOrUDPClient(rfbScreen,rfbScreen->udpSock,TRUE)));
+          rfbNewTCPOrUDPClient(rfbScreen,rfbScreen->udpSock,TRUE,NULL)));
+}
+
+rfbClientPtr
+rfbNewWebSocketsClient(rfbScreenInfoPtr rfbScreen, rfbSocket sock, const char *httpHeaders)
+{
+  return(rfbNewTCPOrUDPClient(rfbScreen,sock,FALSE,httpHeaders));
 }
 
 /*

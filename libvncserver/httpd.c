@@ -355,6 +355,15 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	    rfbScreen->httpSock = RFB_INVALID_SOCKET;
 	    return;
 	}	   
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+        if (strstr(buf, "\r\nUpgrade: websocket\r\n")) {
+            /* websocket connection */
+            rfbLog("httpd: client asked to upgrade to websockets connection\n");
+            rfbNewWebSocketsClient(rfbScreen,rfbScreen->httpSock,buf);
+            rfbScreen->httpSock = RFB_INVALID_SOCKET;
+            return;
+        }
+#endif
     }
 
     if (strncmp(buf, "GET ", 4)) {

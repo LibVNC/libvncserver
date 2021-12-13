@@ -11,6 +11,12 @@ void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion);
 
 rfbClientPtr rfbClientIteratorHead(rfbClientIteratorPtr i);
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+/* from websockets.c */
+
+rfbBool webSocketsHandshake(rfbClientPtr cl, char *scheme, const char *httpHeaders);
+#endif
+
 /* from tight.c */
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ

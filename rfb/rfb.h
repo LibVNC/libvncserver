@@ -770,6 +770,7 @@ extern rfbBool webSocketCheckDisconnect(rfbClientPtr cl);
 extern int webSocketsEncode(rfbClientPtr cl, const char *src, int len, char **dst);
 extern int webSocketsDecode(rfbClientPtr cl, char *dst, int len);
 extern rfbBool webSocketsHasDataInBuffer(rfbClientPtr cl);
+extern rfbClientPtr rfbNewWebSocketsClient(rfbScreenInfoPtr rfbScreen, rfbSocket sock, const char *httpHeaders);
 #endif
 
 /* rfbserver.c */
