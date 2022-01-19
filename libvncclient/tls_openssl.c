@@ -327,8 +327,8 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
     SSL_CTX_set1_param(ssl_ctx, param);
     SSL_CTX_set_cipher_list(ssl_ctx, "ALL");
   } else { /* anonTLS here */
-      /* Need ADH cipher for anonTLS, see https://github.com/LibVNC/libvncserver/issues/347#issuecomment-597477103 */
-      SSL_CTX_set_cipher_list(ssl_ctx, "ADH");
+      /* Need anonymous ciphers for anonTLS, see https://github.com/LibVNC/libvncserver/issues/347#issuecomment-597477103 */
+      SSL_CTX_set_cipher_list(ssl_ctx, "aNULL");
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined LIBRESSL_VERSION_NUMBER
       /*
 	See https://www.openssl.org/docs/man1.1.0/man3/SSL_set_security_level.html
