@@ -126,7 +126,9 @@ int rfbssl_init(rfbClientPtr cl)
     if (!(keyfile = cl->screen->sslkeyfile))
 	keyfile = cl->screen->sslcertfile;
 
-    if (NULL == (ctx = rfbssl_init_global(keyfile,  cl->screen->sslcertfile))) {
+    if (!cl->screen->sslcertfile || !cl->screen->sslcertfile[0]) {
+	rfbErr("SSL connection but no cert specified\n");
+    } else if (NULL == (ctx = rfbssl_init_global(keyfile,  cl->screen->sslcertfile))) {
 	/* */
     } else if (GNUTLS_E_SUCCESS != (ret = rfbssl_init_session(ctx, cl->sock))) {
 	/* */
