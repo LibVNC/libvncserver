@@ -811,6 +811,19 @@ rfbWriteExact(rfbClientPtr cl,
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
     if (cl->wsctx) {
         char *tmp = NULL;
+
+        while (len > UPDATE_BUF_SIZE) {
+            /* webSocketsEncode() can only handle data lengths up to UPDATE_BUF_SIZE
+               so split large writes into multiple smaller writes/frames */
+
+            if (rfbWriteExact(cl, buf, UPDATE_BUF_SIZE) == -1) {
+                return -1;
+            }
+
+            buf += UPDATE_BUF_SIZE;
+            len -= UPDATE_BUF_SIZE;
+        }
+
         if ((len = webSocketsEncode(cl, buf, len, &tmp)) < 0) {
             rfbErr("WriteExact: WebSockets encode error\n");
             return -1;
