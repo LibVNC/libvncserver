@@ -211,7 +211,13 @@ check_function_exists(strdup          LIBVNCSERVER_HAVE_STRDUP)
 check_function_exists(strerror        LIBVNCSERVER_HAVE_STRERROR)
 check_function_exists(strstr          LIBVNCSERVER_HAVE_STRSTR)
 
-check_symbol_exists(htobe64 "endian.h" LIBVNCSERVER_HAVE_HTOBE64)
+if(LIBVNCSERVER_HAVE_ENDIAN_H)
+  set(ENDIAN_HEADER "endian.h")
+elseif(LIBVNCSERVER_HAVE_SYS_ENDIAN_H)
+  set(ENDIAN_HEADER "sys/endian.h")
+endif(LIBVNCSERVER_HAVE_ENDIAN_H)
+
+check_symbol_exists(htobe64 ${ENDIAN_HEADER} LIBVNCSERVER_HAVE_HTOBE64)
 check_symbol_exists(OSSwapHostToBigInt64 "libkern/OSByteOrder.h" LIBVNCSERVER_HAVE_OSSWAPHOSTTOBIGINT64)
 
 if(WITH_THREADS AND Threads_FOUND)
