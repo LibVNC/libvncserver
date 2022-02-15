@@ -34,12 +34,6 @@
 /* errno */
 #include <errno.h>
 
-#ifdef LIBVNCSERVER_HAVE_ENDIAN_H
-#include <endian.h>
-#elif LIBVNCSERVER_HAVE_SYS_ENDIAN_H
-#include <sys/endian.h>
-#endif
-
 #ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
