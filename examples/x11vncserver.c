@@ -1,3 +1,5 @@
+// LIBS := -lvncserver -lxcb -lxcb-xtest -lxcb-keysyms
+
 #include <rfb/rfb.h>
 #include <xcb/xcb.h>
 #include <xcb/xtest.h>
