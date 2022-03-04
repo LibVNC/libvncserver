@@ -477,7 +477,7 @@ void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor
 
    if(cursor->richSource && cursor->cleanupRichSource)
        free(cursor->richSource);
-   cp=cursor->richSource=(unsigned char*)calloc(cursor->width*bpp,cursor->height);
+   cp=cursor->richSource=(unsigned char*)calloc((size_t)cursor->width*bpp,cursor->height);
    if(!cp)
        return;
    cursor->cleanupRichSource=TRUE;
@@ -534,7 +534,7 @@ void rfbHideCursor(rfbClientPtr cl)
    for(j=0;j<y2;j++)
      memcpy(s->frameBuffer+(y1+j)*rowstride+x1*bpp,
 	    s->underCursorBuffer+j*x2*bpp,
-	    x2*bpp);
+	    (size_t)x2*bpp);
 
    /* Copy to all scaled versions */
    rfbScaledScreenUpdate(s, x1, y1, x1+x2, y1+y2);

@@ -975,7 +975,7 @@ SendIndexedRect(rfbClientPtr cl,
             entryLen = 4;
 
         memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf,
-               paletteNumColors * entryLen);
+               (size_t)paletteNumColors * entryLen);
         cl->ublen += paletteNumColors * entryLen;
         rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding,
                                      3 + paletteNumColors * entryLen);
@@ -1617,7 +1617,7 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
         unsigned char *dst;
         int inRed, inGreen, inBlue, i, j;
 
-        if((tmpbuf = (unsigned char *)malloc(w * h * 3)) == NULL)
+        if((tmpbuf = (unsigned char *)malloc((size_t)w * h * 3)) == NULL)
             rfbLog("Memory allocation failure!\n");
         srcptr = (uint16_t *)&cl->scaledScreen->frameBuffer
             [y * cl->scaledScreen->paddedWidthInBytes + x * ps];

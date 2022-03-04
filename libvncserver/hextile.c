@@ -179,7 +179,7 @@ sendHextiles##bpp(rfbClientPtr cl, int rx, int ry, int rw, int rh) {            
                                    cl->scaledScreen->paddedWidthInBytes, w, h); \
                                                                                 \
                 memcpy(&cl->updateBuf[cl->ublen], (char *)clientPixelData,      \
-                       w * h * (bpp/8));                                        \
+                       (size_t)w * h * (bpp/8));                                \
                                                                                 \
                 cl->ublen += w * h * (bpp/8);                                   \
                 rfbStatRecordEncodingSentAdd(cl, rfbEncodingHextile,            \
