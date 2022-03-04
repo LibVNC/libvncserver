@@ -58,6 +58,7 @@ option(WITH_24BPP "Allow 24 bpp" ON)
 option(WITH_IPv6 "Enable IPv6 Support" ON)
 option(WITH_WEBSOCKETS "Build with websockets support" ON)
 option(WITH_SASL "Build with SASL support" ON)
+option(WITH_XCB "Build with XCB support" ON)
 option(WITH_EXAMPLES "Build examples" ON)
 option(WITH_TESTS "Build tests" ON)
 
@@ -69,6 +70,12 @@ endif(WITH_ZLIB)
 
 if(WITH_LZO)
   find_package(LZO)
+endif()
+
+if(WITH_XCB)
+  find_package(XCB)
+  find_package(XCB_XTEST)
+  find_package(XCB_KEYSYMS)
 endif()
 
 if(WITH_JPEG)
@@ -578,6 +585,13 @@ if(ANDROID)
   )
 endif(ANDROID)
 
+if(XCB_FOUND AND XCB_XTEST_FOUND AND XCB_KEYSYMS_FOUND)
+  set(LIBVNCSERVER_EXAMPLES
+    ${LIBVNCSERVER_EXAMPLES}
+    x11vncserver
+  )
+endif(XCB_FOUND AND XCB_XTEST_FOUND AND XCB_KEYSYMS_FOUND)
+
 set(LIBVNCCLIENT_EXAMPLES
     backchannel
     ppmtest
@@ -612,7 +626,7 @@ if(WITH_EXAMPLES)
     add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
     set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
     set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
-    target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY})
+    target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY} ${XCB_LIBRARY} ${XCB_XTEST_LIBRARY} ${XCB_KEYSYMS_LIBRARY})
   endforeach(e ${LIBVNCSERVER_EXAMPLES})
 
   foreach(e ${LIBVNCCLIENT_EXAMPLES})
