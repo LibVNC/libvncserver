@@ -244,7 +244,7 @@ int rfbSelectBox(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
    selData.cancelX = selData.cancelBX+(k-j)/2;
    selData.okY = y2-border;
 
-   frameBufferBackup = (char*)malloc(bpp*(x2-x1)*(y2-y1));
+   frameBufferBackup = (char*)malloc((size_t)bpp*(x2-x1)*(y2-y1));
    if (!frameBufferBackup)
        return(-1);
 
@@ -271,7 +271,7 @@ int rfbSelectBox(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
    for(j=0;j<y2-y1;j++)
      memcpy(frameBufferBackup+j*(x2-x1)*bpp,
 	    rfbScreen->frameBuffer+j*rfbScreen->paddedWidthInBytes+x1*bpp,
-	    (x2-x1)*bpp);
+	    (size_t)(x2-x1)*bpp);
 
    /* paint list and buttons */
    rfbFillRect(rfbScreen,x1,y1,x2,y2,colour);
@@ -286,7 +286,7 @@ int rfbSelectBox(rfbScreenInfoPtr rfbScreen,rfbFontDataPtr font,
    for(j=0;j<y2-y1;j++)
      memcpy(rfbScreen->frameBuffer+j*rfbScreen->paddedWidthInBytes+x1*bpp,
 	    frameBufferBackup+j*(x2-x1)*bpp,
-	    (x2-x1)*bpp);
+	    (size_t)(x2-x1)*bpp);
    free(frameBufferBackup);
    rfbMarkRectAsModified(rfbScreen,x1,y1,x2,y2);
    rfbScreen->screenData = screenDataBackup;
