@@ -295,9 +295,6 @@ typedef struct _rfbScreenInfo
     rfbKbdReleaseAllKeysProcPtr kbdReleaseAllKeys;
     rfbPtrAddEventProcPtr ptrAddEvent;
     rfbSetXCutTextProcPtr setXCutText;
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-    rfbSetXCutTextUTF8ProcPtr setXCutTextUTF8;
-#endif
     rfbGetCursorProcPtr getCursorPtr;
     rfbSetTranslateFunctionProcPtr setTranslateFunction;
     rfbSetSingleWindowProcPtr setSingleWindow;
@@ -371,6 +368,9 @@ typedef struct _rfbScreenInfo
     int pipe_notify_listener_thread[2];
 #elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     uintptr_t listener_thread;
+#endif
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    rfbSetXCutTextUTF8ProcPtr setXCutTextUTF8;
 #endif
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
