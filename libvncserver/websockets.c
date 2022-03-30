@@ -275,6 +275,13 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         return FALSE;
     } 
 
+    if (!sec_ws_key) {
+        rfbErr("webSocketsHandshake: sec-websocket-key is missing\n");
+        free(response);
+        free(buf);
+        return FALSE;
+    }
+
     if (!(path && host && (origin || sec_ws_origin))) {
         rfbErr("webSocketsHandshake: incomplete client handshake\n");
         free(response);
