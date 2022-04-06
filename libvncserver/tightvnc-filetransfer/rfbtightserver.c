@@ -539,6 +539,11 @@ static rfbSecurityHandler tightVncSecurityHandler = {
 void rfbRegisterTightVNCFileTransferExtension(void) {
 	rfbRegisterProtocolExtension(&tightVncFileTransferExtension);
 	rfbRegisterSecurityHandler(&tightVncSecurityHandler);
+        /*
+	  Called as well from rfbTightProcessArg(), but only if there are non
+	  handled cmdline args. Thus, init file transfer here as well.
+	*/
+        InitFileTransfer();
 }
 
 void 
