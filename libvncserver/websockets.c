@@ -376,6 +376,10 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
 	  /* nothing to encode */
 	  return 0;
     }
+    if (len > UPDATE_BUF_SIZE) {
+      rfbErr("%s: Data length %d larger than maximum of %d bytes\n", __func__, len, UPDATE_BUF_SIZE);
+      return -1;
+    }
 
     header = (ws_header_t *)wsctx->codeBufEncode;
 
