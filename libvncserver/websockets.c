@@ -34,12 +34,6 @@
 /* errno */
 #include <errno.h>
 
-#ifdef LIBVNCSERVER_HAVE_ENDIAN_H
-#include <endian.h>
-#elif LIBVNCSERVER_HAVE_SYS_ENDIAN_H
-#include <sys/endian.h>
-#endif
-
 #ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
@@ -280,6 +274,13 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         free(buf);
         return FALSE;
     } 
+
+    if (!sec_ws_key) {
+        rfbErr("webSocketsHandshake: sec-websocket-key is missing\n");
+        free(response);
+        free(buf);
+        return FALSE;
+    }
 
     if (!(path && host && (origin || sec_ws_origin))) {
         rfbErr("webSocketsHandshake: incomplete client handshake\n");

@@ -488,6 +488,18 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
     {
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
         rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
+
+		switch (tAuth[loop]) {
+		case rfbUltra:
+			rfbClientLog("UltraVNC server detected, enabling UltraVNC specific messages\n");
+			DefaultSupportedMessagesUltraVNC(client);
+			break;
+		case rfbTight:
+			rfbClientLog("TightVNC server detected, enabling TightVNC specific messages\n");
+			DefaultSupportedMessagesTightVNC(client);
+			break;
+		}
+
         if (flag) continue;
         extAuthHandler=FALSE;
         for (e = rfbClientExtensions; e; e = e->next) {
@@ -983,13 +995,15 @@ InitialiseRFBConnection(rfbClient* client)
   if ((major==rfbProtocolMajorVersion) && (minor>rfbProtocolMinorVersion))
     client->minor = rfbProtocolMinorVersion;
 
-  /* UltraVNC uses minor codes 4 and 6 for the server */
+  /* Legacy version of UltraVNC uses minor codes 4 and 6 for the server */
+  /* left in for backwards compatibility */
   if (major==3 && (minor==4 || minor==6)) {
       rfbClientLog("UltraVNC server detected, enabling UltraVNC specific messages\n",pv);
       DefaultSupportedMessagesUltraVNC(client);
   }
 
-  /* UltraVNC Single Click uses minor codes 14 and 16 for the server */
+  /* Legacy version of UltraVNC Single Click uses minor codes 14 and 16 for the server */
+  /* left in for backwards compatibility */
   if (major==3 && (minor==14 || minor==16)) {
      minor = minor - 10;
      client->minor = minor;
@@ -997,7 +1011,8 @@ InitialiseRFBConnection(rfbClient* client)
      DefaultSupportedMessagesUltraVNC(client);
   }
 
-  /* TightVNC uses minor codes 5 for the server */
+  /* Legacy version of TightVNC uses minor codes 5 for the server */
+  /* left in for backwards compatibility */
   if (major==3 && minor==5) {
       rfbClientLog("TightVNC server detected, enabling TightVNC specific messages\n",pv);
       DefaultSupportedMessagesTightVNC(client);

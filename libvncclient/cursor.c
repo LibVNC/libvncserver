@@ -63,7 +63,7 @@ rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int h
   if(client->rcSource)
     free(client->rcSource);
 
-  client->rcSource = malloc(width * height * bytesPerPixel);
+  client->rcSource = malloc((size_t)width * height * bytesPerPixel);
   if (client->rcSource == NULL)
     return FALSE;
 
@@ -146,7 +146,7 @@ rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width, int h
     return FALSE;
   }
 
-  client->rcMask = malloc(width * height);
+  client->rcMask = malloc((size_t)width * height);
   if (client->rcMask == NULL) {
     free(client->rcSource);
     client->rcSource = NULL;
