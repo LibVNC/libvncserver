@@ -584,6 +584,10 @@ rfbClientConnectionGone(rfbClientPtr cl)
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     rfbFreeZrleData(cl);
+
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+    rfbFreeTightData(cl);
+#endif
 #endif
 
     rfbFreeUltraData(cl);
