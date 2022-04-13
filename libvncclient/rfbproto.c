@@ -1406,6 +1406,8 @@ SetFormatAndEncodings(rfbClient* client)
   /* New Frame Buffer Size */
   if (se->nEncodings < MAX_ENCODINGS && client->canHandleNewFBSize)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingNewFBSize);
+  if (se->nEncodings < MAX_ENCODINGS)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingExtDesktopSize);
 
   /* Last Rect */
   if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding)
@@ -1468,7 +1470,12 @@ SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, rfbB
   rfbFramebufferUpdateRequestMsg fur;
 
   if (!SupportsClient2Server(client, rfbFramebufferUpdateRequest)) return TRUE;
-  
+
+  if (client->requestedResize) {
+    rfbClientLog("Skipping Update - resize in progress\n");
+    return TRUE;
+  }
+
   fur.type = rfbFramebufferUpdateRequest;
   fur.incremental = incremental ? 1 : 0;
   fur.x = rfbClientSwap16IfLE(x);
@@ -1644,6 +1651,61 @@ SendPointerEvent(rfbClient* client,int x, int y, int buttonMask)
 
 
 /*
+ * Resize client
+ */
+
+static rfbBool
+ResizeClientBuffer(rfbClient* client, int width, int height)
+{
+  client->width = width;
+  client->height = height;
+  client->updateRect.x = client->updateRect.y = 0;
+  client->updateRect.w = client->width;
+  client->updateRect.h = client->height;
+  return client->MallocFrameBuffer(client);
+}
+
+
+/*
+ * SendExtDesktopSize
+ */
+
+rfbBool
+SendExtDesktopSize(rfbClient* client, uint16_t width, uint16_t height)
+{
+  rfbSetDesktopSizeMsg sdm;
+  rfbExtDesktopScreen screen;
+
+  if (client->screen.width == 0 && client->screen.height == 0 ) {
+    rfbClientLog("Screen not yet received from server - not sending dimensions %dx%d\n", width, height);
+    return TRUE;
+  }
+
+  if (client->screen.width != rfbClientSwap16IfLE(width) || client->screen.height != rfbClientSwap16IfLE(height)) {
+    rfbClientLog("Sending dimensions %dx%d\n", width, height);
+    sdm.type = rfbSetDesktopSize;
+    sdm.width = rfbClientSwap16IfLE(width);
+    sdm.height = rfbClientSwap16IfLE(height);
+    sdm.numberOfScreens = 1;
+    screen.width = rfbClientSwap16IfLE(width);
+    screen.height = rfbClientSwap16IfLE(height);
+
+    if (!WriteToRFBServer(client, (char *)&sdm, sz_rfbSetDesktopSizeMsg)) return FALSE;
+    if (!WriteToRFBServer(client, (char *)&screen, sz_rfbExtDesktopScreen)) return FALSE;
+
+    client->screen.width = screen.width;
+    client->screen.height = screen.height;
+
+    client->requestedResize = FALSE;
+
+    SendFramebufferUpdateRequest(client, 0, 0, width, height, FALSE);
+
+    client->requestedResize = TRUE;
+  }
+}
+
+
+/*
  * SendKeyEvent.
  */
 
@@ -1808,16 +1870,46 @@ HandleRFBServerMessage(rfbClient* client)
       }
 
       if (rect.encoding == rfbEncodingNewFBSize) {
-	client->width = rect.r.w;
-	client->height = rect.r.h;
-	client->updateRect.x = client->updateRect.y = 0;
-	client->updateRect.w = client->width;
-	client->updateRect.h = client->height;
-	if (!client->MallocFrameBuffer(client))
+	if(!ResizeClientBuffer(client, rect.r.w, rect.r.h))
 	  return FALSE;
 	SendFramebufferUpdateRequest(client, 0, 0, rect.r.w, rect.r.h, FALSE);
 	rfbClientLog("Got new framebuffer size: %dx%d\n", rect.r.w, rect.r.h);
 	continue;
+      }
+
+      if (rect.encoding == rfbEncodingExtDesktopSize) {
+        /* read encoding data */
+        int screens;
+        int loop;
+        rfbBool invalidScreen = FALSE;
+        rfbExtDesktopScreen screen;
+        rfbExtDesktopSizeMsg eds;
+        if (!ReadFromRFBServer(client, ((char *)&eds), sz_rfbExtDesktopSizeMsg)) {
+          return FALSE;
+        }
+
+        screens = eds.numberOfScreens;
+        for (loop=0; loop < screens; loop++)
+        {
+          if (!ReadFromRFBServer(client, ((char *)&screen), sz_rfbExtDesktopScreen)) {
+            return FALSE;
+          }
+          if (screen.id != 0) {
+            client->screen = screen;
+          } else {
+            invalidScreen = TRUE;
+          }
+        }
+
+        if (!invalidScreen && (client->width != rect.r.w || client->height != rect.r.h)) {
+          if(!ResizeClientBuffer(client, rect.r.w, rect.r.h)) {
+            return FALSE;
+          }
+          rfbClientLog("Updated desktop size: %dx%d\n", rect.r.w, rect.r.h);
+        }
+        client->requestedResize = FALSE;
+
+        continue;
       }
 
       /* rect.r.w=byte count */

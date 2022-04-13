@@ -359,6 +359,10 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->saslSecret = NULL;
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
+  client->requestedResize = FALSE;
+  client->screen.width = 0;
+  client->screen.height = 0;
+
   return client;
 }
 

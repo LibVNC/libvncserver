@@ -471,6 +471,9 @@ typedef struct _rfbClient {
 	 * For internal use only.
 	 */
 	MUTEX(tlsRwMutex);
+
+	rfbBool requestedResize;
+	rfbExtDesktopScreen screen;
 } rfbClient;
 
 /* cursor.c */
@@ -560,6 +563,14 @@ extern rfbBool SendScaleSetting(rfbClient* client,int scaleSetting);
  * @return true if the pointer event was sent successfully, false otherwise
  */
 extern rfbBool SendPointerEvent(rfbClient* client,int x, int y, int buttonMask);
+/**
+ * Sends a SetDesktopSize event to the server.
+ * @param client The client through which to send the SetDesktopSize event
+ * @param width The width of the update request rectangle
+ * @param height The height of the update request rectangle
+ * @return true if the SetDesktopSize event was send successfully, false otherwise
+ */
+extern rfbBool SendExtDesktopSize(rfbClient* client, uint16_t width, uint16_t height);
 /**
  * Sends a key event to the server. If your application is not merely a VNC
  * viewer (i.e. it controls the server), you'll want to send the keys that the
