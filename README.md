@@ -209,20 +209,16 @@ this innovation, they decided to make it GPL, not BSD. The principal
 difference is: You can make closed source programs deriving from BSD, not
 from GPL. You have to give proper credit with both.
 
-Now, why not BSD? Well, imagine your child being some famous actor. Along
-comes a manager who exploits your child exclusively, that is: nobody else
-can profit from the child, it itself included. Got it?
+Frequently Asked Questions
+--------------------------
+> Our commercial product wants to make use of LibVNCServer to create our own VNC server and distribute. Will this be considered derivative work in the GPLv2 context?
 
-What reason do you have now to use this library commercially?
+Yes. Please note that while you would have to stick to the GPL for your program if you link to LibVNCServer/LibVNCClient, you do not have to make your code public in case you use the derivative work internally in your organisation, see https://www.gnu.org/licenses/gpl-faq.html#GPLRequireSourcePostedPublic
 
-Several: You don't have to give away your product. Then you have effectively
-circumvented the GPL, because you have the benefits of other's work and you
-don't give back anything. Not good.
+> Does modifying LibVNCServer code or not make any difference in determining whether our VNC server will be considered derivative work?
 
-Better: Use a concept like MySQL. This is free software, however, they make
-money with it. If you want something implemented, you have the choice:
-Ask them to do it (and pay a fair price), or do it yourself, normally giving
-back your enhancements to the free world of computing.
+No. By simply linking to LibVNCServer/LibVNCClient, your program becomes derivative work. 
+
 
 License
 -------
