@@ -100,6 +100,11 @@ enum rfbSocketState {
 	RFB_SOCKET_SHUTDOWN
 };
 
+enum rfbHandshakeType {
+	RFB_HANDSHAKE_AUTO,
+	RFB_HANDSHAKE_WEBSOCKET,
+};
+
 typedef void (*rfbKbdAddEventProcPtr) (rfbBool down, rfbKeySym keySym, struct _rfbClientRec* cl);
 typedef void (*rfbKbdReleaseAllKeysProcPtr) (struct _rfbClientRec* cl);
 typedef void (*rfbPtrAddEventProcPtr) (int buttonMask, int x, int y, struct _rfbClientRec* cl);
@@ -372,6 +377,16 @@ typedef struct _rfbScreenInfo
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     rfbSetXCutTextUTF8ProcPtr setXCutTextUTF8;
 #endif
+    /** This setting specifies the handshake type to expect.
+     * WebSocket clients are detected by the presence of a special handshake.
+     * The handshake can only be detected by waiting some time for it. Normal
+     * RFB clients do not transmit an initial handshake.
+     *
+     * RFB_HANDSHAKE_AUTO - wait 100ms for WS handshake. Then fall back to normal RFB.
+     * RFB_HANDSHAKE_WEBSOCKET - wait 500ms for WS handshake.
+     *
+     */
+    enum rfbHandshakeType handshake_type;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
