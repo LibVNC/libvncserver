@@ -601,14 +601,14 @@ if(WITH_EXAMPLES)
     set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
     set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
     target_link_libraries(examples_${e} vncserver Threads::Threads ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY})
-  endforeach(e ${LIBVNCSERVER_EXAMPLES})
+  endforeach()
 
   foreach(e ${LIBVNCCLIENT_EXAMPLES})
     add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
     set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
     set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
     target_link_libraries(client_examples_${e} vncclient Threads::Threads ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES})
-  endforeach(e ${LIBVNCCLIENT_EXAMPLES})
+  endforeach()
 endif()
 
 #
@@ -638,7 +638,7 @@ foreach(t ${SIMPLETESTS})
   set_target_properties(test_${t} PROPERTIES OUTPUT_NAME ${t})
   set_target_properties(test_${t} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
   target_link_libraries(test_${t} vncserver vncclient ${ADDITIONAL_TEST_LIBS})
-endforeach(t ${SIMPLETESTS})
+endforeach()
 
 if(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
   add_executable(test_tjunittest
