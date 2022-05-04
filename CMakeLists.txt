@@ -445,7 +445,6 @@ endif()
 
 if(PNG_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBPNG)
-  include_directories(${PNG_INCLUDE_DIR})
 endif()
 
 set(LIBVNCSERVER_SOURCES
@@ -489,6 +488,10 @@ target_link_libraries(vncserver
                       ${ADDITIONAL_TARGETS}
 		      ${PNG_LIBRARIES}
 )
+
+if(PNG_FOUND)
+  target_include_directories(vncserver PRIVATE ${PNG_INCLUDE_DIR})
+endif()
 
 SET_TARGET_PROPERTIES(vncclient vncserver
 		PROPERTIES SOVERSION "${VERSION_SO}" VERSION "${LibVNCServer_VERSION}" C_STANDARD 90
