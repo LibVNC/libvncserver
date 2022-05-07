@@ -50,6 +50,9 @@ int main(int argc,char** argv)
   server->port = -1; /* do not listen on any port */
   server->ipv6port = -1; /* do not listen on any port */
 
+  /* Make sure to call this _before_ connecting out to the repeater */
+  rfbInitServer(server);
+
   sock = rfbConnectToTcpAddr(repeaterHost, repeaterPort);
   if (sock == RFB_INVALID_SOCKET) {
     perror("connect to repeater");
@@ -68,7 +71,6 @@ int main(int argc,char** argv)
   cl->clientGoneHook = clientGone;
 
   /* Run the server */
-  rfbInitServer(server);
   rfbRunEventLoop(server,-1,FALSE);
 
   return 0;
