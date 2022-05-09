@@ -566,7 +566,7 @@ typedef struct _rfbClientRec {
      * means 8K minimum.
      */
 
-#define UPDATE_BUF_SIZE 30000
+#define UPDATE_BUF_SIZE 32768
 
     char updateBuf[UPDATE_BUF_SIZE];
     int ublen;
