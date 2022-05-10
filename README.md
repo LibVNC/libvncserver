@@ -60,6 +60,16 @@ RFB Protocol Support Status
 | ZYWRLE   | 17     | ✔            | ✔            |
 | TightPNG | -260   | ✔            |              |
 
+## Transports
+
+| Name                       | LibVNCServer | LibVNCClient |
+|----------------------------|--------------|--------------|
+| RFB                        | ✔            | ✔            |
+| Encrypted RFB via VeNCrypt |              | ✔            |
+| Encrypted RFB via AnonTLS  |              | ✔            |
+| Websockets                 | ✔            |              |
+| Encrypted Websockets       | ✔            |              |
+
 
 How to build
 ============
