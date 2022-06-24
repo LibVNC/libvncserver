@@ -33,7 +33,7 @@ add_custom_target(
         ${CMAKE_BINARY_DIR}/compile_commands.json
         ${CMAKE_CURRENT_SOURCE_DIR}
     )
-endif(CMAKE_GENERATOR MATCHES "Unix Makefiles|Ninja")
+endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver ${CMAKE_CURRENT_SOURCE_DIR}/common)
 
@@ -65,7 +65,7 @@ option(WITH_TESTS "Build tests" ON)
 
 if(WITH_ZLIB)
   find_package(ZLIB)
-endif(WITH_ZLIB)
+endif()
 
 if(WITH_LZO)
   find_package(LZO)
@@ -117,51 +117,52 @@ if(WITH_JPEG)
 	message(WARNING "*** The libjpeg library you are building against is not libjpeg-turbo.  Performance will be reduced.  You can obtain libjpeg-turbo from:  https://sourceforge.net/projects/libjpeg-turbo/files/ ***")
       endif()
     endif()
-  endif(JPEG_FOUND)
-endif(WITH_JPEG)
+  endif()
+endif()
 
 
 if(WITH_PNG)
   find_package(PNG)
-endif(WITH_PNG)
+endif()
 
 
 if(WITH_SDL)
   find_package(SDL2)
-endif(WITH_SDL)
+endif()
 
 if(WITH_GTK)
   find_package(GTK2)
-endif(WITH_GTK)
+endif()
 
 if(WITH_THREADS)
+  set(THREADS_PREFER_PTHREAD_FLAG TRUE)
   find_package(Threads)
-endif(WITH_THREADS)
+endif()
 
 
 if(WITH_GNUTLS)
   find_package(GnuTLS)
-endif(WITH_GNUTLS)
+endif()
 
 
 if(WITH_OPENSSL)
   find_package(OpenSSL)
-endif(WITH_OPENSSL)
+endif()
 
 
 if(WITH_SYSTEMD AND NOT ANDROID AND NOT WIN32)
   find_package(PkgConfig)
   pkg_check_modules(SYSTEMD "libsystemd")
-endif(WITH_SYSTEMD AND NOT ANDROID AND NOT WIN32)
+endif()
 
 
 if(WITH_GCRYPT)
   find_library(LIBGCRYPT_LIBRARIES gcrypt)
-endif(WITH_GCRYPT)
+endif()
 
 if(WITH_FFMPEG)
   find_package(FFMPEG 3.1.0 COMPONENTS avformat avcodec avutil swscale)
-endif(WITH_FFMPEG)
+endif()
 
 
 check_include_file("dirent.h"      LIBVNCSERVER_HAVE_DIRENT_H)
@@ -180,7 +181,6 @@ check_include_file("sys/resource.h"     LIBVNCSERVER_HAVE_SYS_RESOURCE_H)
 
 # headers needed for check_type_size()
 check_include_file("vfork.h"       LIBVNCSERVER_HAVE_VFORK_H)
-check_include_file("ws2tcpip.h"    LIBVNCSERVER_HAVE_WS2TCPIP_H)
 check_include_file("arpa/inet.h"   HAVE_ARPA_INET_H)
 check_include_file("stdint.h"      HAVE_STDINT_H)
 check_include_file("stddef.h"      HAVE_STDDEF_H)
@@ -193,7 +193,6 @@ endif()
 
 check_function_exists(gettimeofday    LIBVNCSERVER_HAVE_GETTIMEOFDAY)
 check_function_exists(vfork           LIBVNCSERVER_HAVE_VFORK)
-check_function_exists(vprintf         LIBVNCSERVER_HAVE_VPRINTF)
 check_function_exists(mmap            LIBVNCSERVER_HAVE_MMAP)
 check_function_exists(fork            LIBVNCSERVER_HAVE_FORK)
 check_function_exists(ftime           LIBVNCSERVER_HAVE_FTIME)
@@ -213,48 +212,52 @@ check_function_exists(strstr          LIBVNCSERVER_HAVE_STRSTR)
 
 check_symbol_exists(htobe64 "endian.h" LIBVNCSERVER_HAVE_HTOBE64)
 check_symbol_exists(htobe64 "sys/endian.h" LIBVNCSERVER_HAVE_HTOBE64)
-check_symbol_exists(OSSwapHostToBigInt64 "libkern/OSByteOrder.h" LIBVNCSERVER_HAVE_OSSWAPHOSTTOBIGINT64)
+if(NOT LIBVNCSERVER_HAVE_HTOBE64)
+  check_symbol_exists(OSSwapHostToBigInt64 "libkern/OSByteOrder.h" LIBVNCSERVER_HAVE_OSSWAPHOSTTOBIGINT64)
+endif()
 
 if(WITH_THREADS AND Threads_FOUND)
-  set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${CMAKE_THREAD_LIBS_INIT})
-endif(WITH_THREADS AND Threads_FOUND)
+  list(APPEND ADDITIONAL_RAW_LIBS ${CMAKE_THREAD_LIBS_INIT})
+  list(APPEND ADDITIONAL_TARGETS Threads::Threads)
+endif()
 if(ZLIB_FOUND)
   set(LIBVNCSERVER_HAVE_LIBZ 1)
-else()
-  unset(ZLIB_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
-endif(ZLIB_FOUND)
+  list(APPEND ADDITIONAL_RAW_LIBS ${ZLIB_LIBRARIES})
+  list(APPEND ADDITIONAL_TARGETS ZLIB::ZLIB)
+endif()
 if(LZO_FOUND)
   set(LIBVNCSERVER_HAVE_LZO 1)
-else()
-  unset(LZO_LIBRARIES CACHE) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
+  list(APPEND ADDITIONAL_RAW_LIBS ${LZO_LIBRARIES})
+  list(APPEND ADDITIONAL_TARGETS LZO::LZO)
 endif()
 if(JPEG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBJPEG 1)
-else()
-  unset(JPEG_LIBRARIES) # would otherwise confuse target_link_libraries()
-endif(JPEG_FOUND)
+  list(APPEND ADDITIONAL_LIBS ${JPEG_LIBRARIES})
+endif()
 if(PNG_FOUND)
   set(LIBVNCSERVER_HAVE_LIBPNG 1)
 else()
   unset(PNG_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
-endif(PNG_FOUND)
-if(NOT OPENSSL_FOUND)
-    unset(OPENSSL_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
+endif()
+if(OPENSSL_FOUND)
+  list(APPEND ADDITIONAL_RAW_LIBS ${OPENSSL_LIBRARIES})
+  list(APPEND ADDITIONAL_TARGETS OpenSSL::SSL OpenSSL::Crypto)
+  set(LIBVNCSERVER_HAVE_LIBSSL 1)
 endif()
 if(SYSTEMD_FOUND)
   add_definitions(-DLIBVNCSERVER_WITH_SYSTEMD)
   include_directories(${SYSTEMD_INCLUDE_DIRS})
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${SYSTEMD_LIBRARIES})
-endif(SYSTEMD_FOUND)
+endif()
 
 # common crypto used by both libvncserver and libvncclient
 if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
   message(STATUS "Building crypto with Libgcrypt")
-  set(CRYPTO_LIBRARIES ${LIBGCRYPT_LIBRARIES})
   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt.c)
+  list(APPEND ADDITIONAL_LIBS "${LIBGCRYPT_LIBRARIES}")
+  set(LIBVNCSERVER_HAVE_LIBGCRYPT 1)
 elseif(OPENSSL_FOUND)
   message(STATUS "Building crypto with OpenSSL")
-  set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl.c)
 else()
   message(STATUS "Building crypto with builtin functions, only including SHA1 and D3DES")
@@ -265,27 +268,16 @@ if(WITH_WEBSOCKETS AND (LIBVNCSERVER_HAVE_HTOBE64 OR LIBVNCSERVER_HAVE_OSSWAPHOS
   set(LIBVNCSERVER_WITH_WEBSOCKETS 1)
 endif()
 
-if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
-  set(LIBVNCSERVER_HAVE_LIBGCRYPT 1)
-endif(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
-
-if(GNUTLS_FOUND)
-  set(LIBVNCSERVER_HAVE_GNUTLS 1)
-endif(GNUTLS_FOUND)
-
-if(OPENSSL_FOUND)
-  include_directories(${OPENSSL_INCLUDE_DIR})
-  set(LIBVNCSERVER_HAVE_LIBSSL 1)
-endif(OPENSSL_FOUND)
-
 if(WITH_IPv6)
-  if(WIN32 AND LIBVNCSERVER_HAVE_WS2TCPIP_H AND LIBVNCSERVER_HAVE_VPRINTF)
+  if(WIN32)
+    check_include_file("ws2tcpip.h"    LIBVNCSERVER_HAVE_WS2TCPIP_H)
+    if(LIBVNCSERVER_HAVE_WS2TCPIP_H)
+      set(LIBVNCSERVER_IPv6 1)
+    endif()
+  else()
     set(LIBVNCSERVER_IPv6 1)
   endif()
-  if(NOT WIN32)
-    set(LIBVNCSERVER_IPv6 1)
-  endif()
-endif(WITH_IPv6)
+endif()
 
 
 if(WITH_24BPP)
@@ -299,28 +291,28 @@ if(WITH_THREADS)
       unset(CMAKE_USE_PTHREADS_INIT)
     else()
       unset(CMAKE_USE_WIN32_THREADS_INIT)
-    endif(PREFER_WIN32THREADS)
-  endif(CMAKE_USE_PTHREADS_INIT AND CMAKE_USE_WIN32_THREADS_INIT)
+    endif()
+  endif()
 
   if(CMAKE_USE_PTHREADS_INIT)
     set(LIBVNCSERVER_HAVE_LIBPTHREAD 1)
     message(STATUS "Threads support is using pthreads")
-  endif(CMAKE_USE_PTHREADS_INIT)
+  endif()
 
   if(CMAKE_USE_WIN32_THREADS_INIT)
     set(LIBVNCSERVER_HAVE_WIN32THREADS 1)
     message(STATUS "Threads support is using win32 threads")
-  endif(CMAKE_USE_WIN32_THREADS_INIT)
-endif(WITH_THREADS)
+  endif()
+endif()
 
 if(LIBVNCSERVER_HAVE_SYS_SOCKET_H)
   # socklen_t
   list(APPEND CMAKE_EXTRA_INCLUDE_FILES "sys/socket.h")
-endif(LIBVNCSERVER_HAVE_SYS_SOCKET_H)
+endif()
 if(HAVE_ARPA_INET_H)
   # in_addr_t
   list(APPEND CMAKE_EXTRA_INCLUDE_FILES "arpa/inet.h")
-endif(HAVE_ARPA_INET_H)
+endif()
 
 check_type_size(pid_t     LIBVNCSERVER_PID_T)
 check_type_size(size_t    LIBVNCSERVER_SIZE_T)
@@ -328,21 +320,21 @@ check_type_size(socklen_t LIBVNCSERVER_SOCKLEN_T)
 check_type_size(in_addr_t LIBVNCSERVER_IN_ADDR_T)
 if(NOT HAVE_LIBVNCSERVER_IN_ADDR_T)
   set(LIBVNCSERVER_NEED_INADDR_T 1)
-endif(NOT HAVE_LIBVNCSERVER_IN_ADDR_T)
+endif()
 
 TEST_BIG_ENDIAN(LIBVNCSERVER_WORDS_BIGENDIAN)
 
 if(WITH_SASL)
   find_path(SASL2_INCLUDE_DIR sasl/sasl.h)
   find_library(LIBSASL2_LIBRARIES sasl2 libsasl.lib)
-endif(WITH_SASL)
+endif()
 
 if(WITH_SASL AND LIBSASL2_LIBRARIES AND SASL2_INCLUDE_DIR)
   message(STATUS "Building with SASL: ${LIBSASL2_LIBRARIES} and ${SASL2_INCLUDE_DIR}")
   set(LIBVNCSERVER_HAVE_SASL 1)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${LIBSASL2_LIBRARIES})
   include_directories(${SASL2_INCLUDE_DIR})
-endif(WITH_SASL AND LIBSASL2_LIBRARIES AND SASL2_INCLUDE_DIR)
+endif()
 
 # TODO:
 # LIBVNCSERVER_ENOENT_WORKAROUND
@@ -384,75 +376,63 @@ set(LIBVNCCLIENT_SOURCES
 )
 
 if(JPEG_FOUND)
-  set(LIBVNCCLIENT_SOURCES
-    ${LIBVNCCLIENT_SOURCES}
+  list(APPEND LIBVNCCLIENT_SOURCES
     ${COMMON_DIR}/turbojpeg.c
   )
 endif()
 
 if(GNUTLS_FOUND)
+  set(LIBVNCSERVER_HAVE_GNUTLS 1)
+  list(APPEND ADDITIONAL_LIBS ${GNUTLS_LIBRARIES})
   message(STATUS "Building TLS with GnuTLS")
-  set(LIBVNCCLIENT_SOURCES
-    ${LIBVNCCLIENT_SOURCES}
+  list(APPEND LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/tls_gnutls.c
   )
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
+  list(APPEND LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/rfbssl_gnutls.c
     )
   include_directories(${GNUTLS_INCLUDE_DIR})
 elseif(OPENSSL_FOUND)
   message(STATUS "Building TLS with OpenSSL")
-  set(LIBVNCCLIENT_SOURCES
-    ${LIBVNCCLIENT_SOURCES}
+  list(APPEND LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/tls_openssl.c
   )
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
+  list(APPEND LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/rfbssl_openssl.c
   )
-  include_directories(${OPENSSL_INCLUDE_DIR})
 else()
   message(STATUS "Building without TLS")
-  set(LIBVNCCLIENT_SOURCES
-    ${LIBVNCCLIENT_SOURCES}
+  list(APPEND LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/tls_none.c
   )
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
+  list(APPEND LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/rfbssl_none.c
   )
 endif()
 
 if(LIBVNCSERVER_HAVE_SASL)
-  set(LIBVNCCLIENT_SOURCES
-    ${LIBVNCCLIENT_SOURCES}
+  list(APPEND LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/sasl.c
   )
 endif()
 
 if(ZLIB_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBZ)
-  include_directories(${ZLIB_INCLUDE_DIR})
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
+  list(APPEND LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/zlib.c
     ${LIBVNCSERVER_DIR}/zrle.c
     ${LIBVNCSERVER_DIR}/zrleoutstream.c
     ${LIBVNCSERVER_DIR}/zrlepalettehelper.c
   )
-endif(ZLIB_FOUND)
+endif()
 
 if(LZO_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LZO)
-  include_directories(${LZO_INCLUDE_DIR})
 else()
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
+  list(APPEND LIBVNCSERVER_SOURCES
     ${COMMON_DIR}/minilzo.c
   )
-  set(LIBVNCCLIENT_SOURCES
-    ${LIBVNCCLIENT_SOURCES}
+  list(APPEND LIBVNCCLIENT_SOURCES
     ${COMMON_DIR}/minilzo.c
   )
 endif()
@@ -462,13 +442,12 @@ if(JPEG_FOUND)
   include_directories(${JPEG_INCLUDE_DIR})
   if(PNG_FOUND OR ZLIB_FOUND)
     set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c ${COMMON_DIR}/turbojpeg.c)
-  endif(PNG_FOUND OR ZLIB_FOUND)
-endif(JPEG_FOUND)
+  endif()
+endif()
 
 if(PNG_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBPNG)
-  include_directories(${PNG_INCLUDE_DIR})
-endif(PNG_FOUND)
+endif()
 
 set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_SOURCES}
@@ -476,24 +455,22 @@ set(LIBVNCSERVER_SOURCES
 )
 
 if(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
+  list(APPEND LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/tightvnc-filetransfer/rfbtightserver.c
     ${LIBVNCSERVER_DIR}/tightvnc-filetransfer/handlefiletransferrequest.c
     ${LIBVNCSERVER_DIR}/tightvnc-filetransfer/filetransfermsg.c
     ${LIBVNCSERVER_DIR}/tightvnc-filetransfer/filelistinfo.c
   )
-endif(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
+endif()
 
 if(LIBVNCSERVER_WITH_WEBSOCKETS)
   add_definitions(-DLIBVNCSERVER_WITH_WEBSOCKETS)
-  set(LIBVNCSERVER_SOURCES
-    ${LIBVNCSERVER_SOURCES}
+  list(APPEND LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/websockets.c
     ${LIBVNCSERVER_DIR}/ws_decode.c
     ${COMMON_DIR}/base64.c
   )
-endif(LIBVNCSERVER_WITH_WEBSOCKETS)
+endif()
 
 add_library(vncclient ${LIBVNCCLIENT_SOURCES})
 add_library(vncserver ${LIBVNCSERVER_SOURCES})
@@ -501,28 +478,22 @@ if(WIN32)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ws2_32)
   if(WITH_TIGHTVNC_FILETRANSFER)
     add_definitions(-D_WIN32_WINNT=0x0600)
-  endif(WITH_TIGHTVNC_FILETRANSFER)
-endif(WIN32)
+  endif()
+endif()
 
 target_link_libraries(vncclient
                       ${ADDITIONAL_LIBS}
-                      ${ZLIB_LIBRARIES}
-                      ${LZO_LIBRARIES}
-                      ${JPEG_LIBRARIES}
-		      ${CRYPTO_LIBRARIES}
-                      ${GNUTLS_LIBRARIES}
-                      ${OPENSSL_LIBRARIES}
+                      ${ADDITIONAL_TARGETS}
 )
 target_link_libraries(vncserver
                       ${ADDITIONAL_LIBS}
-                      ${ZLIB_LIBRARIES}
-                      ${LZO_LIBRARIES}
-                      ${JPEG_LIBRARIES}
+                      ${ADDITIONAL_TARGETS}
 		      ${PNG_LIBRARIES}
-		      ${CRYPTO_LIBRARIES}
-                      ${GNUTLS_LIBRARIES}
-                      ${OPENSSL_LIBRARIES}
 )
+
+if(PNG_FOUND)
+  target_include_directories(vncserver PRIVATE ${PNG_INCLUDE_DIR})
+endif()
 
 SET_TARGET_PROPERTIES(vncclient vncserver
 		PROPERTIES SOVERSION "${VERSION_SO}" VERSION "${LibVNCServer_VERSION}" C_STANDARD 90
@@ -548,35 +519,31 @@ set(LIBVNCSERVER_EXAMPLES
   )
 
 if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
-  set(LIBVNCSERVER_EXAMPLES
-    ${LIBVNCSERVER_EXAMPLES}
+  list(APPEND LIBVNCSERVER_EXAMPLES
     blooptest
   )
-endif(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
+endif()
 
 if(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
-  set(LIBVNCSERVER_EXAMPLES
-    ${LIBVNCSERVER_EXAMPLES}
+  list(APPEND LIBVNCSERVER_EXAMPLES
     filetransfer
   )
-endif(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
+endif()
 
 if(APPLE AND NOT IOS AND WITH_THREADS AND CMAKE_USE_PTHREADS_INIT)
-  set(LIBVNCSERVER_EXAMPLES
-    ${LIBVNCSERVER_EXAMPLES}
+  list(APPEND LIBVNCSERVER_EXAMPLES
     mac
   )
   find_library(CARBON_LIBRARY Carbon)
   find_library(IOKIT_LIBRARY IOKit)
   find_library(IOSURFACE_LIBRARY IOSurface)
-endif(APPLE AND NOT IOS AND WITH_THREADS AND CMAKE_USE_PTHREADS_INIT)
+endif()
 
 if(ANDROID)
-  set(LIBVNCSERVER_EXAMPLES
-    ${LIBVNCSERVER_EXAMPLES}
+  list(APPEND LIBVNCSERVER_EXAMPLES
     androidvncserver
   )
-endif(ANDROID)
+endif()
 
 set(LIBVNCCLIENT_EXAMPLES
     backchannel
@@ -585,43 +552,40 @@ set(LIBVNCCLIENT_EXAMPLES
 
 if(SDL2_FOUND)
   include_directories(${SDL2_INCLUDE_DIR})
-  set(LIBVNCCLIENT_EXAMPLES
-    ${LIBVNCCLIENT_EXAMPLES}
+  list(APPEND LIBVNCCLIENT_EXAMPLES
     SDLvncviewer
   )
-endif(SDL2_FOUND)
+endif()
 
 if(GTK2_FOUND)
   include_directories(${GTK2_INCLUDE_DIRS})
-  set(LIBVNCCLIENT_EXAMPLES
-    ${LIBVNCCLIENT_EXAMPLES}
+  list(APPEND LIBVNCCLIENT_EXAMPLES
     gtkvncviewer
   )
-endif(GTK2_FOUND)
+endif()
 
 
 if(FFMPEG_FOUND)
-  set(LIBVNCCLIENT_EXAMPLES
-    ${LIBVNCCLIENT_EXAMPLES}
+  list(APPEND LIBVNCCLIENT_EXAMPLES
     vnc2mpg
   )
-endif(FFMPEG_FOUND)
+endif()
 
 if(WITH_EXAMPLES)
   foreach(e ${LIBVNCSERVER_EXAMPLES})
     add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
     set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
     set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
-    target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY})
-  endforeach(e ${LIBVNCSERVER_EXAMPLES})
+    target_link_libraries(examples_${e} vncserver Threads::Threads ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY})
+  endforeach()
 
   foreach(e ${LIBVNCCLIENT_EXAMPLES})
     add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
     set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
     set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
-    target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES})
-  endforeach(e ${LIBVNCCLIENT_EXAMPLES})
-endif(WITH_EXAMPLES)
+    target_link_libraries(client_examples_${e} vncclient Threads::Threads ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES})
+  endforeach()
+endif()
 
 #
 # them tests
@@ -631,7 +595,7 @@ if(WITH_TESTS)
 
 if(UNIX)
     set(ADDITIONAL_TEST_LIBS m)
-endif(UNIX)
+endif()
 
 set(SIMPLETESTS
    cargstest
@@ -643,14 +607,14 @@ if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
       ${SIMPLETESTS}
       encodingstest
      )
-endif(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
+endif()
 
 foreach(t ${SIMPLETESTS})
   add_executable(test_${t} ${TESTS_DIR}/${t}.c)
   set_target_properties(test_${t} PROPERTIES OUTPUT_NAME ${t})
   set_target_properties(test_${t} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
   target_link_libraries(test_${t} vncserver vncclient ${ADDITIONAL_TEST_LIBS})
-endforeach(t ${SIMPLETESTS})
+endforeach()
 
 if(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
   add_executable(test_tjunittest
@@ -677,7 +641,7 @@ if(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
   set_target_properties(test_tjbench PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
   target_link_libraries(test_tjbench vncserver vncclient ${ADDITIONAL_TEST_LIBS})
 
-endif(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
+endif()
 
 if(LIBVNCSERVER_WITH_WEBSOCKETS)
   add_executable(test_wstest
@@ -687,48 +651,46 @@ if(LIBVNCSERVER_WITH_WEBSOCKETS)
   set_target_properties(test_wstest PROPERTIES OUTPUT_NAME wstest)
   set_target_properties(test_wstest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
   target_link_libraries(test_wstest vncserver vncclient ${ADDITIONAL_TEST_LIBS})
-endif(LIBVNCSERVER_WITH_WEBSOCKETS)
+endif()
 
 add_test(NAME cargs COMMAND test_cargstest)
 if(UNIX)
   add_test(NAME includetest COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} ${CMAKE_MAKE_PROGRAM})
-endif(UNIX)
+endif()
 if(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
     add_test(NAME turbojpeg COMMAND test_tjunittest)
-endif(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
+endif()
 if(LIBVNCSERVER_WITH_WEBSOCKETS)
     add_test(NAME wstest COMMAND test_wstest)
-endif(LIBVNCSERVER_WITH_WEBSOCKETS)
+endif()
 
-endif(WITH_TESTS)
+endif()
 
 #
 # this gets the libraries needed by TARGET in "-libx -liby ..." form
 #
-function(get_link_libraries OUT TARGET)
+function(get_link_libraries OUT EXTRA_LIBS)
     set(RESULT "")
-    get_target_property(LIBRARIES ${TARGET} INTERFACE_LINK_LIBRARIES)
-    foreach(LIB ${LIBRARIES})
-	if("${LIB}" MATCHES ".*NOTFOUND.*")
-	    continue()
+    foreach(LIB ${ADDITIONAL_LIBS} ${EXTRA_LIBS})
+	if(LIB MATCHES "^-")
+		list(APPEND RESULT " ${LIB}")
+	else()
+		get_filename_component(FNAME "${LIB}" NAME)
+		string(REGEX REPLACE "^${CMAKE_SHARED_LIBRARY_PREFIX}(.+)${CMAKE_SHARED_LIBRARY_SUFFIX}$" "\\1" LIB "${FNAME}")
+		list(APPEND RESULT " -l${LIB}")
 	endif()
-	string(REGEX REPLACE "^.*/lib" "" LIB ${LIB}) # remove leading path and "lib" name prefix
-	string(REGEX REPLACE "-l" "" LIB ${LIB}) # remove leading -l
-	string(REGEX REPLACE "\\.so$" "" LIB ${LIB}) # remove trailing .so
-	list(APPEND RESULT "-l${LIB}")
     endforeach()
     list(REMOVE_DUPLICATES RESULT)
     string(CONCAT RESULT ${RESULT}) # back to string
-    if(RESULT)
-	string(REPLACE "-l" " -l" RESULT ${RESULT}) # re-add separators
-    endif(RESULT)
     set(${OUT} ${RESULT} PARENT_SCOPE)
 endfunction()
 
-get_link_libraries(PRIVATE_LIBS vncserver)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
-get_link_libraries(PRIVATE_LIBS vncclient)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
+if(NOT WIN32)
+  get_link_libraries(PRIVATE_LIBS "${PNG_LIBRARIES};${ADDITIONAL_RAW_LIBS}")
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
+  get_link_libraries(PRIVATE_LIBS "${ADDITIONAL_RAW_LIBS}")
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
+endif()
 
 if(LIBVNCSERVER_INSTALL)
     set(INSTALL_HEADER_FILES
@@ -786,10 +748,11 @@ if(LIBVNCSERVER_INSTALL)
         "${CMAKE_BINARY_DIR}/LibVNCServerConfig.cmake"
         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibVNCServer")
     
-  
-    install(FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc
-        ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
-        )
+    if(NOT WIN32)
+        install(FILES
+            ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc
+            ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+            )
+    endif()
 endif()

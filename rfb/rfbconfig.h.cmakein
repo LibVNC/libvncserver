@@ -117,9 +117,6 @@
 /* Define to 1 if you have the <vfork.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_VFORK_H  1 
 
-/* Define to 1 if you have the `vprintf' function. */
-#cmakedefine LIBVNCSERVER_HAVE_VPRINTF  1 
-
 /* Define to 1 if `fork' works. */
 #cmakedefine LIBVNCSERVER_HAVE_WORKING_FORK  1 
 
