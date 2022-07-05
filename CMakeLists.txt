@@ -46,6 +46,7 @@ option(WITH_JPEG "Search for the libjpeg compression library to support addition
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
 option(WITH_GTK "Search for the GTK library to build an example GTK vnc client" ON)
+option(WITH_LIBSSH2 "Search for libssh2 to build an example ssh-tunneled client" ON)
 option(WITH_THREADS "Search for a threading library to build with multithreading support" ON)
 option(PREFER_WIN32THREADS "When searching for a threading library, prefer win32 threads if they are found" OFF)
 option(WITH_GNUTLS "Search for the GnuTLS secure communications library to support TLS" ON)
@@ -133,6 +134,10 @@ endif(WITH_SDL)
 if(WITH_GTK)
   find_package(GTK2)
 endif(WITH_GTK)
+
+if(WITH_LIBSSH2)
+  find_package(LibSSH2)
+endif(WITH_LIBSSH2)
 
 if(WITH_THREADS)
   find_package(Threads)
@@ -599,6 +604,17 @@ if(GTK2_FOUND)
   )
 endif(GTK2_FOUND)
 
+if(LIBSSH2_FOUND AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
+  include_directories(${LIBSSH2_INCLUDE_DIR})
+  set(LIBVNCCLIENT_EXAMPLES
+    ${LIBVNCCLIENT_EXAMPLES}
+    sshtunnel
+  )
+endif()
+# if not found, set lib var to empty, otherwise CMake complains
+if(NOT LIBSSH2_FOUND)
+  set(LIBSSH2_LIBRARY "")
+endif()
 
 if(FFMPEG_FOUND)
   set(LIBVNCCLIENT_EXAMPLES
@@ -619,7 +635,7 @@ if(WITH_EXAMPLES)
     add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
     set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
     set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
-    target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES})
+    target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES} ${LIBSSH2_LIBRARY})
   endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 endif(WITH_EXAMPLES)
 
