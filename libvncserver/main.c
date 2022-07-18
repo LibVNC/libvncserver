@@ -461,7 +461,7 @@ clientOutput(void *data)
     while (1) {
         haveUpdate = false;
         while (!haveUpdate) {
-		if (cl->sock == RFB_INVALID_SOCKET) {
+		if (cl->sock == RFB_INVALID_SOCKET || cl->state == RFB_SHUTDOWN) {
 			/* Client has disconnected. */
 			return THREAD_ROUTINE_RETURN_VALUE;
 		}
@@ -528,7 +528,7 @@ clientInput(void *data)
     uintptr_t output_thread = _beginthread(clientOutput, 0, cl);
 #endif
 
-    while (1) {
+    while (cl->state != RFB_SHUTDOWN) {
 	fd_set rfds, wfds, efds;
 	struct timeval tv;
 	int n;
@@ -604,6 +604,10 @@ clientInput(void *data)
     UNLOCK(cl->updateMutex);
     THREAD_JOIN(output_thread);
 
+    /* Close client sock */
+    rfbCloseSocket(cl->sock);
+    cl->sock = RFB_INVALID_SOCKET;
+
     rfbClientConnectionGone(cl);
 
     return THREAD_ROUTINE_RETURN_VALUE;
@@ -620,8 +624,16 @@ listenerRun(void *data)
     socklen_t len;
     fd_set listen_fds;  /* temp file descriptor list for select() */
 
+    /*
+       Only checking socket state here and not using rfbIsActive()
+       because: When rfbShutdownServer() is called by the client, it runs in
+       the client-to-server thread's context, resulting in itself calling
+       its own the pthread_join(), returning immediately, leaving the
+       client-to-server thread to actually terminate _after_ the listener thread
+       is terminated, leaving the client list still populated.
+     */
     /* TODO: HTTP is not handled */
-    while (rfbIsActive(screen)) {
+    while (screen->socketState != RFB_SOCKET_SHUTDOWN) {
         client_fd = -1;
         FD_ZERO(&listen_fds);
 	if(screen->listenSock != RFB_INVALID_SOCKET)
@@ -1173,22 +1185,14 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
         rfbCloseClient(currentCl);
       }
 
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-    if(currentCl->screen->backgroundLoop) {
       /*
-	Notify the thread. This simply writes a NULL byte to the notify pipe in order to get past the select()
-	in clientInput(), the loop in there will then break because the rfbCloseClient() above has set
-	currentCl->sock to -1.
-      */
-      write(currentCl->pipe_notify_client_thread[1], "\x00", 1);
-      /* And wait for it to finish. */
-      pthread_join(currentCl->client_thread, NULL);
-    } else {
-      rfbClientConnectionGone(currentCl);
-    }
-#else
-      rfbClientConnectionGone(currentCl);
+	 In threaded mode, rfbClientConnectionGone() is called by the client-to-server thread.
+	 Only need to call this here for non-threaded mode.
+       */
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    if(!currentCl->screen->backgroundLoop)
 #endif
+	rfbClientConnectionGone(currentCl);
 
       currentCl = nextCl;
     }
@@ -1200,6 +1204,7 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
   rfbShutdownSockets(screen);
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+  screen->socketState = RFB_SOCKET_SHUTDOWN; /* Set this so the listener thread ends */
   if (screen->backgroundLoop) {
       /*
 	Notify the listener thread. This simply writes a NULL byte to the notify pipe in order to get past the select()

@@ -491,7 +491,8 @@ typedef struct _rfbClientRec {
         /* Ephemeral internal-use states that will never be seen by software
          * using LibVNCServer to provide services: */
 
-        RFB_INITIALISATION_SHARED /**< sending initialisation messages with implicit shared-flag already true */
+        RFB_INITIALISATION_SHARED, /**< sending initialisation messages with implicit shared-flag already true */
+        RFB_SHUTDOWN            /**< shutting down */
     } state;
 
     rfbBool reverseConnection;

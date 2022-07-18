@@ -556,24 +556,47 @@ rfbCloseClient(rfbClientPtr cl)
     if (cl->sock != RFB_INVALID_SOCKET)
 #endif
       {
+	/* Remove client sock from allFds and adapt maxFd */
 	FD_CLR(cl->sock,&(cl->screen->allFds));
 	if(cl->sock==cl->screen->maxFd)
 	  while(cl->screen->maxFd>0
 		&& !FD_ISSET(cl->screen->maxFd,&(cl->screen->allFds)))
 	    cl->screen->maxFd--;
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	/* Has to happen before socket close as the SSL implementation might send a goodbye */
 	if (cl->sslctx)
 	    rfbssl_destroy(cl);
 	free(cl->wspath);
 #endif
-#ifndef __MINGW32__
-	shutdown(cl->sock,SHUT_RDWR);
-#endif
-	rfbCloseSocket(cl->sock);
-	cl->sock = RFB_INVALID_SOCKET;
       }
     TSIGNAL(cl->updateCond);
     UNLOCK(cl->updateMutex);
+
+    /*
+       Client socket closing, either via the client-to-server thread or directly.
+    */
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    if(cl->screen->backgroundLoop) {
+	/* Indicate to client-to-server thread that it should not go on */
+	cl->state = RFB_SHUTDOWN;
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+	/*
+	  Notify the thread. This simply writes a NULL byte to the notify pipe in order to get past the select()
+	  in clientInput(), the loop in there will then break because the client state has been set to
+	  RFB_SHUTDOWN. Client socket closing will be done by the thread.
+	*/
+	write(cl->pipe_notify_client_thread[1], "\x00", 1);
+	/* And wait for it to finish. */
+	pthread_join(cl->client_thread, NULL);
+#endif
+    } else
+#endif
+	/* Either no threading support or threading support with screen->backgroundloop == false */
+	{
+	    /* Close client sock */
+	    rfbCloseSocket(cl->sock);
+	    cl->sock = RFB_INVALID_SOCKET;
+	}
 }
 
 
