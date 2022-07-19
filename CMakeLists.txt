@@ -145,7 +145,7 @@ endif(WITH_THREADS)
 
 
 if(WITH_GNUTLS)
-  find_package(GnuTLS)
+  find_package(GnuTLS 3.4.0)
 endif(WITH_GNUTLS)
 
 
