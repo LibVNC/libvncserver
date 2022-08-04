@@ -30,7 +30,7 @@
 
 
 static const char *rfbTLSPriority = "NORMAL:+DHE-DSS:+RSA:+DHE-RSA:+SRP";
-static const char *rfbAnonTLSPriority= "NORMAL:+ANON-DH";
+static const char *rfbAnonTLSPriority = "NORMAL:+ANON-ECDH:+ANON-DH";
 
 #define DH_BITS 1024
 static gnutls_dh_params_t rfbDHParams;
