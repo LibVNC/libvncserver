@@ -1127,18 +1127,36 @@ InitialiseRFBConnection(rfbClient* client)
     if (!HandleVeNCryptAuth(client)) return FALSE;
 
     switch (client->subAuthScheme) {
+      /*
+       * rfbNoAuth and rfbVncAuth are not actually part of VeNCrypt, however
+       * it is important to support them to ensure better compatibility.
+       * When establishing a connection, the client does not know whether
+       * the server supports encryption, and always prefers VeNCrypt if enabled.
+       * Next, if encryption is not available on the server, the connection
+       * will fail. Since the RFB doesn't have any downgrade methods in case
+       * of failure, a client that does not support unencrypted VeNCrypt methods
+       * will never be able to connect.
+       *
+       * The RFB specification also considers any ordinary subauths are valid,
+       * which legitimizes this solution.
+       *
+       * rfbVeNCryptPlain is also supported for better compatibility.
+       */
 
+      case rfbNoAuth:
       case rfbVeNCryptTLSNone:
       case rfbVeNCryptX509None:
         rfbClientLog("No sub authentication needed\n");
         if (!rfbHandleAuthResult(client)) return FALSE;
         break;
 
+      case rfbVncAuth:
       case rfbVeNCryptTLSVNC:
       case rfbVeNCryptX509VNC:
         if (!HandleVncAuth(client)) return FALSE;
         break;
 
+      case rfbVeNCryptPlain:
       case rfbVeNCryptTLSPlain:
       case rfbVeNCryptX509Plain:
         if (!HandlePlainAuth(client)) return FALSE;
