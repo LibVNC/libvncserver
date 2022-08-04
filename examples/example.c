@@ -31,12 +31,18 @@
 #include <netdb.h>
 #endif
 
+#include <signal.h>
+
 #include <rfb/rfb.h>
 #include <rfb/keysym.h>
 
 static const int bpp=4;
 static int maxx=800, maxy=600;
 /* TODO: odd maxx doesn't work (vncviewer bug) */
+
+/* Flag used for threaded mode that's global so we can set it via
+   a signal handler... */
+static int maintain_connection = 1;
 
 /* This initializes a nice (?) background */
 
@@ -277,6 +283,10 @@ static void MakeRichCursor(rfbScreenInfoPtr rfbScreen)
   }
 }
 
+void intHandler(int dummy) {
+    maintain_connection = 0;
+}
+
 /* Initialization */
 
 int main(int argc,char** argv)
@@ -324,12 +334,17 @@ int main(int argc,char** argv)
 #if !defined(LIBVNCSERVER_HAVE_LIBPTHREAD) && !defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 #error "I need pthreads or win32 threads for that."
 #endif
-
+  /* catch Ctrl-C to set a flag for the main thread */
+  signal(SIGINT, intHandler);
   /* this is the non-blocking event loop; a background thread is started */
   rfbRunEventLoop(rfbScreen,-1,TRUE);
   fprintf(stderr, "Running background loop...\n");
   /* now we could do some cool things like rendering in idle time */
-  while(1) sleep(5); /* render(); */
+  while (maintain_connection) {
+      sleep(5); /* render(); */
+  }
+  fprintf(stderr, "\nShutting down...\n");
+  rfbShutdownServer(rfbScreen, TRUE);
 #endif /* BACKGROUND_LOOP */
 
   free(rfbScreen->frameBuffer);

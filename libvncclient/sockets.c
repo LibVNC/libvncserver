@@ -923,7 +923,7 @@ SetDSCP(rfbSocket sock, int dscp)
 rfbBool
 StringToIPAddr(const char *str, unsigned int *addr)
 {
-  struct hostent *hp;
+  struct addrinfo hints, *res;
 
   if (strcmp(str,"") == 0) {
     *addr = htonl(INADDR_LOOPBACK); /* local */
@@ -935,16 +935,19 @@ StringToIPAddr(const char *str, unsigned int *addr)
   if (*addr != -1)
     return TRUE;
 
-  hp = gethostbyname(str);
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family   = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
 
-  if (hp) {
-    *addr = *(unsigned int *)hp->h_addr;
+  if (getaddrinfo(str, NULL, &hints, &res) == 0) {
+    *addr = (((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr);
+    freeaddrinfo(res);
+
     return TRUE;
   }
 
   return FALSE;
 }
-
 
 /*
  * Test if the other end of a socket is on the same machine.

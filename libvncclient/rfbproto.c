@@ -500,6 +500,18 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
     {
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
         rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
+
+		switch (tAuth[loop]) {
+		case rfbUltra:
+			rfbClientLog("UltraVNC server detected, enabling UltraVNC specific messages\n");
+			DefaultSupportedMessagesUltraVNC(client);
+			break;
+		case rfbTight:
+			rfbClientLog("TightVNC server detected, enabling TightVNC specific messages\n");
+			DefaultSupportedMessagesTightVNC(client);
+			break;
+		}
+
         if (flag) continue;
         extAuthHandler=FALSE;
         for (e = rfbClientExtensions; e; e = e->next) {
@@ -519,7 +531,7 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
 #ifdef LIBVNCSERVER_HAVE_SASL
             tAuth[loop]==rfbSASL ||
 #endif /* LIBVNCSERVER_HAVE_SASL */
-            (tAuth[loop]==rfbARD && client->GetCredential))
+            ((tAuth[loop]==rfbARD || tAuth[loop]==rfbUltraMSLogonII) && client->GetCredential))
         {
             if (!subAuth && client->clientAuthSchemes)
             {
@@ -690,6 +702,60 @@ rfbPowM64(uint64_t b, uint64_t e, uint64_t m)
     b=rfbMulM64(b,b,m);
   }
   return r;
+}
+
+static rfbBool
+HandleUltraMSLogonIIAuth(rfbClient *client)
+{
+  uint8_t gen[8], mod[8], resp[8], pub[8], priv[8];
+  uint8_t username[256], password[64], key[8];
+  rfbCredential *cred;
+
+  if (!ReadFromRFBServer(client, (char *)gen, sizeof(gen))) return FALSE;
+  if (!ReadFromRFBServer(client, (char *)mod, sizeof(mod))) return FALSE;
+  if (!ReadFromRFBServer(client, (char *)resp, sizeof(resp))) return FALSE;
+
+  if(!dh_generate_keypair(priv, pub, gen, sizeof(gen), mod, sizeof(priv))) {
+      rfbClientErr("HandleUltraMSLogonIIAuth: generating keypair failed\n");
+      return FALSE;
+  }
+
+  if(!dh_compute_shared_key(key, priv, resp, mod, sizeof(key))) {
+      rfbClientErr("HandleUltraMSLogonIIAuth: creating shared key failed\n");
+      return FALSE;
+  }
+
+  if (!client->GetCredential)
+  {
+    rfbClientLog("GetCredential callback is not set.\n");
+    return FALSE;
+  }
+  rfbClientLog("WARNING! MSLogon security type has very low password encryption! "\
+    "Use it only with SSH tunnel or trusted network.\n");
+  cred = client->GetCredential(client, rfbCredentialTypeUser);
+  if (!cred)
+  {
+    rfbClientLog("Reading credential failed\n");
+    return FALSE;
+  }
+
+  memset(username, 0, sizeof(username));
+  strncpy((char *)username, cred->userCredential.username, sizeof(username)-1);
+  memset(password, 0, sizeof(password));
+  strncpy((char *)password, cred->userCredential.password, sizeof(password)-1);
+  FreeUserCredential(cred);
+
+  rfbClientEncryptBytes2(username, sizeof(username), (unsigned char *)key);
+  rfbClientEncryptBytes2(password, sizeof(password), (unsigned char *)key);
+
+  if (!WriteToRFBServer(client, (char *)pub, sizeof(pub))) return FALSE;
+  if (!WriteToRFBServer(client, (char *)username, sizeof(username))) return FALSE;
+  if (!WriteToRFBServer(client, (char *)password, sizeof(password))) return FALSE;
+
+  /* Handle the SecurityResult message */
+  if (!rfbHandleAuthResult(client)) return FALSE;
+
+  return TRUE;
 }
 
 static rfbBool
@@ -941,13 +1007,15 @@ InitialiseRFBConnection(rfbClient* client)
   if ((major==rfbProtocolMajorVersion) && (minor>rfbProtocolMinorVersion))
     client->minor = rfbProtocolMinorVersion;
 
-  /* UltraVNC uses minor codes 4 and 6 for the server */
+  /* Legacy version of UltraVNC uses minor codes 4 and 6 for the server */
+  /* left in for backwards compatibility */
   if (major==3 && (minor==4 || minor==6)) {
       rfbClientLog("UltraVNC server detected, enabling UltraVNC specific messages\n",pv);
       DefaultSupportedMessagesUltraVNC(client);
   }
 
-  /* UltraVNC Single Click uses minor codes 14 and 16 for the server */
+  /* Legacy version of UltraVNC Single Click uses minor codes 14 and 16 for the server */
+  /* left in for backwards compatibility */
   if (major==3 && (minor==14 || minor==16)) {
      minor = minor - 10;
      client->minor = minor;
@@ -955,7 +1023,8 @@ InitialiseRFBConnection(rfbClient* client)
      DefaultSupportedMessagesUltraVNC(client);
   }
 
-  /* TightVNC uses minor codes 5 for the server */
+  /* Legacy version of TightVNC uses minor codes 5 for the server */
+  /* left in for backwards compatibility */
   if (major==3 && minor==5) {
       rfbClientLog("TightVNC server detected, enabling TightVNC specific messages\n",pv);
       DefaultSupportedMessagesTightVNC(client);
@@ -1015,6 +1084,10 @@ InitialiseRFBConnection(rfbClient* client)
     break;
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
+  case rfbUltraMSLogonII:
+    if (!HandleUltraMSLogonIIAuth(client)) return FALSE;
+    break;
+
   case rfbMSLogon:
     if (!HandleMSLogonAuth(client)) return FALSE;
     break;
@@ -1066,18 +1139,36 @@ InitialiseRFBConnection(rfbClient* client)
     if (!HandleVeNCryptAuth(client)) return FALSE;
 
     switch (client->subAuthScheme) {
+      /*
+       * rfbNoAuth and rfbVncAuth are not actually part of VeNCrypt, however
+       * it is important to support them to ensure better compatibility.
+       * When establishing a connection, the client does not know whether
+       * the server supports encryption, and always prefers VeNCrypt if enabled.
+       * Next, if encryption is not available on the server, the connection
+       * will fail. Since the RFB doesn't have any downgrade methods in case
+       * of failure, a client that does not support unencrypted VeNCrypt methods
+       * will never be able to connect.
+       *
+       * The RFB specification also considers any ordinary subauths are valid,
+       * which legitimizes this solution.
+       *
+       * rfbVeNCryptPlain is also supported for better compatibility.
+       */
 
+      case rfbNoAuth:
       case rfbVeNCryptTLSNone:
       case rfbVeNCryptX509None:
         rfbClientLog("No sub authentication needed\n");
         if (!rfbHandleAuthResult(client)) return FALSE;
         break;
 
+      case rfbVncAuth:
       case rfbVeNCryptTLSVNC:
       case rfbVeNCryptX509VNC:
         if (!HandleVncAuth(client)) return FALSE;
         break;
 
+      case rfbVeNCryptPlain:
       case rfbVeNCryptTLSPlain:
       case rfbVeNCryptX509Plain:
         if (!HandlePlainAuth(client)) return FALSE;
@@ -1345,6 +1436,8 @@ SetFormatAndEncodings(rfbClient* client)
   /* New Frame Buffer Size */
   if (se->nEncodings < MAX_ENCODINGS && client->canHandleNewFBSize)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingNewFBSize);
+  if (se->nEncodings < MAX_ENCODINGS)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingExtDesktopSize);
 
   /* Last Rect */
   if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding)
@@ -1361,6 +1454,9 @@ SetFormatAndEncodings(rfbClient* client)
   /* xvp */
   if (se->nEncodings < MAX_ENCODINGS)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingXvp);
+
+  if (se->nEncodings < MAX_ENCODINGS)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingQemuExtendedKeyEvent);
 
   /* Multicast framebuffer updates */
   if (se->nEncodings < MAX_ENCODINGS && client->canHandleMulticastVNC)
@@ -1410,7 +1506,12 @@ SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, rfbB
   rfbFramebufferUpdateRequestMsg fur;
 
   if (!SupportsClient2Server(client, rfbFramebufferUpdateRequest)) return TRUE;
-  
+
+  if (client->requestedResize) {
+    rfbClientLog("Skipping Update - resize in progress\n");
+    return TRUE;
+  }
+
   fur.type = rfbFramebufferUpdateRequest;
   fur.incremental = incremental ? 1 : 0;
   fur.x = rfbClientSwap16IfLE(x);
@@ -1637,6 +1738,63 @@ SendPointerEvent(rfbClient* client,int x, int y, int buttonMask)
 
 
 /*
+ * Resize client
+ */
+
+static rfbBool
+ResizeClientBuffer(rfbClient* client, int width, int height)
+{
+  client->width = width;
+  client->height = height;
+  client->updateRect.x = client->updateRect.y = 0;
+  client->updateRect.w = client->width;
+  client->updateRect.h = client->height;
+  return client->MallocFrameBuffer(client);
+}
+
+
+/*
+ * SendExtDesktopSize
+ */
+
+rfbBool
+SendExtDesktopSize(rfbClient* client, uint16_t width, uint16_t height)
+{
+  rfbSetDesktopSizeMsg sdm;
+  rfbExtDesktopScreen screen;
+
+  if (client->screen.width == 0 && client->screen.height == 0 ) {
+    rfbClientLog("Screen not yet received from server - not sending dimensions %dx%d\n", width, height);
+    return TRUE;
+  }
+
+  if (client->screen.width != rfbClientSwap16IfLE(width) || client->screen.height != rfbClientSwap16IfLE(height)) {
+    rfbClientLog("Sending dimensions %dx%d\n", width, height);
+    sdm.type = rfbSetDesktopSize;
+    sdm.width = rfbClientSwap16IfLE(width);
+    sdm.height = rfbClientSwap16IfLE(height);
+    sdm.numberOfScreens = 1;
+    screen.width = rfbClientSwap16IfLE(width);
+    screen.height = rfbClientSwap16IfLE(height);
+
+    if (!WriteToRFBServer(client, (char *)&sdm, sz_rfbSetDesktopSizeMsg)) return FALSE;
+    if (!WriteToRFBServer(client, (char *)&screen, sz_rfbExtDesktopScreen)) return FALSE;
+
+    client->screen.width = screen.width;
+    client->screen.height = screen.height;
+
+    client->requestedResize = FALSE;
+
+    SendFramebufferUpdateRequest(client, 0, 0, width, height, FALSE);
+
+    client->requestedResize = TRUE;
+  }
+
+  return TRUE;
+}
+
+
+/*
  * SendKeyEvent.
  */
 
@@ -1652,6 +1810,31 @@ SendKeyEvent(rfbClient* client, uint32_t key, rfbBool down)
   ke.down = down ? 1 : 0;
   ke.key = rfbClientSwap32IfLE(key);
   return WriteToRFBServer(client, (char *)&ke, sz_rfbKeyEventMsg);
+}
+
+
+/*
+ * SendExtendedKeyEvent.
+ */
+
+rfbBool
+SendExtendedKeyEvent(rfbClient* client, uint32_t keysym, uint32_t keycode, rfbBool down)
+{
+  rfbQemuExtendedKeyEventMsg ke;
+
+  /* FIXME: rfbQemuEvent also covers audio events, but this model for checking
+   * for supported messages is somewhat limited, so I'll leave this as is for
+   * now.
+   */
+  if (!SupportsClient2Server(client, rfbQemuEvent)) return FALSE;
+
+  memset(&ke, 0, sizeof(ke));
+  ke.type = rfbQemuEvent;
+  ke.subtype = 0; /* key event subtype */
+  ke.down = rfbClientSwap16IfLE(!!down);
+  ke.keysym = rfbClientSwap32IfLE(keysym);
+  ke.keycode = rfbClientSwap32IfLE(keycode);
+  return WriteToRFBServer(client, (char *)&ke, sz_rfbQemuExtendedKeyEventMsg);
 }
 
 
@@ -1961,16 +2144,46 @@ HandleRFBServerMessage(rfbClient* client)
       }
 
       if (rect.encoding == rfbEncodingNewFBSize) {
-	client->width = rect.r.w;
-	client->height = rect.r.h;
-	client->updateRect.x = client->updateRect.y = 0;
-	client->updateRect.w = client->width;
-	client->updateRect.h = client->height;
-	if (!client->MallocFrameBuffer(client))
+	if(!ResizeClientBuffer(client, rect.r.w, rect.r.h))
 	  return FALSE;
 	SendFramebufferUpdateRequest(client, 0, 0, rect.r.w, rect.r.h, FALSE);
 	rfbClientLog("Got new framebuffer size: %dx%d\n", rect.r.w, rect.r.h);
 	continue;
+      }
+
+      if (rect.encoding == rfbEncodingExtDesktopSize) {
+        /* read encoding data */
+        int screens;
+        int loop;
+        rfbBool invalidScreen = FALSE;
+        rfbExtDesktopScreen screen;
+        rfbExtDesktopSizeMsg eds;
+        if (!ReadFromRFBServer(client, ((char *)&eds), sz_rfbExtDesktopSizeMsg)) {
+          return FALSE;
+        }
+
+        screens = eds.numberOfScreens;
+        for (loop=0; loop < screens; loop++)
+        {
+          if (!ReadFromRFBServer(client, ((char *)&screen), sz_rfbExtDesktopScreen)) {
+            return FALSE;
+          }
+          if (screen.id != 0) {
+            client->screen = screen;
+          } else {
+            invalidScreen = TRUE;
+          }
+        }
+
+        if (!invalidScreen && (client->width != rect.r.w || client->height != rect.r.h)) {
+          if(!ResizeClientBuffer(client, rect.r.w, rect.r.h)) {
+            return FALSE;
+          }
+          rfbClientLog("Updated desktop size: %dx%d\n", rect.r.w, rect.r.h);
+        }
+        client->requestedResize = FALSE;
+
+        continue;
       }
 
       /* rect.r.w=byte count */
@@ -2397,6 +2610,10 @@ HandleRFBServerMessage(rfbClient* client)
      }
 
 #endif
+
+      case rfbEncodingQemuExtendedKeyEvent:
+        SetClient2Server(client, rfbQemuEvent);
+        break;
 
       default:
 	 {

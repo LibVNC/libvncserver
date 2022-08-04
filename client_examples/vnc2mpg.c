@@ -29,6 +29,7 @@
 #include <math.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
 #include <rfb/rfbclient.h>
@@ -388,7 +389,9 @@ rfbBool vnc_malloc_fb(rfbClient* client) {
 	    return FALSE;
         signal(SIGINT,signal_handler);
         signal(SIGTERM,signal_handler);
-        signal(SIGQUIT,signal_handler);
+	#ifdef SIGQUIT
+        	signal(SIGQUIT,signal_handler);
+	#endif
         signal(SIGABRT,signal_handler);
         /* These assignments assumes the AVFrame buffer is contigous. This is true in current ffmpeg versions for
          * most non-HW accelerated bits, but may not be true globally. */

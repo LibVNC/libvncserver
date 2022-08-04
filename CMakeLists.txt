@@ -46,6 +46,7 @@ option(WITH_JPEG "Search for the libjpeg compression library to support addition
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
 option(WITH_GTK "Search for the GTK library to build an example GTK vnc client" ON)
+option(WITH_LIBSSH2 "Search for libssh2 to build an example ssh-tunneled client" ON)
 option(WITH_THREADS "Search for a threading library to build with multithreading support" ON)
 option(PREFER_WIN32THREADS "When searching for a threading library, prefer win32 threads if they are found" OFF)
 option(WITH_GNUTLS "Search for the GnuTLS secure communications library to support TLS" ON)
@@ -58,6 +59,8 @@ option(WITH_24BPP "Allow 24 bpp" ON)
 option(WITH_IPv6 "Enable IPv6 Support" ON)
 option(WITH_WEBSOCKETS "Build with websockets support" ON)
 option(WITH_SASL "Build with SASL support" ON)
+option(WITH_EXAMPLES "Build examples" ON)
+option(WITH_TESTS "Build tests" ON)
 
 
 if(WITH_ZLIB)
@@ -130,6 +133,10 @@ endif(WITH_SDL)
 if(WITH_GTK)
   find_package(GTK2)
 endif(WITH_GTK)
+
+if(WITH_LIBSSH2)
+  find_package(LibSSH2)
+endif(WITH_LIBSSH2)
 
 if(WITH_THREADS)
   find_package(Threads)
@@ -209,6 +216,7 @@ check_function_exists(strerror        LIBVNCSERVER_HAVE_STRERROR)
 check_function_exists(strstr          LIBVNCSERVER_HAVE_STRSTR)
 
 check_symbol_exists(htobe64 "endian.h" LIBVNCSERVER_HAVE_HTOBE64)
+check_symbol_exists(htobe64 "sys/endian.h" LIBVNCSERVER_HAVE_HTOBE64)
 check_symbol_exists(OSSwapHostToBigInt64 "libkern/OSByteOrder.h" LIBVNCSERVER_HAVE_OSSWAPHOSTTOBIGINT64)
 
 if(WITH_THREADS AND Threads_FOUND)
@@ -247,11 +255,11 @@ endif(SYSTEMD_FOUND)
 if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
   message(STATUS "Building crypto with Libgcrypt")
   set(CRYPTO_LIBRARIES ${LIBGCRYPT_LIBRARIES})
-  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt)
+  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt.c)
 elseif(OPENSSL_FOUND)
   message(STATUS "Building crypto with OpenSSL")
   set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
-  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl)
+  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl.c)
 else()
   message(STATUS "Building crypto with builtin functions, only including SHA1 and D3DES")
   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_included.c ${COMMON_DIR}/sha1.c ${COMMON_DIR}/d3des.c)
@@ -598,6 +606,17 @@ if(GTK2_FOUND)
   )
 endif(GTK2_FOUND)
 
+if(LIBSSH2_FOUND AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
+  include_directories(${LIBSSH2_INCLUDE_DIR})
+  set(LIBVNCCLIENT_EXAMPLES
+    ${LIBVNCCLIENT_EXAMPLES}
+    sshtunnel
+  )
+endif()
+# if not found, set lib var to empty, otherwise CMake complains
+if(NOT LIBSSH2_FOUND)
+  set(LIBSSH2_LIBRARY "")
+endif()
 
 if(FFMPEG_FOUND)
   set(LIBVNCCLIENT_EXAMPLES
@@ -606,25 +625,27 @@ if(FFMPEG_FOUND)
   )
 endif(FFMPEG_FOUND)
 
+if(WITH_EXAMPLES)
+  foreach(e ${LIBVNCSERVER_EXAMPLES})
+    add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
+    set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
+    set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
+    target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY})
+  endforeach(e ${LIBVNCSERVER_EXAMPLES})
 
-foreach(e ${LIBVNCSERVER_EXAMPLES})
-  add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
-  set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
-  set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
-  target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY})
-endforeach(e ${LIBVNCSERVER_EXAMPLES})
-
-foreach(e ${LIBVNCCLIENT_EXAMPLES})
-  add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
-  set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
-  set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
-  target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES})
-endforeach(e ${LIBVNCCLIENT_EXAMPLES})
-
+  foreach(e ${LIBVNCCLIENT_EXAMPLES})
+    add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
+    set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
+    set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
+    target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES} ${LIBSSH2_LIBRARY})
+  endforeach(e ${LIBVNCCLIENT_EXAMPLES})
+endif(WITH_EXAMPLES)
 
 #
 # them tests
 #
+
+if(WITH_TESTS)
 
 if(UNIX)
     set(ADDITIONAL_TEST_LIBS m)
@@ -697,6 +718,8 @@ if(LIBVNCSERVER_WITH_WEBSOCKETS)
     add_test(NAME wstest COMMAND test_wstest)
 endif(LIBVNCSERVER_WITH_WEBSOCKETS)
 
+endif(WITH_TESTS)
+
 #
 # this gets the libraries needed by TARGET in "-libx -liby ..." form
 #
@@ -726,22 +749,65 @@ get_link_libraries(PRIVATE_LIBS vncclient)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
 
 if(LIBVNCSERVER_INSTALL)
-  install(TARGETS vncserver DESTINATION ${CMAKE_INSTALL_LIBDIR})
-  install(TARGETS vncclient DESTINATION ${CMAKE_INSTALL_LIBDIR})
-  install(FILES
-    rfb/keysym.h
-    rfb/threading.h
-    rfb/rfb.h
-    rfb/rfbclient.h
-    ${CMAKE_CURRENT_BINARY_DIR}/rfb/rfbconfig.h
-    rfb/rfbproto.h
-    rfb/rfbregion.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rfb
-    )
-
-  install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc
-    ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
-    )
+    set(INSTALL_HEADER_FILES
+        rfb/keysym.h
+        rfb/threading.h
+        rfb/rfb.h
+        rfb/rfbclient.h
+        ${CMAKE_CURRENT_BINARY_DIR}/rfb/rfbconfig.h
+        rfb/rfbproto.h
+        rfb/rfbregion.h
+        )
+    
+    set_property(TARGET vncclient PROPERTY PUBLIC_HEADER ${INSTALL_HEADER_FILES})
+    set_property(TARGET vncserver PROPERTY PUBLIC_HEADER ${INSTALL_HEADER_FILES})
+    if(WIN32)
+        INSTALL(TARGETS vncclient vncserver
+            EXPORT LibVNCServerTargets
+            RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            LIBRARY DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rfb
+            INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            )
+    else()
+        INSTALL(TARGETS vncclient vncserver
+            EXPORT LibVNCServerTargets
+            RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/rfb
+            INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            )
+    endif()
+    
+    # Install cmake configure files
+    install(EXPORT LibVNCServerTargets
+        NAMESPACE
+            "LibVNCServer::"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibVNCServer"
+        )
+    
+    include(CMakePackageConfigHelpers)
+    configure_package_config_file(
+      ${PROJECT_SOURCE_DIR}/cmake/Modules/LibVNCServerConfig.cmake.in
+      ${CMAKE_BINARY_DIR}/LibVNCServerConfig.cmake
+      INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibVNCServer"
+      )
+    # Install cmake version configure file
+    write_basic_package_version_file(
+        "${CMAKE_BINARY_DIR}/LibVNCServerConfigVersion.cmake"
+        VERSION ${PARA_VERSION}
+        COMPATIBILITY AnyNewerVersion)
+    install(FILES
+        "${CMAKE_BINARY_DIR}/LibVNCServerConfigVersion.cmake"
+        "${CMAKE_BINARY_DIR}/LibVNCServerConfig.cmake"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibVNCServer")
+    
+  
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc
+        ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+        )
 endif()

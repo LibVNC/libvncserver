@@ -34,12 +34,6 @@
 /* errno */
 #include <errno.h>
 
-#ifdef LIBVNCSERVER_HAVE_ENDIAN_H
-#include <endian.h>
-#elif LIBVNCSERVER_HAVE_SYS_ENDIAN_H
-#include <sys/endian.h>
-#endif
-
 #ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
@@ -281,6 +275,13 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         return FALSE;
     } 
 
+    if (!sec_ws_key) {
+        rfbErr("webSocketsHandshake: sec-websocket-key is missing\n");
+        free(response);
+        free(buf);
+        return FALSE;
+    }
+
     if (!(path && host && (origin || sec_ws_origin))) {
         rfbErr("webSocketsHandshake: incomplete client handshake\n");
         free(response);
@@ -374,6 +375,10 @@ webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst)
     if (!len) {
 	  /* nothing to encode */
 	  return 0;
+    }
+    if (len > UPDATE_BUF_SIZE) {
+      rfbErr("%s: Data length %d larger than maximum of %d bytes\n", __func__, len, UPDATE_BUF_SIZE);
+      return -1;
     }
 
     header = (ws_header_t *)wsctx->codeBufEncode;

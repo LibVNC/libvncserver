@@ -48,7 +48,7 @@ static const rfbPixelFormat BGR233Format = {
         ((x.bitsPerPixel == y.bitsPerPixel) &&                          \
          (x.depth == y.depth) &&                                        \
          ((x.bigEndian == y.bigEndian) || (x.bitsPerPixel == 8)) &&     \
-         (x.trueColour == y.trueColour) &&                              \
+         (!x.trueColour == !y.trueColour) &&                            \
          (!x.trueColour || ((x.redMax == y.redMax) &&                   \
                             (x.greenMax == y.greenMax) &&               \
                             (x.blueMax == y.blueMax) &&                 \

@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/LibVNC/libvncserver.svg?branch=master)](https://travis-ci.org/LibVNC/libvncserver)
+[![Build Status](https://app.travis-ci.com/LibVNC/libvncserver.svg?branch=master)](https://app.travis-ci.com/LibVNC/libvncserver)
 [![Build status](https://ci.appveyor.com/api/projects/status/fao6m1md3q4g2bwn/branch/master?svg=true)](https://ci.appveyor.com/project/bk138/libvncserver/branch/master)
 [![Help making this possible](https://img.shields.io/badge/liberapay-donate-yellow.png)](https://liberapay.com/LibVNC/donate) [![Join the chat at https://gitter.im/LibVNC/libvncserver](https://badges.gitter.im/LibVNC/libvncserver.svg)](https://gitter.im/LibVNC/libvncserver?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
@@ -40,6 +40,7 @@ RFB Protocol Support Status
 |Apple ARD          |         30 |              |            ✔ |
 |TLS                |         18 |              |            ✔ |
 |VeNCrypt           |         19 |              |            ✔ |
+|UltraVNC MSLogonII |        113 |              |            ✔ |
 
 ## [Encodings](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#76encodings)
 
@@ -58,6 +59,16 @@ RFB Protocol Support Status
 | ZRLE     | 16     | ✔            | ✔            |
 | ZYWRLE   | 17     | ✔            | ✔            |
 | TightPNG | -260   | ✔            |              |
+
+## Transports
+
+| Name                       | LibVNCServer | LibVNCClient |
+|----------------------------|--------------|--------------|
+| RFB                        | ✔            | ✔            |
+| Encrypted RFB via VeNCrypt |              | ✔            |
+| Encrypted RFB via AnonTLS  |              | ✔            |
+| Websockets                 | ✔            |              |
+| Encrypted Websockets       | ✔            |              |
 
 
 How to build
@@ -131,6 +142,30 @@ In case you prefer to learn LibVNCServer by example, have a look at the servers 
 
 For LibVNCClient, examples can be found in [client_examples](client_examples).
 
+Incorporating LibVNCServer/LibVNCClient into your build system
+--------------------------------------------------------------
+
+The install process installs [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/)
+.pc files for LibVNCServer as well as LibVNCClient which you can use in your build
+system via the usual `pkg-config --cflags libvncserver` et al.
+
+If using CMake, LibVNCServer versions > 0.9.13 provide CMake configure files so
+in your project's CMakeLists.txt, you can say:
+
+```cmake
+find_package(LibVNCServer)
+if(LibVNCServer_FOUND)
+	# libs and headers location are now accessible via properties, but you only
+	# need to add the respective export target to your project's target_link_libraries,
+	# cmake will automatically add libs and headers
+	# eg: add client (YOUR_PROJECT_TARGET being a placeholder for your real target -
+	# it must be defined by add_executable or add_library):
+	target_link_libraries(YOUR_PROJECT_TARGET LibVNCServer::vncclient)
+	# add server:
+	target_link_libraries(YOUR_PROJECT_TARGET LibVNCServer::vncserver)
+endif()
+```
+
 Using Websockets
 ----------------
 
@@ -184,20 +219,16 @@ this innovation, they decided to make it GPL, not BSD. The principal
 difference is: You can make closed source programs deriving from BSD, not
 from GPL. You have to give proper credit with both.
 
-Now, why not BSD? Well, imagine your child being some famous actor. Along
-comes a manager who exploits your child exclusively, that is: nobody else
-can profit from the child, it itself included. Got it?
+Frequently Asked Questions
+--------------------------
+> Our commercial product wants to make use of LibVNCServer to create our own VNC server and distribute. Will this be considered derivative work in the GPLv2 context?
 
-What reason do you have now to use this library commercially?
+Yes. Please note that while you would have to stick to the GPL for your program if you link to LibVNCServer/LibVNCClient, you do not have to make your code public in case you use the derivative work internally in your organisation, see https://www.gnu.org/licenses/gpl-faq.html#GPLRequireSourcePostedPublic
 
-Several: You don't have to give away your product. Then you have effectively
-circumvented the GPL, because you have the benefits of other's work and you
-don't give back anything. Not good.
+> Does modifying LibVNCServer code or not make any difference in determining whether our VNC server will be considered derivative work?
 
-Better: Use a concept like MySQL. This is free software, however, they make
-money with it. If you want something implemented, you have the choice:
-Ask them to do it (and pay a fair price), or do it yourself, normally giving
-back your enhancements to the free world of computing.
+No. By simply linking to LibVNCServer/LibVNCClient, your program becomes derivative work. 
+
 
 License
 -------

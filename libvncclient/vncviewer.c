@@ -84,8 +84,10 @@ static char* ReadPassword(rfbClient* client) {
 static rfbBool MallocFrameBuffer(rfbClient* client) {
   uint64_t allocSize;
 
-  if(client->frameBuffer)
+  if(client->frameBuffer) {
     free(client->frameBuffer);
+    client->frameBuffer = NULL;
+  }
 
   /* SECURITY: promote 'width' into uint64_t so that the multiplication does not overflow
      'width' and 'height' are 16-bit integers per RFB protocol design
@@ -367,6 +369,10 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->saslSecret = NULL;
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
+  client->requestedResize = FALSE;
+  client->screen.width = 0;
+  client->screen.height = 0;
+
   return client;
 }
 
@@ -546,6 +552,8 @@ void rfbClientCleanup(rfbClient* client) {
     free(client->clientData);
     client->clientData = next;
   }
+
+  free(client->vncRec);
 
   if (client->sock != RFB_INVALID_SOCKET)
     rfbCloseSocket(client->sock);

@@ -638,7 +638,7 @@ ScreenInit(int argc, char**argv)
   if(stream) {
       CGDisplayStreamStart(stream);
   } else {
-      rfbErr("Could not get screen contents. Check if the program has been given screen recording permisssions in 'System Preferences'->'Security & Privacy'->'Privacy'->'Screen Recording'.\n");
+      rfbErr("Could not get screen contents. Check if the program has been given screen recording permissions in 'System Preferences'->'Security & Privacy'->'Privacy'->'Screen Recording'.\n");
       return FALSE;
   }
 
