@@ -212,7 +212,7 @@ rfbNumCodedRectsTight(rfbClientPtr cl,
     maxRectSize = tightConf[cl->tightCompressLevel].maxRectSize;
     maxRectWidth = tightConf[cl->tightCompressLevel].maxRectWidth;
 
-    if (w > maxRectWidth || w * h > maxRectSize) {
+    if (maxRectWidth > 0 && (w > maxRectWidth || w * h > maxRectSize)) {
         subrectMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
         subrectMaxHeight = maxRectSize / subrectMaxWidth;
         return (((w - 1) / maxRectWidth + 1) *
