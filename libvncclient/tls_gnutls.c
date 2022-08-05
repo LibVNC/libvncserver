@@ -22,10 +22,6 @@
 #include <gnutls/x509.h>
 #include <rfb/rfbclient.h>
 #include <errno.h>
-#ifdef WIN32
-#include <windows.h>           /* for Sleep() */
-#define sleep(X) Sleep(1000*X) /* MinGW32 has no sleep() */
-#endif
 #include "tls.h"
 
 
@@ -228,6 +224,27 @@ PullTLS(gnutls_transport_ptr_t transport, void *data, size_t len)
   }
 }
 
+static int
+PullTimeout(gnutls_transport_ptr_t transport, unsigned int timeout)
+{
+  rfbClient *client = (rfbClient*)transport;
+  int ret;
+
+  while (1)
+  {
+    ret = gnutls_system_recv_timeout((gnutls_transport_ptr_t)(long)client->sock, timeout);
+
+    if (ret < 0)
+    {
+#ifdef WIN32
+      WSAtoTLSErrno((gnutls_session_t*)&client->tlsSession);
+#endif
+      if (errno == EINTR) continue;
+    }
+    return ret;
+  }
+}
+
 static rfbBool
 InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
 {
@@ -251,6 +268,9 @@ InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
   gnutls_transport_set_ptr((gnutls_session_t)client->tlsSession, (gnutls_transport_ptr_t)client);
   gnutls_transport_set_push_function((gnutls_session_t)client->tlsSession, PushTLS);
   gnutls_transport_set_pull_function((gnutls_session_t)client->tlsSession, PullTLS);
+
+  gnutls_transport_set_pull_timeout_function((gnutls_session_t)client->tlsSession, PullTimeout);
+  gnutls_handshake_set_timeout((gnutls_session_t)client->tlsSession, 15000);
 
   INIT_MUTEX(client->tlsRwMutex);
 
@@ -279,27 +299,16 @@ SetTLSAnonCredential(rfbClient* client)
 static rfbBool
 HandshakeTLS(rfbClient* client)
 {
-  int timeout = 15;
   int ret;
 
-  while (timeout > 0 && (ret = gnutls_handshake((gnutls_session_t)client->tlsSession)) < 0)
+  while ((ret = gnutls_handshake((gnutls_session_t)client->tlsSession)) < 0)
   {
     if (!gnutls_error_is_fatal(ret))
     {
-      rfbClientLog("TLS handshake blocking.\n");
-      sleep(1);
-      timeout--;
+      rfbClientLog("TLS handshake got a temporary error: %s.\n", gnutls_strerror(ret));
       continue;
     }
-    rfbClientLog("TLS handshake failed: %s.\n", gnutls_strerror(ret));
-
-    FreeTLS(client);
-    return FALSE;
-  }
-
-  if (timeout <= 0)
-  {
-    rfbClientLog("TLS handshake timeout.\n");
+    rfbClientLog("TLS handshake failed: %s\n", gnutls_strerror(ret));
     FreeTLS(client);
     return FALSE;
   }
