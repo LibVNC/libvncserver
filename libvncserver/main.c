@@ -1079,6 +1079,9 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
   }
   rfbReleaseClientIterator(iterator);
 
+  /* Prevent cursor drawing into framebuffer */
+  LOCK(screen->cursorMutex);
+
   /* Update information in the screenInfo structure */
 
   old_format = screen->serverFormat;
@@ -1136,6 +1139,9 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
     UNLOCK(cl->sendMutex);
   }
   rfbReleaseClientIterator(iterator);
+
+  /* Re-enable cursor drawing into framebuffer */
+  UNLOCK(screen->cursorMutex);
 }
 
 /* hang up on all clients and free all reserved memory */
