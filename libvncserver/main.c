@@ -1072,6 +1072,13 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
   rfbClientIteratorPtr iterator;
   rfbClientPtr cl;
 
+  /* Lock out client reads. */
+  iterator = rfbGetClientIterator(screen);
+  while ((cl = rfbClientIteratorNext(iterator))) {
+      LOCK(cl->sendMutex);
+  }
+  rfbReleaseClientIterator(iterator);
+
   /* Update information in the screenInfo structure */
 
   old_format = screen->serverFormat;
@@ -1124,6 +1131,9 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
 
     TSIGNAL(cl->updateCond);
     UNLOCK(cl->updateMutex);
+
+    /* Swapping frame buffers finished, re-enable client reads. */
+    UNLOCK(cl->sendMutex);
   }
   rfbReleaseClientIterator(iterator);
 }
