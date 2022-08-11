@@ -1157,16 +1157,5 @@ rfbListenOnUDPPort(int port,
 rfbBool
 rfbSetNonBlocking(rfbSocket sock)
 {
-#ifdef WIN32
-  unsigned long block=1;
-  if(ioctlsocket(sock, FIONBIO, &block) == SOCKET_ERROR) {
-    errno=WSAGetLastError();
-#else
-  int flags = fcntl(sock, F_GETFL);
-  if(flags < 0 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
-#endif
-    rfbLogPerror("Setting socket to non-blocking failed");
-    return FALSE;
-  }
-  return TRUE;
+    return sock_set_nonblocking(sock, TRUE, rfbLog);
 }

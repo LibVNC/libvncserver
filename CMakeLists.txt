@@ -373,6 +373,7 @@ set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/draw.c
     ${LIBVNCSERVER_DIR}/selbox.c
     ${COMMON_DIR}/vncauth.c
+    ${COMMON_DIR}/sockets.c
     ${LIBVNCSERVER_DIR}/cargs.c
     ${LIBVNCSERVER_DIR}/ultra.c
     ${LIBVNCSERVER_DIR}/scale.c
@@ -385,6 +386,7 @@ set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/rfbproto.c
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
+    ${COMMON_DIR}/sockets.c
     ${CRYPTO_SOURCES}
 )
 
