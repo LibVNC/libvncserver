@@ -1079,18 +1079,30 @@ rfbConnectToTcpAddr(char *host,
         if ((sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == RFB_INVALID_SOCKET)
             continue;
 
-        if (connect(sock, p->ai_addr, p->ai_addrlen) < 0) {
-            rfbCloseSocket(sock);
-            continue;
-        }
-
-        break;
+	if (sock_set_nonblocking(sock, TRUE, rfbErr)) {
+	    if (connect(sock, p->ai_addr, p->ai_addrlen) == 0) {
+		break;
+	    } else {
+#ifdef WIN32
+		errno=WSAGetLastError();
+#endif
+		if ((errno == EWOULDBLOCK || errno == EINPROGRESS) && sock_wait_for_connected(sock, rfbMaxClientWait/1000))
+		    break;
+		rfbCloseSocket(sock);
+	    }
+	} else {
+	    rfbCloseSocket(sock);
+	}
     }
 
     /* all failed */
     if (p == NULL) {
         rfbLogPerror("rfbConnectToTcoAddr: failed to connect\n");
         sock = RFB_INVALID_SOCKET; /* set return value */
+    } else {
+	/* one succeeded, re-set to blocking */
+	if (!sock_set_nonblocking(sock, FALSE, rfbErr))
+	    rfbCloseSocket(sock);
     }
 
     /* all done with this structure now */
@@ -1116,10 +1128,27 @@ rfbConnectToTcpAddr(char *host,
 	return RFB_INVALID_SOCKET;
     }
 
-    if (connect(sock, (struct sockaddr *)&addr, (sizeof(addr))) < 0) {
+    if (!sock_set_nonblocking(sock, TRUE, rfbErr)) {
 	rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
+
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+#ifdef WIN32
+	errno=WSAGetLastError();
+#endif
+	if (!((errno == EWOULDBLOCK || errno == EINPROGRESS) && sock_wait_for_connected(sock, rfbMaxClientWait/1000))) {
+	    rfbErr("rfbConnectToTcpAddr: connect\n");
+	    rfbCloseSocket(sock);
+	    return RFB_INVALID_SOCKET;
+	}
+    }
+
+    if (!sock_set_nonblocking(sock, FALSE, rfbErr)) {
+	rfbCloseSocket(sock);
+	return RFB_INVALID_SOCKET;
+    }
+
 #endif
     return sock;
 }
