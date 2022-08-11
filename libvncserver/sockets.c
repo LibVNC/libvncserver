@@ -302,26 +302,26 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
     rfbScreen->socketState = RFB_SOCKET_SHUTDOWN;
 
     if(rfbScreen->inetdSock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->inetdSock);
 	FD_CLR(rfbScreen->inetdSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->inetdSock);
 	rfbScreen->inetdSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->listenSock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->listenSock);
 	FD_CLR(rfbScreen->listenSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->listenSock);
 	rfbScreen->listenSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->listen6Sock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->listen6Sock);
 	FD_CLR(rfbScreen->listen6Sock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->listen6Sock);
 	rfbScreen->listen6Sock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->udpSock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->udpSock);
 	FD_CLR(rfbScreen->udpSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->udpSock);
 	rfbScreen->udpSock=RFB_INVALID_SOCKET;
     }
 
