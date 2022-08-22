@@ -64,6 +64,11 @@
 #include <netdb.h>
 #endif
 
+#include "rfb/rfbconfig.h"
+#if LIBVNCSERVER_HAVE_POLL_H
+#include <poll.h>
+#endif
+
 /*
   Common internal socket functions
  */
