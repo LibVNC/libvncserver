@@ -905,8 +905,6 @@ extern rfbBool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 #define TIGHT_DEFAULT_COMPRESSION  6
 #define TURBO_DEFAULT_SUBSAMP 0
 
-extern rfbBool rfbTightDisableGradient;
-
 extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
 
 extern rfbBool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
