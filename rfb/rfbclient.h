@@ -477,6 +477,8 @@ typedef struct _rfbClient {
          * Used for intended dimensions, rfbClient.width and rfbClient.height are used to manage the real framebuffer dimensions.
 	 */
 	rfbExtDesktopScreen screen;
+	/* Flag that is 1 when the connection should be canceled */
+	int cancelConnection;
 } rfbClient;
 
 /* cursor.c */

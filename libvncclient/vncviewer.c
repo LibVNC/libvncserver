@@ -352,6 +352,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->listen6Sock = RFB_INVALID_SOCKET;
   client->listen6Address = NULL;
   client->clientAuthSchemes = NULL;
+  client->cancelConnection = 0;
 
 #ifdef LIBVNCSERVER_HAVE_SASL
   client->GetSASLMechanism = NULL;

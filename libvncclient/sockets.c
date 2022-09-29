@@ -163,6 +163,8 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	       ProcessXtEvents();
 	    */
 	    WaitForMessage(client, USECS_WAIT_PER_RETRY);
+	    if (client->cancelConnection)
+	      return FALSE;
 	    i = 0;
 	  } else {
 	    rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
@@ -212,6 +214,8 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	       ProcessXtEvents();
 	    */
 	    WaitForMessage(client, USECS_WAIT_PER_RETRY);
+	    if (client->cancelConnection)
+	      return FALSE;
 	    i = 0;
 	  } else {
 	    rfbClientErr("read (%s)\n",strerror(errno));
@@ -862,6 +866,11 @@ PrintInHex(char *buf, int len)
   fflush(stderr);
 }
 
+void CancelConnection(rfbClient* client)
+{
+	client->cancelConnection = -1;
+}
+
 int WaitForMessage(rfbClient* client,unsigned int usecs)
 {
 #ifdef LIBVNCSERVER_HAVE_POLL
@@ -896,7 +905,8 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
     errno=WSAGetLastError();
 #endif
     rfbClientLog("Waiting for message failed: %d (%s)\n",errno,strerror(errno));
-  }
+  } else if (num == 0 && client->cancelConnection)
+	num = -1; // connection cancelled
 
   return num;
 }
