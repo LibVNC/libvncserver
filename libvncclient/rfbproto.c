@@ -997,7 +997,7 @@ InitialiseRFBConnection(rfbClient* client)
 
   /* Legacy version of UltraVNC uses minor codes 4 and 6 for the server */
   /* left in for backwards compatibility */
-  if (major==3 && (minor==4 || minor==6)) {
+  if (major==3 && (minor==4 || minor==6 || minor==8)) {
       rfbClientLog("UltraVNC server detected, enabling UltraVNC specific messages\n",pv);
       DefaultSupportedMessagesUltraVNC(client);
   }
