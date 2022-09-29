@@ -751,7 +751,7 @@ rfbBool sraRgnIteratorNext(sraRectangleIterator* i,sraRect* r)
 
   /* is this a new subspan? */
   while(i->sPtrs[i->ptrPos]->subspan) {
-    if(i->ptrPos+2 > i->ptrSize) { /* array is too small */
+    if(i->ptrPos+2 >= i->ptrSize) { /* array is too small */
       i->ptrSize += DEFSTEP;
       i->sPtrs = (sraSpan**)realloc(i->sPtrs, sizeof(sraSpan*)*i->ptrSize);
     }
