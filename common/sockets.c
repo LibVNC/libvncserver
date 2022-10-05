@@ -24,6 +24,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include "sockets.h"
 
