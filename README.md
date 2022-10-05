@@ -131,6 +131,15 @@ win32, the `-dev` packages coming with your distribution won't work.
 	cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake ..
 	cmake --build .
 
+Cutting a Release
+-----------------
+
+* [ ] Update AUTHORS.
+* [ ] Update NEWS.
+* [ ] Increment version in CMakeLists.txt
+* [ ] Update ChangeLog.
+
+
 How to use
 ==========
 
