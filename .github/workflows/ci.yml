@@ -23,10 +23,8 @@ jobs:
       - name: Install Ubuntu Build Dependencies
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          sudo dpkg --add-architecture i386
           sudo apt update
-          sudo apt install libwine:i386
-          sudo apt install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev mingw-w64-i686-dev binutils-mingw-w64-i686 gcc-mingw-w64-i686 wine32
+          sudo apt install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev mingw-w64-x86-64-dev binutils-mingw-w64-x86-64 gcc-mingw-w64-x86-64 wine
       - name: Install MacOS Build Dependencies
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
@@ -41,5 +39,5 @@ jobs:
       - name: Test
         run: |
           cd build
-          cp /usr/i686-w64-mingw32/lib/libwinpthread-1.dll test/ || true # used only for MinGW tests, ok to fail for other cases
+          cp /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll test/ || true # used only for MinGW tests, ok to fail for other cases
           ctest --output-on-failure
