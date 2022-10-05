@@ -14,6 +14,9 @@ jobs:
           - "-DWITH_OPENSSL=OFF -DWITH_GNUTLS=ON  -DWITH_GCRYPT=ON"  # build with GnuTLS and Libgrypt
           - "-DWITH_OPENSSL=OFF -DWITH_GNUTLS=OFF -DWITH_GCRYPT=OFF" # build without external encryption libraries
           - "-DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake" # crosscompile with MinGW toolchain
+        include:
+          - os: macos-latest
+            macos_cmake_options: "-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl" # set this extra var for OSX
         exclude:
           - os: macos-latest
             cmake_options: "-DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake" # don't test MinGW from OSX
@@ -34,7 +37,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake ${{ matrix.cmake_options }} ..
+          cmake ${{ matrix.cmake_options }} ${{ matrix.macos_cmake_options }} ..
           cmake --build .
       - name: Test
         run: |
