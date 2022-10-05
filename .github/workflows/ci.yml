@@ -24,7 +24,7 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt-get update
-          sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev wine
+          sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev mingw-w64-i686-dev wine
       - name: Install MacOS Build Dependencies
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
@@ -38,5 +38,6 @@ jobs:
           cmake --build .
       - name: Test
         run: |
+          cd build
           cp /usr/i686-w64-mingw32/lib/libwinpthread-1.dll test/ || true # used only for MinGW tests, ok to fail for other cases
           ctest --output-on-failure
