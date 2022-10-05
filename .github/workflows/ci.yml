@@ -24,8 +24,8 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev mingw-w64-i686-dev binutils-mingw-w64-i686 gcc-mingw-w64-i686 wine32:i386
+          sudo apt update
+          sudo apt install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev mingw-w64-i686-dev binutils-mingw-w64-i686 gcc-mingw-w64-i686 wine32
       - name: Install MacOS Build Dependencies
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
