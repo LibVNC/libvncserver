@@ -24,7 +24,7 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt-get update
-          sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev mingw-w64-i686-dev wine
+          sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev mingw-w64-i686-dev binutils-mingw-w64-i686 gcc-mingw-w64-i686-win32 wine
       - name: Install MacOS Build Dependencies
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
