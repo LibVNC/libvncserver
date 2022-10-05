@@ -1,0 +1,42 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        cmake_options:
+          - "-DWITH_OPENSSL=ON  -DWITH_GNUTLS=OFF -DWITH_GCRYPT=OFF" # build with OpenSSL
+          - "-DWITH_OPENSSL=OFF -DWITH_GNUTLS=ON  -DWITH_GCRYPT=ON"  # build with GnuTLS and Libgrypt
+          - "-DWITH_OPENSSL=OFF -DWITH_GNUTLS=OFF -DWITH_GCRYPT=OFF" # build without external encryption libraries
+          - "-DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake" # crosscompile with MinGW toolchain
+        os:
+          - ubuntu-latest
+          - macos-latest
+        exclude:
+          - os: macos-latest
+            cmake_options: "-DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake" # don't test MinGW from OSX
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Ubuntu Build Dependencies
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get --no-install-suggests --no-install-recommends install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev wine
+      - name: Install MacOS Build Dependencies
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          brew update
+          brew install sdl2 lzo
+      - name: Build
+        run: |
+          mkdir build
+          cd build
+          cmake ${{ matrix.cmake_options }} ..
+          cmake --build .
+      - name: Test
+        run: |
+          cp /usr/i686-w64-mingw32/lib/libwinpthread-1.dll test/ || true # used only for MinGW tests, ok to fail for other cases
+          ctest --output-on-failure
