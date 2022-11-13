@@ -249,11 +249,7 @@ hexdump:
 rfbBool
 WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 {
-#ifdef LIBVNCSERVER_HAVE_POLL
-  struct pollfd pfd;
-#else
   fd_set fds;
-#endif
   int i = 0;
   int j;
   const char *obuf = buf;
@@ -300,18 +296,6 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 		errno == ENOENT ||
 #endif
 		errno == EAGAIN) {
-#ifdef LIBVNCSERVER_HAVE_POLL
-	  struct pollfd pfd;
-	  pfd.fd = client->sock;
-	  pfd.events = POLLOUT;
-
-	  if (poll(&pfd, 1, -1) <= 0) {
-	    if ((pfd.revents & POLLERR) || (pfd.revents & POLLHUP)) {
-	      rfbClientErr("poll\n");
-	      return FALSE;
-	    }
-	  }
-#else
 	  FD_ZERO(&fds);
 	  FD_SET(client->sock,&fds);
 
@@ -319,7 +303,6 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 	    rfbClientErr("select\n");
 	    return FALSE;
 	  }
-#endif
 	  j = 0;
 	} else {
 	  rfbClientErr("write\n");
@@ -864,25 +847,14 @@ PrintInHex(char *buf, int len)
 
 int WaitForMessage(rfbClient* client,unsigned int usecs)
 {
-#ifdef LIBVNCSERVER_HAVE_POLL
-  struct pollfd pfd;
-#else
   fd_set fds;
   struct timeval timeout;
-#endif
   int num;
 
   if (client->serverPort==-1)
     /* playing back vncrec file */
     return 1;
   
-#ifdef LIBVNCSERVER_HAVE_POLL
-  pfd.fd = client->sock;
-  pfd.events = POLLIN | POLLPRI;
-  num = poll(&pfd, 1, usecs/1000);
-  if ((pfd.revents & POLLERR) || (pfd.revents & POLLHUP))
-    return -1;
-#else
   timeout.tv_sec=(usecs/1000000);
   timeout.tv_usec=(usecs%1000000);
 
@@ -890,7 +862,6 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
   FD_SET(client->sock,&fds);
 
   num=select(client->sock+1, &fds, NULL, NULL, &timeout);
-#endif
   if(num<0) {
 #ifdef WIN32
     errno=WSAGetLastError();

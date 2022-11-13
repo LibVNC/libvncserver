@@ -53,15 +53,6 @@ rfbBool sock_set_nonblocking(rfbSocket sock, rfbBool non_blocking, void (*log)(c
 
 rfbBool sock_wait_for_connected(int socket, unsigned int timeout_seconds)
 {
-#ifdef LIBVNCSERVER_HAVE_POLL
-  struct pollfd pfd;
-  pfd.fd = socket;
-  pfd.events = POLLIN | POLLPRI;
-
-  if (poll(&pfd, 1, timeout_seconds*1000)==1) {
-    if ((pfd.revents & POLLERR) || (pfd.revents & POLLHUP))
-      return FALSE;
-#else
   fd_set writefds;
   fd_set exceptfds;
   struct timeval timeout;
@@ -77,9 +68,7 @@ rfbBool sock_wait_for_connected(int socket, unsigned int timeout_seconds)
 #ifdef WIN32
     if (FD_ISSET(socket, &exceptfds))
       return FALSE;
-#endif
-#endif
-#ifndef WIN32
+#else
     int so_error;
     socklen_t len = sizeof so_error;
     getsockopt(socket, SOL_SOCKET, SO_ERROR, &so_error, &len);

@@ -42,9 +42,6 @@
 /* Define to 1 if you have the `mkfifo' function. */
 #cmakedefine LIBVNCSERVER_HAVE_MKFIFO  1 
 
-/* Define to 1 if you have the `poll' function. */
-#cmakedefine LIBVNCSERVER_HAVE_POLL 1
-
 /* Define to 1 if you have the `select' function. */
 #cmakedefine LIBVNCSERVER_HAVE_SELECT  1 
 
@@ -86,9 +83,6 @@
 
 /* Define to 1 if you have the <netinet/in.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_NETINET_IN_H  1 
-
-/* Define to 1 if you have the <poll.h> header file. */
-#cmakedefine LIBVNCSERVER_HAVE_POLL_H  1
 
 /* Define to 1 if you have the <sys/endian.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_SYS_ENDIAN_H 1
