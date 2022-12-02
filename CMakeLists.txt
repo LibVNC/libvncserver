@@ -625,6 +625,11 @@ if(FFMPEG_FOUND)
   )
 endif(FFMPEG_FOUND)
 
+if(DEFINED ENV{LIB_FUZZING_ENGINE})
+  add_executable(fuzz_server ${LIBVNCSRVEXAMPLE_DIR}/fuzz_server.c)
+  target_link_libraries(fuzz_server vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY} $ENV{LIB_FUZZING_ENGINE})
+endif()
+
 if(WITH_EXAMPLES)
   foreach(e ${LIBVNCSERVER_EXAMPLES})
     add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
@@ -632,7 +637,6 @@ if(WITH_EXAMPLES)
     set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
     target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY})
   endforeach(e ${LIBVNCSERVER_EXAMPLES})
-
   foreach(e ${LIBVNCCLIENT_EXAMPLES})
     add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
     set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
@@ -640,6 +644,7 @@ if(WITH_EXAMPLES)
     target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES} ${LIBSSH2_LIBRARY})
   endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 endif(WITH_EXAMPLES)
+
 
 #
 # them tests

@@ -545,6 +545,9 @@ rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen)
 void
 rfbCloseClient(rfbClientPtr cl)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    cl->sock = RFB_INVALID_SOCKET;
+#endif
     rfbExtensionData* extension;
 
     for(extension=cl->extensions; extension; extension=extension->next)
@@ -638,6 +641,12 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
     return sock;
 }
 
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+size_t fuzz_offset;
+size_t fuzz_size;
+const uint8_t *fuzz_data;
+#endif
+
 /*
  * ReadExact reads an exact number of bytes from a client.  Returns 1 if
  * those bytes have been read, 0 if the other end has closed, or -1 if an error
@@ -647,6 +656,14 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
 int
 rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    if (fuzz_offset + len <= fuzz_size) {
+        memcpy(buf, fuzz_data + fuzz_offset, len);
+        fuzz_offset += len;
+        return 1;
+    }
+    return 0;
+#endif
     rfbSocket sock = cl->sock;
     int n;
     fd_set fds;
@@ -739,6 +756,14 @@ int rfbReadExact(rfbClientPtr cl,char* buf,int len)
 int
 rfbPeekExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    if (fuzz_offset + len <= fuzz_size) {
+        memcpy(buf, fuzz_data + fuzz_offset, len);
+        fuzz_offset += len;
+        return 1;
+    }
+    return 0;
+#endif
     rfbSocket sock = cl->sock;
     int n;
     fd_set fds;
@@ -817,6 +842,9 @@ rfbWriteExact(rfbClientPtr cl,
               const char *buf,
               int len)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    return 1;
+#endif
     rfbSocket sock = cl->sock;
     int n;
     fd_set fds;
