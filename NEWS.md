@@ -1,3 +1,41 @@
+# 2022-12-xx: Version 0.9.14
+
+## Overall changes:
+
+  * Added more documentation (build system integration, repeater setup) and a legal FAQ.
+  * Added [contribution guidelines](CONTRIBUTING.md).
+  * Ported the TravisCI continous integration machinery to GitHub workflows.
+
+## LibVNCServer/LibVNCClient:
+
+  * Added [qemu extended key event](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#qemu-extended-key-event-message)
+    support.
+  * Fixed several potential multiplication overflows.
+
+## LibVNCClient:
+
+  * Fixes of several memory leaks and buffer overflows.
+  * Added UltraVNC's MSLogonII authentication scheme.
+  * Fixed TLS interoperability with GnuTLS servers.
+  * Fixed detection of newer UltraVNC and TightVNC servers.
+  * Added support for [SetDesktopSize](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#setdesktopsize).
+  * Added SSH tunneling example using libssh2.
+  * Added some extensions to VeNCrypt in order to be compatible with a wider range of servers.
+
+## LibVNCServer:
+
+  * Fixes to the multi-threaded server implementation which should be a lot more sound now.
+  * Fixed TightVNC-filetransfer file upload for 64-bit systems.
+  * Fixes of crashes in the zlib compression.
+  * Added support for [UTF8 clipboard data](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#extended-clipboard-pseudo-encoding).
+  * Fixed visual artifacts in framebuffer on ARM platforms.
+  * Fixed several WebSockets bugs.
+  * Fixed the UltraVNC-style repeater example. 
+  * Added support for larger framebuffers (two 4k screens possible now).
+  * Added support for timeouts for outbound connections (to repeaters for instance).
+  * Fixed out-of-bounds memory access in Tight encoding.
+
+
 # 2020-06-13: Version 0.9.13
 
 0.9.13 truly is a cross-platform release, the best we've ever done in that respect:
