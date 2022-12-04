@@ -226,7 +226,7 @@ high latency or both.
 ### Tackling High Latency
 
 On a high-latency link, try asking for framebuffer updates continously, as
-RFB is server-push per default, not client-pull. One example implementation
+RFB is client-pull per default, not server-push. One example implementation
 can be found [here](https://github.com/bk138/multivnc/blob/master/src/VNCConn.cpp#L1112)
 and it definitely improves responsiveness.
 
