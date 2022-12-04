@@ -1134,6 +1134,7 @@ rfbBool rfbUpdateClient(rfbClientPtr cl);
 
 /**
  @page libvncserver_doc LibVNCServer Documentation
+ @tableofcontents
  @section create_server Creating a server instance
  To make a server, you just have to initialise a server structure using the
  function rfbGetScreen(), like
