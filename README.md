@@ -136,6 +136,7 @@ Cutting a Release
 
 * [ ] Update AUTHORS.
 * [ ] Update NEWS.
+* [ ] Update git submodules.
 * [ ] Increment version in CMakeLists.txt
 * [ ] Update Doxygen API docs at https://libvnc.github.io/doc/html/
 * [ ] Update ChangeLog.
