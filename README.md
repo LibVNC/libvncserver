@@ -213,6 +213,45 @@ The server program will tell you a URL to point your web browser to. There,
 you can click on the noVNC-encrypted-connection-button to connect using the
 bundled noVNC viewer using an encrypted Websockets connection.
 
+
+Achieving good performance on 'slow' links
+------------------------------------------
+
+If your client-server connection is sluggish because the link is 'slow', there
+are a few things to consider.
+
+First off, you have to investigate whether your link has low throughput or
+high latency or both.
+
+### Tackling High Latency
+
+On a high-latency link, try asking for framebuffer updates continously, as
+RFB is server-push per default, not client-pull. One example implementation
+can be found [here](https://github.com/bk138/multivnc/blob/master/src/VNCConn.cpp#L1112)
+and it definitely improves responsiveness.
+
+There also is the [ContinuousUpdates RFB extension](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#continuousupdates-pseudo-encoding),
+but that one is not supported by LibVNC (yet).
+
+### Tackling Low Throughput
+
+If your link is low-throughput, you basically have to reduce the number of
+bytes that get sent per framebuffer update:
+
+* First off, you should have your client request a lossy encoding such as Tight.
+  This already yields some huge savings.
+* Use a pixel format that represents a pixel with a smaller amount of bytes.
+  For instance, you can switch from 24-bit true colour to 16-bit high colour or
+  even a palleted colour mode. You can request a pixel format via the client or
+  set a default (native) one in the server. With the latter approach, however,
+  you very probably also have to change the way your framebuffer data gets written,
+  so the first client-side one should be preferred.
+* Send a scaled-down version of your framebuffer. You can do the scaling in your
+  application feeding data into LibVNCServer's framebuffer (production-ready)
+  or let LibVNCServer do the work for you if your client requests a scaled screen
+  (not tested for a long time).
+  
+
 Commercial Use
 ==============
 
