@@ -51,9 +51,10 @@ jobs:
       - name: Install Ubuntu Build Dependencies
         run: |
           sudo apt update
-          sudo apt install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev mingw-w64-x86-64-dev binutils-mingw-w64-x86-64 gcc-mingw-w64-x86-64 wine
+          sudo apt install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev mingw-w64-x86-64-dev binutils-mingw-w64-x86-64 gcc-mingw-w64-x86-64 wine clang
       - name: Build
         env:
+          CC: "clang"
           LIB_FUZZING_ENGINE: "-fsanitize=fuzzer"
           CFLAGS: "-fsanitize=address,fuzzer-no-link -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION=1"
         run: |
