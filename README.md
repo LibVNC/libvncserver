@@ -139,7 +139,7 @@ Cutting a Release
 * [ ] Update git submodules.
 * [ ] Increment version in CMakeLists.txt
 * [ ] Update Doxygen API docs at https://libvnc.github.io/doc/html/
-* [ ] Update ChangeLog.
+* [ ] Update ChangeLog (using [git2cl](utils/git2cl.pl))
 
 
 How to use
