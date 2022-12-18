@@ -250,6 +250,7 @@ bytes that get sent per framebuffer update:
 * Send a scaled-down version of your framebuffer. You can do the scaling in your
   application feeding data into LibVNCServer's framebuffer (production-ready)
   or let LibVNCServer do the work for you if your client requests a scaled screen
+  via a [SetScale or SetScaleFactor message](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#74client-to-server-messages)
   (not tested for a long time).
   
 
