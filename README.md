@@ -248,10 +248,10 @@ bytes that get sent per framebuffer update:
   you very probably also have to change the way your framebuffer data gets written,
   so the first client-side one should be preferred.
 * Send a scaled-down version of your framebuffer. You can do the scaling in your
-  application feeding data into LibVNCServer's framebuffer (production-ready)
+  application feeding data into LibVNCServer's framebuffer (would affect all clients)
   or let LibVNCServer do the work for you if your client requests a scaled screen
   via a [SetScale or SetScaleFactor message](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#74client-to-server-messages)
-  (not tested for a long time).
+  (this is per-client scaling - UltraVNC viewers can request this).
   
 
 Commercial Use
