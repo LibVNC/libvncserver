@@ -647,6 +647,12 @@ endif(WITH_EXAMPLES)
 
 if(WITH_TESTS)
 
+# First fuzzing
+if(DEFINED ENV{LIB_FUZZING_ENGINE})
+  add_executable(fuzz_server ${TESTS_DIR}/fuzz_server.c)
+  target_link_libraries(fuzz_server vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY} $ENV{LIB_FUZZING_ENGINE})
+endif()
+
 if(UNIX)
     set(ADDITIONAL_TEST_LIBS m)
 endif(UNIX)
