@@ -1,4 +1,7 @@
 // LIBS := -lvncserver -lxcb -lxcb-xtest -lxcb-keysyms
+// XWayland not support to read screen, because wayland not allow it.
+// Read screen in wayland need use XDG desktop portals' interface `org.freedesktop.portal.Screenshot` and `org.freedesktop.portal.ScreenCast`
+// Under some environment, this code not work well, see https://github.com/LibVNC/libvncserver/pull/503#issuecomment-1064472566
 
 #include <rfb/rfb.h>
 #include <xcb/xcb.h>
@@ -136,6 +139,7 @@ void get_window_image(xcb_connection_t* conn, xcb_window_t window, uint8_t* buff
     int16_t height = 0;
     get_window_size(conn, window, &width, &height);
 
+    // will failed in wayland, xcb_get_image_data will return NULL, convert_bgrx_to_rgb will abort
     xcb_get_image_cookie_t cookie = xcb_get_image(conn, XCB_IMAGE_FORMAT_Z_PIXMAP, window, 0, 0, width, height, UINT32_MAX);
     xcb_get_image_reply_t* reply = xcb_get_image_reply(conn, cookie, NULL);
     convert_bgrx_to_rgb(xcb_get_image_data(reply), width, height, buff);
