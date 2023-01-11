@@ -1,4 +1,5 @@
-// LIBS := -lvncserver -lxcb -lxcb-xtest -lxcb-keysyms
+// Compile with LIBS := -lvncserver -lxcb -lxcb-xtest -lxcb-keysyms
+// Need CMake 3.24.0 to find these libraries. see https://cmake.org/cmake/help/v3.24/module/FindX11.html
 // XWayland not support to read screen, because wayland not allow it.
 // Read screen in wayland need use XDG desktop portals' interface `org.freedesktop.portal.Screenshot` and `org.freedesktop.portal.ScreenCast`
 // Under some environment, this code not work well, see https://github.com/LibVNC/libvncserver/pull/503#issuecomment-1064472566
