@@ -593,7 +593,7 @@ endif(ANDROID)
 if(X11_xcb_FOUND AND X11_xcb_xtest_FOUND AND X11_xcb_keysyms_FOUND)
   set(LIBVNCSERVER_EXAMPLES
     ${LIBVNCSERVER_EXAMPLES}
-    x11vncserver
+    x11
   )
 else()
   # clear NOTFOUND

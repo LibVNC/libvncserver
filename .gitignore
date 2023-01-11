@@ -34,7 +34,7 @@ examples/simple
 examples/simple15
 examples/storepasswd
 examples/vncev
-examples/x11vncserver
+examples/x11
 test/blooptest
 test/cargstest
 test/copyrecttest
