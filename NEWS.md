@@ -1,3 +1,50 @@
+# 2022-12-18: Version 0.9.14
+
+0.9.14 represents a gradual improvement over 0.9.13 with lots of developments all over
+the place. [40 issues and pull requests](https://github.com/LibVNC/libvncserver/issues?q=milestone%3A%22Release+0.9.14%22+is%3Aclosed)
+were closed/merged with this release. Highlights on the LibVNCServer side are a
+refined multi-threaded implementation, support for Unicode clipboard data 📋❗ and an
+outbound-connection machinery that works for real world use cases. LibVNCClient received
+support for [SetDesktopSize](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#setdesktopsize)
+(which had been added server-side in 0.9.13) and a properly documented SSH-tunneling
+setup.
+
+## Overall changes:
+
+  * Added more documentation (build system integration, repeater setup) and a legal FAQ.
+  * Added [contribution guidelines](CONTRIBUTING.md).
+  * Ported the TravisCI continous integration machinery to GitHub workflows.
+
+## LibVNCServer/LibVNCClient:
+
+  * Added [qemu extended key event](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#qemu-extended-key-event-message)
+    support.
+  * Fixed several potential multiplication overflows.
+
+## LibVNCClient:
+
+  * Fixes of several memory leaks and buffer overflows.
+  * Added UltraVNC's MSLogonII authentication scheme.
+  * Fixed TLS interoperability with GnuTLS servers.
+  * Fixed detection of newer UltraVNC and TightVNC servers.
+  * Added support for [SetDesktopSize](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#setdesktopsize).
+  * Added SSH tunneling example using libssh2.
+  * Added some extensions to VeNCrypt in order to be compatible with a wider range of servers.
+
+## LibVNCServer:
+
+  * Fixes to the multi-threaded server implementation which should be a lot more sound now.
+  * Fixed TightVNC-filetransfer file upload for 64-bit systems.
+  * Fixes of crashes in the zlib compression.
+  * Added support for [UTF8 clipboard data](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#extended-clipboard-pseudo-encoding).
+  * Fixed visual artifacts in framebuffer on ARM platforms.
+  * Fixed several WebSockets bugs.
+  * Fixed the UltraVNC-style repeater example. 
+  * Added support for larger framebuffers (two 4k screens possible now).
+  * Added support for timeouts for outbound connections (to repeaters for instance).
+  * Fixed out-of-bounds memory access in Tight encoding.
+
+
 # 2020-06-13: Version 0.9.13
 
 0.9.13 truly is a cross-platform release, the best we've ever done in that respect:

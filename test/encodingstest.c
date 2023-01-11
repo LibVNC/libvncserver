@@ -109,22 +109,24 @@ static rfbBool resize(rfbClient* cl) {
 	return TRUE;
 }
 
+static THREAD_ROUTINE_RETURN_TYPE clientLoop(void* data);
+
 typedef struct clientData {
 	int encodingIndex;
 	rfbScreenInfo* server;
-	char* display;
+	char display[8];
 } clientData;
 
 static void update(rfbClient* client,int x,int y,int w,int h) {
 #ifndef VERY_VERBOSE
 
-	static const char* progress="|/-\\";
+	static const char progress[]={'|','/','-','\\'};
 	static int counter=0;
 
-	if(++counter>sizeof(progress)) counter=0;
+	if(++counter>=sizeof(progress)) counter=0;
 	fprintf(stderr,"%c\r",progress[counter]);
 #else
-	clientData* cd=(clientData*)client->clientData;
+	clientData* cd = (clientData*)rfbClientGetClientData(client, clientLoop);
 	rfbClientLog("Got update (encoding=%s): (%d,%d)-(%d,%d)\n",
 			testEncodings[cd->encodingIndex].str,
 			x,y,x+w,y+h);
@@ -132,7 +134,7 @@ static void update(rfbClient* client,int x,int y,int w,int h) {
 }
 
 static void update_finished(rfbClient* client) {
-	clientData* cd=(clientData*)client->clientData;
+	clientData* cd = (clientData*)rfbClientGetClientData(client, clientLoop);
         int maxDelta=0;
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
@@ -147,10 +149,9 @@ static void update_finished(rfbClient* client) {
 			!doFramebuffersMatch(cd->server,client,maxDelta));
 }
 
-
 static THREAD_ROUTINE_RETURN_TYPE clientLoop(void* data) {
 	rfbClient* client=(rfbClient*)data;
-	clientData* cd=(clientData*)client->clientData;
+	clientData* cd = (clientData*)rfbClientGetClientData(client, clientLoop);
 
 	client->appData.encodingsString=strdup(testEncodings[cd->encodingIndex].str);
 	client->appData.qualityLevel = 7; /* ZYWRLE fails the test with standard settings */
@@ -163,6 +164,7 @@ static THREAD_ROUTINE_RETURN_TYPE clientLoop(void* data) {
 		rfbClientErr("Had problems starting client (encoding %s)\n",
 				testEncodings[cd->encodingIndex].str);
 		updateStatistics(cd->encodingIndex,TRUE);
+		free(cd);
 		return THREAD_ROUTINE_RETURN_VALUE;
 	}
 	while(1) {
@@ -170,12 +172,11 @@ static THREAD_ROUTINE_RETURN_TYPE clientLoop(void* data) {
 			if(!HandleRFBServerMessage(client))
 				break;
 	}
-	free(((clientData*)client->clientData)->display);
-	free(client->clientData);
-	client->clientData = NULL;
+
 	if(client->frameBuffer)
 		free(client->frameBuffer);
 	rfbClientCleanup(client);
+	free(cd);
 	return THREAD_ROUTINE_RETURN_VALUE;
 }
 
@@ -190,21 +191,16 @@ static void startClient(int encodingIndex,rfbScreenInfo* server) {
 	rfbClient* client=rfbGetClient(8,3,4);
 	clientData* cd;
 
-	client->clientData=malloc(sizeof(clientData));
-	if (!client->clientData) return;
+	cd=calloc(sizeof(clientData), 1);
+	if (!cd) return;
 	client->MallocFrameBuffer=resize;
 	client->GotFrameBufferUpdate=update;
 	client->FinishedFrameBufferUpdate=update_finished;
 
-	cd=(clientData*)client->clientData;
 	cd->encodingIndex=encodingIndex;
 	cd->server=server;
-	cd->display=(char*)malloc(6);
-	if (!cd->display) {
-		free(client->clientData);
-		return;
-	}
 	sprintf(cd->display,":%d",server->port-5900);
+	rfbClientSetClientData(client, clientLoop, cd);
 
 #if defined(LIBVNCSERVER_HAVE_LIBPTHREAD)
 	pthread_create(&all_threads[thread_counter++],NULL,clientLoop,(void*)client);

@@ -302,26 +302,26 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
     rfbScreen->socketState = RFB_SOCKET_SHUTDOWN;
 
     if(rfbScreen->inetdSock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->inetdSock);
 	FD_CLR(rfbScreen->inetdSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->inetdSock);
 	rfbScreen->inetdSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->listenSock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->listenSock);
 	FD_CLR(rfbScreen->listenSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->listenSock);
 	rfbScreen->listenSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->listen6Sock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->listen6Sock);
 	FD_CLR(rfbScreen->listen6Sock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->listen6Sock);
 	rfbScreen->listen6Sock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->udpSock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->udpSock);
 	FD_CLR(rfbScreen->udpSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->udpSock);
 	rfbScreen->udpSock=RFB_INVALID_SOCKET;
     }
 
@@ -545,6 +545,9 @@ rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen)
 void
 rfbCloseClient(rfbClientPtr cl)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    cl->sock = RFB_INVALID_SOCKET;
+#endif
     rfbExtensionData* extension;
 
     for(extension=cl->extensions; extension; extension=extension->next)
@@ -556,24 +559,48 @@ rfbCloseClient(rfbClientPtr cl)
     if (cl->sock != RFB_INVALID_SOCKET)
 #endif
       {
+	/* Remove client sock from allFds and adapt maxFd */
 	FD_CLR(cl->sock,&(cl->screen->allFds));
 	if(cl->sock==cl->screen->maxFd)
 	  while(cl->screen->maxFd>0
 		&& !FD_ISSET(cl->screen->maxFd,&(cl->screen->allFds)))
 	    cl->screen->maxFd--;
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	/* Has to happen before socket close as the SSL implementation might send a goodbye */
 	if (cl->sslctx)
 	    rfbssl_destroy(cl);
 	free(cl->wspath);
 #endif
-#ifndef __MINGW32__
-	shutdown(cl->sock,SHUT_RDWR);
-#endif
-	rfbCloseSocket(cl->sock);
-	cl->sock = RFB_INVALID_SOCKET;
       }
     TSIGNAL(cl->updateCond);
     UNLOCK(cl->updateMutex);
+
+    /*
+       Client socket closing, either via the client-to-server thread or directly.
+    */
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    if(cl->screen->backgroundLoop) {
+	/* Indicate to client-to-server thread that it should not go on */
+	cl->state = RFB_SHUTDOWN;
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+	/*
+	  Notify the thread. This simply writes a NULL byte to the notify pipe in order to get past the select()
+	  in clientInput(), the loop in there will then break because the client state has been set to
+	  RFB_SHUTDOWN. Client socket closing will be done by the thread.
+	*/
+	write(cl->pipe_notify_client_thread[1], "\x00", 1);
+	/*
+	  No joining of threads here, this is fire and forget.
+	*/
+#endif
+    } else
+#endif
+	/* Either no threading support or threading support with screen->backgroundloop == false */
+	{
+	    /* Close client sock */
+	    rfbCloseSocket(cl->sock);
+	    cl->sock = RFB_INVALID_SOCKET;
+	}
 }
 
 
@@ -614,6 +641,12 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
     return sock;
 }
 
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+size_t fuzz_offset;
+size_t fuzz_size;
+const uint8_t *fuzz_data;
+#endif
+
 /*
  * ReadExact reads an exact number of bytes from a client.  Returns 1 if
  * those bytes have been read, 0 if the other end has closed, or -1 if an error
@@ -623,6 +656,14 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
 int
 rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    if (fuzz_offset + len <= fuzz_size) {
+        memcpy(buf, fuzz_data + fuzz_offset, len);
+        fuzz_offset += len;
+        return 1;
+    }
+    return 0;
+#endif
     rfbSocket sock = cl->sock;
     int n;
     fd_set fds;
@@ -715,6 +756,14 @@ int rfbReadExact(rfbClientPtr cl,char* buf,int len)
 int
 rfbPeekExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    if (fuzz_offset + len <= fuzz_size) {
+        memcpy(buf, fuzz_data + fuzz_offset, len);
+        fuzz_offset += len;
+        return 1;
+    }
+    return 0;
+#endif
     rfbSocket sock = cl->sock;
     int n;
     fd_set fds;
@@ -793,6 +842,9 @@ rfbWriteExact(rfbClientPtr cl,
               const char *buf,
               int len)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    return 1;
+#endif
     rfbSocket sock = cl->sock;
     int n;
     fd_set fds;
@@ -811,6 +863,19 @@ rfbWriteExact(rfbClientPtr cl,
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
     if (cl->wsctx) {
         char *tmp = NULL;
+
+        while (len > UPDATE_BUF_SIZE) {
+            /* webSocketsEncode() can only handle data lengths up to UPDATE_BUF_SIZE
+               so split large writes into multiple smaller writes/frames */
+
+            if (rfbWriteExact(cl, buf, UPDATE_BUF_SIZE) == -1) {
+                return -1;
+            }
+
+            buf += UPDATE_BUF_SIZE;
+            len -= UPDATE_BUF_SIZE;
+        }
+
         if ((len = webSocketsEncode(cl, buf, len, &tmp)) < 0) {
             rfbErr("WriteExact: WebSockets encode error\n");
             return -1;
@@ -1042,18 +1107,30 @@ rfbConnectToTcpAddr(char *host,
         if ((sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == RFB_INVALID_SOCKET)
             continue;
 
-        if (connect(sock, p->ai_addr, p->ai_addrlen) < 0) {
-            rfbCloseSocket(sock);
-            continue;
-        }
-
-        break;
+	if (sock_set_nonblocking(sock, TRUE, rfbErr)) {
+	    if (connect(sock, p->ai_addr, p->ai_addrlen) == 0) {
+		break;
+	    } else {
+#ifdef WIN32
+		errno=WSAGetLastError();
+#endif
+		if ((errno == EWOULDBLOCK || errno == EINPROGRESS) && sock_wait_for_connected(sock, rfbMaxClientWait/1000))
+		    break;
+		rfbCloseSocket(sock);
+	    }
+	} else {
+	    rfbCloseSocket(sock);
+	}
     }
 
     /* all failed */
     if (p == NULL) {
         rfbLogPerror("rfbConnectToTcoAddr: failed to connect\n");
         sock = RFB_INVALID_SOCKET; /* set return value */
+    } else {
+	/* one succeeded, re-set to blocking */
+	if (!sock_set_nonblocking(sock, FALSE, rfbErr))
+	    rfbCloseSocket(sock);
     }
 
     /* all done with this structure now */
@@ -1079,10 +1156,27 @@ rfbConnectToTcpAddr(char *host,
 	return RFB_INVALID_SOCKET;
     }
 
-    if (connect(sock, (struct sockaddr *)&addr, (sizeof(addr))) < 0) {
+    if (!sock_set_nonblocking(sock, TRUE, rfbErr)) {
 	rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
+
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+#ifdef WIN32
+	errno=WSAGetLastError();
+#endif
+	if (!((errno == EWOULDBLOCK || errno == EINPROGRESS) && sock_wait_for_connected(sock, rfbMaxClientWait/1000))) {
+	    rfbErr("rfbConnectToTcpAddr: connect\n");
+	    rfbCloseSocket(sock);
+	    return RFB_INVALID_SOCKET;
+	}
+    }
+
+    if (!sock_set_nonblocking(sock, FALSE, rfbErr)) {
+	rfbCloseSocket(sock);
+	return RFB_INVALID_SOCKET;
+    }
+
 #endif
     return sock;
 }
@@ -1120,16 +1214,5 @@ rfbListenOnUDPPort(int port,
 rfbBool
 rfbSetNonBlocking(rfbSocket sock)
 {
-#ifdef WIN32
-  unsigned long block=1;
-  if(ioctlsocket(sock, FIONBIO, &block) == SOCKET_ERROR) {
-    errno=WSAGetLastError();
-#else
-  int flags = fcntl(sock, F_GETFL);
-  if(flags < 0 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
-#endif
-    rfbLogPerror("Setting socket to non-blocking failed");
-    return FALSE;
-  }
-  return TRUE;
+    return sock_set_nonblocking(sock, TRUE, rfbLog);
 }

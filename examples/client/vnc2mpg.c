@@ -29,6 +29,7 @@
 #include <math.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
 #include <rfb/rfbclient.h>

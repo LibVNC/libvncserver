@@ -477,7 +477,7 @@ void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor
 
    if(cursor->richSource && cursor->cleanupRichSource)
        free(cursor->richSource);
-   cp=cursor->richSource=(unsigned char*)calloc(cursor->width*bpp,cursor->height);
+   cp=cursor->richSource=(unsigned char*)calloc((size_t)cursor->width*bpp,cursor->height);
    if(!cp)
        return;
    cursor->cleanupRichSource=TRUE;
@@ -503,10 +503,11 @@ void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor
 void rfbHideCursor(rfbClientPtr cl)
 {
    rfbScreenInfoPtr s=cl->screen;
-   rfbCursorPtr c=s->cursor;
+   rfbCursorPtr c;
    int j,x1,x2,y1,y2,bpp=s->serverFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
    LOCK(s->cursorMutex);
+   c=s->cursor;
    if(!c) {
      UNLOCK(s->cursorMutex);
      return;
@@ -534,7 +535,7 @@ void rfbHideCursor(rfbClientPtr cl)
    for(j=0;j<y2;j++)
      memcpy(s->frameBuffer+(y1+j)*rowstride+x1*bpp,
 	    s->underCursorBuffer+j*x2*bpp,
-	    x2*bpp);
+	    (size_t)x2*bpp);
 
    /* Copy to all scaled versions */
    rfbScaledScreenUpdate(s, x1, y1, x1+x2, y1+y2);
@@ -545,14 +546,18 @@ void rfbHideCursor(rfbClientPtr cl)
 void rfbShowCursor(rfbClientPtr cl)
 {
    rfbScreenInfoPtr s=cl->screen;
-   rfbCursorPtr c=s->cursor;
+   rfbCursorPtr c;
    int i,j,x1,x2,y1,y2,i1,j1,bpp=s->serverFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes,
      bufSize,w;
    rfbBool wasChanged=FALSE;
 
-   if(!c) return;
    LOCK(s->cursorMutex);
+   c=s->cursor;
+   if(!c) {
+	UNLOCK(s->cursorMutex);
+	return;
+   }
 
    bufSize=c->width*c->height*bpp;
    w=(c->width+7)/8;

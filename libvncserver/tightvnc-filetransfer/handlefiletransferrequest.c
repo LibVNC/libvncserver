@@ -186,6 +186,12 @@ GetHomeDir(uid_t uid)
 	}
 	WideCharToMultiByte(CP_UTF8, 0, profileDir, -1, homedir, homedirlen, NULL, NULL);
 	CoTaskMemFree(profileDir);
+#elif defined(ANDROID) || defined(LIBVNCSERVER_HAVE_ANDROID)
+        /*
+	  On Android, each app is a separate user, so don't return its homedir
+	  here but a common public directory.
+	*/
+        homedir = strdup("/sdcard/");
 #else
 	struct passwd *pwEnt = NULL;
 

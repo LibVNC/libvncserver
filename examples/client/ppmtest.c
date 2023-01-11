@@ -102,9 +102,11 @@ main(int argc, char **argv)
 	while (time(NULL)-t<5) {
 		static int i=0;
 		fprintf(stderr,"\r%d",i++);
-		if(WaitForMessage(client,50)<0)
+		int n = WaitForMessage(client,50);
+		if(n < 0)
 			break;
-		if(!HandleRFBServerMessage(client))
+		if(n)
+		    if(!HandleRFBServerMessage(client))
 			break;
 	}
 

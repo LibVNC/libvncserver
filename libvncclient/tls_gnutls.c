@@ -22,15 +22,11 @@
 #include <gnutls/x509.h>
 #include <rfb/rfbclient.h>
 #include <errno.h>
-#ifdef WIN32
-#include <windows.h>           /* for Sleep() */
-#define sleep(X) Sleep(1000*X) /* MinGW32 has no sleep() */
-#endif
 #include "tls.h"
 
 
 static const char *rfbTLSPriority = "NORMAL:+DHE-DSS:+RSA:+DHE-RSA:+SRP";
-static const char *rfbAnonTLSPriority= "NORMAL:+ANON-DH";
+static const char *rfbAnonTLSPriority = "NORMAL:+ANON-ECDH:+ANON-DH";
 
 #define DH_BITS 1024
 static gnutls_dh_params_t rfbDHParams;
@@ -228,6 +224,27 @@ PullTLS(gnutls_transport_ptr_t transport, void *data, size_t len)
   }
 }
 
+static int
+PullTimeout(gnutls_transport_ptr_t transport, unsigned int timeout)
+{
+  rfbClient *client = (rfbClient*)transport;
+  int ret;
+
+  while (1)
+  {
+    ret = gnutls_system_recv_timeout((gnutls_transport_ptr_t)(long)client->sock, timeout);
+
+    if (ret < 0)
+    {
+#ifdef WIN32
+      WSAtoTLSErrno((gnutls_session_t*)&client->tlsSession);
+#endif
+      if (errno == EINTR) continue;
+    }
+    return ret;
+  }
+}
+
 static rfbBool
 InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
 {
@@ -251,6 +268,9 @@ InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
   gnutls_transport_set_ptr((gnutls_session_t)client->tlsSession, (gnutls_transport_ptr_t)client);
   gnutls_transport_set_push_function((gnutls_session_t)client->tlsSession, PushTLS);
   gnutls_transport_set_pull_function((gnutls_session_t)client->tlsSession, PullTLS);
+
+  gnutls_transport_set_pull_timeout_function((gnutls_session_t)client->tlsSession, PullTimeout);
+  gnutls_handshake_set_timeout((gnutls_session_t)client->tlsSession, 15000);
 
   INIT_MUTEX(client->tlsRwMutex);
 
@@ -279,27 +299,16 @@ SetTLSAnonCredential(rfbClient* client)
 static rfbBool
 HandshakeTLS(rfbClient* client)
 {
-  int timeout = 15;
   int ret;
 
-  while (timeout > 0 && (ret = gnutls_handshake((gnutls_session_t)client->tlsSession)) < 0)
+  while ((ret = gnutls_handshake((gnutls_session_t)client->tlsSession)) < 0)
   {
     if (!gnutls_error_is_fatal(ret))
     {
-      rfbClientLog("TLS handshake blocking.\n");
-      sleep(1);
-      timeout--;
+      rfbClientLog("TLS handshake got a temporary error: %s.\n", gnutls_strerror(ret));
       continue;
     }
-    rfbClientLog("TLS handshake failed: %s.\n", gnutls_strerror(ret));
-
-    FreeTLS(client);
-    return FALSE;
-  }
-
-  if (timeout <= 0)
-  {
-    rfbClientLog("TLS handshake timeout.\n");
+    rfbClientLog("TLS handshake failed: %s\n", gnutls_strerror(ret));
     FreeTLS(client);
     return FALSE;
   }
@@ -314,10 +323,9 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
 {
     uint8_t count=0;
     uint8_t loop=0;
-    uint8_t flag=0;
     uint32_t tAuth[256], t;
     char buf1[500],buf2[10];
-    uint32_t authScheme;
+    uint32_t origAuthScheme, authScheme;
 
     if (!ReadFromRFBServer(client, (char *)&count, 1)) return FALSE;
 
@@ -335,8 +343,10 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 4)) return FALSE;
         t=rfbClientSwap32IfLE(tAuth[loop]);
         rfbClientLog("%d) Received security type %d\n", loop, t);
-        if (flag) continue;
-        if (t==rfbVeNCryptTLSNone ||
+        if (t==rfbNoAuth ||
+            t==rfbVncAuth ||
+            t==rfbVeNCryptPlain ||
+            t==rfbVeNCryptTLSNone ||
             t==rfbVeNCryptTLSVNC ||
             t==rfbVeNCryptTLSPlain ||
 #ifdef LIBVNCSERVER_HAVE_SASL
@@ -347,11 +357,16 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
             t==rfbVeNCryptX509VNC ||
             t==rfbVeNCryptX509Plain)
         {
-            flag++;
-            authScheme=t;
-            rfbClientLog("Selecting security type %d (%d/%d in the list)\n", authScheme, loop, count);
-            /* send back 4 bytes (in original byte order!) indicating which security type to use */
-            if (!WriteToRFBServer(client, (char *)&tAuth[loop], 4)) return FALSE;
+            if (
+                authScheme==0 ||
+                authScheme==rfbNoAuth ||
+                authScheme==rfbVncAuth ||
+                authScheme==rfbVeNCryptPlain)
+            {
+                /* for security reasons, the encrypted type has a higher priority */
+                origAuthScheme=tAuth[loop];
+                authScheme=t;
+            }
         }
         tAuth[loop]=t;
     }
@@ -367,6 +382,12 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
         rfbClientLog("Unknown VeNCrypt authentication scheme from VNC server: %s\n",
                buf1);
         return FALSE;
+    }
+    else
+    {
+        rfbClientLog("Selecting security type %d\n", authScheme);
+        /* send back 4 bytes (in original byte order!) indicating which security type to use */
+        if (!WriteToRFBServer(client, (char *)&origAuthScheme, 4)) return FALSE;
     }
     *result = authScheme;
     return TRUE;
@@ -459,8 +480,6 @@ HandleVeNCryptAuth(rfbClient* client)
   gnutls_certificate_credentials_t x509_cred = NULL;
   int ret;
 
-  if (!InitializeTLS()) return FALSE;
-
   /* Read VeNCrypt version */
   if (!ReadFromRFBServer(client, (char *)&major, 1) ||
       !ReadFromRFBServer(client, (char *)&minor, 1))
@@ -489,16 +508,18 @@ HandleVeNCryptAuth(rfbClient* client)
   }
 
   if (!ReadVeNCryptSecurityType(client, &authScheme)) return FALSE;
-  if (!ReadFromRFBServer(client, (char *)&status, 1) || status != 1)
-  {
-    rfbClientLog("Server refused VeNCrypt authentication %d (%d).\n", authScheme, (int)status);
-    return FALSE;
-  }
   client->subAuthScheme = authScheme;
 
-  /* Some VeNCrypt security types are anonymous TLS, others are X509 */
   switch (authScheme)
   {
+    /* Unencrypted types do not require additional actions */
+    case rfbNoAuth:
+    case rfbVncAuth:
+    case rfbVeNCryptPlain:
+      return TRUE;
+      break;
+
+    /* Some VeNCrypt security types are anonymous TLS, others are X509 */
     case rfbVeNCryptTLSNone:
     case rfbVeNCryptTLSVNC:
     case rfbVeNCryptTLSPlain:
@@ -507,10 +528,20 @@ HandleVeNCryptAuth(rfbClient* client)
 #endif /* LIBVNCSERVER_HAVE_SASL */
       anonTLS = TRUE;
       break;
+
     default:
       anonTLS = FALSE;
       break;
   }
+
+  /* Ack is only requred for the encrypted connection */
+  if (!ReadFromRFBServer(client, (char *)&status, 1) || status != 1)
+  {
+    rfbClientLog("Server refused VeNCrypt authentication %d (%d).\n", authScheme, (int)status);
+    return FALSE;
+  }
+
+  if (!InitializeTLS()) return FALSE;
 
   /* Get X509 Credentials if it's not anonymous */
   if (!anonTLS)

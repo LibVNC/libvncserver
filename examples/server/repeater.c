@@ -1,4 +1,28 @@
-/* This example shows how to connect to an UltraVNC repeater. */
+/**
+    This example shows how to connect to an UltraVNC repeater.
+
+    To get you started, you will need the actual repeater.
+    Here's a non-exhaustive link list, some have install instructions,
+    some don't:
+
+    * The official UltraVNC repeater for Windows: https://uvnc.com/downloads/repeater/83-repeater-downloads.html
+    * The Linux port of the UltraVNC repeater, linked (but not made) by TurboVNC: https://turbovnc.org/Documentation/UltraVNCRepeater
+    * An enhanced versions of x11vnc's Perl implementation: https://github.com/tomka/ultravnc-repeater
+
+    After installing and running, you simply connect this server example via
+    `./repeater <id> <repeater-host> [<repeater-port>]`, where 'id' is a number.
+
+    For an UltraVNC repeater, the server will then show up in the
+    "Waiting servers" list of the repeater's web interface.
+
+    To connect with say the example SDLvncviewer, run
+    `./SDLvncviewer -repeaterdest ID:<id> <repeater-host>:[<repeater-port>]`
+    where 'id' is the same number you used with the server example above.
+
+    If the ids match, the repeater will then forward packets in between
+    the connected server and client. That's it!
+
+ */
 
 #include <rfb/rfb.h>
 
@@ -50,6 +74,9 @@ int main(int argc,char** argv)
   server->port = -1; /* do not listen on any port */
   server->ipv6port = -1; /* do not listen on any port */
 
+  /* Make sure to call this _before_ connecting out to the repeater */
+  rfbInitServer(server);
+
   sock = rfbConnectToTcpAddr(repeaterHost, repeaterPort);
   if (sock == RFB_INVALID_SOCKET) {
     perror("connect to repeater");
@@ -68,7 +95,6 @@ int main(int argc,char** argv)
   cl->clientGoneHook = clientGone;
 
   /* Run the server */
-  rfbInitServer(server);
   rfbRunEventLoop(server,-1,FALSE);
 
   return 0;

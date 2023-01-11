@@ -319,37 +319,6 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 }
 
 
-static rfbBool WaitForConnected(int socket, unsigned int secs)
-{
-  fd_set writefds;
-  fd_set exceptfds;
-  struct timeval timeout;
-
-  timeout.tv_sec=secs;
-  timeout.tv_usec=0;
-
-  FD_ZERO(&writefds);
-  FD_SET(socket, &writefds);
-  FD_ZERO(&exceptfds);
-  FD_SET(socket, &exceptfds);
-  if (select(socket+1, NULL, &writefds, &exceptfds, &timeout)==1) {
-#ifdef WIN32
-    if (FD_ISSET(socket, &exceptfds))
-      return FALSE;
-#else
-    int so_error;
-    socklen_t len = sizeof so_error;
-    getsockopt(socket, SOL_SOCKET, SO_ERROR, &so_error, &len);
-    if (so_error!=0)
-      return FALSE;
-#endif
-    return TRUE;
-  }
-
-  return FALSE;
-}
-
-
 rfbSocket
 ConnectClientToTcpAddr(unsigned int host, int port)
 {
@@ -388,7 +357,7 @@ ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int time
 #ifdef WIN32
     errno=WSAGetLastError();
 #endif
-    if (!((errno == EWOULDBLOCK || errno == EINPROGRESS) && WaitForConnected(sock, timeout))) {
+    if (!((errno == EWOULDBLOCK || errno == EINPROGRESS) && sock_wait_for_connected(sock, timeout))) {
       rfbClientErr("ConnectToTcpAddr: connect\n");
       rfbCloseSocket(sock);
       return RFB_INVALID_SOCKET;
@@ -450,7 +419,7 @@ ConnectClientToTcpAddr6WithTimeout(const char *hostname, int port, unsigned int 
 #ifdef WIN32
           errno=WSAGetLastError();
 #endif
-          if ((errno == EWOULDBLOCK || errno == EINPROGRESS) && WaitForConnected(sock, timeout))
+          if ((errno == EWOULDBLOCK || errno == EINPROGRESS) && sock_wait_for_connected(sock, timeout))
             break;
           rfbCloseSocket(sock);
           sock = RFB_INVALID_SOCKET;
@@ -524,7 +493,7 @@ ConnectClientToUnixSockWithTimeout(const char *sockFile, unsigned int timeout)
     return RFB_INVALID_SOCKET;
 
   if (connect(sock, (struct sockaddr *)&addr, sizeof(addr.sun_family) + strlen(addr.sun_path)) < 0 &&
-      !(errno == EINPROGRESS && WaitForConnected(sock, timeout))) {
+      !(errno == EINPROGRESS && sock_wait_for_connected(sock, timeout))) {
     rfbClientErr("ConnectToUnixSock: connect\n");
     rfbCloseSocket(sock);
     return RFB_INVALID_SOCKET;
@@ -725,35 +694,13 @@ AcceptTcpConnection(rfbSocket listenSock)
 rfbBool
 SetNonBlocking(rfbSocket sock)
 {
-#ifdef WIN32
-  unsigned long block=1;
-  if(ioctlsocket(sock, FIONBIO, &block) == SOCKET_ERROR) {
-    errno=WSAGetLastError();
-#else
-  int flags = fcntl(sock, F_GETFL);
-  if(flags < 0 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
-#endif
-    rfbClientErr("Setting socket to non-blocking failed: %s\n",strerror(errno));
-    return FALSE;
-  }
-  return TRUE;
+    return sock_set_nonblocking(sock, TRUE, rfbClientErr);
 }
 
 
 rfbBool SetBlocking(rfbSocket sock)
 {
-#ifdef WIN32
-  unsigned long block=0;
-  if(ioctlsocket(sock, FIONBIO, &block) == SOCKET_ERROR) {
-    errno=WSAGetLastError();
-#else
-  int flags = fcntl(sock, F_GETFL);
-  if(flags < 0 || fcntl(sock, F_SETFL, flags & ~O_NONBLOCK) < 0) {
-#endif
-    rfbClientErr("Setting socket to blocking failed: %s\n",strerror(errno));
-    return FALSE;
-  }
-  return TRUE;
+    return sock_set_nonblocking(sock, FALSE, rfbClientErr);
 }
 
 
@@ -812,7 +759,7 @@ SetDSCP(rfbSocket sock, int dscp)
 rfbBool
 StringToIPAddr(const char *str, unsigned int *addr)
 {
-  struct hostent *hp;
+  struct addrinfo hints, *res;
 
   if (strcmp(str,"") == 0) {
     *addr = htonl(INADDR_LOOPBACK); /* local */
@@ -824,16 +771,19 @@ StringToIPAddr(const char *str, unsigned int *addr)
   if (*addr != -1)
     return TRUE;
 
-  hp = gethostbyname(str);
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family   = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
 
-  if (hp) {
-    *addr = *(unsigned int *)hp->h_addr;
+  if (getaddrinfo(str, NULL, &hints, &res) == 0) {
+    *addr = (((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr);
+    freeaddrinfo(res);
+
     return TRUE;
   }
 
   return FALSE;
 }
-
 
 /*
  * Test if the other end of a socket is on the same machine.
