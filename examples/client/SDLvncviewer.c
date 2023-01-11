@@ -299,6 +299,9 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		SendFramebufferUpdateRequest(cl, 0, 0,
 					cl->width, cl->height, FALSE);
 		break;
+	    case SDL_WINDOWEVENT_RESIZED:
+	        SendExtDesktopSize(cl, e->window.data1, e->window.data2);
+	        break;
 	    case SDL_WINDOWEVENT_FOCUS_GAINED:
                 if (SDL_HasClipboardText()) {
 		        char *text = SDL_GetClipboardText();

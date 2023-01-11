@@ -48,7 +48,6 @@ vncterm/example
 /vncterm/linuxvnc
 /vncterm/vncommand
 CMakeCache.txt
-*.cmake
 /CMakeFiles
 /rfbproto.pdf
 /rfbproto.rst

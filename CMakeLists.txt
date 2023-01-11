@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.4)
 
-project(LibVNCServer VERSION 0.9.13 LANGUAGES C)
+project(LibVNCServer VERSION 0.9.14 LANGUAGES C)
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckIncludeFile)
@@ -19,8 +19,8 @@ set(PROJECT_BUGREPORT_PATH "https://github.com/LibVNC/libvncserver/issues")
 set(LIBVNCSERVER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver)
 set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/common)
 set(LIBVNCCLIENT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncclient)
-set(LIBVNCSRVEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples)
-set(LIBVNCCLIEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/client_examples)
+set(LIBVNCSRVEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples/server)
+set(LIBVNCCLIEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples/client)
 set(TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
@@ -46,6 +46,7 @@ option(WITH_JPEG "Search for the libjpeg compression library to support addition
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
 option(WITH_GTK "Search for the GTK library to build an example GTK vnc client" ON)
+option(WITH_LIBSSH2 "Search for libssh2 to build an example ssh-tunneled client" ON)
 option(WITH_THREADS "Search for a threading library to build with multithreading support" ON)
 option(PREFER_WIN32THREADS "When searching for a threading library, prefer win32 threads if they are found" OFF)
 option(WITH_GNUTLS "Search for the GnuTLS secure communications library to support TLS" ON)
@@ -139,13 +140,17 @@ if(WITH_GTK)
   find_package(GTK2)
 endif(WITH_GTK)
 
+if(WITH_LIBSSH2)
+  find_package(LibSSH2)
+endif(WITH_LIBSSH2)
+
 if(WITH_THREADS)
   find_package(Threads)
 endif(WITH_THREADS)
 
 
 if(WITH_GNUTLS)
-  find_package(GnuTLS)
+  find_package(GnuTLS 3.4.0)
 endif(WITH_GNUTLS)
 
 
@@ -256,11 +261,11 @@ endif(SYSTEMD_FOUND)
 if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
   message(STATUS "Building crypto with Libgcrypt")
   set(CRYPTO_LIBRARIES ${LIBGCRYPT_LIBRARIES})
-  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt)
+  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt.c)
 elseif(OPENSSL_FOUND)
   message(STATUS "Building crypto with OpenSSL")
   set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
-  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl)
+  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl.c)
 else()
   message(STATUS "Building crypto with builtin functions, only including SHA1 and D3DES")
   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_included.c ${COMMON_DIR}/sha1.c ${COMMON_DIR}/d3des.c)
@@ -373,6 +378,7 @@ set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/draw.c
     ${LIBVNCSERVER_DIR}/selbox.c
     ${COMMON_DIR}/vncauth.c
+    ${COMMON_DIR}/sockets.c
     ${LIBVNCSERVER_DIR}/cargs.c
     ${LIBVNCSERVER_DIR}/ultra.c
     ${LIBVNCSERVER_DIR}/scale.c
@@ -385,6 +391,7 @@ set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/rfbproto.c
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
+    ${COMMON_DIR}/sockets.c
     ${CRYPTO_SOURCES}
 )
 
@@ -616,6 +623,17 @@ if(GTK2_FOUND)
   )
 endif(GTK2_FOUND)
 
+if(LIBSSH2_FOUND AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
+  include_directories(${LIBSSH2_INCLUDE_DIR})
+  set(LIBVNCCLIENT_EXAMPLES
+    ${LIBVNCCLIENT_EXAMPLES}
+    sshtunnel
+  )
+endif()
+# if not found, set lib var to empty, otherwise CMake complains
+if(NOT LIBSSH2_FOUND)
+  set(LIBSSH2_LIBRARY "")
+endif()
 
 if(FFMPEG_FOUND)
   set(LIBVNCCLIENT_EXAMPLES
@@ -628,15 +646,15 @@ if(WITH_EXAMPLES)
   foreach(e ${LIBVNCSERVER_EXAMPLES})
     add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
     set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
-    set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
+    set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/server)
     target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY} ${X11_xcb_LIB} ${X11_xcb_xtest_LIB} ${X11_xcb_keysyms_LIB})
   endforeach(e ${LIBVNCSERVER_EXAMPLES})
 
   foreach(e ${LIBVNCCLIENT_EXAMPLES})
     add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
     set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
-    set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
-    target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES})
+    set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/client)
+    target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES} ${LIBSSH2_LIBRARY})
   endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 endif(WITH_EXAMPLES)
 
@@ -645,6 +663,12 @@ endif(WITH_EXAMPLES)
 #
 
 if(WITH_TESTS)
+
+# First fuzzing
+if(DEFINED ENV{LIB_FUZZING_ENGINE})
+  add_executable(fuzz_server ${TESTS_DIR}/fuzz_server.c)
+  target_link_libraries(fuzz_server vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY} $ENV{LIB_FUZZING_ENGINE})
+endif()
 
 if(UNIX)
     set(ADDITIONAL_TEST_LIBS m)
@@ -743,9 +767,9 @@ function(get_link_libraries OUT TARGET)
 endfunction()
 
 get_link_libraries(PRIVATE_LIBS vncserver)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
 get_link_libraries(PRIVATE_LIBS vncclient)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
 
 if(LIBVNCSERVER_INSTALL)
     set(INSTALL_HEADER_FILES

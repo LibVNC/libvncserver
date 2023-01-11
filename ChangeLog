@@ -1,3 +1,684 @@
+2022-12-18  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: document Changelog update tool
+
+2022-12-18  Christian Beier <info@christianbeier.net>
+
+	* NEWS.md: NEWS: add intro and highlights of v0.9.14 re #542
+
+2022-12-18  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: update section about server-side scaling ...as this has been tested now with UltraVNC.  Closes #373
+
+2022-12-18  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: mention needed client msg for server-side
+	scaling re #373
+
+2022-12-18  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt: CMake: set version to 0.9.14 re #542
+
+2022-12-04  Christian Beier <info@christianbeier.net>
+
+	* webclients/novnc: webclients: update noVNC to v1.3.0
+
+2022-12-04  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: update release guidelines
+
+2022-12-04  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: fix reversed RFB operation logic
+
+2022-12-04  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: list some 'slow link' strategies re #373
+
+2022-12-04  Christian Beier <info@christianbeier.net>
+
+	* rfb/rfb.h: docs: add TOC to LibVNCServer doxygen docu
+
+2022-12-03  Christian Beier <info@christianbeier.net>
+
+	* NEWS.md: NEWS: update for v0.9.14
+
+2022-12-02  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: add one more release checklist item
+
+2022-12-02  Christian Beier <info@christianbeier.net>
+
+	* AUTHORS: AUTHORS: add new contributors since v0.9.13
+
+2022-11-13  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt, common/sockets.c, common/sockets.h,
+	libvncclient/sockets.c, rfb/rfbconfig.h.cmakein: Revert
+	"libvncclient: use poll() if available" This reverts commit 993df68933db378ba862af05809d6e4938333d6e.  The new poll() functionality broke connecting a LibVNCServer-based
+	server to an RFB repeater, so reverting this for now.  Closes https://github.com/bk138/droidVNC-NG/issues/109
+
+2022-11-03  Christian Beier <info@christianbeier.net>
+
+	* cmake/Modules/FindLibSSH2.cmake: build: add FindLibSSH2.cmake Closes #539
+
+2022-11-03  Christian Beier <info@christianbeier.net>
+
+	* .gitignore: .gitignore: don't ignore *.cmake re #539
+
+2022-10-05  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: add release checklist
+
+2022-10-05  Christian Beier <info@christianbeier.net>
+
+	* .travis.yml: TravisCI: remove
+
+2022-10-05  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: exchange TravisCI badge with GitHub one
+
+2022-10-05  Christian Beier <info@christianbeier.net>
+
+	* .github/workflows/ci.yml: .github: port TravisCI to GitHub
+	workflow
+
+2022-10-05  Christian Beier <info@christianbeier.net>
+
+	* cmake/Toolchain-cross-mingw32-linux.cmake: CMake: default to
+	64-bit wine in toolchain file
+
+2022-10-05  Christian Beier <info@christianbeier.net>
+
+	* common/sockets.c: common: fix sockets compilation w/ XCode13
+
+2022-09-22  Tobias Junghans <tobydox@veyon.io>
+
+	* libvncserver/tight.c: tight: fix OOB memory accesses As of 7124b5fbcf0df8db4d3f73023d77af6ea56409e7 the maximum rect
+	width and size are equal for every compression level so we can
+	easily save the LUT entries by using constants instead.  This fixes OOB memory accesses in rfbNumCodedRectsTight() when being
+	called by rfbSendFramebufferUpdate() before SendRectEncodingTight()
+	is being called the first time (which limits cl->tightCompressLevel
+	to the size of tightConf).
+
+2022-09-22  Tobias Junghans <tobydox@veyon.io>
+
+	* rfb/rfb.h: rfb: remove unused variable declaration
+
+2022-09-24  Christian Beier <info@christianbeier.net>
+
+	* common/sockets.c: common: fix typo in sock_set_nonblocking() Closes #535
+
+2022-08-23  Tobias Junghans <tobydox@veyon.io>
+
+	* CMakeLists.txt, common/sockets.c, common/sockets.h,
+	libvncclient/sockets.c, rfb/rfbconfig.h.cmakein: libvncclient: use
+	poll() if available select() does not work with file descriptors > 1024 so use the more
+	modern poll() function if available.
+
+2022-08-11  Maksym Sobolyev <sobomax@sippysoft.com>
+
+	* libvncserver/cursor.c: libvncserver: ensure cursorMutex is locked
+	before cursor access This fixes multiple crashes with VirtualBox 6.1.x running Ubuntu
+	22.04 guest when remote cursor is enabled (TightVNC client).
+
+2022-08-11  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/httpd.c, libvncserver/sockets.c: libvncserver: clear
+	fd sets before closing sockets This caused fdsan aborts due to
+	0c9e68a9cc0abd8eda232bad169a62ff352fc571.
+
+2022-08-11  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/sockets.c: libvncserver: make rfbConnectToTCPAddr()
+	time out ...using rfbMaxClientWait for now.  Closes #532
+
+2022-08-11  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt, common/sockets.c, common/sockets.h,
+	libvncclient/sockets.c, libvncserver/sockets.c: common: move here
+	two socket helper functions from server and client re #532
+
+2022-08-11  Christian Beier <info@christianbeier.net>
+
+	* Doxyfile: docs: don't show internals in Doxygen-docs
+
+2022-08-09  Christian Beier <cb@shoutrlabs.com>
+
+	* libvncclient/rfbproto.c: libvncclient: prevent acting on
+	ExtendedDesktopSize with 0 dimensions This is sent by UltraVNC 1.3.2 at least.
+
+2022-08-05  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/main.c: libvncserver: prevent cursor drawing during
+	framebuffer exchange Fixes segfaults in rfbHideCursor(), maybe elsewhere, too.
+
+2022-08-05  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/main.c: libvncserver: lock out client reads during
+	framebuffer exchange Closes #435
+
+2022-08-05  Maxim Devaev <mdevaev@gmail.com>
+
+	* CMakeLists.txt, libvncclient/tls_gnutls.c: libvncclient: use
+	gnutls_handshake_set_timeout()
+
+2022-08-05  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/tight.c: libvncserver/tight: avoid division-by-zero
+
+2022-08-04  Christian Beier <info@christianbeier.net>
+
+	* rfb/rfbproto.h: rfb/rfbproto: extend rfbCloseSocket() to prevent
+	double closes Specifically on Android newer 11, this would cause aborts by the
+	fdsan checker, see
+
+	https://developer.android.com/about/versions/11/behavior-changes-all#fdsanIt's also generally safer to mark a closed fd as closed as to not
+	try to re-use it.
+
+2022-08-04  Maxim Devaev <mdevaev@gmail.com>
+
+	* libvncclient/tls_gnutls.c: libvncclient: rfbAnonTLSPriority =
+	"NORMAL:+ANON-ECDH:+ANON-DH" (#530) I.e. added ANON-ECDH just for better compatibility. Taken from
+	TigerVNC.
+
+2022-08-04  Maxim Devaev <mdevaev@gmail.com>
+
+	* libvncclient/rfbproto.c, libvncclient/tls_gnutls.c,
+	libvncclient/tls_openssl.c: libvncclient: allow non-encrypted
+	subauth methods inside VeNCrypt (#529) Following https://github.com/LibVNC/libvncserver/issues/458 rfbNoAuth and rfbVncAuth are not actually part of VeNCrypt, however
+	it is important to support them to ensure better compatibility.
+	When establishing a connection, the client does not know whether the
+	server supports encryption, and always prefers VeNCrypt if enabled
+	Next, if encryption is not available on the server, the connection
+	will fail. Since the RFB doesn't have any downgrade methods in case
+	of failure, a client that does not support unencrypted VeNCrypt
+	methods will never be able to connect.  rfbVeNCryptPlain is also supported for better compatibility.  The RFB specification also considers any ordinary subauths are
+	valid, which legitimizes this solution: -
+
+	https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#vencrypt> any of the normal VNC security types (except VeNCrypt) may be sent For security and backward compatibility reasons, encrypted
+	connections take precedence over unencrypted ones
+
+2022-08-03  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/main.c, libvncserver/sockets.c, rfb/rfb.h: 
+	libvncserver: indicate client thread end by other means than sock v2 This is a less intrusive version of
+	336fc84ed055577473df738239dc342426a1ba08 Before, the client-to-server thread would end when the client's
+	socket was set to RFB_INVALID_SOCKET. However, there's a race
+	condition where the client's socket can be set to invalid while the
+	client-to-server thread is in select(), causing
+	https://github.com/bk138/droidVNC-NG/issues/8.  Fix this by: * introducing an additional RFB_SHUTDOWN state for clients * use this as an end condition in the client-to-server thread
+	  instead of the socket * move the self-pipe notification to rfbCloseClient from   rfbShutdownServer, but only pthread_join() in rfbShutdownServer
+
+2022-07-24  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/main.c, libvncserver/sockets.c, rfb/rfb.h: Revert
+	"libvncserver: indicate client thread end by other means than
+	socket" This reverts commit 336fc84ed055577473df738239dc342426a1ba08.  Waiting for the client-to-server thread to finish in
+	rfbCloseClient() caused deadlocks in production environments.  Revert the patch and redo in a little bit less intrusive way.
+
+2022-07-18  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/main.c, libvncserver/sockets.c, rfb/rfb.h: 
+	libvncserver: indicate client thread end by other means than socket Before, the client-to-server thread would end when the client's
+	socket was set to RFB_INVALID_SOCKET. However, there's a race
+	condition where the client's socket can be set to invalid while the
+	client-to-server thread is in select(), causing
+	https://github.com/bk138/droidVNC-NG/issues/8.  Fix this by: * introducing an additional RFB_SHUTDOWN state for clients * use this as an end condition in the client-to-server thread
+	  instead of the socket * move the self-pipe notification to rfbCloseClient from   rfbShutdownServer.
+
+2022-07-18  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/rfbserver.c: libvncserver: ensure refCount==0 when
+	disconnecting other clients The idea is taken from rfbShutdownServer().
+
+2022-07-14  Tobias Junghans <tobydox@veyon.io>
+
+	* libvncclient/rfbproto.c: libvncclient: add missing return value to
+	SendExtDesktopSize
+
+2022-07-14  Christian Beier <info@christianbeier.net>
+
+	* examples/example.c: examples/blooptest: add a way of shutting down
+	from the main thread
+
+2022-07-05  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt, client_examples/sshtunnel.c: client_examples: add
+	SSH tunneling example using libssh2
+
+2022-06-23  badda71 <webersebastian@yahoo.de>
+
+	* libvncclient/sockets.c: libvncclient: replace gethostbyname() with
+	getaddrinfo() man gethostbyname: "The gethostbyname*(), gethostbyaddr*(),
+	herror(), and hstrerror() functions are obsolete.  Applications
+	should use getaddrinfo(3), getnameinfo(3), and gai_strerror(3)
+	instead." Furthermore, the man page states that `gethostbyname()` is
+	MT-Unsafe, probably due to the fact that it retuns a pointer to
+	static data. Thus, by using `getaddrinfo()`, we improve the
+	multithreading soundness of LibVNCClient.
+
+2022-06-16  Christian Beier <info@christianbeier.net>
+
+	* client_examples/ppmtest.c: client_examples/ppmtest: only handle
+	message if wait yielded one This is more correct and in line with the other examples.
+
+2022-05-12  Fabrice Fontaine <fontaine.fabrice@gmail.com>
+
+	* common/crypto_openssl.c: common/crypto_openssl.c: fix build with
+	libressl >= 3.5.0 (#522) Fix the following build failure with libressl >= 3.5.0:
+	/nvmedata/autobuild/instance-26/output-1/build/libvncserver-0.9.13/common/crypto_openssl.c: In function 'dh_generate_keypair':
+	/nvmedata/autobuild/instance-26/output-1/build/libvncserver-0.9.13/common/crypto_openssl.c:149:7: error: dereferencing pointer to incomplete type 'DH' {aka 'struct dh_st'}  149 |     dh->p = BN_bin2bn(prime, keylen, NULL);       |       ^~ Fixes:  -
+
+	http://autobuild.buildroot.org/results/49b3940b9d0432cb5fb0c5d22dfa017b18c6e233Signed-off-by: Fabrice Fontaine <fontaine.fabrice@gmail.com>
+
+2022-05-10  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: document transport and encryption support
+
+2022-05-09  Christian Beier <info@christianbeier.net>
+
+	* rfb/rfb.h: rfb/rfb.h: increase UPDATE_BUF_SIZE by 2768 bytes Simply raise the default to 32768 which is not an awful lot of an
+	increase and should not hurt the embedded guys.  If someone needs more, we can still go down the malloc() route and
+	make the buffer size configurable, but leave this to the users to
+	request and KISS for now.  Closes #521
+
+2022-05-08  Christian Beier <info@christianbeier.net>
+
+	* examples/repeater.c: examples: extend repeater docs with a HOWTO
+	for an UltraVNC repeater Closes #87
+
+2022-05-07  Christian Beier <info@christianbeier.net>
+
+	* examples/repeater.c: examples: fix repeater rfbInitServer(), which zeros out all the server's fds, was called
+	after the client was connected, essentially erasing info about the
+	just-made connection.  Call it before connecting out so that the new client's info
+	persists.  Closes #465
+
+2022-04-28  Antenore Gatta <antenore@simbiosi.org>
+
+	* client_examples/vnc2mpg.c: client_examples: explicitly include
+	avcodec.h for ffmpeg example Build fails with the master branch of FFmpeg with these kinds of
+	errors: ``` ../client_examples/vnc2mpg.c:55:5: error: unknown type name
+	     ‘AVCodecContext’ AVCodecContext *enc;      ^~~~~~~~~~~~~~ ``` This patch adds `libavcodec/avcodec.h` in vnc2mpg.c
+
+2022-04-27  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: add a commercial use FAQ Closes #437
+
+2022-04-27  Christian Beier <info@christianbeier.net>
+
+	* TODO.md: TODO: delete and create/update issues #515, #396, #516, #517, #518, #519
+
+2022-04-19  Christian Beier <info@christianbeier.net>
+
+	* rfb/rfbclient.h: rfb/rfbclient: document new screen member re #511, #341
+
+2022-04-19  Marco Fortina <102903237+marcofortina@users.noreply.github.com>
+
+	* client_examples/SDLvncviewer.c, libvncclient/rfbproto.c,
+	libvncclient/vncviewer.c, rfb/rfbclient.h: libvncclient: add support
+	for SetDesktopSize This adds support for
+
+	https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#setdesktopsize in libvncclient.Closes #341, closes #452.
+
+2022-04-16  Alex Converse <alex.converse@gmail.com>
+
+	* test/encodingstest.c: test/encodingstest: fix some ASAN issues - rfbClientCleanup which is automatically in some failure scenarios   tries to interepret client data as rfbClientData - sizeof char pointer vs array
+
+2022-04-14  Alex Converse <alex.converse@gmail.com>
+
+	* libvncserver/translate.c: libvncserver: fix pixel format equality
+	for different values of trueColour Compare boolean truthiness only. The spec implies that only zero vs
+	non-zero matters.
+	https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#setpixelformat
+
+2022-04-10  maxnet <bos@je-eigen-domein.nl>
+
+	* libvncserver/sockets.c, libvncserver/websockets.c: libvncserver:
+	fix buffer overflow in webSocketsEncodeHybi() The websocket code has internal buffers that expect data not to be
+	larger than UPDATE_BUF_SIZE - Modify rfbWriteExact() to split larger writes in multiple   frames.  - Let webSocketsEncodeHybi() return -1 if somebody else   tries to pass a too large buffer to it.    (While in the libvncserver code rfbWriteExact() is the only   function that calls websocketEncode(), it is exposed by rfb.h,   so could theoretically also be called from application code) Closes #484 Signed-off-by: Floris Bos <bos@je-eigen-domein.nl>
+
+2022-04-10  maxnet <bos@je-eigen-domein.nl>
+
+	* libvncserver/main.c, libvncserver/private.h,
+	libvncserver/rfbserver.c, libvncserver/tight.c,
+	libvncserver/zlib.c, rfb/rfb.h: libvncserver: remove thread local
+	storage in Tight and Zlib handling ...to prevent artifacts on ARM platform (#490) * zlib encoding: remove use of TLS variables Use the beforeEncBuf/afterEncBuf members of rfbClientRec that are
+	used by multiple encodings as buffers, instead of TLS variables.  Fixes memory leak in which buffers were never free'd on client
+	disconnect.  (rfbZlibCleanup() never did anything, as it was not
+	called from the client output thread in which the buffer's where
+	malloc'ed.  Cannot see the value of TLS variables from other
+	threads.  beforeEncBuf/AfterEncBuf does get freed by existing code in
+	rfbClientConnectionGone() ) Signed-off-by: Floris Bos <bos@je-eigen-domein.nl> * tightvnc encoding: remove use of TLS variables - Moves some TLS variables to rfbClientRec. Palette to stack.  - Prevents artifacts on ARM platform   Closes #363   Closes #442   Closes #451 - Fixes memory leak in which buffers are not free'd after client   disconnect.  Signed-off-by: Floris Bos <bos@je-eigen-domein.nl> * Tight: make CodeQL happy Co-authored-by: Christian Beier <info@christianbeier.net>
+
+2022-04-06  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c: 
+	libvncserver: fix Tight file transfer root for Android
+
+2022-04-06  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/tightvnc-filetransfer/rfbtightserver.c: libvncserver:
+	init Tight file transfer also if no cmdline args there
+
+2022-04-06  Christian Beier <info@christianbeier.net>
+
+	* examples/filetransfer.c: examples: register extension before
+	rfbGetScreen()
+
+2022-03-30  dsilakov <dsilakov@gmail.com>
+
+	* libvncserver/websockets.c: libvncserver: prevent crash on
+	incomplete WebSocket handshake
+
+2022-03-30  Thorsten Scherer <t.scherer@eckelmann.de>
+
+	* CMakeLists.txt: CMake: Make Source file extensions explicit Compiling using version 3.20.5 cmake yields a warning like the
+	following: CMake Warning (dev) at CMakeLists.txt:490 (add_library):   Policy CMP0115 is not set: Source file extensions must be
+	  explicit.  Run "cmake --help-policy CMP0115" for policy details.
+	  Use the cmake_policy command to set the policy and suppress this
+	warning.    File:     /<build-path>/libvncserver-0.9.13/common/crypto_libgcrypt.c Fix this warning by adding the file extension.  While doing this make the extension for crypto_openssl explicit as
+	well.  Signed-off-by: Thorsten Scherer <t.scherer@eckelmann.de>
+
+2022-03-18  Alex Converse <alex.converse@gmail.com>
+
+	* rfb/rfb.h: libvncserver: fix ABI compatility with v0.9.13 Move added rfbScreenInfo member to the end of the struct.  Fixes https://github.com/LibVNC/libvncserver/issues/507
+
+2022-03-16  badda71 <webersebastian@yahoo.de>
+
+	* libvncclient/rfbproto.c: libvncclient: detect UltraVNC and
+	TightVNC servers by security type ...in addition to using the legacy way of checking RFB protocol
+	versions.  Closes #505
+
+2022-03-05  Tobias Junghans <tobydox@veyon.io>
+
+	* libvncclient/cursor.c, libvncserver/cursor.c,
+	libvncserver/hextile.c, libvncserver/selbox.c, libvncserver/tight.c: 
+	Fix potential multiplication overflows (#504)
+
+2022-02-15  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt: CMake: check for htobe64 in sys/endian.h as well Closes #499 Credits and thanks go to Derek Schrock for pointing this out.
+
+2022-02-15  Derek Schrock <dereks@lifeofadishwasher.com>
+
+	* libvncserver/websockets.c, libvncserver/ws_decode.h: 
+	libvncserver/ws_decode: include endian.h in ws_decode.h
+
+2022-01-23  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/rfbssl_gnutls.c: libvncserver/rfbssl_gnutls: fix
+	crash when no -sslcertfile set Actually bail out on the same condition as rfbssl_openssl does.  Spotted by Joel Hutchinson <joelhutchinson407@gmail.com>, thanks!
+
+2022-01-20  Gaurav Ujjwal <gujjwal00@gmail.com>
+
+	* libvncclient/tls_openssl.c: libvncclient/tls_openssl: Update
+	anonymous cipher list (#494) Using 'aNULL' enables anonymous Elliptic Curve cipher suits.  It
+	improves compatibility with some TLS libraries, e.g. GnuTLS.  Ref: https://www.openssl.org/docs/man1.1.1/man1/ciphers.html
+
+2021-12-10  archont94 <radoslaw.karasinski@gmail.com>
+
+	* CMakeLists.txt: CMake: allow to build without examples or tests Co-authored-by: archont94 <radoslaw.karasinski+github@gmail.com>
+
+2021-12-08  Christian Beier <info@christianbeier.net>
+
+	* CONTRIBUTING.md: CONTRIBUTING: add (some) contribution guidelines
+
+2021-12-01  archont94 <radoslaw.karasinski@gmail.com>
+
+	* libvncserver/main.c,
+	libvncserver/tightvnc-filetransfer/rfbtightserver.c, rfb/rfb.h,
+	rfb/rfbregion.h: libvncserver: change functions taking no args from
+	f() to f(void) ... as () means any number of arguments opposed to (void) which
+	means none.
+
+2021-09-27  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: document how to use in common buildsystems
+	(#481)
+
+2021-09-26  Kang Lin <kl222@126.com>
+
+	* CMakeLists.txt, cmake/Modules/LibVNCServerConfig.cmake.in: CMake:
+	add cmake configure files (#472)
+
+2021-09-22  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: document that UltraVNC MSLogonII is now
+	supported re #480
+
+2021-09-22  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: let TravisCI badge point to travis-ci.com
+
+2021-09-22  Kyle Evans <kevans91@users.noreply.github.com>
+
+	* libvncclient/rfbproto.c, rfb/rfbproto.h: libvncclient: implement
+	UltraVNC's MSLogonII authentication scheme (#480) UltraVNC's MSLogonII protocol is relatively simple; the server sends
+	along DH parameters, we generate a shared secret, and we encrypt
+	both the username and password with it. The pubkey, username, and
+	password then get written back to the server.  Fixes #372
+
+2021-07-19  Christian Beier <info@christianbeier.net>
+
+	* libvncclient/zrle.c: libvncclient: fix stack buffer overflow in
+	ZRLE handler The for loop iterates 'type' times which could exceed the former
+	palette array size 16. Fix this by increasing the palette array
+	size.  Spotted by Max Hofmann, thanks!
+
+2021-07-19  Christian Beier <info@christianbeier.net>
+
+	* libvncclient/trle.c: libvncclient: guard against another buffer
+	overflow in TRLE handling Spotted by Ilja Van Sprundel, thanks!
+
+2021-07-14  Christian Beier <info@christianbeier.net>
+
+	* libvncclient/tight.c: libvncclient: guard against heap overflow in
+	Tight encoding Spotted by Lukas Kupczyk, thanks!
+
+2021-07-14  Christian Beier <info@christianbeier.net>
+
+	* libvncclient/ultra.c: libvncclient: handle negative payload sizes
+	for ultra encoding Spotted by Lukas Kupczyk, thanks!
+
+2021-06-12  Christian Beier <cb@shoutrlabs.com>
+
+	* CMakeLists.txt: CMake: improve libjpeg-turbo fallback check
+
+2021-06-12  Christian Beier <cb@shoutrlabs.com>
+
+	* CMakeLists.txt: CMake: fix TurboVNC-related regex
+
+2021-06-12  Christian Beier <cb@shoutrlabs.com>
+
+	* CMakeLists.txt: CMake: test jpeglib.h header for TurboVNC if
+	compile check fails
+
+2021-05-22  Christian Beier <info@christianbeier.net>
+
+	* libvncclient/trle.c: libvnclient: guard against buffer overflow in
+	TRLE handling Spotted by Max Hofmann, thanks!
+
+2021-06-04  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/rfbserver.c: libvncserver: ensure reverse conn is
+	started in threaded mode
+
+2021-05-28  Ryo Ota <nwtgck@nwtgck.org>
+
+	* examples/mac.c: examples/mac: fix a typo
+
+2021-05-26  Tobias Junghans <tobydox@veyon.io>
+
+	* libvncserver/rfbserver.c: libvncserver: pass unsigned char
+	pointers to zlib
+
+2021-05-26  Tobias Junghans <tobydox@veyon.io>
+
+	* libvncserver/rfbserver.c: libvncserver: fix string truncation
+	warning Calling snprintf with two arguments already containing up to
+	MAX_PATH bytes causes some GCC versions to complain about potential
+	string truncation: libvncserver/rfbserver.c: In function 'rfbSendDirContent': libvncserver/rfbserver.c:1396:50: error: '%s' directive output may
+	be truncated writing up to 255 bytes into a region of size between 0
+	and 259 [-Werror=format-truncation=]      snprintf(retfilename,sizeof(retfilename),"%s/%s", path,
+	     direntp->d_name);                                                   ^~ libvncserver/rfbserver.c:1396:5: note: 'snprintf' output between 2
+	and 516 bytes into a destination of size 260      snprintf(retfilename,sizeof(retfilename),"%s/%s", path,
+	     direntp->d_name);
+	^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~This can be fixed easily by doubling the size of retfilename.
+
+2021-05-22  Christian Beier <info@christianbeier.net>
+
+	* libvncclient/vncviewer.c: libvncclient: ensure framebuffer alloc
+	doesn't leave dangling pointer Could happen when the size check failed: it would potentially leave
+	client->frameBuffer as a free()'d but non-NULL pointer which other
+	parts of the lib or application code could interpret as usable.  Pointed out by Ilja Van Sprundel, thanks!
+
+2021-05-13  Dinglan Peng <pengdinglan@gmail.com>
+
+	* libvncserver/main.c, libvncserver/rfbserver.c, rfb/rfb.h,
+	rfb/rfbproto.h: libvncserver: add support for UTF8 clipboard Tested against TigerVNC and a modified version of x11vnc:
+	https://github.com/pdlan/x11vnc
+
+2021-05-02  Christian Beier <info@christianbeier.net>
+
+	* .travis.yml: TravisCI: use MacOS 10.14
+
+2021-04-26  Christian Beier <info@christianbeier.net>
+
+	* rfb/rfb.h: rfb.h: document that extension supports TightVNC-1.3.x
+	file transfer Closes #467
+
+2021-04-26  Christian Beier <info@christianbeier.net>
+
+	* examples/filetransfer.c: examples: document that this is about
+	TightVNC-1.3.x file transfer re #467
+
+2020-12-14  Christian Beier <info@christianbeier.net>
+
+	* : Merge pull request #454 from timgates42/bugfix_typo_functions docs: fix simple typo, funtions -> functions
+
+2020-12-02  Christian Beier <info@christianbeier.net>
+
+	* : Merge pull request #453 from any1/qemu-extended-key-event libvncclient: add qemu extended key event
+
+2020-11-30  Andri Yngvason <andri@yngvason.is>
+
+	* rfb/rfbproto.h: rfb/rfbproto: Add qemu extended key event
+
+2020-11-21  Christian Beier <info@christianbeier.net>
+
+	* libvncclient/vncviewer.c: libvncclient: free vncRec memory in
+	rfbClientCleanup() Otherwise we leak memory. Spotted by Ramin Farajpour Cami
+	<ramin.blackhat@gmail.com>, thanks!
+
+2020-10-13  gitdevmod <djdomics@gmail.com>
+
+	* client_examples/vnc2mpg.c: vnc2mpg: fix building on Windows 10 Fix compilation on Windows 10/mingw
+
+2020-10-06  Christian Beier <info@christianbeier.net>
+
+	* .github/workflows/codeql-analysis.yml: Create codeql-analysis.yml
+
+2020-09-16  sanjay-cpu <66668807+sanjay-cpu@users.noreply.github.com>
+
+	* .travis.yml: TravisCI: add support for ppc64le
+
+2020-09-16  Jonas �dahl <jadahl@gmail.com>
+
+	* libvncserver/zlib.c: zlib: Clear buffer pointers on cleanup (#444) The pointers to the buffers were freed, and the size fields were set
+	to 0, but the buffer pointers themsef was not set to NULL, when
+	shutting down, meaning the next time used, NULL checks would not
+	tell whether the pointer is valid. This caused crashes ending with   #0  0x00007ffff73729e5 in raise () from /lib64/libc.so.6   #1  0x00007ffff735b895 in abort () from /lib64/libc.so.6   #2  0x00007ffff73b6857 in __libc_message () from /lib64/libc.so.6   #3  0x00007ffff73bdd7c in malloc_printerr () from /lib64/libc.so.6   #4  0x00007ffff73c2f1a in realloc () from /lib64/libc.so.6   #5  0x00007ffff78b558e in rfbSendOneRectEncodingZlib (cl=0x4a4b80,
+	  x=0, y=0, w=800, h=40) at
+	  /home/jonas/Dev/gnome/libvncserver/libvncserver/zlib.c:106 #6
+	  0x00007ffff78b5dec in rfbSendRectEncodingZlib (cl=0x4a4b80, x=0,
+	  y=0, w=800, h=600) at
+	  /home/jonas/Dev/gnome/libvncserver/libvncserver/zlib.c:308 #7
+	  0x00007ffff7899453 in rfbSendFramebufferUpdate (cl=0x4a4b80,
+	  givenUpdateRegion=0x49ef70) at
+	  /home/jonas/Dev/gnome/libvncserver/libvncserver/rfbserver.c:3264
+	#8  0x00007ffff789079d in rfbUpdateClient (cl=0x4a4b80) at
+	  /home/jonas/Dev/gnome/libvncserver/libvncserver/main.c:1275 #9
+	0x00007ffff78905f5 in rfbProcessEvents (screen=0x4d5790, usec=0) at
+	/home/jonas/Dev/gnome/libvncserver/libvncserver/main.c:1251
+
+2020-08-09  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/auth.c: libvncserver/auth: don't keep security
+	handlers from previous runs Whyohsoever security handlers are stored in a variable global to the
+	application, not in the rfbScreen struct. This meant that security
+	handlers registered once would stick around forever before this
+	commit.
+
+2020-08-07  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/tightvnc-filetransfer/filetransfermsg.c: 
+	libvncserver/tightvnc-filetransfer: fix ZeroSizeDataMsg send for
+	64bit systems
+
+2020-08-07  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c: 
+	libvncserver/tightvnc-filetransfer: frame msg send with sendMutex
+	locking
+
+2020-08-07  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/scale.c: libvncserver/scale: add sendMutex locking to
+	ResizeFrameBuffer msg send
+
+2020-08-04  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/tightvnc-filetransfer/handlefiletransferrequest.c: 
+	tightvnc-filetransfer: fix file upload for 64-bit systems Before, the server would read more than the actually sent 4 byte
+	time stamp, missing the next message's header and in turn treating
+	message payload as header data.
+
+2020-07-21  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/main.c: libvncserver: move self-pipe check in client
+	thread before any FD_ISSET ...and jump to loop start on encountering something in the
+	self-pipe.  Rationale is that on some platforms FD_ISSET(-1) triggers `FORTIFY:
+	FD_ISSET: file descriptor -1 < 0`. This is the case on Android, for
+	instance.
+
+2020-07-21  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/main.c, rfb/rfb.h: libvncserver: properly end
+	listener thread on shutdown ... by using the self-pipe trick.
+
+2020-07-20  Christian Beier <info@christianbeier.net>
+
+	* libvncserver/main.c: libvncserver: don't NULL out internal of the
+	default cursor ...otherwise an rfbScreen created after rfbScreenCleanup() was
+	called gets assigned an invalid cursor struct.
+
+2020-07-01  Christian Beier <info@christianbeier.net>
+
+	* NEWS.md: NEWS: mention the CVEs closed by 0.9.13
+
+2020-06-25  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt: CMake: only add turbojpeg test if configured
+	WITH_JPEG Closes #430
+
+2020-06-25  Alexander Tsoy <alexander@tsoy.me>
+
+	* CMakeLists.txt, test/includetest.sh: test: fix includetest to use
+	CMAKE_MAKE_PROGRAM (#431) includetest currently fais if, for example, ninja is used as a CMake
+	generator. Fix it by using CMAKE_MAKE_PROGRAM in the test.
+
+2020-06-17  efim bushmanov <66992851+efimbushmanov@users.noreply.github.com>
+
+	* libvncserver/rfbserver.c: libvncserver: be more clear about code
+	intention * fix "backgroundLoop != FALSE" means true thingy, add missed
+	screen->backgroundLoop check if LIBPTHREAD defined * fix "small improv Co-authored-by: Efim Bushmanov <you@example.com>
+
+2020-06-13  Christian Beier <info@christianbeier.net>
+
+	* ChangeLog: Update ChangeLog for 0.9.13 Closes #376
+
 2020-06-13  Christian Beier <info@christianbeier.net>
 
 	* NEWS.md: NEWS: update

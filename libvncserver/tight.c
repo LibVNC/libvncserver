@@ -52,29 +52,14 @@
 #define MIN_SOLID_SUBRECT_SIZE  2048
 #define MAX_SPLIT_TILE_SIZE       16
 
-/*
- * There is so much access of the Tight encoding static data buffers
- * that we resort to using thread local storage instead of having
- * per-client data.
- */
-#if defined(__GNUC__)
-#define TLS __thread
-#elif defined(_MSC_VER)
-#define TLS __declspec(thread)
-#else
-#define TLS
-#endif
-
-/* This variable is set on every rfbSendRectEncodingTight() call. */
-static TLS rfbBool usePixelFormat24 = FALSE;
-
+#define TIGHT_MAX_RECT_SIZE    65536
+#define TIGHT_MAX_RECT_WIDTH    2048
 
 /* Compression level stuff. The following array contains various
    encoder parameters for each of 10 compression levels (0..9).
    Last three parameters correspond to JPEG quality levels (0..9). */
 
 typedef struct TIGHT_CONF_s {
-    int maxRectSize, maxRectWidth;
     int monoMinRectSize;
     int idxZlibLevel, monoZlibLevel, rawZlibLevel;
     int idxMaxColorsDivisor;
@@ -82,10 +67,10 @@ typedef struct TIGHT_CONF_s {
 } TIGHT_CONF;
 
 static TIGHT_CONF tightConf[4] = {
-    { 65536, 2048,   6, 0, 0, 0,   4, 24 }, /* 0  (used only without JPEG) */
-    { 65536, 2048,  32, 1, 1, 1,  96, 24 }, /* 1 */
-    { 65536, 2048,  32, 3, 3, 2,  96, 96 }, /* 2  (used only with JPEG) */
-    { 65536, 2048,  32, 7, 7, 5,  96, 256 } /* 9 */
+    {  6, 0, 0, 0,   4, 24 }, /* 0  (used only without JPEG) */
+    { 32, 1, 1, 1,  96, 24 }, /* 1 */
+    { 32, 3, 3, 2,  96, 96 }, /* 2  (used only with JPEG) */
+    { 32, 7, 7, 5,  96, 256 } /* 9 */
 };
 
 #ifdef LIBVNCSERVER_HAVE_LIBPNG
@@ -106,10 +91,6 @@ static TIGHT_PNG_CONF tightPngConf[10] = {
     { 9, PNG_ALL_FILTERS },
 };
 #endif
-
-static TLS int compressLevel = 1;
-static TLS int qualityLevel = 95;
-static TLS int subsampLevel = TJ_444;
 
 static const int subsampLevel2tjsubsamp[4] = {
     TJ_444, TJ_420, TJ_422, TJ_GRAYSCALE
@@ -133,41 +114,18 @@ typedef struct PALETTE_s {
     PALETTE_ENTRY entry[256];
     COLOR_LIST *hash[256];
     COLOR_LIST list[256];
-} PALETTE;
+    int numColors;
+    int maxColors;
+    uint32_t monoBackground;
+    uint32_t monoForeground;
+} PALETTE, *palettePtr;
 
-/* TODO: move into rfbScreen struct */
-static TLS int paletteNumColors = 0;
-static TLS int paletteMaxColors = 0;
-static TLS uint32_t monoBackground = 0;
-static TLS uint32_t monoForeground = 0;
-static TLS PALETTE palette;
-
-/* Pointers to dynamically-allocated buffers. */
-
-static TLS int tightBeforeBufSize = 0;
-static TLS char *tightBeforeBuf = NULL;
-
-static TLS int tightAfterBufSize = 0;
-static TLS char *tightAfterBuf = NULL;
-
-static TLS tjhandle j = NULL;
-
-void rfbTightCleanup (rfbScreenInfoPtr screen)
+void rfbFreeTightData (rfbClientPtr cl)
 {
-    if (tightBeforeBufSize) {
-        free (tightBeforeBuf);
-        tightBeforeBufSize = 0;
-        tightBeforeBuf = NULL;
-    }
-    if (tightAfterBufSize) {
-        free (tightAfterBuf);
-        tightAfterBufSize = 0;
-        tightAfterBuf = NULL;
-    }
-	if (j) {
-		tjDestroy(j);
+    if (cl->tightTJ) {
+        tjDestroy(cl->tightTJ);
 		/* Set freed resource handle to 0! */
-		j = 0;
+        cl->tightTJ = 0;
 	}
 }
 
@@ -194,33 +152,33 @@ static rfbBool SendRectSimple    (rfbClientPtr cl, int x, int y, int w, int h);
 static rfbBool SendSubrect       (rfbClientPtr cl, int x, int y, int w, int h);
 
 static rfbBool SendSolidRect     (rfbClientPtr cl);
-static rfbBool SendMonoRect      (rfbClientPtr cl, int x, int y, int w, int h);
-static rfbBool SendIndexedRect   (rfbClientPtr cl, int x, int y, int w, int h);
+static rfbBool SendMonoRect      (rfbClientPtr cl, int x, int y, int w, int h, uint32_t monoForeground, uint32_t monoBackground);
+static rfbBool SendIndexedRect   (palettePtr palette, rfbClientPtr cl, int x, int y, int w, int h);
 static rfbBool SendFullColorRect (rfbClientPtr cl, int x, int y, int w, int h);
 
 static rfbBool CompressData (rfbClientPtr cl, int streamId, int dataLen,
                              int zlibLevel, int zlibStrategy);
 
-static void FillPalette8 (int count);
-static void FillPalette16 (int count);
-static void FillPalette32 (int count);
-static void FastFillPalette16 (rfbClientPtr cl, uint16_t *data, int w,
+static void FillPalette8 (palettePtr palette, rfbClientPtr cl, int count);
+static void FillPalette16 (palettePtr palette, rfbClientPtr cl, int count);
+static void FillPalette32 (palettePtr palette, rfbClientPtr cl, int count);
+static void FastFillPalette16 (palettePtr palette, rfbClientPtr cl, uint16_t *data, int w,
                                int pitch, int h);
-static void FastFillPalette32 (rfbClientPtr cl, uint32_t *data, int w,
+static void FastFillPalette32 (palettePtr palette, rfbClientPtr cl, uint32_t *data, int w,
                                int pitch, int h);
 
-static void PaletteReset (void);
-static int PaletteInsert (uint32_t rgb, int numPixels, int bpp);
+static void PaletteReset (palettePtr palette);
+static int PaletteInsert (palettePtr palette, uint32_t rgb, int numPixels, int bpp);
 
 static void Pack24 (rfbClientPtr cl, char *buf, rfbPixelFormat *fmt,
                     int count);
 
-static void EncodeIndexedRect16 (uint8_t *buf, int count);
-static void EncodeIndexedRect32 (uint8_t *buf, int count);
+static void EncodeIndexedRect16 (palettePtr palette, uint8_t *buf, int count);
+static void EncodeIndexedRect32 (palettePtr palette, uint8_t *buf, int count);
 
-static void EncodeMonoRect8 (uint8_t *buf, int w, int h);
-static void EncodeMonoRect16 (uint8_t *buf, int w, int h);
-static void EncodeMonoRect32 (uint8_t *buf, int w, int h);
+static void EncodeMonoRect8 (uint8_t *buf, int w, int h, uint32_t monoBackground);
+static void EncodeMonoRect16 (uint8_t *buf, int w, int h, uint32_t monoBackground);
+static void EncodeMonoRect32 (uint8_t *buf, int w, int h, uint32_t monoBackground);
 
 static rfbBool SendJpegRect (rfbClientPtr cl, int x, int y, int w, int h,
                              int quality);
@@ -245,7 +203,6 @@ rfbNumCodedRectsTight(rfbClientPtr cl,
                       int w,
                       int h)
 {
-    int maxRectSize, maxRectWidth;
     int subrectMaxWidth, subrectMaxHeight;
 
     /* No matter how many rectangles we will send if LastRect markers
@@ -253,13 +210,10 @@ rfbNumCodedRectsTight(rfbClientPtr cl,
     if (cl->enableLastRectEncoding && w * h >= MIN_SPLIT_RECT_SIZE)
         return 0;
 
-    maxRectSize = tightConf[compressLevel].maxRectSize;
-    maxRectWidth = tightConf[compressLevel].maxRectWidth;
-
-    if (w > maxRectWidth || w * h > maxRectSize) {
-        subrectMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
-        subrectMaxHeight = maxRectSize / subrectMaxWidth;
-        return (((w - 1) / maxRectWidth + 1) *
+    if (w > TIGHT_MAX_RECT_WIDTH || w * h > TIGHT_MAX_RECT_SIZE) {
+        subrectMaxWidth = (w > TIGHT_MAX_RECT_WIDTH) ? TIGHT_MAX_RECT_WIDTH : w;
+        subrectMaxHeight = TIGHT_MAX_RECT_SIZE / subrectMaxWidth;
+        return (((w - 1) / TIGHT_MAX_RECT_WIDTH + 1) *
                 ((h - 1) / subrectMaxHeight + 1));
     } else {
         return 1;
@@ -304,10 +258,6 @@ SendRectEncodingTight(rfbClientPtr cl,
 
     rfbSendUpdateBuf(cl);
 
-    compressLevel = cl->tightCompressLevel;
-    qualityLevel = cl->turboQualityLevel;
-    subsampLevel = cl->turboSubsampLevel;
-
     /* We only allow compression levels that have a demonstrable performance
        benefit.  CL 0 with JPEG reduces CPU usage for workloads that have low
        numbers of unique colors, but the same thing can be accomplished by
@@ -317,14 +267,14 @@ SendRectEncodingTight(rfbClientPtr cl,
        high-color workloads, CL 1 should always be used, as higher compression
        levels increase CPU usage for these workloads without providing any
        significant reduction in bandwidth. */
-    if (qualityLevel != -1) {
-        if (compressLevel < 1) compressLevel = 1;
-        if (compressLevel > 2) compressLevel = 2;
+    if (cl->turboQualityLevel != -1) {
+        if (cl->tightCompressLevel < 1) cl->tightCompressLevel = 1;
+        if (cl->tightCompressLevel > 2) cl->tightCompressLevel = 2;
     }
 
     /* With JPEG disabled, CL 2 offers no significant bandwidth savings over
        CL 1, so we don't include it. */
-    else if (compressLevel > 1) compressLevel = 1;
+    else if (cl->tightCompressLevel > 1) cl->tightCompressLevel = 1;
 
     /* CL 9 (which maps internally to CL 3) is included mainly for backward
        compatibility with TightVNC Compression Levels 5-9.  It should be used
@@ -332,45 +282,43 @@ SendRectEncodingTight(rfbClientPtr cl,
        benefit.  For low-color workloads, it provides typically only 10-20%
        better compression than CL 2 with JPEG and CL 1 without JPEG, and it
        uses, on average, twice as much CPU time. */
-    if (cl->tightCompressLevel == 9) compressLevel = 3;
+    if (cl->tightCompressLevel == 9) cl->tightCompressLevel = 3;
 
     if ( cl->format.depth == 24 && cl->format.redMax == 0xFF &&
          cl->format.greenMax == 0xFF && cl->format.blueMax == 0xFF ) {
-        usePixelFormat24 = TRUE;
+        cl->tightUsePixelFormat24 = TRUE;
     } else {
-        usePixelFormat24 = FALSE;
+        cl->tightUsePixelFormat24 = FALSE;
     }
 
     if (!cl->enableLastRectEncoding || w * h < MIN_SPLIT_RECT_SIZE)
         return SendRectSimple(cl, x, y, w, h);
 
-    /* Make sure we can write at least one pixel into tightBeforeBuf. */
+    /* Make sure we can write at least one pixel into cl->beforeEncBuf. */
 
-    if (!tightBeforeBuf || tightBeforeBufSize < 4) {
-        if (tightBeforeBuf == NULL)
-            tightBeforeBuf = (char *)malloc(4);
+    if (!cl->beforeEncBuf || cl->beforeEncBufSize < 4) {
+        if (cl->beforeEncBuf == NULL)
+            cl->beforeEncBuf = (char *)malloc(4);
         else {
-            char *reallocedBeforeEncBuf = (char *)realloc(tightBeforeBuf, 4);
+            char *reallocedBeforeEncBuf = (char *)realloc(cl->beforeEncBuf, 4);
             if (!reallocedBeforeEncBuf) return FALSE;
-            tightBeforeBuf = reallocedBeforeEncBuf;
+            cl->beforeEncBuf = reallocedBeforeEncBuf;
         }
-        if(!tightBeforeBuf)
+        if(!cl->beforeEncBuf)
         {
             rfbLog("SendRectEncodingTight: failed to allocate memory\n");
             return FALSE;
         }
-        tightBeforeBufSize = 4;
+        cl->beforeEncBufSize = 4;
     }
 
     /* Calculate maximum number of rows in one non-solid rectangle. */
 
     {
-        int maxRectSize, maxRectWidth, nMaxWidth;
+        int nMaxWidth;
 
-        maxRectSize = tightConf[compressLevel].maxRectSize;
-        maxRectWidth = tightConf[compressLevel].maxRectWidth;
-        nMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
-        nMaxRows = maxRectSize / nMaxWidth;
+        nMaxWidth = (w > TIGHT_MAX_RECT_WIDTH) ? TIGHT_MAX_RECT_WIDTH : w;
+        nMaxRows = TIGHT_MAX_RECT_SIZE / nMaxWidth;
     }
 
     /* Try to find large solid-color areas and send them separately. */
@@ -396,7 +344,7 @@ SendRectEncodingTight(rfbClientPtr cl,
 
             if (CheckSolidTile(cl, dx, dy, dw, dh, &colorValue, FALSE)) {
 
-                if (subsampLevel == TJ_GRAYSCALE && qualityLevel != -1) {
+                if (cl->turboSubsampLevel == TJ_GRAYSCALE && cl->turboQualityLevel != -1) {
                     uint32_t r = (colorValue >> 16) & 0xFF;
                     uint32_t g = (colorValue >> 8) & 0xFF;
                     uint32_t b = (colorValue) & 0xFF;
@@ -443,7 +391,7 @@ SendRectEncodingTight(rfbClientPtr cl,
                          (x_best * (cl->scaledScreen->bitsPerPixel / 8)));
 
                 (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
-                                   &cl->format, fbptr, tightBeforeBuf,
+                                   &cl->format, fbptr, cl->beforeEncBuf,
                                    cl->scaledScreen->paddedWidthInBytes, 1, 1);
 
                 if (!SendSolidRect(cl))
@@ -623,54 +571,50 @@ static rfbBool
 SendRectSimple(rfbClientPtr cl, int x, int y, int w, int h)
 {
     int maxBeforeSize, maxAfterSize;
-    int maxRectSize, maxRectWidth;
     int subrectMaxWidth, subrectMaxHeight;
     int dx, dy;
     int rw, rh;
 
-    maxRectSize = tightConf[compressLevel].maxRectSize;
-    maxRectWidth = tightConf[compressLevel].maxRectWidth;
-
-    maxBeforeSize = maxRectSize * (cl->format.bitsPerPixel / 8);
+    maxBeforeSize = TIGHT_MAX_RECT_SIZE * (cl->format.bitsPerPixel / 8);
     maxAfterSize = maxBeforeSize + (maxBeforeSize + 99) / 100 + 12;
 
-    if (!tightBeforeBuf || tightBeforeBufSize < maxBeforeSize) {
-        if (tightBeforeBuf == NULL)
-            tightBeforeBuf = (char *)malloc(maxBeforeSize);
+    if (!cl->beforeEncBuf || cl->beforeEncBufSize < maxBeforeSize) {
+        if (cl->beforeEncBuf == NULL)
+            cl->beforeEncBuf = (char *)malloc(maxBeforeSize);
         else {
-            char *reallocedBeforeEncBuf = (char *)realloc(tightBeforeBuf, maxBeforeSize);
+            char *reallocedBeforeEncBuf = (char *)realloc(cl->beforeEncBuf, maxBeforeSize);
             if (!reallocedBeforeEncBuf) return FALSE;
-            tightBeforeBuf = reallocedBeforeEncBuf;
+            cl->beforeEncBuf = reallocedBeforeEncBuf;
         }
-        if (tightBeforeBuf)
-            tightBeforeBufSize = maxBeforeSize;
+        if (cl->beforeEncBuf)
+            cl->beforeEncBufSize = maxBeforeSize;
     }
 
-    if (!tightAfterBuf || tightAfterBufSize < maxAfterSize) {
-        if (tightAfterBuf == NULL)
-            tightAfterBuf = (char *)malloc(maxAfterSize);
+    if (!cl->afterEncBuf || cl->afterEncBufSize < maxAfterSize) {
+        if (cl->afterEncBuf == NULL)
+            cl->afterEncBuf = (char *)malloc(maxAfterSize);
         else {
-            char *reallocedAfterEncBuf = (char *)realloc(tightAfterBuf, maxAfterSize);
+            char *reallocedAfterEncBuf = (char *)realloc(cl->afterEncBuf, maxAfterSize);
             if (!reallocedAfterEncBuf) return FALSE;
-            tightAfterBuf = reallocedAfterEncBuf;
+            cl->afterEncBuf = reallocedAfterEncBuf;
         }
-        if(tightAfterBuf)
-            tightAfterBufSize = maxAfterSize;
+        if(cl->afterEncBuf)
+            cl->afterEncBufSize = maxAfterSize;
     }
 
-    if (!tightBeforeBuf || !tightAfterBuf)
+    if (!cl->beforeEncBuf || !cl->afterEncBuf)
     {
         rfbLog("SendRectSimple: failed to allocate memory\n");
         return FALSE;
     }
 
-    if (w > maxRectWidth || w * h > maxRectSize) {
-        subrectMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
-        subrectMaxHeight = maxRectSize / subrectMaxWidth;
+    if (w > TIGHT_MAX_RECT_WIDTH || w * h > TIGHT_MAX_RECT_SIZE) {
+        subrectMaxWidth = (w > TIGHT_MAX_RECT_WIDTH) ? TIGHT_MAX_RECT_WIDTH: w;
+        subrectMaxHeight = TIGHT_MAX_RECT_SIZE / subrectMaxWidth;
 
         for (dy = 0; dy < h; dy += subrectMaxHeight) {
-            for (dx = 0; dx < w; dx += maxRectWidth) {
-                rw = (dx + maxRectWidth < w) ? maxRectWidth : w - dx;
+            for (dx = 0; dx < w; dx += TIGHT_MAX_RECT_WIDTH) {
+                rw = (dx + TIGHT_MAX_RECT_WIDTH < w) ? TIGHT_MAX_RECT_WIDTH : w - dx;
                 rh = (dy + subrectMaxHeight < h) ? subrectMaxHeight : h - dy;
                 if (!SendSubrect(cl, x + dx, y + dy, rw, rh))
                     return FALSE;
@@ -692,6 +636,7 @@ SendSubrect(rfbClientPtr cl,
             int h)
 {
     char *fbptr;
+    PALETTE palette;
     rfbBool success = FALSE;
 
     /* Send pending data if there is more than 128 bytes. */
@@ -707,15 +652,15 @@ SendSubrect(rfbClientPtr cl,
              + (cl->scaledScreen->paddedWidthInBytes * y)
              + (x * (cl->scaledScreen->bitsPerPixel / 8)));
 
-    if (subsampLevel == TJ_GRAYSCALE && qualityLevel != -1)
-        return SendJpegRect(cl, x, y, w, h, qualityLevel);
+    if (cl->turboSubsampLevel == TJ_GRAYSCALE && cl->turboQualityLevel != -1)
+        return SendJpegRect(cl, x, y, w, h, cl->turboQualityLevel);
 
-    paletteMaxColors = w * h / tightConf[compressLevel].idxMaxColorsDivisor;
-    if(qualityLevel != -1)
-        paletteMaxColors = tightConf[compressLevel].palMaxColorsWithJPEG;
-    if ( paletteMaxColors < 2 &&
-         w * h >= tightConf[compressLevel].monoMinRectSize ) {
-        paletteMaxColors = 2;
+    palette.maxColors = w * h / tightConf[cl->tightCompressLevel].idxMaxColorsDivisor;
+    if(cl->turboQualityLevel != -1)
+        palette.maxColors = tightConf[cl->tightCompressLevel].palMaxColorsWithJPEG;
+    if ( palette.maxColors < 2 &&
+         w * h >= tightConf[cl->tightCompressLevel].monoMinRectSize ) {
+        palette.maxColors = 2;
     }
 
     if (cl->format.bitsPerPixel == cl->screen->serverFormat.bitsPerPixel &&
@@ -728,43 +673,43 @@ SendSubrect(rfbClientPtr cl,
            with JPEG, since it is unnecessary */
         switch (cl->format.bitsPerPixel) {
         case 16:
-            FastFillPalette16(cl, (uint16_t *)fbptr, w,
+            FastFillPalette16(&palette, cl, (uint16_t *)fbptr, w,
                               cl->scaledScreen->paddedWidthInBytes / 2, h);
             break;
         default:
-            FastFillPalette32(cl, (uint32_t *)fbptr, w,
+            FastFillPalette32(&palette, cl, (uint32_t *)fbptr, w,
                               cl->scaledScreen->paddedWidthInBytes / 4, h);
         }
 
-        if(paletteNumColors != 0 || qualityLevel == -1) {
+        if(palette.numColors != 0 || cl->turboQualityLevel == -1) {
             (*cl->translateFn)(cl->translateLookupTable,
                                &cl->screen->serverFormat, &cl->format, fbptr,
-                               tightBeforeBuf,
+                               cl->beforeEncBuf,
                                cl->scaledScreen->paddedWidthInBytes, w, h);
         }
     }
     else {
         (*cl->translateFn)(cl->translateLookupTable, &cl->screen->serverFormat,
-                           &cl->format, fbptr, tightBeforeBuf,
+                           &cl->format, fbptr, cl->beforeEncBuf,
                            cl->scaledScreen->paddedWidthInBytes, w, h);
 
         switch (cl->format.bitsPerPixel) {
         case 8:
-            FillPalette8(w * h);
+            FillPalette8(&palette, cl, w * h);
             break;
         case 16:
-            FillPalette16(w * h);
+            FillPalette16(&palette, cl, w * h);
             break;
         default:
-            FillPalette32(w * h);
+            FillPalette32(&palette, cl, w * h);
         }
     }
 
-    switch (paletteNumColors) {
+    switch (palette.numColors) {
     case 0:
         /* Truecolor image */
-        if (qualityLevel != -1) {
-            success = SendJpegRect(cl, x, y, w, h, qualityLevel);
+        if (cl->turboQualityLevel != -1) {
+            success = SendJpegRect(cl, x, y, w, h, cl->turboQualityLevel);
         } else {
             success = SendFullColorRect(cl, x, y, w, h);
         }
@@ -775,11 +720,11 @@ SendSubrect(rfbClientPtr cl,
         break;
     case 2:
         /* Two-color rectangle */
-        success = SendMonoRect(cl, x, y, w, h);
+        success = SendMonoRect(cl, x, y, w, h, palette.monoForeground, palette.monoBackground);
         break;
     default:
         /* Up to 256 different colors */
-        success = SendIndexedRect(cl, x, y, w, h);
+        success = SendIndexedRect(&palette, cl, x, y, w, h);
     }
     return success;
 }
@@ -825,8 +770,8 @@ SendSolidRect(rfbClientPtr cl)
 {
     int len;
 
-    if (usePixelFormat24) {
-        Pack24(cl, tightBeforeBuf, &cl->format, 1);
+    if (cl->tightUsePixelFormat24) {
+        Pack24(cl, cl->beforeEncBuf, &cl->format, 1);
         len = 3;
     } else
         len = cl->format.bitsPerPixel / 8;
@@ -837,7 +782,7 @@ SendSolidRect(rfbClientPtr cl)
     }
 
     cl->updateBuf[cl->ublen++] = (char)(rfbTightFill << 4);
-    memcpy (&cl->updateBuf[cl->ublen], tightBeforeBuf, len);
+    memcpy (&cl->updateBuf[cl->ublen], cl->beforeEncBuf, len);
     cl->ublen += len;
 
     rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, len + 1);
@@ -850,7 +795,9 @@ SendMonoRect(rfbClientPtr cl,
              int x,
              int y,
              int w,
-             int h)
+             int h,
+             uint32_t monoForeground,
+             uint32_t monoBackground)
 {
     int streamId = 1;
     int paletteLen, dataLen;
@@ -873,7 +820,7 @@ SendMonoRect(rfbClientPtr cl,
     dataLen = (w + 7) / 8;
     dataLen *= h;
 
-    if (tightConf[compressLevel].monoZlibLevel == 0 &&
+    if (tightConf[cl->tightCompressLevel].monoZlibLevel == 0 &&
         cl->tightEncoding != rfbEncodingTightPng)
         cl->updateBuf[cl->ublen++] =
             (char)((rfbTightNoZlib | rfbTightExplicitFilter) << 4);
@@ -886,34 +833,34 @@ SendMonoRect(rfbClientPtr cl,
     switch (cl->format.bitsPerPixel) {
 
     case 32:
-        EncodeMonoRect32((uint8_t *)tightBeforeBuf, w, h);
+        EncodeMonoRect32((uint8_t *)cl->beforeEncBuf, w, h, monoBackground);
 
-        ((uint32_t *)tightAfterBuf)[0] = monoBackground;
-        ((uint32_t *)tightAfterBuf)[1] = monoForeground;
-        if (usePixelFormat24) {
-            Pack24(cl, tightAfterBuf, &cl->format, 2);
+        ((uint32_t *)cl->afterEncBuf)[0] = monoBackground;
+        ((uint32_t *)cl->afterEncBuf)[1] = monoForeground;
+        if (cl->tightUsePixelFormat24) {
+            Pack24(cl, cl->afterEncBuf, &cl->format, 2);
             paletteLen = 6;
         } else
             paletteLen = 8;
 
-        memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteLen);
+        memcpy(&cl->updateBuf[cl->ublen], cl->afterEncBuf, paletteLen);
         cl->ublen += paletteLen;
         rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, 3 + paletteLen);
         break;
 
     case 16:
-        EncodeMonoRect16((uint8_t *)tightBeforeBuf, w, h);
+        EncodeMonoRect16((uint8_t *)cl->beforeEncBuf, w, h, monoBackground);
 
-        ((uint16_t *)tightAfterBuf)[0] = (uint16_t)monoBackground;
-        ((uint16_t *)tightAfterBuf)[1] = (uint16_t)monoForeground;
+        ((uint16_t *)cl->afterEncBuf)[0] = (uint16_t)monoBackground;
+        ((uint16_t *)cl->afterEncBuf)[1] = (uint16_t)monoForeground;
 
-        memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, 4);
+        memcpy(&cl->updateBuf[cl->ublen], cl->afterEncBuf, 4);
         cl->ublen += 4;
         rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, 7);
         break;
 
     default:
-        EncodeMonoRect8((uint8_t *)tightBeforeBuf, w, h);
+        EncodeMonoRect8((uint8_t *)cl->beforeEncBuf, w, h, monoBackground);
 
         cl->updateBuf[cl->ublen++] = (char)monoBackground;
         cl->updateBuf[cl->ublen++] = (char)monoForeground;
@@ -921,12 +868,13 @@ SendMonoRect(rfbClientPtr cl,
     }
 
     return CompressData(cl, streamId, dataLen,
-                        tightConf[compressLevel].monoZlibLevel,
+                        tightConf[cl->tightCompressLevel].monoZlibLevel,
                         Z_DEFAULT_STRATEGY);
 }
 
 static rfbBool
-SendIndexedRect(rfbClientPtr cl,
+SendIndexedRect(palettePtr palette,
+                rfbClientPtr cl,
                 int x,
                 int y,
                 int w,
@@ -942,57 +890,57 @@ SendIndexedRect(rfbClientPtr cl,
 #endif
 
     if ( cl->ublen + TIGHT_MIN_TO_COMPRESS + 6 +
-	 paletteNumColors * cl->format.bitsPerPixel / 8 >
+     palette->numColors * cl->format.bitsPerPixel / 8 >
          UPDATE_BUF_SIZE ) {
         if (!rfbSendUpdateBuf(cl))
             return FALSE;
     }
 
     /* Prepare tight encoding header. */
-    if (tightConf[compressLevel].idxZlibLevel == 0 &&
+    if (tightConf[cl->tightCompressLevel].idxZlibLevel == 0 &&
         cl->tightEncoding != rfbEncodingTightPng)
         cl->updateBuf[cl->ublen++] =
             (char)((rfbTightNoZlib | rfbTightExplicitFilter) << 4);
     else
         cl->updateBuf[cl->ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     cl->updateBuf[cl->ublen++] = rfbTightFilterPalette;
-    cl->updateBuf[cl->ublen++] = (char)(paletteNumColors - 1);
+    cl->updateBuf[cl->ublen++] = (char)(palette->numColors - 1);
 
     /* Prepare palette, convert image. */
     switch (cl->format.bitsPerPixel) {
 
     case 32:
-        EncodeIndexedRect32((uint8_t *)tightBeforeBuf, w * h);
+        EncodeIndexedRect32(palette, (uint8_t *)cl->beforeEncBuf, w * h);
 
-        for (i = 0; i < paletteNumColors; i++) {
-            ((uint32_t *)tightAfterBuf)[i] =
-                palette.entry[i].listNode->rgb;
+        for (i = 0; i < palette->numColors; i++) {
+            ((uint32_t *)cl->afterEncBuf)[i] =
+                palette->entry[i].listNode->rgb;
         }
-        if (usePixelFormat24) {
-            Pack24(cl, tightAfterBuf, &cl->format, paletteNumColors);
+        if (cl->tightUsePixelFormat24) {
+            Pack24(cl, cl->afterEncBuf, &cl->format, palette->numColors);
             entryLen = 3;
         } else
             entryLen = 4;
 
-        memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf,
-               paletteNumColors * entryLen);
-        cl->ublen += paletteNumColors * entryLen;
+        memcpy(&cl->updateBuf[cl->ublen], cl->afterEncBuf,
+               (size_t) palette->numColors * entryLen);
+        cl->ublen += palette->numColors * entryLen;
         rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding,
-                                     3 + paletteNumColors * entryLen);
+                                     3 + palette->numColors * entryLen);
         break;
 
     case 16:
-        EncodeIndexedRect16((uint8_t *)tightBeforeBuf, w * h);
+        EncodeIndexedRect16(palette, (uint8_t *)cl->beforeEncBuf, w * h);
 
-        for (i = 0; i < paletteNumColors; i++) {
-            ((uint16_t *)tightAfterBuf)[i] =
-                (uint16_t)palette.entry[i].listNode->rgb;
+        for (i = 0; i < palette->numColors; i++) {
+            ((uint16_t *)cl->afterEncBuf)[i] =
+                (uint16_t)palette->entry[i].listNode->rgb;
         }
 
-        memcpy(&cl->updateBuf[cl->ublen], tightAfterBuf, paletteNumColors * 2);
-        cl->ublen += paletteNumColors * 2;
+        memcpy(&cl->updateBuf[cl->ublen], cl->afterEncBuf, palette->numColors * 2);
+        cl->ublen += palette->numColors * 2;
         rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding,
-                                     3 + paletteNumColors * 2);
+                                     3 + palette->numColors * 2);
         break;
 
     default:
@@ -1000,7 +948,7 @@ SendIndexedRect(rfbClientPtr cl,
     }
 
     return CompressData(cl, streamId, w * h,
-                        tightConf[compressLevel].idxZlibLevel,
+                        tightConf[cl->tightCompressLevel].idxZlibLevel,
                         Z_DEFAULT_STRATEGY);
 }
 
@@ -1025,21 +973,21 @@ SendFullColorRect(rfbClientPtr cl,
             return FALSE;
     }
 
-    if (tightConf[compressLevel].rawZlibLevel == 0 &&
+    if (tightConf[cl->tightCompressLevel].rawZlibLevel == 0 &&
         cl->tightEncoding != rfbEncodingTightPng)
         cl->updateBuf[cl->ublen++] = (char)(rfbTightNoZlib << 4);
     else
         cl->updateBuf[cl->ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
     rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, 1);
 
-    if (usePixelFormat24) {
-        Pack24(cl, tightBeforeBuf, &cl->format, w * h);
+    if (cl->tightUsePixelFormat24) {
+        Pack24(cl, cl->beforeEncBuf, &cl->format, w * h);
         len = 3;
     } else
         len = cl->format.bitsPerPixel / 8;
 
     return CompressData(cl, streamId, w * h * len,
-                        tightConf[compressLevel].rawZlibLevel,
+                        tightConf[cl->tightCompressLevel].rawZlibLevel,
                         Z_DEFAULT_STRATEGY);
 }
 
@@ -1054,14 +1002,14 @@ CompressData(rfbClientPtr cl,
     int err;
 
     if (dataLen < TIGHT_MIN_TO_COMPRESS) {
-        memcpy(&cl->updateBuf[cl->ublen], tightBeforeBuf, dataLen);
+        memcpy(&cl->updateBuf[cl->ublen], cl->beforeEncBuf, dataLen);
         cl->ublen += dataLen;
         rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, dataLen);
         return TRUE;
     }
 
     if (zlibLevel == 0)
-        return rfbSendCompressedDataTight(cl, tightBeforeBuf, dataLen);
+        return rfbSendCompressedDataTight(cl, cl->beforeEncBuf, dataLen);
 
     pz = &cl->zsStruct[streamId];
 
@@ -1081,10 +1029,10 @@ CompressData(rfbClientPtr cl,
     }
 
     /* Prepare buffer pointers. */
-    pz->next_in = (Bytef *)tightBeforeBuf;
+    pz->next_in = (Bytef *)cl->beforeEncBuf;
     pz->avail_in = dataLen;
-    pz->next_out = (Bytef *)tightAfterBuf;
-    pz->avail_out = tightAfterBufSize;
+    pz->next_out = (Bytef *)cl->afterEncBuf;
+    pz->avail_out = cl->afterEncBufSize;
 
     /* Change compression parameters if needed. */
     if (zlibLevel != cl->zsLevel[streamId]) {
@@ -1100,8 +1048,8 @@ CompressData(rfbClientPtr cl,
         return FALSE;
     }
 
-    return rfbSendCompressedDataTight(cl, tightAfterBuf,
-                                      tightAfterBufSize - pz->avail_out);
+    return rfbSendCompressedDataTight(cl, cl->afterEncBuf,
+                                      cl->afterEncBufSize - pz->avail_out);
 }
 
 rfbBool rfbSendCompressedDataTight(rfbClientPtr cl, char *buf,
@@ -1145,22 +1093,22 @@ rfbBool rfbSendCompressedDataTight(rfbClientPtr cl, char *buf,
  */
 
 static void
-FillPalette8(int count)
+FillPalette8(palettePtr palette, rfbClientPtr cl, int count)
 {
-    uint8_t *data = (uint8_t *)tightBeforeBuf;
+    uint8_t *data = (uint8_t *)cl->beforeEncBuf;
     uint8_t c0, c1;
     int i, n0, n1;
 
-    paletteNumColors = 0;
+    palette->numColors = 0;
 
     c0 = data[0];
     for (i = 1; i < count && data[i] == c0; i++);
     if (i == count) {
-        paletteNumColors = 1;
+        palette->numColors = 1;
         return;                 /* Solid rectangle */
     }
 
-    if (paletteMaxColors < 2)
+    if (palette->maxColors < 2)
         return;
 
     n0 = i;
@@ -1176,13 +1124,13 @@ FillPalette8(int count)
     }
     if (i == count) {
         if (n0 > n1) {
-            monoBackground = (uint32_t)c0;
-            monoForeground = (uint32_t)c1;
+            palette->monoBackground = (uint32_t)c0;
+            palette->monoForeground = (uint32_t)c1;
         } else {
-            monoBackground = (uint32_t)c1;
-            monoForeground = (uint32_t)c0;
+            palette->monoBackground = (uint32_t)c1;
+            palette->monoForeground = (uint32_t)c0;
         }
-        paletteNumColors = 2;   /* Two colors */
+        palette->numColors = 2;   /* Two colors */
     }
 }
 
@@ -1190,20 +1138,20 @@ FillPalette8(int count)
 #define DEFINE_FILL_PALETTE_FUNCTION(bpp)                               \
                                                                         \
 static void                                                             \
-FillPalette##bpp(int count) {                                           \
-    uint##bpp##_t *data = (uint##bpp##_t *)tightBeforeBuf;              \
+FillPalette##bpp(palettePtr palette,  rfbClientPtr cl, int count) {     \
+    uint##bpp##_t *data = (uint##bpp##_t *)cl->beforeEncBuf;            \
     uint##bpp##_t c0, c1, ci;                                           \
     int i, n0, n1, ni;                                                  \
                                                                         \
     c0 = data[0];                                                       \
     for (i = 1; i < count && data[i] == c0; i++);                       \
     if (i >= count) {                                                   \
-        paletteNumColors = 1;   /* Solid rectangle */                   \
+        palette->numColors = 1;   /* Solid rectangle */                 \
         return;                                                         \
     }                                                                   \
                                                                         \
-    if (paletteMaxColors < 2) {                                         \
-        paletteNumColors = 0;   /* Full-color encoding preferred */     \
+    if (palette->maxColors < 2) {                                       \
+        palette->numColors = 0;   /* Full-color encoding preferred */   \
         return;                                                         \
     }                                                                   \
                                                                         \
@@ -1221,32 +1169,32 @@ FillPalette##bpp(int count) {                                           \
     }                                                                   \
     if (i >= count) {                                                   \
         if (n0 > n1) {                                                  \
-            monoBackground = (uint32_t)c0;                              \
-            monoForeground = (uint32_t)c1;                              \
+            palette->monoBackground = (uint32_t)c0;                     \
+            palette->monoForeground = (uint32_t)c1;                     \
         } else {                                                        \
-            monoBackground = (uint32_t)c1;                              \
-            monoForeground = (uint32_t)c0;                              \
+            palette->monoBackground = (uint32_t)c1;                     \
+            palette->monoForeground = (uint32_t)c0;                     \
         }                                                               \
-        paletteNumColors = 2;   /* Two colors */                        \
+        palette->numColors = 2;   /* Two colors */                      \
         return;                                                         \
     }                                                                   \
                                                                         \
-    PaletteReset();                                                     \
-    PaletteInsert (c0, (uint32_t)n0, bpp);                              \
-    PaletteInsert (c1, (uint32_t)n1, bpp);                              \
+    PaletteReset(palette);                                              \
+    PaletteInsert (palette, c0, (uint32_t)n0, bpp);                     \
+    PaletteInsert (palette, c1, (uint32_t)n1, bpp);                     \
                                                                         \
     ni = 1;                                                             \
     for (i++; i < count; i++) {                                         \
         if (data[i] == ci) {                                            \
             ni++;                                                       \
         } else {                                                        \
-            if (!PaletteInsert (ci, (uint32_t)ni, bpp))                 \
+            if (!PaletteInsert (palette, ci, (uint32_t)ni, bpp))        \
                 return;                                                 \
             ci = data[i];                                               \
             ni = 1;                                                     \
         }                                                               \
     }                                                                   \
-    PaletteInsert (ci, (uint32_t)ni, bpp);                              \
+    PaletteInsert (palette, ci, (uint32_t)ni, bpp);                     \
 }
 
 DEFINE_FILL_PALETTE_FUNCTION(16)
@@ -1255,7 +1203,7 @@ DEFINE_FILL_PALETTE_FUNCTION(32)
 #define DEFINE_FAST_FILL_PALETTE_FUNCTION(bpp)                          \
                                                                         \
 static void                                                             \
-FastFillPalette##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w,       \
+FastFillPalette##bpp(palettePtr palette, rfbClientPtr cl, uint##bpp##_t *data, int w, \
                      int pitch, int h)                                  \
 {                                                                       \
     uint##bpp##_t c0, c1, ci, mask, c0t, c1t, cit;                      \
@@ -1279,11 +1227,11 @@ FastFillPalette##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w,       \
     }                                                                   \
     done:                                                               \
     if (j >= h) {                                                       \
-        paletteNumColors = 1;   /* Solid rectangle */                   \
+        palette->numColors = 1;   /* Solid rectangle */                 \
         return;                                                         \
     }                                                                   \
-    if (paletteMaxColors < 2) {                                         \
-        paletteNumColors = 0;   /* Full-color encoding preferred */     \
+    if (palette->maxColors < 2) {                                       \
+        palette->numColors = 0;   /* Full-color encoding preferred */   \
         return;                                                         \
     }                                                                   \
                                                                         \
@@ -1312,19 +1260,19 @@ FastFillPalette##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w,       \
                        (char *)&c1, (char *)&c1t, bpp/8, 1, 1);         \
     if (j2 >= h) {                                                      \
         if (n0 > n1) {                                                  \
-            monoBackground = (uint32_t)c0t;                             \
-            monoForeground = (uint32_t)c1t;                             \
+            palette->monoBackground = (uint32_t)c0t;                    \
+            palette->monoForeground = (uint32_t)c1t;                    \
         } else {                                                        \
-            monoBackground = (uint32_t)c1t;                             \
-            monoForeground = (uint32_t)c0t;                             \
+            palette->monoBackground = (uint32_t)c1t;                    \
+            palette->monoForeground = (uint32_t)c0t;                    \
         }                                                               \
-        paletteNumColors = 2;   /* Two colors */                        \
+        palette->numColors = 2;   /* Two colors */                      \
         return;                                                         \
     }                                                                   \
                                                                         \
-    PaletteReset();                                                     \
-    PaletteInsert (c0t, (uint32_t)n0, bpp);                             \
-    PaletteInsert (c1t, (uint32_t)n1, bpp);                             \
+    PaletteReset(palette);                                              \
+    PaletteInsert (palette, c0t, (uint32_t)n0, bpp);                    \
+    PaletteInsert (palette, c1t, (uint32_t)n1, bpp);                    \
                                                                         \
     ni = 1;                                                             \
     i2++;  if (i2 >= w) {i2 = 0;  j2++;}                                \
@@ -1337,7 +1285,7 @@ FastFillPalette##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w,       \
                                    &cl->screen->serverFormat,           \
                                    &cl->format, (char *)&ci,            \
                                    (char *)&cit, bpp/8, 1, 1);          \
-                if (!PaletteInsert (cit, (uint32_t)ni, bpp))            \
+                if (!PaletteInsert (palette, cit, (uint32_t)ni, bpp))   \
                     return;                                             \
                 ci = data[j * pitch + i] & mask;                        \
                 ni = 1;                                                 \
@@ -1349,7 +1297,7 @@ FastFillPalette##bpp(rfbClientPtr cl, uint##bpp##_t *data, int w,       \
     (*cl->translateFn)(cl->translateLookupTable,                        \
                        &cl->screen->serverFormat, &cl->format,          \
                        (char *)&ci, (char *)&cit, bpp/8, 1, 1);         \
-    PaletteInsert (cit, (uint32_t)ni, bpp);                             \
+    PaletteInsert (palette, cit, (uint32_t)ni, bpp);                    \
 }
 
 DEFINE_FAST_FILL_PALETTE_FUNCTION(16)
@@ -1365,15 +1313,16 @@ DEFINE_FAST_FILL_PALETTE_FUNCTION(32)
 
 
 static void
-PaletteReset(void)
+PaletteReset(palettePtr palette)
 {
-    paletteNumColors = 0;
-    memset(palette.hash, 0, 256 * sizeof(COLOR_LIST *));
+    palette->numColors = 0;
+    memset(palette->hash, 0, 256 * sizeof(COLOR_LIST *));
 }
 
 
 static int
-PaletteInsert(uint32_t rgb,
+PaletteInsert(palettePtr palette,
+              uint32_t rgb,
               int numPixels,
               int bpp)
 {
@@ -1383,58 +1332,58 @@ PaletteInsert(uint32_t rgb,
 
     hash_key = (bpp == 16) ? HASH_FUNC16(rgb) : HASH_FUNC32(rgb);
 
-    pnode = palette.hash[hash_key];
+    pnode = palette->hash[hash_key];
 
     while (pnode != NULL) {
         if (pnode->rgb == rgb) {
             /* Such palette entry already exists. */
             new_idx = idx = pnode->idx;
-            count = palette.entry[idx].numPixels + numPixels;
-            if (new_idx && palette.entry[new_idx-1].numPixels < count) {
+            count = palette->entry[idx].numPixels + numPixels;
+            if (new_idx && palette->entry[new_idx-1].numPixels < count) {
                 do {
-                    palette.entry[new_idx] = palette.entry[new_idx-1];
-                    palette.entry[new_idx].listNode->idx = new_idx;
+                    palette->entry[new_idx] = palette->entry[new_idx-1];
+                    palette->entry[new_idx].listNode->idx = new_idx;
                     new_idx--;
                 }
-                while (new_idx && palette.entry[new_idx-1].numPixels < count);
-                palette.entry[new_idx].listNode = pnode;
+                while (new_idx && palette->entry[new_idx-1].numPixels < count);
+                palette->entry[new_idx].listNode = pnode;
                 pnode->idx = new_idx;
             }
-            palette.entry[new_idx].numPixels = count;
-            return paletteNumColors;
+            palette->entry[new_idx].numPixels = count;
+            return palette->numColors;
         }
         prev_pnode = pnode;
         pnode = pnode->next;
     }
 
     /* Check if palette is full. */
-    if (paletteNumColors == 256 || paletteNumColors == paletteMaxColors) {
-        paletteNumColors = 0;
+    if (palette->numColors == 256 || palette->numColors == palette->maxColors) {
+        palette->numColors = 0;
         return 0;
     }
 
     /* Move palette entries with lesser pixel counts. */
-    for ( idx = paletteNumColors;
-          idx > 0 && palette.entry[idx-1].numPixels < numPixels;
+    for ( idx = palette->numColors;
+          idx > 0 && palette->entry[idx-1].numPixels < numPixels;
           idx-- ) {
-        palette.entry[idx] = palette.entry[idx-1];
-        palette.entry[idx].listNode->idx = idx;
+        palette->entry[idx] = palette->entry[idx-1];
+        palette->entry[idx].listNode->idx = idx;
     }
 
     /* Add new palette entry into the freed slot. */
-    pnode = &palette.list[paletteNumColors];
+    pnode = &palette->list[palette->numColors];
     if (prev_pnode != NULL) {
         prev_pnode->next = pnode;
     } else {
-        palette.hash[hash_key] = pnode;
+        palette->hash[hash_key] = pnode;
     }
     pnode->next = NULL;
     pnode->idx = idx;
     pnode->rgb = rgb;
-    palette.entry[idx].listNode = pnode;
-    palette.entry[idx].numPixels = numPixels;
+    palette->entry[idx].listNode = pnode;
+    palette->entry[idx].numPixels = numPixels;
 
-    return (++paletteNumColors);
+    return (++palette->numColors);
 }
 
 
@@ -1481,7 +1430,7 @@ static void Pack24(rfbClientPtr cl,
 #define DEFINE_IDX_ENCODE_FUNCTION(bpp)                                 \
                                                                         \
 static void                                                             \
-EncodeIndexedRect##bpp(uint8_t *buf, int count) {                       \
+EncodeIndexedRect##bpp(palettePtr palette, uint8_t *buf, int count) {   \
     COLOR_LIST *pnode;                                                  \
     uint##bpp##_t *src;                                                 \
     uint##bpp##_t rgb;                                                  \
@@ -1494,7 +1443,7 @@ EncodeIndexedRect##bpp(uint8_t *buf, int count) {                       \
         while (count && *src == rgb) {                                  \
             rep++, src++, count--;                                      \
         }                                                               \
-        pnode = palette.hash[HASH_FUNC##bpp(rgb)];                      \
+        pnode = palette->hash[HASH_FUNC##bpp(rgb)];                     \
         while (pnode != NULL) {                                         \
             if ((uint##bpp##_t)pnode->rgb == rgb) {                     \
                 *buf++ = (uint8_t)pnode->idx;                           \
@@ -1516,7 +1465,7 @@ DEFINE_IDX_ENCODE_FUNCTION(32)
 #define DEFINE_MONO_ENCODE_FUNCTION(bpp)                                \
                                                                         \
 static void                                                             \
-EncodeMonoRect##bpp(uint8_t *buf, int w, int h) {                       \
+EncodeMonoRect##bpp(uint8_t *buf, int w, int h, uint32_t monoBackground) { \
     uint##bpp##_t *ptr;                                                 \
     uint##bpp##_t bg;                                                   \
     unsigned int value, mask;                                           \
@@ -1577,7 +1526,7 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
 {
     unsigned char *srcbuf;
     int ps = cl->screen->serverFormat.bitsPerPixel / 8;
-    int subsamp = subsampLevel2tjsubsamp[subsampLevel];
+    int subsamp = subsampLevel2tjsubsamp[cl->turboSubsampLevel];
     unsigned long size = 0;
     int flags = 0, pitch;
     unsigned char *tmpbuf = NULL;
@@ -1589,27 +1538,27 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
         rfbLog("Error: JPEG requires 16-bit, 24-bit, or 32-bit pixel format.\n");
         return 0;
     }
-    if (!j) {
-        if ((j = tjInitCompress()) == NULL) {
+    if (!cl->tightTJ) {
+        if ((cl->tightTJ = tjInitCompress()) == NULL) {
             rfbLog("JPEG Error: %s\n", tjGetErrorStr());
             return 0;
         }
     }
 
-    if (!tightAfterBuf || tightAfterBufSize < TJBUFSIZE(w, h)) {
-        if (tightAfterBuf == NULL)
-            tightAfterBuf = (char *)malloc(TJBUFSIZE(w, h));
+    if (!cl->afterEncBuf || cl->afterEncBufSize < TJBUFSIZE(w, h)) {
+        if (cl->afterEncBuf == NULL)
+            cl->afterEncBuf = (char *)malloc(TJBUFSIZE(w, h));
         else {
-            char *reallocedAfterEncBuf = (char *)realloc(tightAfterBuf, TJBUFSIZE(w, h));
+            char *reallocedAfterEncBuf = (char *)realloc(cl->afterEncBuf, TJBUFSIZE(w, h));
             if (!reallocedAfterEncBuf) return FALSE;
-            tightAfterBuf = reallocedAfterEncBuf;
+            cl->afterEncBuf = reallocedAfterEncBuf;
         }
-        if (!tightAfterBuf)
+        if (!cl->afterEncBuf)
         {
             rfbLog("SendJpegRect: failed to allocate memory\n");
             return FALSE;
         }
-        tightAfterBufSize = TJBUFSIZE(w, h);
+        cl->afterEncBufSize = TJBUFSIZE(w, h);
     }
 
     if (ps == 2) {
@@ -1617,7 +1566,7 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
         unsigned char *dst;
         int inRed, inGreen, inBlue, i, j;
 
-        if((tmpbuf = (unsigned char *)malloc(w * h * 3)) == NULL)
+        if((tmpbuf = (unsigned char *)malloc((size_t)w * h * 3)) == NULL)
             rfbLog("Memory allocation failure!\n");
         srcptr = (uint16_t *)&cl->scaledScreen->frameBuffer
             [y * cl->scaledScreen->paddedWidthInBytes + x * ps];
@@ -1662,7 +1611,7 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
             [y * pitch + x * ps];
     }
 
-    if (tjCompress(j, srcbuf, w, pitch, h, ps, (unsigned char *)tightAfterBuf,
+    if (tjCompress(cl->tightTJ, srcbuf, w, pitch, h, ps, (unsigned char *)cl->afterEncBuf,
                    &size, subsamp, quality, flags) == -1) {
         rfbLog("JPEG Error: %s\n", tjGetErrorStr());
         if (tmpbuf) {
@@ -1685,7 +1634,7 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
     cl->updateBuf[cl->ublen++] = (char)(rfbTightJpeg << 4);
     rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, 1);
 
-    return rfbSendCompressedDataTight(cl, tightAfterBuf, (int)size);
+    return rfbSendCompressedDataTight(cl, cl->afterEncBuf, (int)size);
 }
 
 static void
@@ -1770,8 +1719,6 @@ DEFINE_JPEG_GET_ROW_FUNCTION(32)
 
 #ifdef LIBVNCSERVER_HAVE_LIBPNG
 
-static TLS int pngDstDataLen = 0;
-
 static rfbBool CanSendPngRect(rfbClientPtr cl, int w, int h) {
     if (cl->tightEncoding != rfbEncodingTightPng) {
         return FALSE;
@@ -1794,9 +1741,10 @@ static void pngWriteData(png_structp png_ptr, png_bytep data,
     buffer_reserve(&vs->tight.png, vs->tight.png.offset + length);
     memcpy(vs->tight.png.buffer + vs->tight.png.offset, data, length);
 #endif
-    memcpy(tightAfterBuf + pngDstDataLen, data, length);
+    rfbClientPtr cl = png_get_io_ptr(png_ptr);
+    memcpy(cl->afterEncBuf + cl->tightPngDstDataLen, data, length);
 
-    pngDstDataLen += length;
+    cl->tightPngDstDataLen += length;
 }
 
 static void pngFlushData(png_structp png_ptr)
@@ -1826,7 +1774,7 @@ static rfbBool SendPngRect(rfbClientPtr cl, int x, int y, int w, int h) {
     uint8_t *buf;
     int dy;
 
-    pngDstDataLen = 0;
+    cl->tightPngDstDataLen = 0;
 
     png_ptr = png_create_write_struct_2(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL,
                                         NULL, pngMalloc, pngFree);
@@ -1924,6 +1872,6 @@ static rfbBool SendPngRect(rfbClientPtr cl, int x, int y, int w, int h) {
     rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, 1);
 
     /* rfbLog("<< SendPngRect\n"); */
-    return rfbSendCompressedDataTight(cl, tightAfterBuf, pngDstDataLen);
+    return rfbSendCompressedDataTight(cl, cl->afterEncBuf, cl->tightPngDstDataLen);
 }
 #endif

@@ -1,7 +1,8 @@
 /*
- *  LibVNCServer/LibVNCClient common platform socket defines and includes.
+ *  LibVNCServer/LibVNCClient common platform socket defines, includes
+ *  and internal socket helper functions.
  *
- *  Copyright (C) 2020 Christian Beier <dontmind@freeshell.org>
+ *  Copyright (C) 2022 Christian Beier <dontmind@freeshell.org>
  *
  *  This is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -62,5 +63,24 @@
 #include <netinet/tcp.h>
 #include <netdb.h>
 #endif
+
+/*
+  Common internal socket functions
+ */
+#include "rfb/rfbproto.h"
+
+/*
+   Set (non)blocking mode for a socket.
+   Returns TRUE on succcess, FALSE on failure.
+ */
+rfbBool sock_set_nonblocking(rfbSocket sock, rfbBool non_blocking, void (*log)(const char *format, ...));
+
+
+/*
+   Wait for a socket to become connected.
+   Returns TRUE if socket connected in time, FALSE if otherwise.
+*/
+rfbBool sock_wait_for_connected(int socket, unsigned int timeout_seconds);
+
 
 #endif /* _RFB_COMMON_SOCKETS_H */
