@@ -74,7 +74,7 @@ if(WITH_LZO)
 endif()
 
 if(WITH_XCB)
-  find_package(X11)
+  find_package(X11) # Need CMake 3.24.0 to find X11 libraries. see https://cmake.org/cmake/help/v3.24/module/FindX11.html 
 endif()
 
 if(WITH_JPEG)
