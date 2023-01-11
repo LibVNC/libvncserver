@@ -73,9 +73,7 @@ if(WITH_LZO)
 endif()
 
 if(WITH_XCB)
-  find_package(XCB)
-  find_package(XCB_XTEST)
-  find_package(XCB_KEYSYMS)
+  find_package(X11)
 endif()
 
 if(WITH_JPEG)
@@ -585,12 +583,17 @@ if(ANDROID)
   )
 endif(ANDROID)
 
-if(XCB_FOUND AND XCB_XTEST_FOUND AND XCB_KEYSYMS_FOUND)
+if(X11_xcb_FOUND AND X11_xcb_xtest_FOUND AND X11_xcb_keysyms_FOUND)
   set(LIBVNCSERVER_EXAMPLES
     ${LIBVNCSERVER_EXAMPLES}
     x11vncserver
   )
-endif(XCB_FOUND AND XCB_XTEST_FOUND AND XCB_KEYSYMS_FOUND)
+else()
+  # clear NOTFOUND
+  unset(X11_xcb_LIB CACHE)
+  unset(X11_xcb_xtest_LIB CACHE)
+  unset(X11_xcb_keysyms_LIB CACHE)
+endif(X11_xcb_FOUND AND X11_xcb_xtest_FOUND AND X11_xcb_keysyms_FOUND)
 
 set(LIBVNCCLIENT_EXAMPLES
     backchannel
@@ -626,7 +629,7 @@ if(WITH_EXAMPLES)
     add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
     set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
     set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
-    target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY} ${XCB_LIBRARY} ${XCB_XTEST_LIBRARY} ${XCB_KEYSYMS_LIBRARY})
+    target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY} ${X11_xcb_LIB} ${X11_xcb_xtest_LIB} ${X11_xcb_keysyms_LIB})
   endforeach(e ${LIBVNCSERVER_EXAMPLES})
 
   foreach(e ${LIBVNCCLIENT_EXAMPLES})
