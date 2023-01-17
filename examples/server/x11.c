@@ -10,8 +10,8 @@
 #include <xcb/xcb_keysyms.h>
 
 void dirty_copy(rfbScreenInfoPtr rfbScreen, const uint8_t* data, int width, int height, int nbytes);
-void convert_bgrx_to_rgb(const uint8_t* in, int16_t width, int32_t height, uint8_t* buff);
-void get_window_size(xcb_connection_t* conn, xcb_window_t window, int16_t* width, int16_t* height);
+void convert_bgrx_to_rgb(const uint8_t* in, uint16_t width, uint16_t height, uint8_t* buff);
+void get_window_size(xcb_connection_t* conn, xcb_window_t window, uint16_t* width, uint16_t* height);
 void get_window_image(xcb_connection_t* conn, xcb_window_t window, uint8_t* buff);
 void send_keycode(xcb_connection_t *conn, xcb_keycode_t keycode, int press);
 void send_keysym(xcb_connection_t *conn, xcb_keysym_t keysym, int press);
@@ -111,11 +111,11 @@ void dirty_copy(rfbScreenInfoPtr rfbScreen, const uint8_t* data, int width, int 
     }
 }
 
-void convert_bgrx_to_rgb(const uint8_t* in, int16_t width, int32_t height, uint8_t* buff)
+void convert_bgrx_to_rgb(const uint8_t* in, uint16_t width, uint16_t height, uint8_t* buff)
 {
-    for (int16_t y = 0; y < height; y++)
+    for (uint16_t y = 0; y < height; y++)
     {
-        for(int16_t x = 0; x < width; x++)
+        for(uint16_t x = 0; x < width; x++)
         {
             buff[(y*width+x)*3] = in[(y*width+x)*4 + 2];
             buff[(y*width+x)*3 + 1] = in[(y*width+x)*4 + 1];
@@ -124,7 +124,7 @@ void convert_bgrx_to_rgb(const uint8_t* in, int16_t width, int32_t height, uint8
     }
 }
 
-void get_window_size(xcb_connection_t* conn, xcb_window_t window, int16_t* width, int16_t* height)
+void get_window_size(xcb_connection_t* conn, xcb_window_t window, uint16_t* width, uint16_t* height)
 {
     xcb_get_geometry_cookie_t cookie = xcb_get_geometry(conn, window);
     xcb_get_geometry_reply_t* reply = xcb_get_geometry_reply(conn, cookie, NULL);
@@ -136,8 +136,8 @@ void get_window_size(xcb_connection_t* conn, xcb_window_t window, int16_t* width
 
 void get_window_image(xcb_connection_t* conn, xcb_window_t window, uint8_t* buff)
 {
-    int16_t width = 0;
-    int16_t height = 0;
+    uint16_t width = 0;
+    uint16_t height = 0;
     get_window_size(conn, window, &width, &height);
 
     // will failed in wayland, xcb_get_image_data will return NULL, convert_bgrx_to_rgb will abort
