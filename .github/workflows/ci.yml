@@ -49,7 +49,7 @@ jobs:
       - name: Test
         run: |
           cd build
-          ctest --output-on-failure
+          ctest -C Debug --output-on-failure
   fuzzing_build:
     runs-on: ubuntu-latest
     steps:
