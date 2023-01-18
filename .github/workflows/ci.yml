@@ -42,10 +42,13 @@ jobs:
           cd build
           cmake ${{ matrix.cmake_options }} ${{ matrix.macos_cmake_options }} ..
           cmake --build .
+      - name: Prepare Test
+        if: ${{ matrix.os == 'ubuntu-latest' }} # only ubuntu does crosscompile with MinGW toolchain
+        run: |
+          cp /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll build/test/
       - name: Test
         run: |
           cd build
-          cp /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll test/ || true # used only for MinGW tests, ok to fail for other cases
           ctest --output-on-failure
   fuzzing_build:
     runs-on: ubuntu-latest
