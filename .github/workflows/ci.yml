@@ -9,6 +9,7 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
+          - windows-latest
         cmake_options:
           - "-DWITH_OPENSSL=ON  -DWITH_GNUTLS=OFF -DWITH_GCRYPT=OFF" # build with OpenSSL
           - "-DWITH_OPENSSL=OFF -DWITH_GNUTLS=ON  -DWITH_GCRYPT=ON"  # build with GnuTLS and Libgrypt
@@ -19,6 +20,8 @@ jobs:
             macos_cmake_options: "-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl" # set this extra var for OSX
         exclude:
           - os: macos-latest
+            cmake_options: "-DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake" # don't test MinGW from OSX
+          - os: windows-latest
             cmake_options: "-DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake" # don't test MinGW from OSX
     runs-on: ${{ matrix.os }}
     steps:
