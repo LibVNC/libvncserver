@@ -28,6 +28,9 @@
 #include <openssl/dh.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
+#if (OPENSSL_VERSION_NUMBER >= 0x30000000L)
+#include <openssl/provider.h>
+#endif
 #include "crypto.h"
 
 static unsigned char reverseByte(unsigned char b) {
@@ -69,12 +72,24 @@ void random_bytes(void *out, size_t len)
 int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
 {
     int result = 0;
-    EVP_CIPHER_CTX *des;
+    EVP_CIPHER_CTX *des = NULL;
     unsigned char mungedkey[8];
     int i;
+#if (OPENSSL_VERSION_NUMBER >= 0x30000000L)
+    OSSL_PROVIDER *providerLegacy = NULL;
+    OSSL_PROVIDER *providerDefault = NULL;
+#endif
 
     for (i = 0; i < 8; i++)
       mungedkey[i] = reverseByte(key[i]);
+
+#if (OPENSSL_VERSION_NUMBER >= 0x30000000L)
+    /* Load Multiple providers into the default (NULL) library context */
+    if (!(providerLegacy = OSSL_PROVIDER_load(NULL, "legacy")))
+    	goto out;
+    if (!(providerDefault = OSSL_PROVIDER_load(NULL, "default")))
+    	goto out;
+#endif
 
     if(!(des = EVP_CIPHER_CTX_new()))
 	goto out;
@@ -86,7 +101,14 @@ int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
     result = 1;
 
  out:
-    EVP_CIPHER_CTX_free(des);
+    if (des)
+      EVP_CIPHER_CTX_free(des);
+#if (OPENSSL_VERSION_NUMBER >= 0x30000000L)
+    if (providerLegacy)
+      OSSL_PROVIDER_unload(providerLegacy);
+    if (providerDefault)
+      OSSL_PROVIDER_unload(providerDefault);
+#endif
     return result;
 }
 
