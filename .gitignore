@@ -34,6 +34,7 @@ examples/simple
 examples/simple15
 examples/storepasswd
 examples/vncev
+examples/x11
 test/blooptest
 test/cargstest
 test/copyrecttest
@@ -47,7 +48,6 @@ vncterm/example
 /vncterm/linuxvnc
 /vncterm/vncommand
 CMakeCache.txt
-*.cmake
 /CMakeFiles
 /rfbproto.pdf
 /rfbproto.rst

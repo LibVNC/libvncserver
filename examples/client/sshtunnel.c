@@ -16,6 +16,15 @@
 #include <netdb.h>
 #include <signal.h>
 #include <errno.h>
+#ifdef LIBVNCSERVER_HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+#ifdef LIBVNCSERVER_HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+#ifdef LIBVNCSERVER_HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 /* The one global bool that's global so we can set it via
    a signal handler... */

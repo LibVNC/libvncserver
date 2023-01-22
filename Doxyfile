@@ -591,8 +591,6 @@ WARN_LOGFILE           =
 # with spaces.
 
 INPUT                  = rfb \
-                         libvncclient \
-                         libvncserver \
                          client_examples/SDLvncviewer.c \
                          client_examples/ppmtest.c \
                          client_examples/vnc2mpg.c \

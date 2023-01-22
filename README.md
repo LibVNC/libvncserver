@@ -1,4 +1,4 @@
-[![Build Status](https://app.travis-ci.com/LibVNC/libvncserver.svg?branch=master)](https://app.travis-ci.com/LibVNC/libvncserver)
+[![CI](https://github.com/LibVNC/libvncserver/actions/workflows/ci.yml/badge.svg)](https://github.com/LibVNC/libvncserver/actions/workflows/ci.yml)
 [![Build status](https://ci.appveyor.com/api/projects/status/fao6m1md3q4g2bwn/branch/master?svg=true)](https://ci.appveyor.com/project/bk138/libvncserver/branch/master)
 [![Help making this possible](https://img.shields.io/badge/liberapay-donate-yellow.png)](https://liberapay.com/LibVNC/donate) [![Join the chat at https://gitter.im/LibVNC/libvncserver](https://badges.gitter.im/LibVNC/libvncserver.svg)](https://gitter.im/LibVNC/libvncserver?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
@@ -131,6 +131,17 @@ win32, the `-dev` packages coming with your distribution won't work.
 	cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake ..
 	cmake --build .
 
+Cutting a Release
+-----------------
+
+* [ ] Update AUTHORS.
+* [ ] Update NEWS.
+* [ ] Update git submodules.
+* [ ] Increment version in CMakeLists.txt
+* [ ] Update Doxygen API docs at https://libvnc.github.io/doc/html/
+* [ ] Update ChangeLog (using [git2cl](utils/git2cl.pl))
+
+
 How to use
 ==========
 
@@ -202,6 +213,46 @@ key and cert:
 The server program will tell you a URL to point your web browser to. There,
 you can click on the noVNC-encrypted-connection-button to connect using the
 bundled noVNC viewer using an encrypted Websockets connection.
+
+
+Achieving good performance on 'slow' links
+------------------------------------------
+
+If your client-server connection is sluggish because the link is 'slow', there
+are a few things to consider.
+
+First off, you have to investigate whether your link has low throughput or
+high latency or both.
+
+### Tackling High Latency
+
+On a high-latency link, try asking for framebuffer updates continously, as
+RFB is client-pull per default, not server-push. One example implementation
+can be found [here](https://github.com/bk138/multivnc/blob/master/src/VNCConn.cpp#L1112)
+and it definitely improves responsiveness.
+
+There also is the [ContinuousUpdates RFB extension](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#continuousupdates-pseudo-encoding),
+but that one is not supported by LibVNC (yet).
+
+### Tackling Low Throughput
+
+If your link is low-throughput, you basically have to reduce the number of
+bytes that get sent per framebuffer update:
+
+* First off, you should have your client request a lossy encoding such as Tight.
+  This already yields some huge savings.
+* Use a pixel format that represents a pixel with a smaller amount of bytes.
+  For instance, you can switch from 24-bit true colour to 16-bit high colour or
+  even a palleted colour mode. You can request a pixel format via the client or
+  set a default (native) one in the server. With the latter approach, however,
+  you very probably also have to change the way your framebuffer data gets written,
+  so the first client-side one should be preferred.
+* Send a scaled-down version of your framebuffer. You can do the scaling in your
+  application feeding data into LibVNCServer's framebuffer (would affect all clients)
+  or let LibVNCServer do the work for you if your client requests a scaled screen
+  via a [SetScale or SetScaleFactor message](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#74client-to-server-messages)
+  (this is per-client scaling - UltraVNC viewers can request this).
+  
 
 Commercial Use
 ==============

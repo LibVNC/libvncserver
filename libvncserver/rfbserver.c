@@ -370,6 +370,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       rfbReleaseClientIterator(iterator);
       rfbLog("  %lu other clients\n", (unsigned long) otherClientsCount);
 
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
       if(!rfbSetNonBlocking(sock)) {
 	rfbCloseSocket(sock);
 	return NULL;
@@ -382,6 +383,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
       FD_SET(sock,&(rfbScreen->allFds));
 		rfbScreen->maxFd = rfbMax(sock,rfbScreen->maxFd);
+#endif
 
       INIT_MUTEX(cl->outputMutex);
       INIT_MUTEX(cl->refCountMutex);
@@ -484,6 +486,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->pipe_notify_client_thread[1] = -1;
 #endif
 
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
       /*
        * Wait a few ms for the client to send WebSockets connection (TLS/SSL or plain)
@@ -494,6 +497,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
         rfbClientConnectionGone(cl);
         return NULL;
       }
+#endif
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ

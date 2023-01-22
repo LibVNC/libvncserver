@@ -503,10 +503,11 @@ void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor
 void rfbHideCursor(rfbClientPtr cl)
 {
    rfbScreenInfoPtr s=cl->screen;
-   rfbCursorPtr c=s->cursor;
+   rfbCursorPtr c;
    int j,x1,x2,y1,y2,bpp=s->serverFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
    LOCK(s->cursorMutex);
+   c=s->cursor;
    if(!c) {
      UNLOCK(s->cursorMutex);
      return;
@@ -545,14 +546,18 @@ void rfbHideCursor(rfbClientPtr cl)
 void rfbShowCursor(rfbClientPtr cl)
 {
    rfbScreenInfoPtr s=cl->screen;
-   rfbCursorPtr c=s->cursor;
+   rfbCursorPtr c;
    int i,j,x1,x2,y1,y2,i1,j1,bpp=s->serverFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes,
      bufSize,w;
    rfbBool wasChanged=FALSE;
 
-   if(!c) return;
    LOCK(s->cursorMutex);
+   c=s->cursor;
+   if(!c) {
+	UNLOCK(s->cursorMutex);
+	return;
+   }
 
    bufSize=c->width*c->height*bpp;
    w=(c->width+7)/8;

@@ -129,20 +129,20 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
 
 void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
     if(rfbScreen->httpSock>-1) {
-	rfbCloseSocket(rfbScreen->httpSock);
 	FD_CLR(rfbScreen->httpSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->httpSock);
 	rfbScreen->httpSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->httpListenSock>-1) {
-	rfbCloseSocket(rfbScreen->httpListenSock);
 	FD_CLR(rfbScreen->httpListenSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->httpListenSock);
 	rfbScreen->httpListenSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->httpListen6Sock>-1) {
-	rfbCloseSocket(rfbScreen->httpListen6Sock);
 	FD_CLR(rfbScreen->httpListen6Sock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->httpListen6Sock);
 	rfbScreen->httpListen6Sock=RFB_INVALID_SOCKET;
     }
 }

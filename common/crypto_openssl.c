@@ -28,6 +28,9 @@
 #include <openssl/dh.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
+#if (OPENSSL_VERSION_NUMBER >= 0x30000000L)
+#include <openssl/provider.h>
+#endif
 #include "crypto.h"
 
 static unsigned char reverseByte(unsigned char b) {
@@ -69,12 +72,24 @@ void random_bytes(void *out, size_t len)
 int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
 {
     int result = 0;
-    EVP_CIPHER_CTX *des;
+    EVP_CIPHER_CTX *des = NULL;
     unsigned char mungedkey[8];
     int i;
+#if (OPENSSL_VERSION_NUMBER >= 0x30000000L)
+    OSSL_PROVIDER *providerLegacy = NULL;
+    OSSL_PROVIDER *providerDefault = NULL;
+#endif
 
     for (i = 0; i < 8; i++)
       mungedkey[i] = reverseByte(key[i]);
+
+#if (OPENSSL_VERSION_NUMBER >= 0x30000000L)
+    /* Load Multiple providers into the default (NULL) library context */
+    if (!(providerLegacy = OSSL_PROVIDER_load(NULL, "legacy")))
+    	goto out;
+    if (!(providerDefault = OSSL_PROVIDER_load(NULL, "default")))
+    	goto out;
+#endif
 
     if(!(des = EVP_CIPHER_CTX_new()))
 	goto out;
@@ -86,7 +101,14 @@ int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
     result = 1;
 
  out:
-    EVP_CIPHER_CTX_free(des);
+    if (des)
+      EVP_CIPHER_CTX_free(des);
+#if (OPENSSL_VERSION_NUMBER >= 0x30000000L)
+    if (providerLegacy)
+      OSSL_PROVIDER_unload(providerLegacy);
+    if (providerDefault)
+      OSSL_PROVIDER_unload(providerDefault);
+#endif
     return result;
 }
 
@@ -134,6 +156,15 @@ int encrypt_aes128ecb(void *out, int *out_len, const unsigned char key[16], cons
     return result;
 }
 
+static void pad_leading_zeros(uint8_t *out, const size_t current_len, const size_t expected_len) {
+    if (current_len >= expected_len || expected_len < 1)
+        return;
+
+    size_t diff = expected_len - current_len;
+    memmove(out + diff, out, current_len);
+    memset(out, 0, diff);
+}
+
 int dh_generate_keypair(uint8_t *priv_out, uint8_t *pub_out, const uint8_t *gen, const size_t gen_len, const uint8_t *prime, const size_t keylen)
 {
     int result = 0;
@@ -162,6 +193,9 @@ int dh_generate_keypair(uint8_t *priv_out, uint8_t *pub_out, const uint8_t *gen,
 	goto out;
     if(BN_bn2bin(dh->pub_key, pub_out) == 0)
 	goto out;
+
+    pad_leading_zeros(priv_out, BN_num_bytes(dh->priv_key), keylen);
+    pad_leading_zeros(pub_out, BN_num_bytes(dh->pub_key), keylen);
 #else
     DH_get0_key(dh, &pub_key, &priv_key);
     if(BN_bn2binpad(priv_key, priv_out, keylen) == -1)
@@ -194,9 +228,11 @@ int dh_compute_shared_key(uint8_t *shared_out, const uint8_t *priv, const uint8_
     if(!DH_set0_key(dh, NULL, BN_bin2bn(priv, keylen, NULL)))
 	goto out;
 #endif
-    if(DH_compute_key(shared_out, BN_bin2bn(pub, keylen, NULL), dh) == -1)
-	goto out;
+    int shared_len = DH_compute_key(shared_out, BN_bin2bn(pub, keylen, NULL), dh);
+    if(shared_len == -1)
+        goto out;
 
+    pad_leading_zeros(shared_out, shared_len, keylen);
     result = 1;
 
  out:

@@ -52,12 +52,14 @@
 #define MIN_SOLID_SUBRECT_SIZE  2048
 #define MAX_SPLIT_TILE_SIZE       16
 
+#define TIGHT_MAX_RECT_SIZE    65536
+#define TIGHT_MAX_RECT_WIDTH    2048
+
 /* Compression level stuff. The following array contains various
    encoder parameters for each of 10 compression levels (0..9).
    Last three parameters correspond to JPEG quality levels (0..9). */
 
 typedef struct TIGHT_CONF_s {
-    int maxRectSize, maxRectWidth;
     int monoMinRectSize;
     int idxZlibLevel, monoZlibLevel, rawZlibLevel;
     int idxMaxColorsDivisor;
@@ -65,10 +67,10 @@ typedef struct TIGHT_CONF_s {
 } TIGHT_CONF;
 
 static TIGHT_CONF tightConf[4] = {
-    { 65536, 2048,   6, 0, 0, 0,   4, 24 }, /* 0  (used only without JPEG) */
-    { 65536, 2048,  32, 1, 1, 1,  96, 24 }, /* 1 */
-    { 65536, 2048,  32, 3, 3, 2,  96, 96 }, /* 2  (used only with JPEG) */
-    { 65536, 2048,  32, 7, 7, 5,  96, 256 } /* 9 */
+    {  6, 0, 0, 0,   4, 24 }, /* 0  (used only without JPEG) */
+    { 32, 1, 1, 1,  96, 24 }, /* 1 */
+    { 32, 3, 3, 2,  96, 96 }, /* 2  (used only with JPEG) */
+    { 32, 7, 7, 5,  96, 256 } /* 9 */
 };
 
 #ifdef LIBVNCSERVER_HAVE_LIBPNG
@@ -201,7 +203,6 @@ rfbNumCodedRectsTight(rfbClientPtr cl,
                       int w,
                       int h)
 {
-    int maxRectSize, maxRectWidth;
     int subrectMaxWidth, subrectMaxHeight;
 
     /* No matter how many rectangles we will send if LastRect markers
@@ -209,13 +210,10 @@ rfbNumCodedRectsTight(rfbClientPtr cl,
     if (cl->enableLastRectEncoding && w * h >= MIN_SPLIT_RECT_SIZE)
         return 0;
 
-    maxRectSize = tightConf[cl->tightCompressLevel].maxRectSize;
-    maxRectWidth = tightConf[cl->tightCompressLevel].maxRectWidth;
-
-    if (maxRectWidth > 0 && (w > maxRectWidth || w * h > maxRectSize)) {
-        subrectMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
-        subrectMaxHeight = maxRectSize / subrectMaxWidth;
-        return (((w - 1) / maxRectWidth + 1) *
+    if (w > TIGHT_MAX_RECT_WIDTH || w * h > TIGHT_MAX_RECT_SIZE) {
+        subrectMaxWidth = (w > TIGHT_MAX_RECT_WIDTH) ? TIGHT_MAX_RECT_WIDTH : w;
+        subrectMaxHeight = TIGHT_MAX_RECT_SIZE / subrectMaxWidth;
+        return (((w - 1) / TIGHT_MAX_RECT_WIDTH + 1) *
                 ((h - 1) / subrectMaxHeight + 1));
     } else {
         return 1;
@@ -317,12 +315,10 @@ SendRectEncodingTight(rfbClientPtr cl,
     /* Calculate maximum number of rows in one non-solid rectangle. */
 
     {
-        int maxRectSize, maxRectWidth, nMaxWidth;
+        int nMaxWidth;
 
-        maxRectSize = tightConf[cl->tightCompressLevel].maxRectSize;
-        maxRectWidth = tightConf[cl->tightCompressLevel].maxRectWidth;
-        nMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
-        nMaxRows = maxRectSize / nMaxWidth;
+        nMaxWidth = (w > TIGHT_MAX_RECT_WIDTH) ? TIGHT_MAX_RECT_WIDTH : w;
+        nMaxRows = TIGHT_MAX_RECT_SIZE / nMaxWidth;
     }
 
     /* Try to find large solid-color areas and send them separately. */
@@ -575,15 +571,11 @@ static rfbBool
 SendRectSimple(rfbClientPtr cl, int x, int y, int w, int h)
 {
     int maxBeforeSize, maxAfterSize;
-    int maxRectSize, maxRectWidth;
     int subrectMaxWidth, subrectMaxHeight;
     int dx, dy;
     int rw, rh;
 
-    maxRectSize = tightConf[cl->tightCompressLevel].maxRectSize;
-    maxRectWidth = tightConf[cl->tightCompressLevel].maxRectWidth;
-
-    maxBeforeSize = maxRectSize * (cl->format.bitsPerPixel / 8);
+    maxBeforeSize = TIGHT_MAX_RECT_SIZE * (cl->format.bitsPerPixel / 8);
     maxAfterSize = maxBeforeSize + (maxBeforeSize + 99) / 100 + 12;
 
     if (!cl->beforeEncBuf || cl->beforeEncBufSize < maxBeforeSize) {
@@ -616,13 +608,13 @@ SendRectSimple(rfbClientPtr cl, int x, int y, int w, int h)
         return FALSE;
     }
 
-    if (w > maxRectWidth || w * h > maxRectSize) {
-        subrectMaxWidth = (w > maxRectWidth) ? maxRectWidth : w;
-        subrectMaxHeight = maxRectSize / subrectMaxWidth;
+    if (w > TIGHT_MAX_RECT_WIDTH || w * h > TIGHT_MAX_RECT_SIZE) {
+        subrectMaxWidth = (w > TIGHT_MAX_RECT_WIDTH) ? TIGHT_MAX_RECT_WIDTH: w;
+        subrectMaxHeight = TIGHT_MAX_RECT_SIZE / subrectMaxWidth;
 
         for (dy = 0; dy < h; dy += subrectMaxHeight) {
-            for (dx = 0; dx < w; dx += maxRectWidth) {
-                rw = (dx + maxRectWidth < w) ? maxRectWidth : w - dx;
+            for (dx = 0; dx < w; dx += TIGHT_MAX_RECT_WIDTH) {
+                rw = (dx + TIGHT_MAX_RECT_WIDTH < w) ? TIGHT_MAX_RECT_WIDTH : w - dx;
                 rh = (dy + subrectMaxHeight < h) ? subrectMaxHeight : h - dy;
                 if (!SendSubrect(cl, x + dx, y + dy, rw, rh))
                     return FALSE;

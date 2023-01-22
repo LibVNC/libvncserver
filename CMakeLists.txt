@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.4)
 
-project(LibVNCServer VERSION 0.9.13 LANGUAGES C)
+project(LibVNCServer VERSION 0.9.14 LANGUAGES C)
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckIncludeFile)
@@ -19,8 +19,8 @@ set(PROJECT_BUGREPORT_PATH "https://github.com/LibVNC/libvncserver/issues")
 set(LIBVNCSERVER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver)
 set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/common)
 set(LIBVNCCLIENT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncclient)
-set(LIBVNCSRVEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples)
-set(LIBVNCCLIEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/client_examples)
+set(LIBVNCSRVEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples/server)
+set(LIBVNCCLIEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples/client)
 set(TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
@@ -59,6 +59,7 @@ option(WITH_24BPP "Allow 24 bpp" ON)
 option(WITH_IPv6 "Enable IPv6 Support" ON)
 option(WITH_WEBSOCKETS "Build with websockets support" ON)
 option(WITH_SASL "Build with SASL support" ON)
+option(WITH_XCB "Build with XCB support" ON)
 option(WITH_EXAMPLES "Build examples" ON)
 option(WITH_TESTS "Build tests" ON)
 
@@ -69,6 +70,10 @@ endif(WITH_ZLIB)
 
 if(WITH_LZO)
   find_package(LZO)
+endif()
+
+if(WITH_XCB)
+  find_package(X11) # Need CMake 3.24.0 to find XCB libraries. see https://cmake.org/cmake/help/v3.24/module/FindX11.html 
 endif()
 
 if(WITH_JPEG)
@@ -372,6 +377,7 @@ set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/draw.c
     ${LIBVNCSERVER_DIR}/selbox.c
     ${COMMON_DIR}/vncauth.c
+    ${COMMON_DIR}/sockets.c
     ${LIBVNCSERVER_DIR}/cargs.c
     ${LIBVNCSERVER_DIR}/ultra.c
     ${LIBVNCSERVER_DIR}/scale.c
@@ -386,6 +392,7 @@ set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
     ${COMMON_DIR}/ghpringbuf.c
+    ${COMMON_DIR}/sockets.c
     ${CRYPTO_SOURCES}
 )
 
@@ -585,6 +592,18 @@ if(ANDROID)
   )
 endif(ANDROID)
 
+if(X11_xcb_FOUND AND X11_xcb_xtest_FOUND AND X11_xcb_keysyms_FOUND)
+  set(LIBVNCSERVER_EXAMPLES
+    ${LIBVNCSERVER_EXAMPLES}
+    x11
+  )
+else()
+  # clear NOTFOUND
+  unset(X11_xcb_LIB CACHE)
+  unset(X11_xcb_xtest_LIB CACHE)
+  unset(X11_xcb_keysyms_LIB CACHE)
+endif(X11_xcb_FOUND AND X11_xcb_xtest_FOUND AND X11_xcb_keysyms_FOUND)
+
 set(LIBVNCCLIENT_EXAMPLES
     backchannel
     ppmtest
@@ -629,14 +648,14 @@ if(WITH_EXAMPLES)
   foreach(e ${LIBVNCSERVER_EXAMPLES})
     add_executable(examples_${e} ${LIBVNCSRVEXAMPLE_DIR}/${e}.c)
     set_target_properties(examples_${e} PROPERTIES OUTPUT_NAME ${e})
-    set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples)
-    target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY})
+    set_target_properties(examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/server)
+    target_link_libraries(examples_${e} vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY} ${X11_xcb_LIB} ${X11_xcb_xtest_LIB} ${X11_xcb_keysyms_LIB})
   endforeach(e ${LIBVNCSERVER_EXAMPLES})
 
   foreach(e ${LIBVNCCLIENT_EXAMPLES})
     add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
     set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
-    set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/client_examples)
+    set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/client)
     target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES} ${LIBSSH2_LIBRARY})
   endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 endif(WITH_EXAMPLES)
@@ -646,6 +665,12 @@ endif(WITH_EXAMPLES)
 #
 
 if(WITH_TESTS)
+
+# First fuzzing
+if(DEFINED ENV{LIB_FUZZING_ENGINE})
+  add_executable(fuzz_server ${TESTS_DIR}/fuzz_server.c)
+  target_link_libraries(fuzz_server vncserver ${CMAKE_THREAD_LIBS_INIT} ${CARBON_LIBRARY} ${IOKIT_LIBRARY} ${IOSURFACE_LIBRARY} $ENV{LIB_FUZZING_ENGINE})
+endif()
 
 if(UNIX)
     set(ADDITIONAL_TEST_LIBS m)
@@ -744,9 +769,9 @@ function(get_link_libraries OUT TARGET)
 endfunction()
 
 get_link_libraries(PRIVATE_LIBS vncserver)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
 get_link_libraries(PRIVATE_LIBS vncclient)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
 
 if(LIBVNCSERVER_INSTALL)
     set(INSTALL_HEADER_FILES

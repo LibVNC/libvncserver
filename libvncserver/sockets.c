@@ -419,26 +419,26 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
     rfbScreen->socketState = RFB_SOCKET_SHUTDOWN;
 
     if(rfbScreen->inetdSock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->inetdSock);
 	FD_CLR(rfbScreen->inetdSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->inetdSock);
 	rfbScreen->inetdSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->listenSock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->listenSock);
 	FD_CLR(rfbScreen->listenSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->listenSock);
 	rfbScreen->listenSock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->listen6Sock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->listen6Sock);
 	FD_CLR(rfbScreen->listen6Sock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->listen6Sock);
 	rfbScreen->listen6Sock=RFB_INVALID_SOCKET;
     }
 
     if(rfbScreen->udpSock!=RFB_INVALID_SOCKET) {
-	rfbCloseSocket(rfbScreen->udpSock);
 	FD_CLR(rfbScreen->udpSock,&rfbScreen->allFds);
+	rfbCloseSocket(rfbScreen->udpSock);
 	rfbScreen->udpSock=RFB_INVALID_SOCKET;
     }
 
@@ -669,6 +669,9 @@ rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen)
 void
 rfbCloseClient(rfbClientPtr cl)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    cl->sock = RFB_INVALID_SOCKET;
+#endif
     rfbExtensionData* extension;
 
     for(extension=cl->extensions; extension; extension=extension->next)
@@ -762,6 +765,12 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
     return sock;
 }
 
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+size_t fuzz_offset;
+size_t fuzz_size;
+const uint8_t *fuzz_data;
+#endif
+
 /*
  * ReadExact reads an exact number of bytes from a client.  Returns 1 if
  * those bytes have been read, 0 if the other end has closed, or -1 if an error
@@ -771,6 +780,14 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
 int
 rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    if (fuzz_offset + len <= fuzz_size) {
+        memcpy(buf, fuzz_data + fuzz_offset, len);
+        fuzz_offset += len;
+        return 1;
+    }
+    return 0;
+#endif
     rfbSocket sock = cl->sock;
     int n;
     fd_set fds;
@@ -863,6 +880,14 @@ int rfbReadExact(rfbClientPtr cl,char* buf,int len)
 int
 rfbPeekExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    if (fuzz_offset + len <= fuzz_size) {
+        memcpy(buf, fuzz_data + fuzz_offset, len);
+        fuzz_offset += len;
+        return 1;
+    }
+    return 0;
+#endif
     rfbSocket sock = cl->sock;
     int n;
     fd_set fds;
@@ -941,6 +966,9 @@ rfbWriteExact(rfbClientPtr cl,
               const char *buf,
               int len)
 {
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    return 1;
+#endif
     rfbSocket sock = cl->sock;
     int n;
     fd_set fds;
@@ -1361,18 +1389,30 @@ rfbConnectToTcpAddr(char *host,
         if ((sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == RFB_INVALID_SOCKET)
             continue;
 
-        if (connect(sock, p->ai_addr, p->ai_addrlen) < 0) {
-            rfbCloseSocket(sock);
-            continue;
-        }
-
-        break;
+	if (sock_set_nonblocking(sock, TRUE, rfbErr)) {
+	    if (connect(sock, p->ai_addr, p->ai_addrlen) == 0) {
+		break;
+	    } else {
+#ifdef WIN32
+		errno=WSAGetLastError();
+#endif
+		if ((errno == EWOULDBLOCK || errno == EINPROGRESS) && sock_wait_for_connected(sock, rfbMaxClientWait/1000))
+		    break;
+		rfbCloseSocket(sock);
+	    }
+	} else {
+	    rfbCloseSocket(sock);
+	}
     }
 
     /* all failed */
     if (p == NULL) {
         rfbLogPerror("rfbConnectToTcoAddr: failed to connect\n");
         sock = RFB_INVALID_SOCKET; /* set return value */
+    } else {
+	/* one succeeded, re-set to blocking */
+	if (!sock_set_nonblocking(sock, FALSE, rfbErr))
+	    rfbCloseSocket(sock);
     }
 
     /* all done with this structure now */
@@ -1398,10 +1438,27 @@ rfbConnectToTcpAddr(char *host,
 	return RFB_INVALID_SOCKET;
     }
 
-    if (connect(sock, (struct sockaddr *)&addr, (sizeof(addr))) < 0) {
+    if (!sock_set_nonblocking(sock, TRUE, rfbErr)) {
 	rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
+
+    if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+#ifdef WIN32
+	errno=WSAGetLastError();
+#endif
+	if (!((errno == EWOULDBLOCK || errno == EINPROGRESS) && sock_wait_for_connected(sock, rfbMaxClientWait/1000))) {
+	    rfbErr("rfbConnectToTcpAddr: connect\n");
+	    rfbCloseSocket(sock);
+	    return RFB_INVALID_SOCKET;
+	}
+    }
+
+    if (!sock_set_nonblocking(sock, FALSE, rfbErr)) {
+	rfbCloseSocket(sock);
+	return RFB_INVALID_SOCKET;
+    }
+
 #endif
     return sock;
 }
@@ -1440,18 +1497,7 @@ rfbListenOnUDPPort(int port,
 rfbBool
 rfbSetNonBlocking(rfbSocket sock)
 {
-#ifdef WIN32
-  unsigned long block=1;
-  if(ioctlsocket(sock, FIONBIO, &block) == SOCKET_ERROR) {
-    errno=WSAGetLastError();
-#else
-  int flags = fcntl(sock, F_GETFL);
-  if(flags < 0 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
-#endif
-    rfbLogPerror("Setting socket to non-blocking failed");
-    return FALSE;
-  }
-  return TRUE;
+    return sock_set_nonblocking(sock, TRUE, rfbLog);
 }
 
 
