@@ -2526,7 +2526,7 @@ HandleRFBServerMessage(rfbClient* client)
     if (client->appData.clipboardEnabledCap && ilen >= 0) {
       if (!client->GotXCutTextFallback) {
         rfbClientLog("extend clipboardCap enabled but msg len:%d >= 0. no fallback callback. ignore\n", ilen);
-	return FALSE;
+        return FALSE;
       } else {
         rfbClientLog("extend clipboardCap enabled but msg len:%d >= 0. fallback\n", ilen);
         fallback = TRUE;
