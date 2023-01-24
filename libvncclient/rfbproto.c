@@ -1446,6 +1446,13 @@ SetFormatAndEncodings(rfbClient* client)
   if (se->nEncodings < MAX_ENCODINGS)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingQemuExtendedKeyEvent);
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+  /* extendedclipboard */
+  if (client->appData.clipboardCap)
+    if (se->nEncodings < MAX_ENCODINGS)
+      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingExtendedClipboard);
+#endif
+
   /* client extensions */
   for(e = rfbClientExtensions; e; e = e->next)
     if(e->encodings) {
@@ -1769,6 +1776,78 @@ SendExtendedKeyEvent(rfbClient* client, uint32_t keysym, uint32_t keycode, rfbBo
 }
 
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+/*
+ * sendClientCutTextNotify
+ * it is needed when client send utf8 clipboard data
+ * please refer to
+ * https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#extended-clipboard-pseudo-encoding
+ * to supprot utf-8 clipboard we need at least support notify and text
+ */
+
+static rfbBool
+sendExtClientCutTextNotify(rfbClient *client)
+{
+  rfbClientCutTextMsg cct = {0, };
+  const uint32_t be_flags = rfbClientSwap32IfLE(rfbExtendedClipboard_Notify
+                                                | rfbExtendedClipboard_Text); /*text and notify*/
+  cct.type = rfbClientCutText;
+  cct.length = rfbClientSwap32IfLE(-((uint32_t)sizeof(be_flags)));/*flag*/
+  rfbBool ret = WriteToRFBServer(client, (char *)&cct, sz_rfbClientCutTextMsg)
+                && WriteToRFBServer(client, (char *)&be_flags, sizeof(be_flags));
+  return ret;
+}
+
+
+/*
+ * sendClientCutTextProvide
+ * it need send notify first to grab clipboard (server will check that)
+ */
+
+static rfbBool
+sendExtClientCutTextProvide(rfbClient *client, char* data, int len)
+{
+  rfbClientCutTextMsg cct = {0, };
+  const uint32_t be_flags = rfbClientSwap32IfLE(rfbExtendedClipboard_Provide
+                                                | rfbExtendedClipboard_Text); /*text and provide*/
+  const uint32_t be_size = rfbClientSwap32IfLE(len);
+  const size_t sz_to_compressed = sizeof(be_size) + len; /*size, data*/
+  size_t csz = compressBound(sz_to_compressed + 1); /*tricky, some server need extar byte to flush data*/
+
+  unsigned char *buf = malloc(sz_to_compressed + 1); /*tricky, some server need extra byte to flush data*/
+  if (!buf) {
+    rfbClientLog("sendExtClientCutTextProvide. alloc buf failed\n");
+    return FALSE;
+  }
+  memcpy(buf, &be_size, sizeof(be_size));
+  memcpy(buf + sizeof(be_size), data, len);
+  buf[sz_to_compressed] = 0;
+
+  unsigned char *cbuf = malloc(sizeof(be_flags) + csz); /*flag, compressed*/
+  if (!cbuf) {
+    rfbClientLog("sendExtClientCutTextProvide. alloc cbuf failed\n");
+    free(buf);
+    return FALSE;
+  }
+  memcpy(cbuf, &be_flags, sizeof(be_flags));
+  if (compress(cbuf + sizeof(be_flags), &csz, buf, sz_to_compressed + 1) != Z_OK) {
+    rfbClientLog("sendExtClientCutTextProvide: compress cbuf failed\n");
+    free(buf);
+    free(cbuf);
+    return FALSE;
+  }
+
+  cct.type = rfbClientCutText;
+  cct.length = rfbClientSwap32IfLE(-(sizeof(be_flags) + csz));/*flag, compressed*/
+  rfbBool ret = sendExtClientCutTextNotify(client)
+                && WriteToRFBServer(client, (char *)&cct, sz_rfbClientCutTextMsg)
+                && WriteToRFBServer(client, (char *)cbuf, sizeof(be_flags) + csz);
+  free(buf);
+  free(cbuf);
+  return ret;
+}
+#endif
+
 /*
  * SendClientCutText.
  */
@@ -1780,6 +1859,12 @@ SendClientCutText(rfbClient* client, char *str, int len)
 
   if (!SupportsClient2Server(client, rfbClientCutText)) return TRUE;
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+  if (client->appData.clipboardEnabledCap) { /* if enabled extended clipboard, use it */
+    return sendExtClientCutTextProvide(client, str, len);
+  }
+#endif
+
   memset(&cct, 0, sizeof(cct));
   cct.type = rfbClientCutText;
   cct.length = rfbClientSwap32IfLE(len);
@@ -1787,6 +1872,101 @@ SendClientCutText(rfbClient* client, char *str, int len)
 	   WriteToRFBServer(client, str, len));
 }
 
+
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+/*
+ * process server clipboard extend text
+ */
+
+static rfbBool
+rfbClientProcessExtServerCutText(rfbClient* client, char *data, int len)
+{
+  uint32_t flags;
+  if (len < sizeof(flags)) {
+    rfbClientLog("rfbClientProcessExtServerCutText. len < 4\n");
+    return FALSE;
+  }
+  memcpy(&flags, data, sizeof(flags));
+  data += sizeof(flags);
+  len -= sizeof(flags);
+  flags = rfbClientSwap32IfLE(flags);
+
+  /*
+   * only process (text | provide). Ignore all others
+   * modify here if need more types(rtf,html,dib,files)
+   */
+  if (!(flags & rfbExtendedClipboard_Text)) {
+    rfbClientLog("rfbClientProcessExtServerCutText. not text type. ignore\n");
+    return TRUE;
+  }
+  if (!(flags & rfbExtendedClipboard_Provide)) {
+    rfbClientLog("rfbClientProcessExtServerCutText. not provide type. ignore\n");
+    return TRUE;
+  }
+  if (flags & rfbExtendedClipboard_Caps) {
+    rfbClientLog("rfbClientProcessExtServerCutText. default cap.\n");
+    client->appData.clipboardEnabledCap |= rfbExtendedClipboard_Text; /* for now, only text */
+    return TRUE;
+  }
+
+  z_stream stream;
+  stream.zalloc = NULL;
+  stream.zfree = NULL;
+  stream.opaque = NULL;
+  stream.avail_in = 0;
+  stream.next_in = NULL;
+  if (inflateInit(&stream) != Z_OK) {
+    rfbClientLog("rfbClientProcessExtServerCutText. inflateInit failed\n");
+    return FALSE;
+  }
+  stream.avail_in = len;
+  stream.next_in = (unsigned char *)data;
+
+  uint32_t size;
+  stream.avail_out = sizeof(size);
+  stream.next_out = (unsigned char *)&size;
+  if (inflate(&stream, Z_SYNC_FLUSH) != Z_OK) {
+    rfbClientLog("rfbClientProcessExtServerCutText. inflate size failed\n");
+    inflateEnd(&stream);
+    return FALSE;
+  }
+  size = rfbClientSwap32IfLE(size);
+  if (size > (1 << 20)) {
+    rfbClientLog("rfbClientProcessExtServerCutText. size too large\n");
+    inflateEnd(&stream);
+    return FALSE;
+  }
+
+  unsigned char *buf = malloc(size);
+  if (!buf) {
+    rfbClientLog("rfbClientProcessExtServerCutText. alloc buf failed\n");
+    inflateEnd(&stream);
+    return FALSE;
+  }
+  stream.avail_out = size;
+  stream.next_out = buf;
+  uLong out_before = stream.total_out;
+  int err = inflate(&stream, Z_SYNC_FLUSH);
+  if (err != Z_OK && err != Z_STREAM_END) {
+    rfbClientLog("rfbClientProcessExtServerCutText. inflate buf failed\n");
+    free(buf);
+    inflateEnd(&stream);
+    return FALSE;
+  }
+  if ((stream.total_out - out_before) != size) {
+    rfbClientLog("rfbClientProcessExtServerCutText. inflate size error\n");
+    free(buf);
+    inflateEnd(&stream);
+    return FALSE;
+  }
+  if (client->GotXCutText)
+    client->GotXCutText(client, (char *)buf, size);
+  free(buf);
+
+  inflateEnd(&stream);
+  return TRUE;
+}
+#endif
 
 
 /*
@@ -2332,12 +2512,31 @@ HandleRFBServerMessage(rfbClient* client)
   case rfbServerCutText:
   {
     char *buffer;
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    int32_t ilen; /* also as a flag, if ilen < 0, it is ext clipboard text */
+    rfbBool fallback = FALSE;
+#endif
 
     if (!ReadFromRFBServer(client, ((char *)&msg) + 1,
 			   sz_rfbServerCutTextMsg - 1))
       return FALSE;
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    ilen = rfbClientSwap32IfLE(msg.sct.length);
+    if (client->appData.clipboardEnabledCap && ilen >= 0) {
+      if (!client->GotXCutTextFallback) {
+        rfbClientLog("extend clipboardCap enabled but msg len:%d >= 0. no fallback callback. ignore\n", ilen);
+	return FALSE;
+      } else {
+        rfbClientLog("extend clipboardCap enabled but msg len:%d >= 0. fallback\n", ilen);
+        fallback = TRUE;
+      }
+    }
+
+    msg.sct.length = ilen < 0 ? -ilen : ilen;
+#else
     msg.sct.length = rfbClientSwap32IfLE(msg.sct.length);
+#endif
 
     if (msg.sct.length > 1<<20) {
 	    rfbClientErr("Ignoring too big cut text length sent by server: %u B > 1 MB\n", (unsigned int)msg.sct.length);
@@ -2353,8 +2552,20 @@ HandleRFBServerMessage(rfbClient* client)
 
     buffer[msg.sct.length] = 0;
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+    if (fallback) {
+      client->GotXCutTextFallback(client, buffer, msg.sct.length);
+    } else if (ilen < 0) {
+      if (!rfbClientProcessExtServerCutText(client, buffer, -ilen)) {
+        free(buffer);
+        return FALSE;
+      }
+    } else if (client->GotXCutText)
+      client->GotXCutText(client, buffer, msg.sct.length);
+#else
     if (client->GotXCutText)
       client->GotXCutText(client, buffer, msg.sct.length);
+#endif
 
     free(buffer);
 
