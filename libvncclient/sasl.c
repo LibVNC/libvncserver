@@ -128,6 +128,8 @@ static int password_callback_adapt(sasl_conn_t *conn,
 
    strcpy((char *)lsec->data, password);
    lsec->len = strlen(password);
+   if (client->saslSecret)
+       free(client->saslSecret);
    client->saslSecret = lsec;
    *secret = lsec;
 
@@ -170,7 +172,8 @@ HandleSASLAuth(rfbClient *client)
     char *wantmech;
     const char *mechname;
 
-    client->saslconn = NULL;
+    if (client->saslconn)
+        sasl_dispose(&client->saslconn);
 
     /* Sets up the SASL library as a whole */
     err = sasl_client_init(NULL);
