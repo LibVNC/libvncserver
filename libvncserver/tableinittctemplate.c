@@ -126,7 +126,7 @@ rfbInitOneRGBTableOUT (OUT_T *table, int inMax, int outMax, int outShift,
     int nEntries = inMax + 1;
 
     for (i = 0; i < nEntries; i++) {
-        table[i] = ((i * outMax + inMax / 2) / inMax) << outShift;
+        table[i] = ((OUT_T)((i * outMax + inMax / 2) / inMax)) << outShift;
 #if (OUT != 8)
         if (swap) {
             table[i] = SwapOUT(table[i]);
