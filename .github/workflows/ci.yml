@@ -74,31 +74,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev abi-dumper abi-compliance-checker universal-ctags
-      - name: Build libraries
-        env:
-          CFLAGS: "-gdwarf-4 -Og"      
-        run: |
-          mkdir build
-          cd build
-          cmake ..
-          cmake --build . --target vncclient
-          cmake --build . --target vncserver
       - name: Check ABI
-        run: |
-          mkdir abi-check
-          cd abi-check
-          abi-dumper -lver $GITHUB_REF_NAME ../build/libvncclient.so -o client-abi-new.dump -public-headers ../rfb
-          abi-dumper -lver $GITHUB_REF_NAME ../build/libvncserver.so -o server-abi-new.dump -public-headers ../rfb
-          abi-compliance-checker -l LibVNCClient  -old ../utils/abi/client-abi-v1.dump -new client-abi-new.dump -report-path client-report.html 
-          abi-compliance-checker -l LibVNCServer  -old ../utils/abi/server-abi-v1.dump -new server-abi-new.dump -report-path server-report.html 
-      
+        run: ./test/abi/abi-check.py
       - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: abi-check-result
-          path: abi-check
+          path: test/abi/abi-check-result
             
