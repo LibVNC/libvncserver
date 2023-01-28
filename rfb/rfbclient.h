@@ -136,13 +136,6 @@ typedef struct {
   rfbBool useRemoteCursor;
   rfbBool palmVNC;  /**< use palmvnc specific SetScale (vs ultravnc) */
   int scaleSetting; /**< 0 means no scale set, else 1/scaleSetting */
-#ifdef LIBVNCSERVER_HAVE_LIBZ
-  uint32_t clipboardCap; /**extended clipboard pseudo-encoding cap */
-                         /**it is bitset as rfb3.8, current only support text */
-                         /**client set it to rfbExtendedClipboard_Text for now */
-  uint32_t clipboardEnabledCap; /**enabled cap which confirmed by server */
-                                /**client can use it as a check for server cap */
-#endif
 } AppData;
 
 /** For GetCredentialProc callback function to return */
@@ -486,6 +479,11 @@ typedef struct _rfbClient {
 	rfbExtDesktopScreen screen;
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
+	uint32_t clipboardCap; /**extended clipboard pseudo-encoding cap */
+	                       /**it is bitset as rfb3.8, current only support text */
+	                       /**client set it to rfbExtendedClipboard_Text for now */
+	uint32_t clipboardEnabledCap; /**enabled cap which confirmed by server */
+	                              /**client can use it as a check for server cap */
 	/**
 	 * Used for extended clipboard text fallback
 	 * When server announce cap of utf8, but still send latin-1

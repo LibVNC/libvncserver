@@ -1448,7 +1448,7 @@ SetFormatAndEncodings(rfbClient* client)
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
   /* extendedclipboard */
-  if (client->appData.clipboardCap)
+  if (client->clipboardCap)
     if (se->nEncodings < MAX_ENCODINGS)
       encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingExtendedClipboard);
 #endif
@@ -1860,7 +1860,7 @@ SendClientCutText(rfbClient* client, char *str, int len)
   if (!SupportsClient2Server(client, rfbClientCutText)) return TRUE;
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-  if (client->appData.clipboardEnabledCap) { /* if enabled extended clipboard, use it */
+  if (client->clipboardEnabledCap) { /* if enabled extended clipboard, use it */
     return sendExtClientCutTextProvide(client, str, len);
   }
 #endif
@@ -1905,7 +1905,7 @@ rfbClientProcessExtServerCutText(rfbClient* client, char *data, int len)
   }
   if (flags & rfbExtendedClipboard_Caps) {
     rfbClientLog("rfbClientProcessExtServerCutText. default cap.\n");
-    client->appData.clipboardEnabledCap |= rfbExtendedClipboard_Text; /* for now, only text */
+    client->clipboardEnabledCap |= rfbExtendedClipboard_Text; /* for now, only text */
     return TRUE;
   }
 
@@ -2523,7 +2523,7 @@ HandleRFBServerMessage(rfbClient* client)
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     ilen = rfbClientSwap32IfLE(msg.sct.length);
-    if (client->appData.clipboardEnabledCap && ilen >= 0) {
+    if (client->clipboardEnabledCap && ilen >= 0) {
       if (!client->GotXCutTextFallback) {
         rfbClientLog("extend clipboardCap enabled but msg len:%d >= 0. no fallback callback. ignore\n", ilen);
         return FALSE;
