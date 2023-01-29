@@ -40,6 +40,7 @@ test/cargstest
 test/copyrecttest
 test/encodingstest
 test/wstest
+test/abi/abi-check-result
 /test/tjbench
 /test/tjunittest
 vncterm/LinuxVNC
