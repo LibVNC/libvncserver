@@ -560,10 +560,14 @@ clientInput(void *data)
 	tv.tv_sec = 60; /* 1 minute */
 	tv.tv_usec = 0;
 
+retry:
 	n = select(nfds + 1, &rfds, &wfds, &efds, &tv);
 
 	if (n < 0) {
 	    rfbLogPerror("ReadExact: select");
+        if (errno == EINTR) {
+            goto retry;
+        }
 	    break;
 	}
 	if (n == 0) /* timeout */
