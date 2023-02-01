@@ -47,6 +47,7 @@
 #include "crypto.h"
 #include "ws_decode.h"
 #include "base64.h"
+#include "private.h"
 
 #if 0
 #include <sys/syscall.h>
@@ -85,8 +86,6 @@ struct timeval
 }
 ;
 #endif
-
-static rfbBool webSocketsHandshake(rfbClientPtr cl, char *scheme);
 
 static int webSocketsEncodeHybi(rfbClientPtr cl, const char *src, int len, char **dst);
 
@@ -151,15 +150,15 @@ webSocketsCheck (rfbClientPtr cl)
 
     rfbLog("Got '%s' WebSockets handshake\n", scheme);
 
-    if (!webSocketsHandshake(cl, scheme)) {
+    if (!webSocketsHandshake(cl, scheme, NULL)) {
         return FALSE;
     }
     /* Start WebSockets framing */
     return TRUE;
 }
 
-static rfbBool
-webSocketsHandshake(rfbClientPtr cl, char *scheme)
+rfbBool
+webSocketsHandshake(rfbClientPtr cl, char *scheme, const char *httpHeaders)
 {
     char *buf, *response, *line;
     int n, linestart = 0, len = 0, llen, base64 = FALSE;
@@ -183,7 +182,13 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     }
 
     while (len < WEBSOCKETS_MAX_HANDSHAKE_LEN-1) {
-        if ((n = rfbReadExactTimeout(cl, buf+len, 1,
+        if (httpHeaders) {
+            buf[len] = httpHeaders[0];
+            if (!httpHeaders[0])
+                break;
+            httpHeaders++;
+        }
+        else if ((n = rfbReadExactTimeout(cl, buf+len, 1,
                                      WEBSOCKETS_CLIENT_SEND_WAIT_MS)) <= 0) {
             if ((n < 0) && (errno == ETIMEDOUT)) {
                 break;
