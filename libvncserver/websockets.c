@@ -74,8 +74,7 @@ Connection: Upgrade\r\n\
 Sec-WebSocket-Accept: %s\r\n\
 \r\n"
 
-#define WEBSOCKETS_CLIENT_CONNECT_WAIT_MS 100
-#define WEBSOCKETS_CLIENT_SEND_WAIT_MS 100
+#define WEBSOCKETS_CLIENT_CONNECT_WAIT_MS 500
 #define WEBSOCKETS_MAX_HANDSHAKE_LEN 4096
 
 #if defined(__linux__) && defined(NEED_TIMEVAL)
@@ -119,8 +118,17 @@ webSocketsCheck (rfbClientPtr cl)
     char bbuf[4], *scheme;
     int ret;
 
-    ret = rfbPeekExactTimeout(cl, bbuf, 4,
-                                   WEBSOCKETS_CLIENT_CONNECT_WAIT_MS);
+    int timeout = WEBSOCKETS_CLIENT_CONNECT_WAIT_MS;
+    switch (cl->screen->handshake_type) {
+        case RFB_HANDSHAKE_AUTO:
+            timeout = cl->screen->maxClientWait ? cl->screen->maxClientWait : rfbMaxClientWait;
+            break;
+        case RFB_HANDSHAKE_WEBSOCKET:
+            timeout = WEBSOCKETS_CLIENT_CONNECT_WAIT_MS;
+            break;
+    }
+
+    ret = rfbPeekExactTimeout(cl, bbuf, 4, timeout);
     if ((ret < 0) && (errno == ETIMEDOUT)) {
       rfbLog("Normal socket connection\n");
       return TRUE;
@@ -138,7 +146,7 @@ webSocketsCheck (rfbClientPtr cl)
 	  rfbErr("webSocketsHandshake: rfbssl_init failed\n");
 	  return FALSE;
 	}
-	ret = rfbPeekExactTimeout(cl, bbuf, 4, WEBSOCKETS_CLIENT_CONNECT_WAIT_MS);
+	ret = rfbPeekExactTimeout(cl, bbuf, 4, timeout);
         scheme = "wss";
     } else {
         scheme = "ws";
@@ -183,8 +191,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     }
 
     while (len < WEBSOCKETS_MAX_HANDSHAKE_LEN-1) {
-        if ((n = rfbReadExactTimeout(cl, buf+len, 1,
-                                     WEBSOCKETS_CLIENT_SEND_WAIT_MS)) <= 0) {
+        if ((n = rfbReadExact(cl, buf+len, 1)) <= 0) {
             if ((n < 0) && (errno == ETIMEDOUT)) {
                 break;
             }
