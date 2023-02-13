@@ -149,9 +149,9 @@ See the [LibVNCServer API intro documentation](https://libvnc.github.io/doc/html
 for how to create a server instance, wire up input handlers and handle cursors.
 
 In case you prefer to learn LibVNCServer by example, have a look at the servers in the
-[examples](examples) directory. 
+[examples/server](examples/server) directory. 
 
-For LibVNCClient, examples can be found in [client_examples](client_examples).
+For LibVNCClient, examples can be found in [examples/client](examples/client).
 
 Incorporating LibVNCServer/LibVNCClient into your build system
 --------------------------------------------------------------
