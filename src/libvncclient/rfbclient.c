@@ -20,7 +20,7 @@
  */
 
 /*
- * rfbproto.c - functions to deal with client side of RFB protocol.
+ * rfbclient.c - functions to deal with client side of RFB protocol.
  */
 
 #ifdef __STRICT_ANSI__
