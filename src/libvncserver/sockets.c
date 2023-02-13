@@ -794,10 +794,12 @@ int rfbReadExact(rfbClientPtr cl,char* buf,int len)
     return(rfbReadExactTimeout(cl,buf,len,rfbMaxClientWait));
 }
 
-inline static unsigned min(unsigned a, unsigned b)
+#ifndef min
+inline static int min(int a, int b)
 {
     return a > b ? b : a;
 }
+#endif
 
 /*
  * SkipExact reads an exact number of bytes on a TCP socket into a temporary
@@ -921,7 +923,7 @@ rfbWriteExact(rfbClientPtr cl,
     return 1;
 #endif
     rfbSocket sock = cl->sock;
-    int n;
+    int n, bytesWritten = 0;
     fd_set fds;
     struct timeval tv;
     int totalTimeWaited = 0;
@@ -972,6 +974,7 @@ rfbWriteExact(rfbClientPtr cl,
 
             buf += n;
             len -= n;
+            bytesWritten += n;
 
         } else if (n == 0) {
 
@@ -1023,6 +1026,7 @@ rfbWriteExact(rfbClientPtr cl,
         }
     }
     UNLOCK(cl->outputMutex);
+    cl->sockOffset += bytesWritten;
     return 1;
 }
 

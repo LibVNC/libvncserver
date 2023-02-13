@@ -43,6 +43,8 @@ rfbUsage(void)
                                                              "new non-shared\n"
                     "                       connection comes in (refuse new connection "
                                                                 "instead)\n");
+    fprintf(stderr, "-noflowcontrol         when continuous updates are enabled, send updates\n"
+                    "                       whether or not the viewer is ready to receive them\n");
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
     fprintf(stderr, "-sslkeyfile path       set path to private key file for encrypted WebSockets connections\n");
     fprintf(stderr, "-sslcertfile path      set path to certificate file for encrypted WebSockets connections\n");
@@ -158,6 +160,8 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
             rfbScreen->neverShared = TRUE;
         } else if (strcmp(argv[i], "-dontdisconnect") == 0) {
             rfbScreen->dontDisconnect = TRUE;
+        } else if (strcmp(argv[i], "-noflowcontrol") == 0) {
+           rfbScreen->rfbCongestionControl = FALSE;
         } else if (strcmp(argv[i], "-httpdir") == 0) {  /* -httpdir directory-path */
             if (i + 1 >= *argc) {
 		rfbUsage();

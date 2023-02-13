@@ -388,6 +388,7 @@ set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/ultra.c
     ${LIBVNCSERVER_DIR}/scale.c
     ${CRYPTO_SOURCES}
+    ${LIBVNCSERVER_DIR}/flowcontrol.c
     ${LIBVNCSERVER_DIR}/rfbtimers.c
 )
 

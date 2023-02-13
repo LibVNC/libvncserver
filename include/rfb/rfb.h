@@ -41,7 +41,9 @@ extern "C"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <rfb/rfblist.h>
 #include <rfb/rfbproto.h>
+#include <rfb/rfbtimers.h>
 
 #if defined(ANDROID) || defined(LIBVNCSERVER_HAVE_ANDROID)
 #include <arpa/inet.h>
@@ -372,7 +374,16 @@ typedef struct _rfbScreenInfo
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     rfbSetXCutTextUTF8ProcPtr setXCutTextUTF8;
 #endif
+    rfbBool rfbCongestionControl;
 } rfbScreenInfo, *rfbScreenInfoPtr;
+
+
+typedef struct {
+  struct timeval tv;
+  unsigned pos, extra;
+  char congested;
+  struct rfb_list entry;
+} rfbRTTInfo;
 
 
 /**
@@ -707,6 +718,34 @@ typedef struct _rfbClientRec {
     int tightPngDstDataLen;
 #endif
 #endif
+
+    /* flow control extensions */
+
+    rfbBool enableCU;                 /**< client supports Continuous Updates */
+    rfbBool enableFence;              /**< client supports fence extension */
+
+    rfbBool continuousUpdates;
+    sraRegionPtr cuRegion;
+
+    rfbTimersPtr timers;
+
+    rfbBool pendingSyncFence, syncFence;
+    uint32_t fenceFlags;
+    unsigned fenceDataLen;
+    char fenceData[64];
+
+    unsigned lastPosition, extraBuffer;
+    struct timeval lastUpdate, lastSent;
+    unsigned baseRTT, congWindow;
+    rfbBool inSlowStart;
+    int sockOffset;
+    struct rfb_list pings;
+    rfbTimerPtr congestionTimer;
+    rfbRTTInfo lastPong;
+    struct timeval lastPongArrival;
+    int measurements;
+    struct timeval lastAdjustment;
+    unsigned minRTT, minCongestedRTT;
 } rfbClientRec, *rfbClientPtr;
 
 /**
@@ -755,9 +794,12 @@ extern int rfbMaxClientWait;
 
 extern void rfbInitSockets(rfbScreenInfoPtr rfbScreen);
 extern void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen);
+extern void rfbCorkSock(int sock);
+extern void rfbUncorkSock(int sock);
 extern void rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen);
 extern void rfbCloseClient(rfbClientPtr cl);
 extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
+extern int rfbSkipExact(rfbClientPtr cl, int len);
 extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbPeekExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);

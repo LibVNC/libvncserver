@@ -77,6 +77,7 @@
 #endif
 #elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
 #include <process.h>
+#include <windows.h>
 #define LOCK(mutex)                   EnterCriticalSection(&(mutex))
 #define UNLOCK(mutex)                 LeaveCriticalSection(&(mutex))
 #define MUTEX(mutex)                  CRITICAL_SECTION (mutex)
