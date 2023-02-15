@@ -20,6 +20,7 @@
  */
 
 /*
+ *  Copyright (C) 2012-2020, 2022-2023 D. R. Commander
  *  Copyright (C) 2011-2012 Christian Beier <dontmind@freeshell.org>
  *  Copyright (C) 2005 Rohit Kumar, Johannes E. Schindelin
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
@@ -330,6 +331,52 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
 	errno=WSAGetLastError();
 	rfbLogPerror("Could not terminate Windows Sockets\n");
     }
+#endif
+}
+
+/*
+ * rfbCorkSock enables the TCP cork functionality on Linux to inform the TCP
+ * layer to send only complete packets
+ */
+
+void rfbCorkSock(int sock)
+{
+  static int alreadywarned = 0;
+#ifdef TCP_CORK
+  int one = 1;
+
+  if (setsockopt(sock, IPPROTO_TCP, TCP_CORK, (char *)&one, sizeof(one)) < 0) {
+    if (!alreadywarned) {
+      rfbLogPerror("Could not enable TCP corking");
+      alreadywarned = 1;
+    }
+  }
+#else
+  if (!alreadywarned) {
+    rfbLogPerror("TCP corking not available on this system.");
+    alreadywarned = 1;
+  }
+#endif
+}
+
+
+/*
+ * rfbUncorkSock disables corking and sends all partially-complete packets
+ */
+
+void rfbUncorkSock(int sock)
+{
+#ifdef TCP_CORK
+  static int alreadywarned = 0;
+  int zero = 0;
+
+  if (setsockopt(sock, IPPROTO_TCP, TCP_CORK, (char *)&zero,
+                 sizeof(zero)) < 0) {
+    if (!alreadywarned) {
+      rfbLogPerror("Could not disable TCP corking");
+      alreadywarned = 1;
+    }
+  }
 #endif
 }
 
