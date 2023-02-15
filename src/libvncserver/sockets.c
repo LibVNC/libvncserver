@@ -794,6 +794,34 @@ int rfbReadExact(rfbClientPtr cl,char* buf,int len)
     return(rfbReadExactTimeout(cl,buf,len,rfbMaxClientWait));
 }
 
+inline static unsigned min(unsigned a, unsigned b)
+{
+    return a > b ? b : a;
+}
+
+/*
+ * SkipExact reads an exact number of bytes on a TCP socket into a temporary
+ * buffer and then discards them.  Returns 1 on success, 0 if the other end has
+ * closed, or -1 if an error occurred (errno is set to ETIMEDOUT if it timed
+ * out).
+ */
+
+int rfbSkipExact(rfbClientPtr cl, int len)
+{
+  char *tmpbuf = NULL;
+  int bufLen = min(len, 65536), i, retval = 1;
+
+  tmpbuf = (char *)malloc(bufLen);
+
+  for (i = 0; i < len; i += bufLen) {
+    retval = rfbReadExact(cl, tmpbuf, min(bufLen, len - i));
+    if (retval <= 0) break;
+  }
+
+  free(tmpbuf);
+  return retval;
+}
+
 /*
  * PeekExact peeks at an exact number of bytes from a client.  Returns 1 if
  * those bytes have been read, 0 if the other end has closed, or -1 if an
