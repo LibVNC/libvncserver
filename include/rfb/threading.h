@@ -26,11 +26,20 @@
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 #include <pthread.h>
+#define RFB_THREADING_GLUE_DETAIL(x, y) x ## y
+#define RFB_THREADING_GLUE(x, y) RFB_THREADING_GLUE_DETAIL(x, y)
 #if 0 /* debugging */
 #define LOCK(mutex)                   (rfbLog("%s:%d LOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_lock(&(mutex)))
 #define UNLOCK(mutex)                 (rfbLog("%s:%d UNLOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_unlock(&(mutex)))
 #define MUTEX(mutex)                  pthread_mutex_t (mutex)
 #define INIT_MUTEX(mutex)             (rfbLog("%s:%d INIT_MUTEX(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_init(&(mutex),NULL))
+#define INIT_MUTEX_RECURSIVE(mutex)   do { \
+                                         rfbLog("%s:%d INIT_MUTEX_RECURSIVE(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex); \
+                                         pthread_mutexattr_t RFB_THREADING_GLUE(recattr, __LINE__); \
+                                         pthread_mutexattr_settype(&RFB_THREADING_GLUE(recattr, __LINE__), PTHREAD_MUTEX_RECURSIVE); \
+                                         pthread_mutex_init(&(mutex), &RFB_THREADING_GLUE(recattr, __LINE__)); \
+                                         pthread_mutexattr_destroy(&RFB_THREADING_GLUE(recattr, __LINE__)); \
+                                      } while (0)
 #define TINI_MUTEX(mutex)             (rfbLog("%s:%d TINI_MUTEX(%s)\n",__FILE__,__LINE__,#mutex), pthread_mutex_destroy(&(mutex)))
 #define TSIGNAL(cond)                 (rfbLog("%s:%d TSIGNAL(%s)\n",__FILE__,__LINE__,#cond), pthread_cond_signal(&(cond)))
 #define WAIT(cond,mutex)              (rfbLog("%s:%d WAIT(%s,%s)\n",__FILE__,__LINE__,#cond,#mutex), pthread_cond_wait(&(cond),&(mutex)))
@@ -46,6 +55,13 @@
 #define MUTEX(mutex)                  pthread_mutex_t (mutex)
 #define MUTEX_SIZE                    (sizeof(pthread_mutex_t))
 #define INIT_MUTEX(mutex)             pthread_mutex_init(&(mutex),NULL)
+#define INIT_MUTEX_RECURSIVE(mutex)   do { \
+                                         pthread_mutexattr_t RFB_THREADING_GLUE(recattr, __LINE__); \
+                                         pthread_mutexattr_init(&RFB_THREADING_GLUE(recattr, __LINE__)); \
+                                         pthread_mutexattr_settype(&RFB_THREADING_GLUE(recattr, __LINE__), PTHREAD_MUTEX_RECURSIVE); \
+                                         pthread_mutex_init(&(mutex), &RFB_THREADING_GLUE(recattr, __LINE__)); \
+                                         pthread_mutexattr_destroy(&RFB_THREADING_GLUE(recattr, __LINE__)); \
+                                      } while (0)
 #define TINI_MUTEX(mutex)             pthread_mutex_destroy(&(mutex))
 #define TSIGNAL(cond)                 pthread_cond_signal(&(cond))
 #define WAIT(cond,mutex)              pthread_cond_wait(&(cond),&(mutex))
@@ -66,6 +82,7 @@
 #define MUTEX(mutex)                  CRITICAL_SECTION (mutex)
 #define MUTEX_SIZE                    (sizeof(CRITICAL_SECTION))
 #define INIT_MUTEX(mutex)             InitializeCriticalSection(&(mutex))
+#define INIT_MUTEX_RECURSIVE(mutex)   INIT_MUTEX(mutex)
 #define TINI_MUTEX(mutex)             DeleteCriticalSection(&(mutex))
 #define TSIGNAL(cond)                 WakeAllConditionVariable(&(cond))
 #define WAIT(cond,mutex)              SleepConditionVariableCS(&(cond),&(mutex),INFINITE);
@@ -83,6 +100,7 @@
 #define UNLOCK(mutex)
 #define MUTEX(mutex)
 #define INIT_MUTEX(mutex)
+#define INIT_MUTEX_RECURSIVE(mutex)
 #define TINI_MUTEX(mutex)
 #define TSIGNAL(cond)
 #define WAIT(cond,mutex)              this_is_unsupported
