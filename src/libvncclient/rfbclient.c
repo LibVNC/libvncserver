@@ -1812,7 +1812,7 @@ sendExtClientCutTextProvide(rfbClient *client, char* data, int len)
                                                 | rfbExtendedClipboard_Text); /*text and provide*/
   const uint32_t be_size = rfbClientSwap32IfLE(len);
   const size_t sz_to_compressed = sizeof(be_size) + len; /*size, data*/
-  size_t csz = compressBound(sz_to_compressed + 1); /*tricky, some server need extar byte to flush data*/
+  uLong csz = compressBound(sz_to_compressed + 1); /*tricky, some server need extar byte to flush data*/
 
   unsigned char *buf = malloc(sz_to_compressed + 1); /*tricky, some server need extra byte to flush data*/
   if (!buf) {
