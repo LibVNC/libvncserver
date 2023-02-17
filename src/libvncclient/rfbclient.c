@@ -1964,7 +1964,7 @@ rfbClientProcessExtServerCutText(rfbClient* client, char *data, int len)
     return FALSE;
   }
   if (client->GotXCutTextUTF8)
-    client->GotXCutTextUTF8(client, buf, size);
+    client->GotXCutTextUTF8(client, (char *)buf, size);
   free(buf);
 
   inflateEnd(&stream);
