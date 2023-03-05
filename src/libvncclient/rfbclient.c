@@ -1808,20 +1808,21 @@ static rfbBool
 sendExtClientCutTextProvide(rfbClient *client, char* data, int len)
 {
   rfbClientCutTextMsg cct = {0, };
+  int sentLen = len + 1;  /* Sent data is null terminated*/
   const uint32_t be_flags = rfbClientSwap32IfLE(rfbExtendedClipboard_Provide
                                                 | rfbExtendedClipboard_Text); /*text and provide*/
-  const uint32_t be_size = rfbClientSwap32IfLE(len);
-  const size_t sz_to_compressed = sizeof(be_size) + len; /*size, data*/
-  uLong csz = compressBound(sz_to_compressed + 1); /*tricky, some server need extar byte to flush data*/
+  const uint32_t be_size = rfbClientSwap32IfLE(sentLen);
+  const size_t sz_to_compressed = sizeof(be_size) + sentLen; /*size, data*/
+  uLong csz = compressBound(sz_to_compressed);
 
-  unsigned char *buf = malloc(sz_to_compressed + 1); /*tricky, some server need extra byte to flush data*/
+  unsigned char *buf = malloc(sz_to_compressed);
   if (!buf) {
     rfbClientLog("sendExtClientCutTextProvide. alloc buf failed\n");
     return FALSE;
   }
   memcpy(buf, &be_size, sizeof(be_size));
   memcpy(buf + sizeof(be_size), data, len);
-  buf[sz_to_compressed] = 0;
+  buf[sz_to_compressed - 1] = 0;  /* Null terminate sent data */
 
   unsigned char *cbuf = malloc(sizeof(be_flags) + csz); /*flag, compressed*/
   if (!cbuf) {
@@ -1830,7 +1831,7 @@ sendExtClientCutTextProvide(rfbClient *client, char* data, int len)
     return FALSE;
   }
   memcpy(cbuf, &be_flags, sizeof(be_flags));
-  if (compress(cbuf + sizeof(be_flags), &csz, buf, sz_to_compressed + 1) != Z_OK) {
+  if (compress(cbuf + sizeof(be_flags), &csz, buf, sz_to_compressed) != Z_OK) {
     rfbClientLog("sendExtClientCutTextProvide: compress cbuf failed\n");
     free(buf);
     free(cbuf);
