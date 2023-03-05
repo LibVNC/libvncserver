@@ -1801,6 +1801,43 @@ sendExtClientCutTextNotify(rfbClient *client)
   return ret;
 }
 
+/**
+ * Due to bugs, many servers (including most versions of LibVNCServer) can't
+ * properly handle zlib streams created by compress() function of zlib library.
+ *
+ * Primary bug is that these servers don't expect inflate() to return Z_STREAM_END
+ * which is the case for (correct) streams created by compress().
+ *
+ * So this function creates a compatible stream, for which inflate() returns Z_OK.
+ * This is how some clients create zlib streams, unintentionally avoiding the bug.
+ */
+static int
+CompressClipData(Bytef *dest, uLongf *destLen, Bytef *source, uLong sourceLen)
+{
+  int ret;
+  z_stream *zs = (z_stream*)malloc(sizeof(z_stream));
+  memset(zs, 0, sizeof(z_stream));
+
+  zs->zfree = Z_NULL;
+  zs->zalloc = Z_NULL;
+  zs->opaque = Z_NULL;
+  ret = deflateInit(zs, Z_DEFAULT_COMPRESSION);
+  if (ret == Z_OK) {
+    zs->avail_in = sourceLen;
+    zs->next_in = source;
+    zs->avail_out = *destLen;
+    zs->next_out = dest;
+
+    do {
+      // Using Z_SYNC_FLUSH instead of Z_FINISH is the key here.
+      ret = deflate(zs, Z_SYNC_FLUSH);
+    } while (ret >= 0 && zs->avail_in > 0);
+
+    *destLen = zs->total_out;
+    deflateEnd(zs);
+  }
+  return ret;
+}
 
 /*
  * sendExtClientCutTextProvide
@@ -1834,7 +1871,7 @@ sendExtClientCutTextProvide(rfbClient *client, char* data, int len)
     return FALSE;
   }
   memcpy(cbuf, &be_flags, sizeof(be_flags));
-  if (compress(cbuf + sizeof(be_flags), &csz, buf, sz_to_compressed) != Z_OK) {
+  if (CompressClipData(cbuf + sizeof(be_flags), &csz, buf, sz_to_compressed) != Z_OK) {
     rfbClientLog("sendExtClientCutTextProvide: compress cbuf failed\n");
     free(buf);
     free(cbuf);
