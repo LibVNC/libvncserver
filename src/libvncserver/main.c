@@ -10,6 +10,13 @@
  *  see GPL (latest version) for full details
  */
 
+#include <rfb/rfbconfig.h>
+
+#if LIBVNCSERVER_HAVE_SCHED_H
+#define _GNU_SOURCE
+#include <sched.h>
+#endif
+
 #ifdef __STRICT_ANSI__
 #define _BSD_SOURCE
 #endif
@@ -23,6 +30,10 @@
 #ifndef false
 #define false 0
 #define true -1
+#endif
+
+#ifdef LIBVNCSERVER_HAVE_SYS_SYSCTL_H
+#include <sys/sysctl.h>
 #endif
 
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
@@ -53,6 +64,43 @@ static int rfbEnableLogging=1;
 char rfbEndianTest = (1==0);
 #else
 char rfbEndianTest = (1==1);
+#endif
+
+#ifndef min
+inline static int min(int a, int b)
+{
+    return a > b ? b : a;
+}
+#endif
+
+#ifdef __APPLE__
+typedef struct cpu_set {
+    uint64_t    count;
+} cpu_set_t;
+
+static inline void
+CPU_ZERO(cpu_set_t *cs) { cs->count = 0; }
+
+static inline int
+CPU_COUNT(cpu_set_t *cs) { return __builtin_popcountll(cs->count); }
+
+int sched_getaffinity(pid_t pid, size_t cpu_size, cpu_set_t *cpu_set)
+{
+    int i;
+    int32_t core_count = 0;
+    size_t len = sizeof(core_count);
+    int ret = sysctlbyname("machdep.cpu.core_count", &core_count, &len, 0, 0);
+    if (ret) {
+        rfbErr("error while get core count %d\n", ret);
+        return -1;
+    }
+    cpu_set->count = 0;
+    for (i = 0; i < core_count; i++) {
+        cpu_set->count |= (1 << i);
+    }
+
+    return 0;
+}
 #endif
 
 /*
@@ -996,10 +1044,46 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    screen->permitFileTransfer = FALSE;
 
+   screen->rfbMT = TRUE;
+   screen->rfbNumThreads = 0;
+
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);
      return NULL;
    }
+
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+#if defined(WIN32) || defined(__MINGW32__)
+   DWORD64 dwProcessAffinity, dwSystemAffinity;
+   GetProcessAffinityMask(GetCurrentProcess(), &dwProcessAffinity, &dwSystemAffinity);
+#if defined(__MINGW32__)
+   const int np = __builtin_popcountll(dwProcessAffinity);
+#else
+   const int np = __popcnt64(dwProcessAffinity);
+#endif
+#elif LIBVNCSERVER_HAVE_SCHED_H
+   cpu_set_t cs;
+   CPU_ZERO(&cs);
+   int cpus = -1;
+   if (sched_getaffinity(0, sizeof(cs), &cs) == 0) {
+       cpus = CPU_COUNT(&cs);
+   }
+   const int np = cpus;
+#else
+   const int np = -1;
+#endif
+   if (np == -1 && screen->rfbMT) {
+     rfbLog("WARNING: Could not determine CPU count.  Multithreaded encoding disabled.\n");
+     screen->rfbMT = FALSE;
+   }
+   if (!screen->rfbMT) screen->rfbNumThreads = 1;
+   else if (screen->rfbNumThreads < 1) screen->rfbNumThreads = min(np, 4);
+   if (screen->rfbNumThreads > np) {
+     rfbLog("NOTICE: Encoding thread count has been clamped to CPU count\n");
+     screen->rfbNumThreads = np;
+   }
+#endif
+
 
 #ifdef WIN32
    {

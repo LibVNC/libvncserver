@@ -504,6 +504,15 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       }
     }
 
+#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+    /* Multithreaded tight encoding. */
+
+    cl->threadInit = FALSE;
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    memset(cl->thnd, 0, sizeof(cl->thnd));
+#endif
+#endif
+
     for(extension = rfbGetExtensionIterator(); extension;
 	    extension=extension->next) {
 	void* data = NULL;
