@@ -783,6 +783,7 @@ if(LIBVNCSERVER_INSTALL)
         include/rfb/rfb.h
         include/rfb/rfbclient.h
         ${CMAKE_CURRENT_BINARY_DIR}/include/rfb/rfbconfig.h
+        include/rfb/rfblist.h
         include/rfb/rfbproto.h
         include/rfb/rfbregion.h
         )
