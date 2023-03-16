@@ -388,6 +388,7 @@ set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/ultra.c
     ${LIBVNCSERVER_DIR}/scale.c
     ${CRYPTO_SOURCES}
+    ${LIBVNCSERVER_DIR}/rfbtimers.c
 )
 
 set(LIBVNCCLIENT_SOURCES
@@ -786,6 +787,7 @@ if(LIBVNCSERVER_INSTALL)
         include/rfb/rfblist.h
         include/rfb/rfbproto.h
         include/rfb/rfbregion.h
+        include/rfb/rfbtimers.h
         )
     
     set_property(TARGET vncclient PROPERTY PUBLIC_HEADER ${INSTALL_HEADER_FILES})
