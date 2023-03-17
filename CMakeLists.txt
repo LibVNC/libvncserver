@@ -189,6 +189,7 @@ check_include_file("sys/stat.h"    LIBVNCSERVER_HAVE_SYS_STAT_H)
 check_include_file("sys/time.h"    LIBVNCSERVER_HAVE_SYS_TIME_H)
 check_include_file("sys/types.h"   LIBVNCSERVER_HAVE_SYS_TYPES_H)
 check_include_file("sys/wait.h"    LIBVNCSERVER_HAVE_SYS_WAIT_H)
+check_include_file("sched.h"       LIBVNCSERVER_HAVE_SCHED_H)
 check_include_file("unistd.h"      LIBVNCSERVER_HAVE_UNISTD_H)
 check_include_file("sys/resource.h"     LIBVNCSERVER_HAVE_SYS_RESOURCE_H)
 
