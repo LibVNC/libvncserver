@@ -344,7 +344,7 @@ char* rfbMakeMaskFromAlphaSource(int width,int height,unsigned char* alphaSource
 				/* alpha was treated as 0 */
 			} else {
 				/* set to solid */
-				result[i/8+j*maskStride]|=(0x100>>(i&7));
+				result[i/8+j*maskStride]|=(0x100>>((i&7)+1));
 				/* alpha was treated as 0xff */
 				currentError-=0xff;
 			}
