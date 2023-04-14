@@ -610,6 +610,9 @@ clientInput(void *data)
 
     rfbClientConnectionGone(cl);
 
+    /* Each thread needs to be either joined or detached to prevent a memory leak, we can't join so detach */
+    pthread_detach(cl->client_thread);
+
     return THREAD_ROUTINE_RETURN_VALUE;
 }
 
@@ -1204,10 +1207,7 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
       }
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
-    if(currentCl->screen->backgroundLoop) {
-      /* Wait for threads to finish. The thread has already been pipe-notified by rfbCloseClient() */
-      pthread_join(currentCl->client_thread, NULL);
-    } else {
+    if(!currentCl->screen->backgroundLoop) {
       /*
 	In threaded mode, rfbClientConnectionGone() is called by the client-to-server thread.
 	Only need to call this here for non-threaded mode.
