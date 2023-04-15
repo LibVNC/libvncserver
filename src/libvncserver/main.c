@@ -611,7 +611,9 @@ clientInput(void *data)
     rfbClientConnectionGone(cl);
 
     /* Each thread needs to be either joined or detached to prevent a memory leak, we can't join so detach */
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_detach(cl->client_thread);
+#endif
 
     return THREAD_ROUTINE_RETURN_VALUE;
 }
