@@ -996,6 +996,11 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    screen->permitFileTransfer = FALSE;
 
+   screen->showCursorRefCount = 0;
+   screen->underCursorBufferX = 0;
+   screen->underCursorBufferY = 0;
+   INIT_RWLOCK(screen->showCursorRWLock);
+
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);
      return NULL;
@@ -1156,6 +1161,8 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
     cl1=cl;
   }
   rfbReleaseClientIterator(i);
+
+  TINI_RWLOCK(screen->showCursorRWLock);
     
 #define FREE_IF(x) if(screen->x) free(screen->x)
   FREE_IF(colourMap.data.bytes);

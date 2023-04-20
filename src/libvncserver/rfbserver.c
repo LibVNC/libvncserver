@@ -3328,7 +3328,12 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	UNLOCK(cl->screen->cursorMutex);
 	rfbRedrawAfterHideCursor(cl,updateRegion);
       }
-      rfbShowCursor(cl);
+      /* show the cursor if the cursor is not shown in the framebuffer, increment the refcount */
+      RDLOCK(cl->screen->showCursorRWLock);
+      rfbShowCursor(cl->screen);
+    } else {
+      /* wait until the cursor is not shown in the framebuffer */
+      WRLOCK(cl->screen->showCursorRWLock);
     }
 
     /*
@@ -3574,6 +3579,7 @@ updateFailed:
     if (!cl->enableCursorShapeUpdates) {
       rfbHideCursor(cl);
     }
+    RWUNLOCK(cl->screen->showCursorRWLock);
 
     if(i)
         sraRgnReleaseIterator(i);

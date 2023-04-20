@@ -372,6 +372,12 @@ typedef struct _rfbScreenInfo
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     rfbSetXCutTextUTF8ProcPtr setXCutTextUTF8;
 #endif
+
+    /** how many clients have requested to show the cursor in the framebuffer */
+    int showCursorRefCount;
+    /** where the cursor is shown */
+    int underCursorBufferX, underCursorBufferY;
+    RWLOCK(showCursorRWLock);
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
