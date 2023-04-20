@@ -277,7 +277,7 @@ typedef struct _rfbScreenInfo
     rfbBool neverShared;
     rfbBool dontDisconnect;
     struct _rfbClientRec* clientHead;
-    struct _rfbClientRec* pointerClient;  /**< "Mutex" for pointer events */
+    struct _rfbClientRec* pointerClient;  /**< "Mutex" for pointer drag events */
 
 
     /* cursor */
@@ -378,6 +378,14 @@ typedef struct _rfbScreenInfo
     /** where the cursor is shown */
     int underCursorBufferX, underCursorBufferY;
     RWLOCK(showCursorRWLock);
+
+    /* The client that last moved the pointer
+       Other clients will automatically receive cursor updates via the traditional
+       mechanism of drawing the cursor into the framebuffer (AKA "server-side
+       cursor rendering") so they can track the pointer's movement regardless of
+       whether cursor shape updates (AKA "client-side cursor rendering") are
+       enabled. */
+    struct _rfbClientRec* pointerOwner;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -722,7 +730,9 @@ typedef struct _rfbClientRec {
 
 #define FB_UPDATE_PENDING(cl)                                              \
      (((cl)->enableCursorShapeUpdates && (cl)->cursorWasChanged) ||        \
-     (((cl)->enableCursorShapeUpdates == FALSE &&                          \
+     ((                                                                    \
+       ((cl)->enableCursorShapeUpdates == FALSE ||                         \
+        (cl)->screen->pointerOwner != (cl)) &&                             \
        ((cl)->cursorX != (cl)->screen->cursorX ||                          \
 	(cl)->cursorY != (cl)->screen->cursorY))) ||                       \
      ((cl)->useNewFBSize && (cl)->newFBSizePending) ||                     \

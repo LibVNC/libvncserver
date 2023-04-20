@@ -781,7 +781,7 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
   if(rfbScreen->cursor) {
     iterator=rfbGetClientIterator(rfbScreen);
     while((cl=rfbClientIteratorNext(iterator)))
-	if(!cl->enableCursorShapeUpdates)
+	if(!cl->enableCursorShapeUpdates || (cl->screen->pointerOwner && cl->screen->pointerOwner != cl))
 	  rfbRedrawAfterHideCursor(cl,NULL);
     rfbReleaseClientIterator(iterator);
 
@@ -794,8 +794,11 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
   iterator=rfbGetClientIterator(rfbScreen);
   while((cl=rfbClientIteratorNext(iterator))) {
     cl->cursorWasChanged = TRUE;
-    if(!cl->enableCursorShapeUpdates)
+    if(!cl->enableCursorShapeUpdates || (cl->screen->pointerOwner && cl->screen->pointerOwner != cl))
       rfbRedrawAfterHideCursor(cl,NULL);
+    LOCK(cl->updateMutex);
+    TSIGNAL(cl->updateCond);
+    UNLOCK(cl->updateMutex);
   }
   rfbReleaseClientIterator(iterator);
 

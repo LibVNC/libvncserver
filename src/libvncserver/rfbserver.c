@@ -627,6 +627,9 @@ rfbClientConnectionGone(rfbClientPtr cl)
     if (cl->screen->pointerClient == cl)
         cl->screen->pointerClient = NULL;
 
+    if (cl->screen->pointerOwner == cl)
+        cl->screen->pointerOwner = NULL;
+
     sraRgnDestroy(cl->modifiedRegion);
     sraRgnDestroy(cl->requestedRegion);
     sraRgnDestroy(cl->copyRegion);
@@ -2688,6 +2691,14 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    cl->screen->pointerClient = cl;
 
 	if(!cl->viewOnly) {
+	    /* If the pointer was most recently moved by another client, we set
+	       pointerOwner to NULL here so that the client that is currently
+	       moving the pointer (cl), assuming it understands cursor shape
+	       updates, will receive a cursor shape update with the last known
+	       pointer position. */
+            if (cl->screen->pointerOwner != cl)
+                cl->screen->pointerOwner = NULL;
+
 	    if (msg.pe.buttonMask != cl->lastPtrButtons ||
 		    cl->screen->deferPtrUpdateTime == 0) {
 		cl->screen->ptrAddEvent(msg.pe.buttonMask,
@@ -2700,6 +2711,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		cl->lastPtrY = ScaleY(cl->scaledScreen, cl->screen, Swap16IfLE(msg.pe.y));
 		cl->lastPtrButtons = msg.pe.buttonMask;
 	    }
+
+            cl->screen->pointerOwner = cl;
       }      
       return;
 
@@ -3158,8 +3171,9 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     }
     
     /*
-     * If this client understands cursor shape updates, cursor should be
-     * removed from the framebuffer. Otherwise, make sure it's put up.
+     * If this client understands cursor shape updates and owns the pointer or is
+     * about to own the pointer, then the cursor should be removed from the
+     * framebuffer.  Otherwise, make sure it's drawn.
      */
 
     if (cl->enableCursorShapeUpdates) {
@@ -3264,7 +3278,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     sraRgnOr(updateRegion,cl->copyRegion);
     if(!sraRgnAnd(updateRegion,cl->requestedRegion) &&
        sraRgnEmpty(updateRegion) &&
-       (cl->enableCursorShapeUpdates ||
+       ((cl->enableCursorShapeUpdates && (!cl->screen->pointerOwner || cl->screen->pointerOwner == cl)) ||
 	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY)) &&
        !sendCursorShape && !sendCursorPos && !sendKeyboardLedState &&
        !sendSupportedMessages && !sendSupportedEncodings && !sendServerIdentity) {
@@ -3319,7 +3333,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
    
      UNLOCK(cl->updateMutex);
    
-    if (!cl->enableCursorShapeUpdates) {
+    if (!cl->enableCursorShapeUpdates || (cl->screen->pointerOwner && cl->screen->pointerOwner != cl)) {
       if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) {
 	rfbRedrawAfterHideCursor(cl,updateRegion);
 	LOCK(cl->screen->cursorMutex);
@@ -3576,8 +3590,8 @@ updateFailed:
 	result = FALSE;
     }
 
-    if (!cl->enableCursorShapeUpdates) {
-      rfbHideCursor(cl);
+    if (!cl->enableCursorShapeUpdates || (cl->screen->pointerOwner && cl->screen->pointerOwner != cl)) {
+      rfbHideCursor(cl->screen);
     }
     RWUNLOCK(cl->screen->showCursorRWLock);
 
