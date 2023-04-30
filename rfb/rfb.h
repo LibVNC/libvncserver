@@ -394,7 +394,7 @@ typedef struct _rfbScreenInfo
     uint16_t  mcublen;
     rfbBool multicastUseCopyRect;            /**< All multicast clients support CopyRect */
     sraRegionPtr multicastUpdateRegion;
-#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     MUTEX(multicastOutputMutex);             /**< Ensures that exactly one thread is sending multicast output */
     MUTEX(multicastUpdateMutex);             /**< Ensures that exactly one thread is processing a multicast framebuffer update */
     MUTEX(multicastSharedMutex);             /**< Ensures that exactly one thread is modifying the shared variables
