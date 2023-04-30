@@ -1375,20 +1375,6 @@ void rfbShutdownServer(rfbScreenInfoPtr screen,rfbBool disconnectClients) {
 #endif
 }
 
-#if !defined LIBVNCSERVER_HAVE_GETTIMEOFDAY && defined WIN32
-#include <fcntl.h>
-#include <conio.h>
-#include <sys/timeb.h>
-
-static void gettimeofday(struct timeval* tv,char* dummy)
-{
-   SYSTEMTIME t;
-   GetSystemTime(&t);
-   tv->tv_sec=t.wHour*3600+t.wMinute*60+t.wSecond;
-   tv->tv_usec=t.wMilliseconds*1000;
-}
-#endif
-
 rfbBool
 rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 {
