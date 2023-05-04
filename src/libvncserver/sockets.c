@@ -96,6 +96,7 @@ int allow_severity=LOG_INFO;
 int deny_severity=LOG_WARNING;
 #endif
 
+#include "private.h"
 #include "sockets.h"
 
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
@@ -548,11 +549,27 @@ rfbCloseClient(rfbClientPtr cl)
 #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
     cl->sock = RFB_INVALID_SOCKET;
 #endif
-    rfbExtensionData* extension;
 
-    for(extension=cl->extensions; extension; extension=extension->next)
-	if(extension->extension->close)
-	    extension->extension->close(cl, extension->data);
+    rfbExtension2Data* extension2Data = cl->extensions2;
+    for (; extension2Data; extension2Data = extension2Data->next) {
+        rfbProtocolExtensionHookClose ptrClose = NULL;
+        rfbProtocolExtensionElement* el = extension2Data->extension2->elements;
+        for (; el && el < extension2Data->extension2->elements + extension2Data->extension2->elementsCount; ++el) {
+            void* data;
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_CLOSE) {
+                ptrClose = el->hook.close;
+                data = extension2Data->data;
+            } else if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+                ptrClose = extension->close;
+                data = rfbGetExtensionClientData(cl, extension);
+            }
+            if (ptrClose) {
+                (*ptrClose)(cl, data);
+                break;
+            }
+        }
+    }
 
     LOCK(cl->updateMutex);
 #if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
