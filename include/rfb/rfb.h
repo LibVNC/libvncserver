@@ -207,6 +207,8 @@ enum rfbProtocolExtensionHookType {
     RFB_PROTOCOL_EXTENSION_HOOK_CLOSE,
     RFB_PROTOCOL_EXTENSION_HOOK_USAGE,
     RFB_PROTOCOL_EXTENSION_HOOK_PROCESS_ARGUMENT,
+    RFB_PROTOCOL_EXTENSION_HOOK_PRE_FBU,
+    RFB_PROTOCOL_EXTENSION_HOOK_POST_FBU,
 };
 
 typedef void* rfbProtocolExtensionHookGeneric;
@@ -248,6 +250,13 @@ _Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExte
 typedef int (*rfbProtocolExtensionHookProcessArgument)(int argc, char *argv[]);
 _Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookProcessArgument), "extension hook size doesn't match");
 
+/** returns TRUE if proceed with the framebuffer update (PostFbu is called in any case). */
+typedef rfbBool (*rfbProtocolExtensionHookPreFbu)(struct _rfbClientRec* client, void* data);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookPreFbu), "extension hook size doesn't match");
+
+typedef void (*rfbProtocolExtensionHookPostFbu)(struct _rfbClientRec* client, void* data);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookPostFbu), "extension hook size doesn't match");
+
 typedef struct _rfbProtocolExtensionElement {
     union {
         /** for the type 1 extensions */
@@ -261,6 +270,9 @@ typedef struct _rfbProtocolExtensionElement {
         rfbProtocolExtensionHookClose close;
         rfbProtocolExtensionHookUsage usage;
         rfbProtocolExtensionHookProcessArgument processArgument;
+
+        rfbProtocolExtensionHookPreFbu preFbu;
+        rfbProtocolExtensionHookPostFbu postFbu;
     } hook;
     /** which hook it is */
     int type;

@@ -3411,6 +3411,22 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
      * Now send the update.
      */
     
+    rfbBool extensionsAllowProceed = TRUE;
+    rfbExtension2Data *e = cl->extensions2;
+    for (; e; e = e->next) {
+        rfbProtocolExtensionElement* el = e->extension2->elements;
+        for (; el && el < e->extension2->elements + e->extension2->elementsCount; ++el) {
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_PRE_FBU) {
+                extensionsAllowProceed = extensionsAllowProceed && el->hook.preFbu(cl, e->data);
+                break;
+            }
+        }
+    }
+
+    if (!extensionsAllowProceed) {
+        goto updateFailed;
+    }
+
     rfbStatRecordMessageSent(cl, rfbFramebufferUpdate, 0, 0);
     if (cl->preferredEncoding == rfbEncodingCoRRE) {
         nUpdateRegionRects = 0;
@@ -3645,6 +3661,17 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     if (!rfbSendUpdateBuf(cl)) {
 updateFailed:
 	result = FALSE;
+    }
+
+    e = cl->extensions2;
+    for (; e; e = e->next) {
+        rfbProtocolExtensionElement* el = e->extension2->elements;
+        for (; el && el < e->extension2->elements + e->extension2->elementsCount; ++el) {
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_POST_FBU) {
+                el->hook.postFbu(cl, e->data);
+                break;
+            }
+        }
     }
 
     if (!cl->enableCursorShapeUpdates) {
