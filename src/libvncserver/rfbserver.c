@@ -2647,6 +2647,18 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	  cl->enableCursorPosUpdates = FALSE;
 	}
 
+        rfbProtocolExtension2 *extension2 = rfbGetExtension2Iterator();
+        for (; extension2; extension2 = extension2->next) {
+            rfbProtocolExtensionElement* el = extension2->elements;
+            for (; el && el < extension2->elements + extension2->elementsCount; ++el) {
+                if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_POST_SET_ENCODINGS) {
+                    el->hook.postSetEncodings(cl);
+                    break;
+                }
+            }
+        }
+        rfbReleaseExtension2Iterator();
+
         return;
     }
 
