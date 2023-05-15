@@ -570,6 +570,8 @@ void rfbClientCleanup(rfbClient* client) {
     rfbCloseSocket(client->sock);
   if (client->listenSock != RFB_INVALID_SOCKET)
     rfbCloseSocket(client->listenSock);
+  if (client->listen6Sock != RFB_INVALID_SOCKET)
+    rfbCloseSocket(client->listen6Sock);
   if (client->multicastSock != RFB_INVALID_SOCKET)
     close(client->multicastSock);
   ghpringbuf_destroy(client->multicastPacketBuf);
