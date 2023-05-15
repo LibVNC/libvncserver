@@ -557,6 +557,8 @@ void rfbClientCleanup(rfbClient* client) {
     rfbCloseSocket(client->sock);
   if (client->listenSock != RFB_INVALID_SOCKET)
     rfbCloseSocket(client->listenSock);
+  if (client->listen6Sock != RFB_INVALID_SOCKET)
+    rfbCloseSocket(client->listen6Sock);
   free(client->desktopName);
   free(client->serverHost);
   if (client->destHost)
