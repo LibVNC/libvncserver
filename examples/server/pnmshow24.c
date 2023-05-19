@@ -77,6 +77,8 @@ int main(int argc,char** argv)
   rfbScreen->httpDir = "../webclients";
 
   /* allocate picture and read it */
+  if (paddedWidth>SIZE_MAX/3 || (height!=0 && paddedWidth*3>SIZE_MAX/height))
+    return 1;
   rfbScreen->frameBuffer = (char*)malloc(paddedWidth*3*height);
   if(!rfbScreen->frameBuffer)
     return 1;
