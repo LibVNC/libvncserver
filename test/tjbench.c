@@ -585,7 +585,7 @@ int main(int argc, char *argv[])
 			if(!strcasecmp(argv[i], "-bottomup")) flags|=TJFLAG_BOTTOMUP;
 			if(!strcasecmp(argv[i], "-quiet")) quiet=1;
 			if(!strcasecmp(argv[i], "-qq")) quiet=2;
-			if(!strcasecmp(argv[i], "-scale") && i<argc-1)
+			if(i<argc-1 && !strcasecmp(argv[i], "-scale"))
 			{
 				int temp1=0, temp2=0, match=0;
 				if(sscanf(argv[++i], "%d/%d", &temp1, &temp2)==2)
