@@ -437,9 +437,21 @@ static void got_selection_utf8(rfbClient *cl, const char *buf, int len)
 
 
 static rfbCredential* get_credential(rfbClient* cl, int credentialType){
-        rfbCredential *c = malloc(sizeof(rfbCredential));
+	rfbCredential *c = malloc(sizeof(rfbCredential));
+	if (!c) {
+		return NULL;
+	}
 	c->userCredential.username = malloc(RFB_BUF_SIZE);
+	if (!c->userCredential.username) {
+		free(c);
+		return NULL;
+	}
 	c->userCredential.password = malloc(RFB_BUF_SIZE);
+	if (!c->userCredential.password) {
+		free(c->userCredential.username);
+		free(c);
+		return NULL;
+	}
 
 	if(credentialType != rfbCredentialTypeUser) {
 	    rfbClientErr("something else than username and password required for authentication\n");
