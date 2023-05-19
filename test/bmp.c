@@ -122,15 +122,15 @@ int loadppm(int *fd, unsigned char **buf, int *w, int *h,
 		switch(totalread)
 		{
 			case 0:
-				if((numread=sscanf(temps, "%d %d %d", w, h, &scalefactor))==EOF)
+				if((numread=sscanf(temps, "%d %d %d", w, h, &scalefactor))!=3)
 					_throw("Read error");
 				break;
 			case 1:
-				if((numread=sscanf(temps, "%d %d", h, &scalefactor))==EOF)
+				if((numread=sscanf(temps, "%d %d", h, &scalefactor))!=2)
 					_throw("Read error");
 				break;
 			case 2:
-				if((numread=sscanf(temps, "%d", &scalefactor))==EOF)
+				if((numread=sscanf(temps, "%d", &scalefactor))!=1)
 					_throw("Read error");
 				break;
 		}
