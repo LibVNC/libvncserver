@@ -50,7 +50,10 @@ int main(int argc,char** argv)
   } while(buffer[0]=='#');
 
   /* get width & height */
-  sscanf(buffer,"%d %d",&width,&height);
+  if(sscanf(buffer,"%d %d",&width,&height) != 2) {
+    printf("Failed to get width or height.\n");
+    exit(3);
+  }
   rfbLog("Got width %d and height %d.\n",width,height);
   fgets(buffer,1024,in);
 
