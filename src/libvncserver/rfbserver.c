@@ -312,7 +312,6 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     struct sockaddr_in addr;
 #endif
     socklen_t addrlen = sizeof(addr);
-    rfbProtocolExtension* extension;
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
 
@@ -463,6 +462,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->progressiveSliceY = 0;
 
       cl->extensions = NULL;
+      cl->extensions2 = NULL;
 
       cl->lastPtrX = -1;
 
@@ -504,15 +504,29 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       }
     }
 
-    for(extension = rfbGetExtensionIterator(); extension;
-	    extension=extension->next) {
-	void* data = NULL;
-	/* if the extension does not have a newClient method, it wants
-	 * to be initialized later. */
-	if(extension->newClient && extension->newClient(cl, &data))
-		rfbEnableExtension(cl, extension, data);
+    rfbProtocolExtension2* extension2 = rfbGetExtension2Iterator();
+    for (; extension2; extension2 = extension2->next) {
+        rfbProtocolExtensionHookNewClient ptrNewClient;
+        /* if the extension does not have a newClient method, it wants
+         * to be initialized later. */
+        rfbProtocolExtensionElement* el = extension2->elements;
+        for (; el && el < extension2->elements + extension2->elementsCount; ++el) {
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_NEW_CLIENT) {
+                ptrNewClient = el->hook.newClient;
+            } else if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+                ptrNewClient = extension->newClient;
+            }
+            if (ptrNewClient) {
+                void* data = NULL;
+                if (ptrNewClient(cl, &data)) {
+                    rfbEnableExtension2(cl, extension2, data);
+                }
+                break;
+            }
+        }
     }
-    rfbReleaseExtensionIterator();
+    rfbReleaseExtension2Iterator();
 
     switch (cl->screen->newClientHook(cl)) {
     case RFB_CLIENT_ON_HOLD:
@@ -812,7 +826,6 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
     int len, n;
     rfbClientIteratorPtr iterator;
     rfbClientPtr otherCl;
-    rfbExtensionData* extension;
 
     if (cl->state == RFB_INITIALISATION_SHARED) {
         /* In this case behave as though an implicit ClientInit message has
@@ -851,13 +864,28 @@ rfbProcessClientInitMessage(rfbClientPtr cl)
         return;
     }
 
-    for(extension = cl->extensions; extension;) {
-	rfbExtensionData* next = extension->next;
-	if(extension->extension->init &&
-		!extension->extension->init(cl, extension->data))
-	    /* extension requested that it be removed */
-	    rfbDisableExtension(cl, extension->extension);
-	extension = next;
+    rfbExtension2Data* extension2Data = cl->extensions2;
+    for (; extension2Data; extension2Data = extension2Data->next) {
+        rfbProtocolExtensionElement* el = extension2Data->extension2->elements;
+        for (; el && el < extension2Data->extension2->elements + extension2Data->extension2->elementsCount; ++el) {
+            rfbProtocolExtensionHookInit ptrInit = NULL;
+            void* data;
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_INIT) {
+                ptrInit = el->hook.init;
+                data = extension2Data->data;
+            } else if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+                ptrInit = extension->init;
+                data = rfbGetExtensionClientData(cl, extension);
+            }
+            if (ptrInit) {
+                if (!ptrInit(cl, data)) {
+                    /* extension requested that it be removed */
+                    rfbDisableExtension2(cl, extension2Data->extension2);
+                }
+                break;
+            }
+        }
     }
 
     cl->state = RFB_NORMAL;
@@ -2509,54 +2537,86 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 #endif
 		} else
 #endif
-		{
-			rfbExtensionData* e;
-			for(e = cl->extensions; e;) {
-				rfbExtensionData* next = e->next;
-				if(e->extension->enablePseudoEncoding &&
-					e->extension->enablePseudoEncoding(cl,
-						&e->data, (int)enc))
-					/* ext handles this encoding */
-					break;
-				e = next;
-			}
-			if(e == NULL) {
-				rfbBool handled = FALSE;
-				/* if the pseudo encoding is not handled by the
-				   enabled extensions, search through all
-				   extensions. */
-				rfbProtocolExtension* e;
+                {
+                    rfbBool handled = FALSE;
 
-				for(e = rfbGetExtensionIterator(); e;) {
-					int* encs = e->pseudoEncodings;
-					while(encs && *encs!=0) {
-						if(*encs==(int)enc) {
-							void* data = NULL;
-							if(!e->enablePseudoEncoding(cl, &data, (int)enc)) {
-								rfbLog("Installed extension pretends to handle pseudo encoding 0x%x, but does not!\n",(int)enc);
-							} else {
-								rfbEnableExtension(cl, e, data);
-								handled = TRUE;
-								e = NULL;
-								break;
-							}
-						}
-						encs++;
-					}
+                    rfbExtension2Data* extension2Data = cl->extensions2;
+                    for (; !handled && extension2Data; extension2Data = extension2Data->next) {
+                        rfbProtocolExtensionElement* el = extension2Data->extension2->elements;
+                        for (; el && el < extension2Data->extension2->elements + extension2Data->extension2->elementsCount; ++el) {
+                            rfbProtocolExtensionHookEnablePseudoEncoding ptrEnablePseudoEncoding = NULL;
+                            void* data;
+                            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_ENABLE_PSEUDO_ENCODING) {
+                                ptrEnablePseudoEncoding = el->hook.enablePseudoEncoding;
+                                data = extension2Data->data;
+                            } else if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                                rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+                                ptrEnablePseudoEncoding = extension->enablePseudoEncoding;
+                                data = rfbGetExtensionClientData(cl, extension);
+                            }
+                            if (ptrEnablePseudoEncoding) {
+                                if ((*ptrEnablePseudoEncoding)(cl, &data, (int) enc)) {
+                                    handled = TRUE;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if (!handled) {
+                        /* if the pseudo encoding is not handled by the
+                         enabled extensions, search through all
+                         extensions. */
+                        rfbProtocolExtension2 *extension2 = rfbGetExtension2Iterator();
+                        for (; !handled && extension2; extension2 = extension2->next) {
+                            int* encs = NULL;
+                            rfbProtocolExtensionElement* el = extension2->elements;
+                            for (; el && el < extension2->elements + extension2->elementsCount; ++el) {
+                                if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_PSEUDO_ENCODINGS) {
+                                    encs = el->hook.pseudoEncodings;
+                                    break;
+                                } else if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                                    rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+                                    encs = extension->pseudoEncodings;
+                                    break;
+                                }
+                            }
+                            for (; !handled && encs && *encs != 0; ++encs) {
+                                if (*encs == (int) enc) {
+                                    rfbProtocolExtensionElement* el = extension2->elements;
+                                    for (; el && el < extension2->elements + extension2->elementsCount; ++el) {
+                                        rfbProtocolExtensionHookEnablePseudoEncoding ptrEnablePseudoEncoding = NULL;
+                                        if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_ENABLE_PSEUDO_ENCODING) {
+                                            ptrEnablePseudoEncoding = el->hook.enablePseudoEncoding;
+                                            break;
+                                        } else if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                                            rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+                                            ptrEnablePseudoEncoding = extension->enablePseudoEncoding;
+                                            break;
+                                        }
+                                        if (ptrEnablePseudoEncoding) {
+                                            void* data = NULL;
+                                            if (!ptrEnablePseudoEncoding(cl, &data, (int) enc)) {
+                                                rfbLog("Installed extension pretends to handle pseudo encoding 0x%x, but does not!\n", (int) enc);
+                                            } else {
+                                                rfbEnableExtension2(cl, extension2, data);
+                                                handled = TRUE;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        rfbReleaseExtension2Iterator();
 
-					if(e)
-						e = e->next;
-				}
-				rfbReleaseExtensionIterator();
-
-				if(!handled)
-					rfbLog("rfbProcessClientNormalMessage: "
-					    "ignoring unsupported encoding type %s\n",
-					    encodingName(enc,encBuf,sizeof(encBuf)));
-			}
-		}
-            }
+                        if (!handled)
+                            rfbLog("rfbProcessClientNormalMessage: "
+                                   "ignoring unsupported encoding type %s\n",
+                                   encodingName(enc, encBuf, sizeof(encBuf)));
+                    }
+                }
         }
+    }
 
 
 
@@ -2586,6 +2646,18 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		 cl->host);
 	  cl->enableCursorPosUpdates = FALSE;
 	}
+
+        rfbProtocolExtension2 *extension2 = rfbGetExtension2Iterator();
+        for (; extension2; extension2 = extension2->next) {
+            rfbProtocolExtensionElement* el = extension2->elements;
+            for (; el && el < extension2->elements + extension2->elementsCount; ++el) {
+                if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_POST_SET_ENCODINGS) {
+                    el->hook.postSetEncodings(cl);
+                    break;
+                }
+            }
+        }
+        rfbReleaseExtension2Iterator();
 
         return;
     }
@@ -3079,18 +3151,29 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
     default:
 	{
-	    rfbExtensionData *e,*next;
-
-	    for(e=cl->extensions; e;) {
-		next = e->next;
-		if(e->extension->handleMessage &&
-			e->extension->handleMessage(cl, e->data, &msg))
-                {
-                    rfbStatRecordMessageRcvd(cl, msg.type, 0, 0); /* Extension should handle this */
-		    return;
+            rfbExtension2Data* extension2Data = cl->extensions2;
+            for (; extension2Data; extension2Data = extension2Data->next) {
+                rfbProtocolExtensionElement* el = extension2Data->extension2->elements;
+                for (; el && el < extension2Data->extension2->elements + extension2Data->extension2->elementsCount; ++el) {
+                    rfbProtocolExtensionHookHandleMessage ptrHandleMessage = NULL;
+                    void *data;
+                    if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_HANDLE_MESSAGE) {
+                        ptrHandleMessage = el->hook.handleMessage;
+                        data = extension2Data->data;
+                    } else if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                        rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+                        ptrHandleMessage = extension->handleMessage;
+                        data = rfbGetExtensionClientData(cl, extension);
+                    }
+                    if (ptrHandleMessage) {
+                        if (ptrHandleMessage(cl, data, &msg)) {
+                            rfbStatRecordMessageRcvd(cl, msg.type, 0, 0); /* Extension should handle this */
+                            return;
+                        }
+                        break;
+                    }
                 }
-		e = next;
-	    }
+            }
 
 	    rfbLog("rfbProcessClientNormalMessage: unknown message type %d\n",
 		    msg.type);
@@ -3340,6 +3423,22 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
      * Now send the update.
      */
     
+    rfbBool extensionsAllowProceed = TRUE;
+    rfbExtension2Data *e = cl->extensions2;
+    for (; e; e = e->next) {
+        rfbProtocolExtensionElement* el = e->extension2->elements;
+        for (; el && el < e->extension2->elements + e->extension2->elementsCount; ++el) {
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_PRE_FBU) {
+                extensionsAllowProceed = extensionsAllowProceed && el->hook.preFbu(cl, e->data);
+                break;
+            }
+        }
+    }
+
+    if (!extensionsAllowProceed) {
+        goto updateFailed;
+    }
+
     rfbStatRecordMessageSent(cl, rfbFramebufferUpdate, 0, 0);
     if (cl->preferredEncoding == rfbEncodingCoRRE) {
         nUpdateRegionRects = 0;
@@ -3574,6 +3673,17 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     if (!rfbSendUpdateBuf(cl)) {
 updateFailed:
 	result = FALSE;
+    }
+
+    e = cl->extensions2;
+    for (; e; e = e->next) {
+        rfbProtocolExtensionElement* el = e->extension2->elements;
+        for (; el && el < e->extension2->elements + e->extension2->elementsCount; ++el) {
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_POST_FBU) {
+                el->hook.postFbu(cl, e->data);
+                break;
+            }
+        }
     }
 
     if (!cl->enableCursorShapeUpdates) {

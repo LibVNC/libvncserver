@@ -193,6 +193,103 @@ typedef struct _rfbExtensionData {
 } rfbExtensionData;
 
 /**
+ * Protocol extended extension handling.
+ */
+
+enum rfbProtocolExtensionHookType {
+    RFB_PROTOCOL_EXTENSION_HOOK_NONE = 0,
+    RFB_PROTOCOL_EXTENSION_HOOK_RESERVED_1 = 1,
+    RFB_PROTOCOL_EXTENSION_HOOK_NEW_CLIENT,
+    RFB_PROTOCOL_EXTENSION_HOOK_INIT,
+    RFB_PROTOCOL_EXTENSION_HOOK_PSEUDO_ENCODINGS,
+    RFB_PROTOCOL_EXTENSION_HOOK_ENABLE_PSEUDO_ENCODING,
+    RFB_PROTOCOL_EXTENSION_HOOK_HANDLE_MESSAGE,
+    RFB_PROTOCOL_EXTENSION_HOOK_CLOSE,
+    RFB_PROTOCOL_EXTENSION_HOOK_USAGE,
+    RFB_PROTOCOL_EXTENSION_HOOK_PROCESS_ARGUMENT,
+    RFB_PROTOCOL_EXTENSION_HOOK_POST_SET_ENCODINGS,
+    RFB_PROTOCOL_EXTENSION_HOOK_PRE_FBU,
+    RFB_PROTOCOL_EXTENSION_HOOK_POST_FBU,
+};
+
+typedef void* rfbProtocolExtensionHookGeneric;
+
+/** returns FALSE if extension should be deactivated for client.
+   if newClient == NULL, it is always deactivated. */
+typedef rfbBool (*rfbProtocolExtensionHookNewClient)(struct _rfbClientRec* client, void** data);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookNewClient), "extension hook size doesn't match");
+
+/** returns FALSE if extension should be deactivated for client.
+   if init == NULL, it stays activated. */
+typedef rfbBool (*rfbProtocolExtensionHookInit)(struct _rfbClientRec* client, void* data);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookInit), "extension hook size doesn't match");
+
+/** if pseudoEncodings is not NULL, it contains a 0 terminated
+   list of the pseudo encodings handled by this extension. */
+typedef int* rfbProtocolExtensionHookPseudoEncodings;
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookPseudoEncodings), "extension hook size doesn't match");
+
+/** returns TRUE if that pseudo encoding is handled by the extension.
+   encodingNumber==0 means "reset encodings". */
+typedef rfbBool (*rfbProtocolExtensionHookEnablePseudoEncoding)(struct _rfbClientRec* client,
+                                                                 void** data, int encodingNumber);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookEnablePseudoEncoding), "extension hook size doesn't match");
+
+/** returns TRUE if message was handled */
+typedef rfbBool (*rfbProtocolExtensionHookHandleMessage)(struct _rfbClientRec* client,
+                                                         void* data,
+                                                         const rfbClientToServerMsg* message);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookHandleMessage), "extension hook size doesn't match");
+
+typedef void (*rfbProtocolExtensionHookClose)(struct _rfbClientRec* client, void* data);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookClose), "extension hook size doesn't match");
+
+typedef void (*rfbProtocolExtensionHookUsage)(void);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookUsage), "extension hook size doesn't match");
+
+/** processArguments returns the number of handled arguments */
+typedef int (*rfbProtocolExtensionHookProcessArgument)(int argc, char *argv[]);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookProcessArgument), "extension hook size doesn't match");
+
+typedef void (*rfbProtocolExtensionHookPostSetEncodings)(struct _rfbClientRec* client);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookPostSetEncodings), "extension hook size doesn't match");
+
+/** returns TRUE if proceed with the framebuffer update (PostFbu is called in any case). */
+typedef rfbBool (*rfbProtocolExtensionHookPreFbu)(struct _rfbClientRec* client, void* data);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookPreFbu), "extension hook size doesn't match");
+
+typedef void (*rfbProtocolExtensionHookPostFbu)(struct _rfbClientRec* client, void* data);
+_Static_assert(sizeof(rfbProtocolExtensionHookGeneric) == sizeof(rfbProtocolExtensionHookPostFbu), "extension hook size doesn't match");
+
+typedef struct _rfbProtocolExtensionElement {
+    union {
+        /** for the type 1 extensions */
+        rfbProtocolExtensionHookGeneric generic;
+
+        rfbProtocolExtensionHookNewClient newClient;
+        rfbProtocolExtensionHookInit init;
+        rfbProtocolExtensionHookPseudoEncodings pseudoEncodings;
+        rfbProtocolExtensionHookEnablePseudoEncoding enablePseudoEncoding;
+        rfbProtocolExtensionHookHandleMessage handleMessage;
+        rfbProtocolExtensionHookClose close;
+        rfbProtocolExtensionHookUsage usage;
+        rfbProtocolExtensionHookProcessArgument processArgument;
+
+        rfbProtocolExtensionHookPostSetEncodings postSetEncodings;
+        rfbProtocolExtensionHookPreFbu preFbu;
+        rfbProtocolExtensionHookPostFbu postFbu;
+    } hook;
+    /** which hook it is */
+    int type;
+} rfbProtocolExtensionElement;
+
+typedef struct _rfbProtocolExtension2 {
+    rfbProtocolExtensionElement* elements;
+    size_t elementsCount;
+    struct _rfbProtocolExtension2* next;
+} rfbProtocolExtension2;
+
+/**
  * Per-screen (framebuffer) structure.  There can be as many as you wish,
  * each serving different clients. However, you have to call
  * rfbProcessEvents for each of these.
@@ -707,6 +804,8 @@ typedef struct _rfbClientRec {
     int tightPngDstDataLen;
 #endif
 #endif
+
+    struct _rfbExtension2Data* extensions2;
 } rfbClientRec, *rfbClientPtr;
 
 /**
@@ -1038,6 +1137,15 @@ rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
 	void* data);
 rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension);
 void* rfbGetExtensionClientData(rfbClientPtr cl, rfbProtocolExtension* extension);
+
+void rfbRegisterProtocolExtension2(rfbProtocolExtension2* extension2);
+void rfbUnregisterProtocolExtension2(rfbProtocolExtension2* extension2);
+struct _rfbProtocolExtension2* rfbGetExtension2Iterator(void);
+void rfbReleaseExtension2Iterator(void);
+rfbBool rfbEnableExtension2(rfbClientPtr cl, rfbProtocolExtension2* extension2,
+	void* data);
+rfbBool rfbDisableExtension2(rfbClientPtr cl, rfbProtocolExtension2* extension2);
+void* rfbGetExtension2ClientData(rfbClientPtr cl, rfbProtocolExtension2* extension2);
 
 /** to check against plain passwords */
 rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len);

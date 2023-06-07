@@ -14,13 +14,13 @@
 
 #include <rfb/rfb.h>
 
+#include "private.h"
+
 extern int rfbStringToAddr(char *str, in_addr_t *iface);
 
 void
 rfbUsage(void)
 {
-    rfbProtocolExtension* extension;
-
     fprintf(stderr, "-rfbport port          TCP port for RFB protocol\n");
 #ifdef LIBVNCSERVER_IPv6
     fprintf(stderr, "-rfbportv6 port        TCP6 port for RFB protocol\n");
@@ -61,10 +61,24 @@ rfbUsage(void)
     fprintf(stderr, "                       addr ipv6addr. '-listen localhost' and hostname work too.\n");
 #endif
 
-    for(extension=rfbGetExtensionIterator();extension;extension=extension->next)
-	if(extension->usage)
-		extension->usage();
-    rfbReleaseExtensionIterator();
+    rfbProtocolExtension2* extension2 = rfbGetExtension2Iterator();
+    for (; extension2; extension2 = extension2->next) {
+        rfbProtocolExtensionElement* el = extension2->elements;
+        for (; el && el < extension2->elements + extension2->elementsCount; ++el) {
+            rfbProtocolExtensionHookUsage ptrUsage = NULL;
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_USAGE) {
+                ptrUsage = el->hook.usage;
+            } else if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+                ptrUsage = extension->usage;
+            }
+            if (ptrUsage) {
+                ptrUsage();
+                break;
+            }
+        }
+    }
+    rfbReleaseExtension2Iterator();
 }
 
 /* purges COUNT arguments from ARGV at POSITION and decrements ARGC.
@@ -217,14 +231,26 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
             rfbScreen->sslcertfile = argv[++i];
 #endif
         } else {
-	    rfbProtocolExtension* extension;
+            rfbProtocolExtension2* extension2;
 	    int handled=0;
 
-	    for(extension=rfbGetExtensionIterator();handled==0 && extension;
-			extension=extension->next)
-		if(extension->processArgument)
-			handled = extension->processArgument(*argc - i, argv + i);
-	    rfbReleaseExtensionIterator();
+            for (extension2 = rfbGetExtension2Iterator(); handled == 0 && extension2; extension2 = extension2->next) {
+                rfbProtocolExtensionHookProcessArgument ptrProcessArgument = NULL;
+                rfbProtocolExtensionElement* el = extension2->elements;
+                for (; el && el < extension2->elements + extension2->elementsCount; ++el) {
+                    if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_PROCESS_ARGUMENT) {
+                        ptrProcessArgument = el->hook.processArgument;
+                    } else if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                        rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+                        ptrProcessArgument = extension->processArgument;
+                    }
+                    if (ptrProcessArgument) {
+                        handled = ptrProcessArgument(*argc - i, argv + i);
+                        break;
+                    }
+                }
+            }
+            rfbReleaseExtension2Iterator();
 
 	    if(handled==0) {
 		i++;

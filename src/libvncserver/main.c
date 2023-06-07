@@ -59,7 +59,49 @@ char rfbEndianTest = (1==1);
  * Protocol extensions
  */
 
-static rfbProtocolExtension* rfbExtensionHead = NULL;
+static rfbProtocolExtension2* rfbExtension2Head = NULL;
+static rfbProtocolExtension* rfbExtensionViewHead = NULL;
+
+static rfbBool rfbIsSameExtension(rfbProtocolExtension2* extension2, rfbProtocolExtension* extension)
+{
+    rfbProtocolExtensionElement* el = extension2->elements;
+    for (; el && el < extension2->elements + extension2->elementsCount; ++el) {
+        if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1 &&
+                (rfbProtocolExtensionHookExtension1) el->hook.generic == extension) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+static rfbProtocolExtension2* rfbCreateExtension2FromExtension1(rfbProtocolExtension* extension1)
+{
+    rfbProtocolExtension2* extension2 = (rfbProtocolExtension2*) malloc(sizeof(rfbProtocolExtension2));
+    if (!extension2) {
+        rfbLog("Memory allocation failure! %s\n", strerror(errno));
+        return extension2;
+    }
+
+    extension2->elements = (rfbProtocolExtensionElement*) malloc(sizeof(rfbProtocolExtensionElement));
+    if (!extension2->elements) {
+        rfbLog("Memory allocation failure! %s\n", strerror(errno));
+        free(extension2);
+        extension2 = NULL;
+        return extension2;
+    }
+
+    extension2->elements[0].type = RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1;
+    extension2->elements[0].hook.generic = (rfbProtocolExtensionHookGeneric) extension1;
+    extension2->elementsCount = 1;
+
+    return extension2;
+}
+
+static void rfbDestroyExtension2FromExtension1(rfbProtocolExtension2* extension2)
+{
+    free(extension2->elements);
+    free(extension2);
+}
 
 /*
  * This method registers a list of new extensions.  
@@ -70,7 +112,9 @@ static rfbProtocolExtension* rfbExtensionHead = NULL;
 void
 rfbRegisterProtocolExtension(rfbProtocolExtension* extension)
 {
-	rfbProtocolExtension *head = rfbExtensionHead, *next = NULL;
+	rfbProtocolExtension2* head = rfbExtension2Head;
+	rfbProtocolExtension* next = NULL;
+	rfbProtocolExtension2* extension2 = NULL;
 
 	if(extension == NULL)
 		return;
@@ -85,7 +129,7 @@ rfbRegisterProtocolExtension(rfbProtocolExtension* extension)
 	LOCK(extMutex);
 
 	while(head != NULL) {
-		if(head == extension) {
+		if(rfbIsSameExtension(head, extension)) {
 			UNLOCK(extMutex);
 			rfbRegisterProtocolExtension(next);
 			return;
@@ -94,8 +138,13 @@ rfbRegisterProtocolExtension(rfbProtocolExtension* extension)
 		head = head->next;
 	}
 
-	extension->next = rfbExtensionHead;
-	rfbExtensionHead = extension;
+	extension2 = rfbCreateExtension2FromExtension1(extension);
+	if (!extension2) {
+	    return;
+	}
+
+	extension2->next = rfbExtension2Head;
+	rfbExtension2Head = extension2;
 
 	UNLOCK(extMutex);
 	rfbRegisterProtocolExtension(next);
@@ -110,7 +159,7 @@ void
 rfbUnregisterProtocolExtension(rfbProtocolExtension* extension)
 {
 
-	rfbProtocolExtension *cur = NULL, *pre = NULL;
+	rfbProtocolExtension2 *cur = NULL, *pre = NULL, *next = NULL;
 
 	if(extension == NULL)
 		return;
@@ -122,18 +171,22 @@ rfbUnregisterProtocolExtension(rfbProtocolExtension* extension)
 
 	LOCK(extMutex);
 
-	if(rfbExtensionHead == extension) {
-		rfbExtensionHead = rfbExtensionHead->next;
+	if(rfbIsSameExtension(rfbExtension2Head, extension)) {
+		next = rfbExtension2Head->next;
+		rfbDestroyExtension2FromExtension1(rfbExtension2Head);
+		rfbExtension2Head = next;
 		UNLOCK(extMutex);
 		rfbUnregisterProtocolExtension(extension->next);
 		return;
 	}
 
-	cur = pre = rfbExtensionHead;
+	cur = pre = rfbExtension2Head;
 
 	while(cur) {
-		if(cur == extension) {
-			pre->next = cur->next;
+		if(rfbIsSameExtension(cur, extension)) {
+			next = cur->next;
+			rfbDestroyExtension2FromExtension1(cur);
+			pre->next = next;
 			break;
 		}
 		pre = cur;
@@ -147,13 +200,30 @@ rfbUnregisterProtocolExtension(rfbProtocolExtension* extension)
 
 rfbProtocolExtension* rfbGetExtensionIterator(void)
 {
+    rfbProtocolExtension2 *curr2;
+
 	if (! extMutex_initialized) {
 		INIT_MUTEX(extMutex);
 		extMutex_initialized = 1;
 	}
 
 	LOCK(extMutex);
-	return rfbExtensionHead;
+
+    rfbExtensionViewHead = NULL;
+
+    for (curr2 = rfbExtension2Head; curr2; curr2 = curr2->next) {
+        rfbProtocolExtensionElement* el = curr2->elements;
+        for (; el && el < curr2->elements + curr2->elementsCount; ++el) {
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                rfbProtocolExtension *found1 = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+                found1->next = rfbExtensionViewHead;
+                rfbExtensionViewHead = found1;
+                break;
+            }
+        }
+    }
+
+    return rfbExtensionViewHead;
 }
 
 void rfbReleaseExtensionIterator(void)
@@ -164,43 +234,38 @@ void rfbReleaseExtensionIterator(void)
 rfbBool rfbEnableExtension(rfbClientPtr cl, rfbProtocolExtension* extension,
 	void* data)
 {
-	rfbExtensionData* extData;
+    rfbProtocolExtension2* extension2Found = NULL;
+    rfbProtocolExtension2* extension2 = rfbGetExtension2Iterator();
+    for (; extension2 && !extension2Found; extension2 = extension2->next) {
+        rfbProtocolExtensionElement* el = extension2->elements;
+        for (; el && el < extension2->elements + extension2->elementsCount && !extension2Found; ++el) {
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1 && (rfbProtocolExtensionHookExtension1) el->hook.generic == extension) {
+                extension2Found = extension2;
+            }
+        }
 
-	/* make sure extension is not yet enabled. */
-	for(extData = cl->extensions; extData; extData = extData->next)
-		if(extData->extension == extension)
-			return FALSE;
+    }
+    rfbReleaseExtension2Iterator();
 
-	extData = calloc(sizeof(rfbExtensionData),1);
-	if(!extData)
-		return FALSE;
-	extData->extension = extension;
-	extData->data = data;
-	extData->next = cl->extensions;
-	cl->extensions = extData;
-
-	return TRUE;
+    return extension2Found ? rfbEnableExtension2(cl, extension2Found, data) : FALSE;
 }
 
 rfbBool rfbDisableExtension(rfbClientPtr cl, rfbProtocolExtension* extension)
 {
-	rfbExtensionData* extData;
-	rfbExtensionData* prevData = NULL;
+    rfbProtocolExtension2* extension2Found = NULL;
+    rfbProtocolExtension2* extension2 = rfbGetExtension2Iterator();
+    for (; extension2 && !extension2Found; extension2 = extension2->next) {
+        rfbProtocolExtensionElement* el = extension2->elements;
+        for (; el && el < extension2->elements + extension2->elementsCount && !extension2Found; ++el) {
+            if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1 && (rfbProtocolExtensionHookExtension1) el->hook.generic == extension) {
+                extension2Found = extension2;
+            }
+        }
 
-	for(extData = cl->extensions; extData; extData = extData->next) {
-		if(extData->extension == extension) {
-			if(extData->data)
-				free(extData->data);
-			if(prevData == NULL)
-				cl->extensions = extData->next;
-			else
-				prevData->next = extData->next;
-			return TRUE;
-		}
-		prevData = extData;
-	}
+    }
+    rfbReleaseExtension2Iterator();
 
-	return FALSE;
+    return extension2Found ? rfbDisableExtension2(cl, extension2Found) : FALSE;
 }
 
 void* rfbGetExtensionClientData(rfbClientPtr cl, rfbProtocolExtension* extension)
@@ -214,6 +279,204 @@ void* rfbGetExtensionClientData(rfbClientPtr cl, rfbProtocolExtension* extension
 	rfbLog("Extension is not enabled !\n");
 	/* rfbCloseClient(cl); */
 	return NULL;
+    }
+
+    return data->data;
+}
+
+void rfbRegisterProtocolExtension2(rfbProtocolExtension2* extension2)
+{
+    rfbProtocolExtension2 *head = rfbExtension2Head, *next = NULL;
+
+    if (extension2 == NULL)
+        return;
+
+    next = extension2->next;
+
+    if (!extMutex_initialized) {
+        INIT_MUTEX(extMutex);
+        extMutex_initialized = 1;
+    }
+
+    LOCK(extMutex);
+
+    while (head != NULL) {
+        if (head == extension2) {
+            UNLOCK(extMutex);
+            rfbRegisterProtocolExtension2(next);
+            return;
+        }
+
+        head = head->next;
+    }
+
+    extension2->next = rfbExtension2Head;
+    rfbExtension2Head = extension2;
+
+    UNLOCK(extMutex);
+    rfbRegisterProtocolExtension2(next);
+}
+
+void rfbUnregisterProtocolExtension2(rfbProtocolExtension2* extension2)
+{
+    rfbProtocolExtension2 *cur = NULL, *pre = NULL;
+
+    if (extension2 == NULL)
+        return;
+
+    if (!extMutex_initialized) {
+        INIT_MUTEX(extMutex);
+        extMutex_initialized = 1;
+    }
+
+    LOCK(extMutex);
+
+    if (rfbExtension2Head == extension2) {
+        rfbExtension2Head = rfbExtension2Head->next;
+        UNLOCK(extMutex);
+        rfbUnregisterProtocolExtension2(extension2->next);
+        return;
+    }
+
+    cur = pre = rfbExtension2Head;
+
+    while (cur) {
+        if (cur == extension2) {
+            pre->next = cur->next;
+            break;
+        }
+        pre = cur;
+        cur = cur->next;
+    }
+
+    UNLOCK(extMutex);
+
+    rfbUnregisterProtocolExtension2(extension2->next);
+}
+
+struct _rfbProtocolExtension2* rfbGetExtension2Iterator(void)
+{
+    if (!extMutex_initialized) {
+        INIT_MUTEX(extMutex);
+        extMutex_initialized = 1;
+    }
+
+    LOCK(extMutex);
+
+    return rfbExtension2Head;
+}
+
+void rfbReleaseExtension2Iterator(void)
+{
+    UNLOCK(extMutex);
+}
+
+rfbBool rfbEnableExtension2(rfbClientPtr cl, rfbProtocolExtension2* extension2,
+        void* data)
+{
+    rfbExtensionData* extData = NULL;
+
+    /* make sure extension is not yet enabled. */
+    rfbExtension2Data* ext2Data = cl->extensions2;
+    for (; ext2Data; ext2Data = ext2Data->next)
+        if (ext2Data->extension2 == extension2)
+            return FALSE;
+
+    /* prepare extension 1 data. */
+    rfbProtocolExtensionElement* el = extension2->elements;
+    for (; el && el < extension2->elements + extension2->elementsCount; ++el) {
+        if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+            rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+
+            /* make sure extension is not yet enabled. */
+            for (extData = cl->extensions; extData; extData = extData->next)
+                if (extData->extension == extension)
+                    return FALSE;
+
+            extData = calloc(sizeof(rfbExtensionData), 1);
+            if (!extData) {
+                return FALSE;
+            }
+            extData->extension = extension;
+            extData->data = data;
+            extData->next = cl->extensions;
+
+            break;
+        }
+    }
+
+    ext2Data = calloc(sizeof(rfbExtension2Data), 1);
+    if (!ext2Data) {
+        free(extData);
+        return FALSE;
+    }
+    ext2Data->extension2 = extension2;
+    ext2Data->data = data;
+    ext2Data->next = cl->extensions2;
+    cl->extensions2 = ext2Data;
+
+    if (extData) {
+        cl->extensions = extData;
+    }
+
+    return TRUE;
+}
+
+rfbBool rfbDisableExtension2(rfbClientPtr cl, rfbProtocolExtension2* extension2)
+{
+    rfbExtension2Data* prev2Data = NULL;
+    rfbExtension2Data* ext2Data = cl->extensions2;
+    for (; ext2Data; ext2Data = ext2Data->next) {
+        if (ext2Data->extension2 == extension2) {
+            free(ext2Data->data);
+            if (prev2Data == NULL)
+                cl->extensions2 = ext2Data->next;
+            else
+                prev2Data->next = ext2Data->next;
+            free(ext2Data);
+
+            rfbProtocolExtensionElement* el = extension2->elements;
+            for (; el && el < extension2->elements + extension2->elementsCount; ++el) {
+                if (el->type == RFB_PROTOCOL_EXTENSION_HOOK_EXTENSION1) {
+                    rfbProtocolExtension* extension = (rfbProtocolExtensionHookExtension1) el->hook.generic;
+
+                    rfbExtensionData* prevData = NULL;
+                    rfbExtensionData* extData = cl->extensions;
+                    for (; extData; extData = extData->next) {
+                        if (extData->extension == extension) {
+                            if (prevData == NULL)
+                                cl->extensions = extData->next;
+                            else
+                                prevData->next = extData->next;
+                            free(extData);
+                            break;
+                        }
+                        prevData = extData;
+                    }
+
+                    break;
+                }
+            }
+
+            return TRUE;
+        }
+        prev2Data = ext2Data;
+    }
+
+    return FALSE;
+}
+
+void* rfbGetExtension2ClientData(rfbClientPtr cl, rfbProtocolExtension2* extension2)
+{
+    rfbExtension2Data* data = cl->extensions2;
+
+    while(data && data->extension2 != extension2)
+        data = data->next;
+
+    if(data == NULL) {
+        rfbLog("Extension is not enabled !\n");
+        /* rfbCloseClient(cl); */
+        return NULL;
     }
 
     return data->data;
