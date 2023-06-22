@@ -551,8 +551,10 @@ rfbCloseClient(rfbClientPtr cl)
     rfbExtensionData* extension;
 
     for(extension=cl->extensions; extension; extension=extension->next)
-	if(extension->extension->close)
+        if(extension->extension->close) {
 	    extension->extension->close(cl, extension->data);
+	    extension->data = NULL;
+	}
 
     LOCK(cl->updateMutex);
 #if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
