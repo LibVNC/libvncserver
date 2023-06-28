@@ -607,6 +607,11 @@ rfbClientConnectionGone(rfbClientPtr cl)
 
     rfbLog("Client %s gone\n",cl->host);
     free(cl->host);
+	
+    if (cl->wsctx != NULL){
+        free(cl->wsctx);
+        cl->wsctx = NULL;
+    }
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     /* Release the compression state structures if any. */
