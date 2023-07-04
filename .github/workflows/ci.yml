@@ -40,6 +40,8 @@ jobs:
       - name: Install MacOS Build Dependencies
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
+          unset HOMEBREW_NO_INSTALL_FROM_API
+          brew untap homebrew/core homebrew/cask
           brew update
           brew install sdl2 lzo
       - name: Install Windows Build Dependencies
