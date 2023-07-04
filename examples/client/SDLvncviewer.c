@@ -42,9 +42,6 @@ static rfbBool resize(rfbClient* client) {
 	if (enableResizable)
 		sdlFlags |= SDL_WINDOW_RESIZABLE;
 
-	client->updateRect.x = client->updateRect.y = 0;
-	client->updateRect.w = width; client->updateRect.h = height;
-
 	/* (re)create the surface used as the client's framebuffer */
 	SDL_FreeSurface(rfbClientGetClientData(client, SDL_Init));
 	SDL_Surface* sdl=SDL_CreateRGBSurface(0,
