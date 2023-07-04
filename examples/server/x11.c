@@ -63,11 +63,11 @@ int main(int argc, char* argv[])
     int16_t width;
     int16_t height;
     get_window_size(conn, root, &width, &height);
-    void* frameBuffer = malloc(3UL * width * height);
+    void* frameBuffer = malloc(4UL * width * height);
 
-    rfbScreenInfoPtr rfbScreen = rfbGetScreen(&argc, argv, (int)width, (int)height, 8, 3, 3);
+    rfbScreenInfoPtr rfbScreen = rfbGetScreen(&argc, argv, (int)width, (int)height, 8, 3, 4);
     rfbScreen->desktopName = "LibVNCServer X11 Example";
-    rfbScreen->frameBuffer = (char*)malloc(3UL * width * height);
+    rfbScreen->frameBuffer = (char*)malloc(4UL * width * height);
     rfbScreen->alwaysShared = TRUE;
     rfbScreen->kbdAddEvent = keyCallback;
     rfbScreen->ptrAddEvent = mouseCallback;
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
     while (TRUE)
     {
         get_window_image(conn, root, (uint8_t*)frameBuffer);
-        dirty_copy(rfbScreen, (uint8_t*)frameBuffer, (int)width, (int)height, 3);
+        dirty_copy(rfbScreen, (uint8_t*)frameBuffer, (int)width, (int)height, 4);
     }
 
     free(rfbScreen->frameBuffer);
@@ -117,12 +117,13 @@ void convert_bgrx_to_rgb(const uint8_t* in, uint16_t width, uint16_t height, uin
     {
         for(uint16_t x = 0; x < width; x++)
         {
-            buff[(y*width+x)*3] = in[(y*width+x)*4 + 2];
-            buff[(y*width+x)*3 + 1] = in[(y*width+x)*4 + 1];
-            buff[(y*width+x)*3 + 2] = in[(y*width+x)*4];
+            buff[(y*width+x)*4] = in[(y*width+x)*4 + 2];
+            buff[(y*width+x)*4 + 1] = in[(y*width+x)*4 + 1];
+            buff[(y*width+x)*4 + 2] = in[(y*width+x)*4];
         }
     }
 }
+
 
 void get_window_size(xcb_connection_t* conn, xcb_window_t window, uint16_t* width, uint16_t* height)
 {

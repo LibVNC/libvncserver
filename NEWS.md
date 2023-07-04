@@ -1,3 +1,23 @@
+# xxx-xx-xx: Version 0.9.15
+
+## Overall changes:
+
+  * Added fuzzing with OSS-Fuzz thanks to Catena Cyber.
+
+## LibVNCServer/LibVNCClient:
+
+  * Fixed building with OpenSSL >= 3.0.0.
+
+## LibVNCClient:
+
+  * Fixed LibVNCClient handling of UltraVNC MSLogonII when built with OpenSSL.
+  * Added UTF8 clipboard handling.
+
+## LibVNCServer:
+
+  * Added a proof-of-concept X11 example server.
+
+
 # 2022-12-18: Version 0.9.14
 
 0.9.14 represents a gradual improvement over 0.9.13 with lots of developments all over

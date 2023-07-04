@@ -217,6 +217,7 @@ typedef char* (*GetPasswordProc)(struct _rfbClient* client);
 typedef rfbCredential* (*GetCredentialProc)(struct _rfbClient* client, int credentialType);
 typedef rfbBool (*MallocFrameBufferProc)(struct _rfbClient* client);
 typedef void (*GotXCutTextProc)(struct _rfbClient* client, const char *text, int textlen);
+typedef void (*GotXCutTextUTF8Proc)(struct _rfbClient* client, const char* buffer, int buffer_len);
 typedef void (*BellProc)(struct _rfbClient* client);
 /**
     Called when a cursor shape update was received from the server. The decoded cursor shape
@@ -478,6 +479,17 @@ typedef struct _rfbClient {
 	 */
 	rfbExtDesktopScreen screen;
 
+#ifdef LIBVNCSERVER_HAVE_LIBZ
+        uint32_t extendedClipboardServerCapabilities;
+#endif
+        /**
+	 * Callback fired when "Extended Clipboard" UTF-8 text data is received.
+	 */
+        GotXCutTextUTF8Proc GotXCutTextUTF8;
+
+        /* flag to indicate wheter updateRect is managed by lib or user */
+        rfbBool isUpdateRectManagedByLib;
+
         /** Counts bytes received by this client. */
         size_t  bytesRcvd;
 
@@ -522,7 +534,7 @@ extern rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width
 extern void listenForIncomingConnections(rfbClient* viewer);
 extern int listenForIncomingConnectionsNoFork(rfbClient* viewer, int usec_timeout);
 
-/* rfbproto.c */
+/* rfbclient.c */
 
 extern rfbBool rfbEnableClientLogging;
 typedef void (*rfbClientLogProc)(const char *format, ...);
@@ -627,18 +639,33 @@ extern rfbBool SendKeyEvent(rfbClient* client,uint32_t key, rfbBool down);
  */
 extern rfbBool SendExtendedKeyEvent(rfbClient* client, uint32_t keysym, uint32_t keycode, rfbBool down);
 /**
- * Places a string on the server's clipboard. Use this function if you want to
+ * Places a Latin-1-encoded string on the server's clipboard. Use this function if you want to
  * be able to copy and paste between the server and your application. For
  * instance, when your application is notified that the user copied some text
  * onto the clipboard, you would call this function to synchronize the server's
  * clipboard with your local clipboard.
  * @param client The client structure through which to send the client cut text
  * message
- * @param str The string to send (doesn't need to be NULL terminated)
+ * @param str The string to send (needs to be Latin-1-encoded, doesn't need to be NULL terminated)
  * @param len The length of the string
  * @return true if the client cut message was sent successfully, false otherwise
  */
 extern rfbBool SendClientCutText(rfbClient* client,char *str, int len);
+/**
+ * Places a UTF-8-encoded string on the server's clipboard if the server supports it.
+ * Use this function if you want to be able to copy and paste between the server and your application. For
+ * instance, when your application is notified that the user copied some text
+ * onto the clipboard, you would call this function to synchronize the server's
+ * clipboard with your local clipboard. This is the more modern equivalent of
+ * SendClientCutText().
+ * @param client The client structure through which to send the client cut text
+ * message
+ * @param str The string to send (needs to be UTF-8-encoded, doesn't need to be NULL terminated)
+ * @param len The length of the string in bytes
+ * @return true if the message was sent successfully, false otherwise - you might want to
+ * fall back to SendClientCutText() in this case.
+ */
+extern rfbBool SendClientCutTextUTF8(rfbClient* client, char *str, int len);
 /**
  * Handles messages from the RFB server. You must call this function
  * intermittently so LibVNCClient can parse messages from the server. For
@@ -678,6 +705,26 @@ extern void PrintPixelFormat(rfbPixelFormat *format);
 
 extern rfbBool SupportsClient2Server(rfbClient* client, int messageType);
 extern rfbBool SupportsServer2Client(rfbClient* client, int messageType);
+
+/**
+ * Set the rectangle the client is interested in. If set, the client will
+ * ask only for the given rectangle in incremental framebuffer requests.
+ * @param client The client on which to set the rectangle
+ * @param rect The rectangle the client is interested in. The function does
+ *             not take ownership of 'rect'. Set to NULL to have the library
+ *             manage this, which means always request the full remote
+ *             framebuffer.
+ */
+extern void rfbClientSetUpdateRect(rfbClient *client, rfbRectangle *rect);
+
+/**
+ * Get the rectangle the client asks for in incremental framebuffer
+ * requests.
+ * @param client The client for which to get the rectangle
+ * @param rect Will be filled with what's currently set for the given client
+ * @param isManagedbylib Will be set to TRUE if client is using the default
+ */
+extern void rfbClientGetUpdateRect(rfbClient *client, rfbRectangle *rect, rfbBool *isManagedByLib);
 
 /* client data */
 

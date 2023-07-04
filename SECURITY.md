@@ -9,4 +9,4 @@ team head count.
 
 ## Reporting a Vulnerability
 
-Mail in to dontmind@sdf.org.
+Please use [this form](https://github.com/LibVNC/libvncserver/security/advisories/new).

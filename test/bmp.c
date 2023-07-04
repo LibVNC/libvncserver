@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #ifdef _WIN32
  #include <io.h>
 #else
@@ -122,15 +123,15 @@ int loadppm(int *fd, unsigned char **buf, int *w, int *h,
 		switch(totalread)
 		{
 			case 0:
-				if((numread=sscanf(temps, "%d %d %d", w, h, &scalefactor))==EOF)
+				if((numread=sscanf(temps, "%d %d %d", w, h, &scalefactor))!=3)
 					_throw("Read error");
 				break;
 			case 1:
-				if((numread=sscanf(temps, "%d %d", h, &scalefactor))==EOF)
+				if((numread=sscanf(temps, "%d %d", h, &scalefactor))!=2)
 					_throw("Read error");
 				break;
 			case 2:
-				if((numread=sscanf(temps, "%d", &scalefactor))==EOF)
+				if((numread=sscanf(temps, "%d", &scalefactor))!=1)
 					_throw("Read error");
 				break;
 		}
@@ -139,7 +140,7 @@ int loadppm(int *fd, unsigned char **buf, int *w, int *h,
 	if((*w)<1 || (*h)<1 || scalefactor<1) _throw("Corrupt PPM header");
 
 	dstpitch=(((*w)*ps[f])+(align-1))&(~(align-1));
-	if((*buf=(unsigned char *)malloc(dstpitch*(*h)))==NULL)
+	if((*buf=(unsigned char *)calloc(dstpitch, *h))==NULL)
 		_throw("Memory allocation error");
 	if(ascii)
 	{
@@ -159,7 +160,7 @@ int loadppm(int *fd, unsigned char **buf, int *w, int *h,
 	{
 		if(scalefactor!=255)
 			_throw("Binary PPMs must have 8-bit components");
-		if((tempbuf=(unsigned char *)malloc((*w)*(*h)*3))==NULL)
+		if(*h>SIZE_MAX/3 || (tempbuf=(unsigned char *)calloc(*w, (*h)*3))==NULL)
 			_throw("Memory allocation error");
 		if(fread(tempbuf, (*w)*(*h)*3, 1, fs)!=1) _throw("Read error");
 		pixelconvert(tempbuf, BMP_RGB, (*w)*3, *buf, f, dstpitch, *w, *h, dstbottomup);
@@ -249,8 +250,8 @@ int loadbmp(char *filename, unsigned char **buf, int *w, int *h,
 	dstpitch=(((*w)*ps[f])+(align-1))&(~(align-1));
 
 	if(srcpitch*(*h)+bh.bfOffBits!=bh.bfSize) _throw("Corrupt bitmap header");
-	if((tempbuf=(unsigned char *)malloc(srcpitch*(*h)))==NULL
-	|| (*buf=(unsigned char *)malloc(dstpitch*(*h)))==NULL)
+	if((tempbuf=(unsigned char *)calloc(srcpitch, *h))==NULL
+	|| (*buf=(unsigned char *)calloc(dstpitch, *h))==NULL)
 		_throw("Memory allocation error");
 	if(lseek(fd, (long)bh.bfOffBits, SEEK_SET)!=(long)bh.bfOffBits)
 		_throw(strerror(errno));

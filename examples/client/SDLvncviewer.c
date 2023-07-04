@@ -42,9 +42,6 @@ static rfbBool resize(rfbClient* client) {
 	if (enableResizable)
 		sdlFlags |= SDL_WINDOW_RESIZABLE;
 
-	client->updateRect.x = client->updateRect.y = 0;
-	client->updateRect.w = width; client->updateRect.h = height;
-
 	/* (re)create the surface used as the client's framebuffer */
 	SDL_FreeSurface(rfbClientGetClientData(client, SDL_Init));
 	SDL_Surface* sdl=SDL_CreateRGBSurface(0,
@@ -307,7 +304,8 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		        char *text = SDL_GetClipboardText();
 			if(text) {
 			    rfbClientLog("sending clipboard text '%s'\n", text);
-			    SendClientCutText(cl, text, strlen(text));
+			    if(!SendClientCutTextUTF8(cl, text, strlen(text)))
+			       SendClientCutText(cl, text, strlen(text));
 			}
 		}
 
@@ -420,18 +418,37 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 	return TRUE;
 }
 
-static void got_selection(rfbClient *cl, const char *text, int len)
+static void got_selection_latin1(rfbClient *cl, const char *text, int len)
 {
-        rfbClientLog("received clipboard text '%s'\n", text);
+        rfbClientLog("received latin1 clipboard text '%s'\n", text);
         if(SDL_SetClipboardText(text) != 0)
-	    rfbClientErr("could not set received clipboard text: %s\n", SDL_GetError());
+	    rfbClientErr("could not set received latin1 clipboard text: %s\n", SDL_GetError());
+}
+
+static void got_selection_utf8(rfbClient *cl, const char *buf, int len)
+{
+        rfbClientLog("received utf8 clipboard text '%s'\n", buf);
+        if(SDL_SetClipboardText(buf) != 0)
+	    rfbClientErr("could not set received utf8 clipboard text: %s\n", SDL_GetError());
 }
 
 
 static rfbCredential* get_credential(rfbClient* cl, int credentialType){
-        rfbCredential *c = malloc(sizeof(rfbCredential));
+	rfbCredential *c = malloc(sizeof(rfbCredential));
+	if (!c) {
+		return NULL;
+	}
 	c->userCredential.username = malloc(RFB_BUF_SIZE);
+	if (!c->userCredential.username) {
+		free(c);
+		return NULL;
+	}
 	c->userCredential.password = malloc(RFB_BUF_SIZE);
+	if (!c->userCredential.password) {
+		free(c->userCredential.username);
+		free(c);
+		return NULL;
+	}
 
 	if(credentialType != rfbCredentialTypeUser) {
 	    rfbClientErr("something else than username and password required for authentication\n");
@@ -496,7 +513,11 @@ int main(int argc,char** argv) {
 	  cl->GotFrameBufferUpdate=update;
 	  cl->HandleKeyboardLedState=kbd_leds;
 	  cl->HandleTextChat=text_chat;
-	  cl->GotXCutText = got_selection;
+	  /* two different cut text handlers here for demo purposes, you
+	     might as well use the same callback for both if it doesn't
+	     matter for your application */
+	  cl->GotXCutText = got_selection_latin1;
+	  cl->GotXCutTextUTF8 = got_selection_utf8;
 	  cl->GetCredential = get_credential;
 	  cl->listenPort = LISTEN_PORT_OFFSET;
 	  cl->listen6Port = LISTEN_PORT_OFFSET;

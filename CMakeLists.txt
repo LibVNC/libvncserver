@@ -16,9 +16,9 @@ set(PACKAGE_NAME           "LibVNCServer")
 set(FULL_PACKAGE_NAME      "LibVNCServer")
 set(VERSION_SO             "1")
 set(PROJECT_BUGREPORT_PATH "https://github.com/LibVNC/libvncserver/issues")
-set(LIBVNCSERVER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver)
-set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/common)
-set(LIBVNCCLIENT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libvncclient)
+set(LIBVNCSERVER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/libvncserver)
+set(COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/common)
+set(LIBVNCCLIENT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/libvncclient)
 set(LIBVNCSRVEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples/server)
 set(LIBVNCCLIEXAMPLE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/examples/client)
 set(TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
@@ -35,7 +35,12 @@ add_custom_target(
     )
 endif(CMAKE_GENERATOR MATCHES "Unix Makefiles|Ninja")
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/libvncserver ${CMAKE_CURRENT_SOURCE_DIR}/common)
+include_directories(
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_BINARY_DIR}/include
+  ${LIBVNCSERVER_DIR}
+  ${LIBVNCCLIENT_DIR}
+  ${COMMON_DIR})
 
 # all the build configuration switches
 option(LIBVNCSERVER_INSTALL "Generate installation target" ON)
@@ -357,7 +362,7 @@ endif(WITH_SASL AND LIBSASL2_LIBRARIES AND SASL2_INCLUDE_DIR)
 # LIBVNCSERVER_ENOENT_WORKAROUND
 # inline
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/rfb/rfbconfig.h.cmakein ${CMAKE_CURRENT_BINARY_DIR}/rfb/rfbconfig.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/include/rfb/rfbconfig.h.cmakein ${CMAKE_CURRENT_BINARY_DIR}/include/rfb/rfbconfig.h)
 
 set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/main.c
@@ -388,7 +393,7 @@ set(LIBVNCSERVER_SOURCES
 set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/cursor.c
     ${LIBVNCCLIENT_DIR}/listen.c
-    ${LIBVNCCLIENT_DIR}/rfbproto.c
+    ${LIBVNCCLIENT_DIR}/rfbclient.c
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
     ${COMMON_DIR}/ghpringbuf.c
@@ -769,19 +774,19 @@ function(get_link_libraries OUT TARGET)
 endfunction()
 
 get_link_libraries(PRIVATE_LIBS vncserver)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncserver/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/libvncserver/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
 get_link_libraries(PRIVATE_LIBS vncclient)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/libvncclient/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/libvncclient/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
 
 if(LIBVNCSERVER_INSTALL)
     set(INSTALL_HEADER_FILES
-        rfb/keysym.h
-        rfb/threading.h
-        rfb/rfb.h
-        rfb/rfbclient.h
-        ${CMAKE_CURRENT_BINARY_DIR}/rfb/rfbconfig.h
-        rfb/rfbproto.h
-        rfb/rfbregion.h
+        include/rfb/keysym.h
+        include/rfb/threading.h
+        include/rfb/rfb.h
+        include/rfb/rfbclient.h
+        ${CMAKE_CURRENT_BINARY_DIR}/include/rfb/rfbconfig.h
+        include/rfb/rfbproto.h
+        include/rfb/rfbregion.h
         )
     
     set_property(TARGET vncclient PROPERTY PUBLIC_HEADER ${INSTALL_HEADER_FILES})

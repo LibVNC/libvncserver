@@ -50,7 +50,10 @@ int main(int argc,char** argv)
   } while(buffer[0]=='#');
 
   /* get width & height */
-  sscanf(buffer,"%d %d",&width,&height);
+  if(sscanf(buffer,"%d %d",&width,&height) != 2) {
+    printf("Failed to get width or height.\n");
+    exit(3);
+  }
   rfbLog("Got width %d and height %d.\n",width,height);
   fgets(buffer,1024,in);
 
@@ -77,6 +80,8 @@ int main(int argc,char** argv)
   rfbScreen->httpDir = "../webclients";
 
   /* allocate picture and read it */
+  if (paddedWidth>SIZE_MAX/3 || (height!=0 && paddedWidth*3>SIZE_MAX/height))
+    return 1;
   rfbScreen->frameBuffer = (char*)malloc(paddedWidth*3*height);
   if(!rfbScreen->frameBuffer)
     return 1;
