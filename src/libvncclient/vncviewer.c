@@ -403,6 +403,7 @@ static rfbBool rfbInitConnection(rfbClient* client)
     client->updateRect.x = client->updateRect.y = 0;
     client->updateRect.w = client->width;
     client->updateRect.h = client->height;
+    client->isUpdateRectManagedByLib = TRUE;
   }
 
   if (client->appData.scaleSetting>1)

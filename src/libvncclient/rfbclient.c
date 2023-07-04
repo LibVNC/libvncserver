@@ -1684,9 +1684,12 @@ ResizeClientBuffer(rfbClient* client, int width, int height)
 {
   client->width = width;
   client->height = height;
-  client->updateRect.x = client->updateRect.y = 0;
-  client->updateRect.w = client->width;
-  client->updateRect.h = client->height;
+  /* Only adadpt updateRect to new dimensions if managed by lib */
+  if (client->isUpdateRectManagedByLib) {
+      client->updateRect.x = client->updateRect.y = 0;
+      client->updateRect.w = client->width;
+      client->updateRect.h = client->height;
+  }
   return client->MallocFrameBuffer(client);
 }
 
@@ -1972,6 +1975,29 @@ rfbClientProcessExtServerCutText(rfbClient* client, char *data, int len)
 }
 #endif
 
+void rfbClientSetUpdateRect(rfbClient *client, rfbRectangle *rect) {
+    if (rect) {
+	client->updateRect.x = rect->x;
+	client->updateRect.y = rect->y;
+	client->updateRect.w = rect->w;
+	client->updateRect.h = rect->h;
+	client->isUpdateRectManagedByLib = FALSE;
+    } else {
+	/* rect NULL, reset to defaults */
+	client->updateRect.x = client->updateRect.y = 0;
+	client->updateRect.w = client->width;
+	client->updateRect.h = client->height;
+	client->isUpdateRectManagedByLib = TRUE;
+    }
+}
+
+void rfbClientGetUpdateRect(rfbClient *client, rfbRectangle *rect, rfbBool *isManagedByLib) {
+    rect->x = client->updateRect.x;
+    rect->y = client->updateRect.y;
+    rect->w = client->updateRect.w;
+    rect->h = client->updateRect.h;
+    *isManagedByLib = client->isUpdateRectManagedByLib;
+}
 
 /*
  * HandleRFBServerMessage.
