@@ -502,7 +502,7 @@ extern rfbBool HandleCursorShape(rfbClient* client,int xhot, int yhot, int width
 extern void listenForIncomingConnections(rfbClient* viewer);
 extern int listenForIncomingConnectionsNoFork(rfbClient* viewer, int usec_timeout);
 
-/* rfbproto.c */
+/* rfbclient.c */
 
 extern rfbBool rfbEnableClientLogging;
 typedef void (*rfbClientLogProc)(const char *format, ...);
