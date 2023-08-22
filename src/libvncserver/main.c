@@ -1153,11 +1153,11 @@ void rfbNewFramebuffer(rfbScreenInfoPtr screen, char *framebuffer,
 void rfbScreenCleanup(rfbScreenInfoPtr screen)
 {
   rfbClientIteratorPtr i=rfbGetClientIterator(screen);
-  rfbClientPtr cl,cl1=rfbClientIteratorNext(i);
-  while(cl1) {
-    cl=rfbClientIteratorNext(i);
-    rfbClientConnectionGone(cl1);
-    cl1=cl;
+  rfbClientPtr nextCl,currentCl=rfbClientIteratorNext(i);
+  while(currentCl) {
+    nextCl=rfbClientIteratorNext(i);
+    rfbClientConnectionGone(currentCl);
+    currentCl=nextCl;
   }
   rfbReleaseClientIterator(i);
     
