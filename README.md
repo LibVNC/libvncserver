@@ -125,7 +125,9 @@ Tested with MinGW-w64 on Debian, which you should install via `sudo apt install 
 You can make use of the [provided toolchainfile](cmake/Toolchain-cross-mingw32-linux.cmake).
 It sets CMake to expect (optional) win32 dependencies like libjpeg and friends
 in the `deps` directory. Note that you need (probably self-built) development packages for
-win32, the `-dev` packages coming with your distribution won't work.
+win32, the `-dev` packages coming with your distribution won't work. Also note that you'll
+need to put `libwinpthread-1.dll` in the build dir to run the examples. You can find this DLL
+on your Linux build machine via `locate libwinpthread-1.dll`.
 
 
 	mkdir build
