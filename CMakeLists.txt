@@ -641,6 +641,7 @@ if(NOT LIBSSH2_FOUND)
 endif()
 
 if(FFMPEG_FOUND)
+  include_directories(${FFMPEG_INCLUDE_DIRS})
   set(LIBVNCCLIENT_EXAMPLES
     ${LIBVNCCLIENT_EXAMPLES}
     vnc2mpg
