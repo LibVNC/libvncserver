@@ -478,7 +478,7 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
     rfbSocket chosen_listen_sock = RFB_INVALID_SOCKET;
 #if defined LIBVNCSERVER_HAVE_SYS_RESOURCE_H && defined LIBVNCSERVER_HAVE_FCNTL_H
     struct rlimit rlim;
-    size_t maxfds, curfds, i;
+    size_t maxfds, curopenfds, curfreefds, i;
 #endif
     /* Do another select() call to find out which listen socket
        has an incoming connection pending. We know that at least 
@@ -512,13 +512,17 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
 	maxfds = rlim.rlim_cur;
 
     /* get the number of currently open fds as per https://stackoverflow.com/a/7976880/361413 */
-    curfds = 0;
-    for(i = 0; i < maxfds; ++i)
+    curopenfds = 0;
+    curfreefds = 0;
+    for(i = 0; i < maxfds, curfreefds < rfbScreen->fdSufficientFreeCount; ++i) {
 	if(fcntl(i, F_GETFD) != -1)
-	    ++curfds;
+	    ++curopenfds;
+    else
+        ++curfreefds;
+    }
 
-    if(curfds > maxfds * rfbScreen->fdQuota) {
-	rfbErr("rfbProcessNewconnection: open fd count of %lu exceeds quota %.1f of limit %lu, denying connection\n", curfds, rfbScreen->fdQuota, maxfds);
+    if(curfreefds < rfbScreen->fdSufficientFreeCount && curopenfds > maxfds * rfbScreen->fdQuota) {
+	rfbErr("rfbProcessNewconnection: open fd count of %lu exceeds quota %.1f of limit %lu, denying connection\n", curopenfds, rfbScreen->fdQuota, maxfds);
 	sock = accept(chosen_listen_sock, NULL, NULL);
 	rfbCloseSocket(sock);
 	return FALSE;
