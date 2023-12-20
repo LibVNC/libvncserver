@@ -669,6 +669,7 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
     rfbSocket sock = cl->sock;
     int n;
     fd_set fds;
+    fd_set exceptfds;
     struct timeval tv;
 
     while (len > 0) {
@@ -715,9 +716,10 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 #endif
             FD_ZERO(&fds);
             FD_SET(sock, &fds);
+	    exceptfds = fds;
             tv.tv_sec = timeout / 1000;
             tv.tv_usec = (timeout % 1000) * 1000;
-            n = select(sock+1, &fds, NULL, &fds, &tv);
+            n = select(sock+1, &fds, NULL, &exceptfds, &tv);
             if (n < 0) {
                 rfbLogPerror("ReadExact: select");
                 return n;
