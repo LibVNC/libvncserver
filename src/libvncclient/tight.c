@@ -54,23 +54,61 @@
 
 #ifndef RGB_TO_PIXEL
 
-#define RGB_TO_PIXEL(bpp,r,g,b)						\
-  (((CARD##bpp)(r) & client->format.redMax) << client->format.redShift |		\
-   ((CARD##bpp)(g) & client->format.greenMax) << client->format.greenShift |	\
-   ((CARD##bpp)(b) & client->format.blueMax) << client->format.blueShift)
+/*
+ * Unfortunately we cannot use rfbClientSwap16IfLE() and related macros here as
+ * rfbClientSwap16IfLE() swaps when the host byte order of the client is
+ * little-endian, but we want to swap when the host byte order of the client is
+ * different from the byte order of the pixel format it is using. In other
+ * words, rfbClientSwap16IfLE() will do the right thing only when the pixel
+ * format is big-endian.
+ */
+#define Swap8(c) (c)
+#define Swap16(s) ((((s) & 0xff) << 8) | (((s) >> 8) & 0xff))
+#define Swap32(l) ((((l) >> 24) & 0x000000ff)| \
+                   (((l) & 0x00ff0000) >> 8)  | \
+                   (((l) & 0x0000ff00) << 8)  | \
+                   (((l) & 0x000000ff) << 24))
 
-#define RGB24_TO_PIXEL(bpp,r,g,b)                                       \
-   ((((CARD##bpp)(r) & 0xFF) * client->format.redMax + 127) / 255             \
-    << client->format.redShift |                                              \
-    (((CARD##bpp)(g) & 0xFF) * client->format.greenMax + 127) / 255           \
-    << client->format.greenShift |                                            \
-    (((CARD##bpp)(b) & 0xFF) * client->format.blueMax + 127) / 255            \
-    << client->format.blueShift)
+#ifdef LIBVNCSERVER_WORDS_BIGENDIAN
+#define NEED_SWAP (!client->format.bigEndian)
+#else
+#define NEED_SWAP (client->format.bigEndian)
+#endif
 
-#define RGB24_TO_PIXEL32(r,g,b)						\
-  (((uint32_t)(r) & 0xFF) << client->format.redShift |				\
-   ((uint32_t)(g) & 0xFF) << client->format.greenShift |			\
+#define RGB_TO_PIXEL_NOSWAP(card,r,g,b)                                       \
+   (((card)(r) & client->format.redMax) << client->format.redShift |          \
+    ((card)(g) & client->format.greenMax) << client->format.greenShift |      \
+    ((card)(b) & client->format.blueMax) << client->format.blueShift)
+
+#define RGB_TO_PIXEL(bpp,r,g,b) NEED_SWAP ?                                   \
+  CONCAT2(Swap,bpp)(RGB_TO_PIXEL_NOSWAP(CARD##bpp,r,g,b)) :                   \
+  RGB_TO_PIXEL_NOSWAP(CARD##bpp,r,g,b)
+
+#define RGB24_TO_PIXEL_NOSWAP(card,r,g,b)                                     \
+  ((((card)(r) & 0xFF) * client->format.redMax + 127) / 255                   \
+   << client->format.redShift |                                               \
+   (((card)(g) & 0xFF) * client->format.greenMax + 127) / 255                 \
+   << client->format.greenShift |                                             \
+   (((card)(b) & 0xFF) * client->format.blueMax + 127) / 255                  \
+   << client->format.blueShift)
+
+#define RGB24_TO_PIXEL(bpp,r,g,b) NEED_SWAP ?                                 \
+  CONCAT2(Swap,bpp)(RGB24_TO_PIXEL_NOSWAP(CARD##bpp,r,g,b)) :                 \
+  RGB24_TO_PIXEL_NOSWAP(CARD##bpp,r,g,b)
+
+#define RGB24_TO_PIXEL32_NOSWAP(r,g,b)                                        \
+  (((uint32_t)(r) & 0xFF) << client->format.redShift |                        \
+   ((uint32_t)(g) & 0xFF) << client->format.greenShift |                      \
    ((uint32_t)(b) & 0xFF) << client->format.blueShift)
+
+#define RGB24_TO_PIXEL32_SWAP(r,g,b)                                          \
+  (((uint32_t)(r) & 0xFF) << (24 - client->format.redShift) |                 \
+   ((uint32_t)(g) & 0xFF) << (24 - client->format.greenShift) |               \
+   ((uint32_t)(b) & 0xFF) << (24 - client->format.blueShift))
+
+#define RGB24_TO_PIXEL32(r,g,b) NEED_SWAP ?                                   \
+  RGB24_TO_PIXEL32_SWAP(r,g,b) :                                              \
+  RGB24_TO_PIXEL32_NOSWAP(r,g,b)
 
 #endif
 
