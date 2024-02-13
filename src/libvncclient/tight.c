@@ -635,10 +635,17 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
   pitch = w * pixelSize;
   dst = (uint8_t *)client->buffer;
 #else
-  if (client->format.bigEndian) flags |= TJ_ALPHAFIRST;
-  if (client->format.redShift == 16 && client->format.blueShift == 0)
-    flags |= TJ_BGR;
-  if (client->format.bigEndian) flags ^= TJ_BGR;
+  if (client->format.redShift == 24 &&
+      client->format.greenShift == 16 && client->format.blueShift == 8) {
+    flags |= TJ_ALPHAFIRST | TJ_BGR; /* ABGR */
+  } else if (client->format.redShift == 16 &&
+      client->format.greenShift == 8 && client->format.blueShift == 0) {
+    flags |= TJ_BGR; /* BGRA */
+  } else if (client->format.redShift == 8 &&
+      client->format.greenShift == 16 && client->format.blueShift == 24) {
+    flags |= TJ_ALPHAFIRST; /* ARGB */
+  } /* else RGBA */
+  if (client->format.bigEndian) flags ^= TJ_ALPHAFIRST | TJ_BGR;
   pixelSize = BPP / 8;
   pitch = client->width * pixelSize;
   dst = &client->frameBuffer[y * pitch + x * pixelSize];
