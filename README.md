@@ -232,10 +232,10 @@ high latency or both.
 
 On a high-latency link, try asking for framebuffer updates continously, as
 RFB is client-pull per default, not server-push. One example implementation
-can be found [here](https://github.com/bk138/multivnc/blob/master/src/VNCConn.cpp#L1112)
+can be found [here](https://github.com/bk138/multivnc/blob/6251169ed11835ed709c0c191599937759856dda/src/VNCConn.cpp#L1112)
 and it definitely improves responsiveness.
 
-There also is the [ContinuousUpdates RFB extension](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#continuousupdates-pseudo-encoding),
+There also is the [ContinuousUpdates RFB extension](https://github.com/rfbproto/rfbproto/blob/513c651fff1b213188daa5069444145a63e71617/rfbproto.rst#L4052),
 but that one is not supported by LibVNC (yet).
 
 ### Tackling Low Throughput
@@ -254,7 +254,7 @@ bytes that get sent per framebuffer update:
 * Send a scaled-down version of your framebuffer. You can do the scaling in your
   application feeding data into LibVNCServer's framebuffer (would affect all clients)
   or let LibVNCServer do the work for you if your client requests a scaled screen
-  via a [SetScale or SetScaleFactor message](https://github.com/rfbproto/rfbproto/blob/master/rfbproto.rst#74client-to-server-messages)
+  via a [SetScale or SetScaleFactor message](https://github.com/rfbproto/rfbproto/blob/513c651fff1b213188daa5069444145a63e71617/rfbproto.rst#L1344)
   (this is per-client scaling - UltraVNC viewers can request this).
   
 
