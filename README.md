@@ -55,7 +55,6 @@ RFB Protocol Support Status
 | Hextile  | 5      | ✔            | ✔            |
 | Zlib     | 6      | ✔            | ✔            |
 | Tight    | 7      | ✔            | ✔            |
-| Zlibhex  | 8      | ✔            |              |
 | Ultra    | 9      | ✔            | ✔            |
 | TRLE     | 15     |              | ✔            |
 | ZRLE     | 16     | ✔            | ✔            |
