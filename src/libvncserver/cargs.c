@@ -60,6 +60,13 @@ rfbUsage(void)
     fprintf(stderr, "-listenv6 ipv6addr     listen for IPv6 connections only on network interface with\n");
     fprintf(stderr, "                       addr ipv6addr. '-listen localhost' and hostname work too.\n");
 #endif
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    fprintf(stderr, "-nomt                  disable multithreaded Tight encoding\n");
+    fprintf(stderr, "-nthreads N            specify number of threads (1 <= N <= %d) to use with\n",
+         MAX_ENCODING_THREADS);
+    fprintf(stderr, "                       multithreaded Tight encoding [default: 1 per CPU core,\n");
+    fprintf(stderr, "                       max. %d]\n", MAX_ENCODING_THREADS);
+#endif
 
     for(extension=rfbGetExtensionIterator();extension;extension=extension->next)
 	if(extension->usage)
@@ -201,6 +208,20 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		return FALSE;
 	    }
 	    rfbScreen->listen6Interface = argv[++i];
+#endif
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+        } else if (strcmp(argv[i], "-nomt") == 0) {
+            rfbScreen->rfbMT = FALSE;
+        } else if (strcmp(argv[i], "-nthreads") == 0) {
+            if (i + 1 >= *argc) {
+                rfbUsage();
+                return FALSE;
+            }
+            rfbScreen->rfbNumThreads = atoi(argv[++i]);
+            if (rfbScreen->rfbNumThreads < 1 || rfbScreen->rfbNumThreads > MAX_ENCODING_THREADS) {
+                rfbUsage();
+                return FALSE;
+            }
 #endif
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
         } else if (strcmp(argv[i], "-sslkeyfile") == 0) {  /* -sslkeyfile sslkeyfile */
