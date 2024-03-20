@@ -3,8 +3,8 @@
 
 /* from cursor.c */
 
-void rfbShowCursor(rfbClientPtr cl);
-void rfbHideCursor(rfbClientPtr cl);
+void rfbShowCursor(rfbScreenInfoPtr s);
+void rfbHideCursor(rfbScreenInfoPtr s);
 void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion);
 
 /* from main.c */

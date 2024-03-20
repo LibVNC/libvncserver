@@ -29,6 +29,9 @@
 #if 0 /* debugging */
 #define LOCK(mutex)                   (rfbLog("%s:%d LOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_lock(&(mutex)))
 #define UNLOCK(mutex)                 (rfbLog("%s:%d UNLOCK(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_unlock(&(mutex)))
+#define RDLOCK(rwlock)                (rfbLog("%s:%d RDLOCK(%s,0x%x)\n",__FILE__,__LINE__,#rwlock,&(rwlock)), pthread_rwlock_rdlock(&(rwlock)))
+#define WRLOCK(rwlock)                (rfbLog("%s:%d WRLOCK(%s,0x%x)\n",__FILE__,__LINE__,#rwlock,&(rwlock)), pthread_rwlock_wrlock(&(rwlock)))
+#define RWUNLOCK(rwlock)              (rfbLog("%s:%d RWUNLOCK(%s,0x%x)\n",__FILE__,__LINE__,#rwlock,&(rwlock)), pthread_rwlock_unlock(&(rwlock)))
 #define MUTEX(mutex)                  pthread_mutex_t (mutex)
 #define INIT_MUTEX(mutex)             (rfbLog("%s:%d INIT_MUTEX(%s,0x%x)\n",__FILE__,__LINE__,#mutex,&(mutex)), pthread_mutex_init(&(mutex),NULL))
 #define TINI_MUTEX(mutex)             (rfbLog("%s:%d TINI_MUTEX(%s)\n",__FILE__,__LINE__,#mutex), pthread_mutex_destroy(&(mutex)))
@@ -37,11 +40,22 @@
 #define COND(cond) pthread_cond_t     (cond)
 #define INIT_COND(cond)               (rfbLog("%s:%d INIT_COND(%s)\n",__FILE__,__LINE__,#cond), pthread_cond_init(&(cond),NULL))
 #define TINI_COND(cond)               (rfbLog("%s:%d TINI_COND(%s)\n",__FILE__,__LINE__,#cond), pthread_cond_destroy(&(cond)))
+#define RWLOCK(rwlock)                pthread_rwlock_t (rwlock)
+#define INIT_RWLOCK(rwlock)           (rfbLog("%s:%d INIT_RWLOCK(%s)\n",__FILE__,__LINE__,#rwlock), pthread_rwlock_init(&(rwlock),NULL))
+#define TINI_RWLOCK(rwlock)           (rfbLog("%s:%d TINI_RWLOCK(%s)\n",__FILE__,__LINE__,#rwlock), pthread_rwlock_destroy(&(rwlock)))
 #define IF_PTHREADS(x)                x
+#define THREAD_ROUTINE_RETURN_TYPE    void*
+#define THREAD_ROUTINE_RETURN_VALUE   NULL
+#define THREAD_SLEEP_MS(ms)           usleep(ms*1000)
+#define THREAD_JOIN(thread)           pthread_join(thread, NULL)
+#define CURRENT_THREAD_ID             pthread_self()
 #else
 #if !NONETWORK
 #define LOCK(mutex)                   pthread_mutex_lock(&(mutex))
 #define UNLOCK(mutex)                 pthread_mutex_unlock(&(mutex))
+#define RDLOCK(rwlock)                pthread_rwlock_rdlock(&(rwlock))
+#define WRLOCK(rwlock)                pthread_rwlock_wrlock(&(rwlock))
+#define RWUNLOCK(rwlock)              pthread_rwlock_unlock(&(rwlock))
 #endif
 #define MUTEX(mutex)                  pthread_mutex_t (mutex)
 #define MUTEX_SIZE                    (sizeof(pthread_mutex_t))
@@ -52,6 +66,9 @@
 #define COND(cond)                    pthread_cond_t (cond)
 #define INIT_COND(cond)               pthread_cond_init(&(cond),NULL)
 #define TINI_COND(cond)               pthread_cond_destroy(&(cond))
+#define RWLOCK(rwlock)                pthread_rwlock_t (rwlock)
+#define INIT_RWLOCK(rwlock)           pthread_rwlock_init(&(rwlock),NULL)
+#define TINI_RWLOCK(rwlock)           pthread_rwlock_destroy(&(rwlock))
 #define IF_PTHREADS(x)                x
 #define THREAD_ROUTINE_RETURN_TYPE    void*
 #define THREAD_ROUTINE_RETURN_VALUE   NULL
@@ -64,6 +81,9 @@
 #include <process.h>
 #define LOCK(mutex)                   EnterCriticalSection(&(mutex))
 #define UNLOCK(mutex)                 LeaveCriticalSection(&(mutex))
+#define RDLOCK(rwlock)                LOCK((rwlock))
+#define WRLOCK(rwlock)                LOCK((rwlock))
+#define RWUNLOCK(rwlock)              UNLOCK((rwlock))
 #define MUTEX(mutex)                  CRITICAL_SECTION (mutex)
 #define MUTEX_SIZE                    (sizeof(CRITICAL_SECTION))
 #define INIT_MUTEX(mutex)             InitializeCriticalSection(&(mutex))
@@ -73,6 +93,9 @@
 #define COND(cond)                    CONDITION_VARIABLE (cond)
 #define INIT_COND(cond)               InitializeConditionVariable(&(cond));
 #define TINI_COND(cond)
+#define RWLOCK(rwlock)                MUTEX((rwlock))
+#define INIT_RWLOCK(rwlock)           INIT_MUTEX((rwlock))
+#define TINI_RWLOCK(rwlock)           TINI_MUTEX((rwlock))
 #define IF_PTHREADS(x)
 #define THREAD_ROUTINE_RETURN_TYPE    void
 #define THREAD_ROUTINE_RETURN_VALUE
@@ -83,6 +106,8 @@
 #else
 #define LOCK(mutex)
 #define UNLOCK(mutex)
+#define WRLOCK(rwlock)
+#define RWUNLOCK(rwlock)
 #define MUTEX(mutex)
 #define INIT_MUTEX(mutex)
 #define TINI_MUTEX(mutex)
@@ -91,6 +116,9 @@
 #define COND(cond)
 #define INIT_COND(cond)
 #define TINI_COND(cond)
+#define RWLOCK(rwlock)
+#define INIT_RWLOCK(rwlock)
+#define TINI_RWLOCK(rwlock)
 #define IF_PTHREADS(x)
 #endif
 

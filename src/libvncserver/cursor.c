@@ -500,13 +500,16 @@ void rfbMakeRichCursorFromXCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr cursor
 
 /* functions to draw/hide cursor directly in the frame buffer */
 
-void rfbHideCursor(rfbClientPtr cl)
+void rfbHideCursor(rfbScreenInfoPtr s)
 {
-   rfbScreenInfoPtr s=cl->screen;
    rfbCursorPtr c;
    int j,x1,x2,y1,y2,bpp=s->serverFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes;
    LOCK(s->cursorMutex);
+   if(--s->showCursorRefCount != 0) {
+     UNLOCK(s->cursorMutex);
+     return;
+   }
    c=s->cursor;
    if(!c) {
      UNLOCK(s->cursorMutex);
@@ -514,7 +517,7 @@ void rfbHideCursor(rfbClientPtr cl)
    }
    
    /* restore what is under the cursor */
-   x1=cl->cursorX-c->xhot;
+   x1=s->underCursorBufferX-c->xhot;
    x2=x1+c->width;
    if(x1<0) x1=0;
    if(x2>=s->width) x2=s->width-1;
@@ -522,7 +525,7 @@ void rfbHideCursor(rfbClientPtr cl)
      UNLOCK(s->cursorMutex);
      return;
    }
-   y1=cl->cursorY-c->yhot;
+   y1=s->underCursorBufferY-c->yhot;
    y2=y1+c->height;
    if(y1<0) y1=0;
    if(y2>=s->height) y2=s->height-1;
@@ -543,9 +546,8 @@ void rfbHideCursor(rfbClientPtr cl)
    UNLOCK(s->cursorMutex);
 }
 
-void rfbShowCursor(rfbClientPtr cl)
+void rfbShowCursor(rfbScreenInfoPtr s)
 {
-   rfbScreenInfoPtr s=cl->screen;
    rfbCursorPtr c;
    int i,j,x1,x2,y1,y2,i1,j1,bpp=s->serverFormat.bitsPerPixel/8,
      rowstride=s->paddedWidthInBytes,
@@ -553,6 +555,10 @@ void rfbShowCursor(rfbClientPtr cl)
    rfbBool wasChanged=FALSE;
 
    LOCK(s->cursorMutex);
+   if(++s->showCursorRefCount != 1) {
+     UNLOCK(s->cursorMutex);
+     return;
+   }
    c=s->cursor;
    if(!c) {
 	UNLOCK(s->cursorMutex);
@@ -570,7 +576,7 @@ void rfbShowCursor(rfbClientPtr cl)
 
    /* save what is under the cursor */
    i1=j1=0; /* offset in cursor */
-   x1=cl->cursorX-c->xhot;
+   x1=s->cursorX-c->xhot;
    x2=x1+c->width;
    if(x1<0) { i1=-x1; x1=0; }
    if(x2>=s->width) x2=s->width-1;
@@ -579,7 +585,7 @@ void rfbShowCursor(rfbClientPtr cl)
      return; /* nothing to do */
    }
 
-   y1=cl->cursorY-c->yhot;
+   y1=s->cursorY-c->yhot;
    y2=y1+c->height;
    if(y1<0) { j1=-y1; y1=0; }
    if(y2>=s->height) y2=s->height-1;
@@ -704,6 +710,10 @@ void rfbShowCursor(rfbClientPtr cl)
    /* Copy to all scaled versions */
    rfbScaledScreenUpdate(s, x1, y1, x1+x2, y1+y2);
 
+   /* Memorize the coords where the cursor was drawn */
+   s->underCursorBufferX = s->cursorX;
+   s->underCursorBufferY = s->cursorY;
+
    UNLOCK(s->cursorMutex);
 }
 
@@ -764,12 +774,14 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
   rfbClientIteratorPtr iterator;
   rfbClientPtr cl;
 
+  /* wait until the cursor is not shown in the framebuffer */
+  WRLOCK(rfbScreen->showCursorRWLock);
   LOCK(rfbScreen->cursorMutex);
 
   if(rfbScreen->cursor) {
     iterator=rfbGetClientIterator(rfbScreen);
     while((cl=rfbClientIteratorNext(iterator)))
-	if(!cl->enableCursorShapeUpdates)
+	if(!cl->enableCursorShapeUpdates || (cl->screen->pointerOwner && cl->screen->pointerOwner != cl))
 	  rfbRedrawAfterHideCursor(cl,NULL);
     rfbReleaseClientIterator(iterator);
 
@@ -782,11 +794,15 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
   iterator=rfbGetClientIterator(rfbScreen);
   while((cl=rfbClientIteratorNext(iterator))) {
     cl->cursorWasChanged = TRUE;
-    if(!cl->enableCursorShapeUpdates)
+    if(!cl->enableCursorShapeUpdates || (cl->screen->pointerOwner && cl->screen->pointerOwner != cl))
       rfbRedrawAfterHideCursor(cl,NULL);
+    LOCK(cl->updateMutex);
+    TSIGNAL(cl->updateCond);
+    UNLOCK(cl->updateMutex);
   }
   rfbReleaseClientIterator(iterator);
 
   UNLOCK(rfbScreen->cursorMutex);
+  RWUNLOCK(rfbScreen->showCursorRWLock);
 }
 
