@@ -38,6 +38,7 @@
 #include <rfb/rfbregion.h>
 #include "private.h"
 #include "rfb/rfbconfig.h"
+#include "flowcontrol.h"
 
 #ifdef LIBVNCSERVER_HAVE_FCNTL_H
 #include <fcntl.h>
@@ -504,6 +505,11 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       }
     }
 
+    cl->timers = rfbTimersCreate();
+    rfb_list_init(&cl->pings);
+    cl->baseRTT = cl->minRTT = cl->minCongestedRTT = (unsigned)-1;
+    cl->cuRegion = sraRgnCreate();
+
     for(extension = rfbGetExtensionIterator(); extension;
 	    extension=extension->next) {
 	void* data = NULL;
@@ -555,6 +561,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
 #if defined(LIBVNCSERVER_HAVE_LIBZ) && defined(LIBVNCSERVER_HAVE_LIBJPEG)
     int i;
 #endif
+    rfbRTTInfo *rttInfo, *tmp;
 
     LOCK(rfbClientListMutex);
 
@@ -566,6 +573,8 @@ rfbClientConnectionGone(rfbClientPtr cl)
         cl->next->prev = cl->prev;
 
     UNLOCK(rfbClientListMutex);
+
+    rfbTimerFree(cl->timers, cl->congestionTimer);
 
 #if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
     if (cl->screen->backgroundLoop) {
@@ -657,6 +666,15 @@ rfbClientConnectionGone(rfbClientPtr cl)
     }
 #endif
 
+    sraRgnDestroy(cl->cuRegion);
+
+    rfb_list_for_each_entry_safe(rttInfo, tmp, &cl->pings, entry) {
+        rfb_list_del(&rttInfo->entry);
+        free(rttInfo);
+    }
+
+    rfbTimersDestroy(cl->timers);
+
     rfbPrintStats(cl);
     rfbResetStats(cl);
 
@@ -671,24 +689,44 @@ rfbClientConnectionGone(rfbClientPtr cl)
 void
 rfbProcessClientMessage(rfbClientPtr cl)
 {
+    rfbCorkSock(cl->sock);
+
+    if (cl->pendingSyncFence) {
+        cl->syncFence = TRUE;
+        cl->pendingSyncFence = FALSE;
+    }
+
     switch (cl->state) {
     case RFB_PROTOCOL_VERSION:
         rfbProcessClientProtocolVersion(cl);
-        return;
+        break;
     case RFB_SECURITY_TYPE:
         rfbProcessClientSecurityType(cl);
-        return;
+        break;
     case RFB_AUTHENTICATION:
         rfbAuthProcessClientMessage(cl);
-        return;
+        break;
     case RFB_INITIALISATION:
     case RFB_INITIALISATION_SHARED:
+        rfbInitFlowControl(cl);
         rfbProcessClientInitMessage(cl);
-        return;
+        break;
     default:
+        rfbTimerCheck(cl->timers);
         rfbProcessClientNormalMessage(cl);
-        return;
+        break;
     }
+
+    if (cl->syncFence) {
+        LOCK(cl->sendMutex);
+        rfbBool sent = rfbSendFence(cl, cl->fenceFlags, cl->fenceDataLen, cl->fenceData);
+        UNLOCK(cl->sendMutex);
+        if (!sent)
+            return;
+        cl->syncFence = FALSE;
+    }
+
+    rfbUncorkSock(cl->sock);
 }
 
 
@@ -999,6 +1037,8 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     /*rfbSetBit(msgs.client2server, rfbSetSW);           */
     /*rfbSetBit(msgs.client2server, rfbTextChat);        */
     rfbSetBit(msgs.client2server, rfbPalmVNCSetScaleFactor);
+    rfbSetBit(msgs.client2server, rfbEnableContinuousUpdates);
+    rfbSetBit(msgs.client2server, rfbFence);
 
     rfbSetBit(msgs.server2client, rfbFramebufferUpdate);
     rfbSetBit(msgs.server2client, rfbSetColourMapEntries);
@@ -1007,6 +1047,8 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     rfbSetBit(msgs.server2client, rfbResizeFrameBuffer);
     rfbSetBit(msgs.server2client, rfbPalmVNCReSizeFrameBuffer);
     rfbSetBit(msgs.client2server, rfbSetDesktopSize);
+    rfbSetBit(msgs.server2client, rfbEndOfContinuousUpdates);
+    rfbSetBit(msgs.server2client, rfbFence);
 
     if (cl->screen->xvpHook) {
         rfbSetBit(msgs.client2server, rfbXvp);
@@ -2292,6 +2334,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
      */
     case rfbSetEncodings:
     {
+        rfbBool firstFence = !cl->enableFence;
+        rfbBool firstCU = !cl->enableCU;
 
         if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
                            sz_rfbSetEncodingsMsg - 1)) <= 0) {
@@ -2410,6 +2454,20 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		    cl->enableLastRectEncoding = TRUE;
 		}
 		break;
+            case rfbEncodingFence:
+                if (!cl->enableFence) {
+                    rfbLog("Enabling Fence protocol extension for client %s\n",
+                           cl->host);
+                    cl->enableFence = TRUE;
+                }
+                break;
+            case rfbEncodingContinuousUpdates:
+                if (!cl->enableCU) {
+                    rfbLog("Enabling Continuous Updates protocol extension for client %s\n",
+                           cl->host);
+                    cl->enableCU = TRUE;
+                }
+                break;
 	    case rfbEncodingNewFBSize:
 		if (!cl->useNewFBSize) {
 		    rfbLog("Enabling NewFBSize protocol extension for client "
@@ -2586,6 +2644,23 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		 cl->host);
 	  cl->enableCursorPosUpdates = FALSE;
 	}
+
+        if (cl->enableFence && firstFence) {
+            char type = 0;
+            LOCK(cl->sendMutex);
+            rfbBool sent = rfbSendFence(cl, rfbFenceFlagRequest, sizeof(type), &type);
+            UNLOCK(cl->sendMutex);
+            if (!sent)
+                return;
+        }
+
+        if (cl->enableCU && cl->enableFence && firstCU) {
+            LOCK(cl->sendMutex);
+            rfbBool sent = rfbSendEndOfCU(cl);
+            UNLOCK(cl->sendMutex);
+            if (!sent)
+                return;
+        }
 
         return;
     }
@@ -2941,6 +3016,91 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
         return;
 
+    case rfbEnableContinuousUpdates:
+    {
+      if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
+          sz_rfbEnableContinuousUpdatesMsg - 1)) <= 0) {
+          if (n != 0)
+              rfbLogPerror("rfbProcessClientNormalMessage: read");
+          rfbCloseClient(cl);
+          return;
+      }
+
+      if (!cl->enableFence || !cl->enableCU) {
+          rfbLog("Ignoring request to enable continuous updates because the client does not\n");
+          rfbLog("support the flow control extensions.\n");
+          return;
+      }
+
+      int x1 = Swap16IfLE(msg.ecu.x);
+      int y1 = Swap16IfLE(msg.ecu.y);
+      int x2 = x1 + Swap16IfLE(msg.ecu.w);
+      int y2 = y1 + Swap16IfLE(msg.ecu.h);
+      cl->cuRegion = sraRgnCreateRect(x1, y1, x2, y2);
+
+      cl->continuousUpdates = msg.ecu.enable;
+      if (cl->continuousUpdates) {
+          LOCK(cl->updateMutex);
+          sraRgnMakeEmpty(cl->requestedRegion);
+          sraRegionPtr updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
+          UNLOCK(cl->updateMutex);
+          LOCK(cl->sendMutex);
+          rfbBool sent = rfbSendFramebufferUpdate(cl, updateRegion);
+          UNLOCK(cl->sendMutex);
+          sraRgnDestroy(updateRegion);
+          if (!sent)
+            return;
+      } else {
+          LOCK(cl->sendMutex);
+          rfbBool sent = rfbSendEndOfCU(cl);
+          UNLOCK(cl->sendMutex);
+          if (!sent)
+              return;
+      }
+
+      rfbLog("Continuous updates %s\n",
+             cl->continuousUpdates ? "enabled" : "disabled");
+      return;
+    }
+
+    case rfbFence:
+    {
+      uint32_t flags;
+      char data[64];
+
+      if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
+          sz_rfbFenceMsg - 1)) <= 0) {
+          if (n != 0)
+              rfbLogPerror("rfbProcessClientNormalMessage: read");
+          rfbCloseClient(cl);
+          return;
+      }
+
+      flags = Swap32IfLE(msg.f.flags);
+
+      if (msg.f.length > sizeof(data)) {
+          rfbLog("Ignoring fence.  Payload of %d bytes is too large.\n", msg.f.length);
+          if ((n = rfbSkipExact(cl, msg.f.length)) <= 0) {
+              if (n != 0)
+                  rfbLogPerror("rfbProcessClientNormalMessage: skip");
+              rfbCloseClient(cl);
+              return;
+          }
+      } else {
+          if ((n = rfbReadExact(cl, (char *)&data, msg.f.length)) <= 0) {
+              if (n != 0)
+                  rfbLogPerror("rfbProcessClientNormalMessage: read");
+              rfbCloseClient(cl);
+              return;
+          }
+          LOCK(cl->sendMutex);
+          rfbHandleFence(cl, flags, msg.f.length, data);
+          UNLOCK(cl->sendMutex);
+      }
+
+      return;
+    }
+
     case rfbPalmVNCSetScaleFactor:
       cl->PalmVNC = TRUE;
       if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
@@ -3127,6 +3287,29 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     rfbBool sendServerIdentity = FALSE;
     rfbBool result = TRUE;
     
+    rfbUpdatePosition(cl, cl->sockOffset);
+
+    /*
+     * We're in the middle of processing a command that's supposed to be
+     * synchronised. Allowing an update to slip out right now might violate
+     * that synchronisation.
+     */
+
+    if (cl->syncFence) return TRUE;
+
+    if (cl->state != RFB_NORMAL) return TRUE;
+
+    /* Check that we actually have some space on the link and retry in a
+       bit if things are congested. */
+
+    if (cl->screen->rfbCongestionControl && rfbIsCongested(cl))
+      return TRUE;
+
+    /* In continuous mode, we will be outputting at least three distinct
+       messages.  We need to aggregate these in order to not clog up TCP's
+       congestion window. */
+
+    rfbCorkSock(cl->sock);
 
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
@@ -3245,6 +3428,9 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
      * no update is needed.
      */
 
+    if (cl->continuousUpdates)
+        sraRgnOr(cl->requestedRegion, cl->cuRegion);
+
     updateRegion = sraRgnCreateRgn(givenUpdateRegion);
     if(cl->screen->progressiveSliceHeight>0) {
 	    int height=cl->screen->progressiveSliceHeight,
@@ -3335,6 +3521,9 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
       }
       rfbShowCursor(cl);
     }
+
+    if (!rfbSendRTTPing(cl))
+      goto updateFailed;
 
     /*
      * Now send the update.
@@ -3587,6 +3776,13 @@ updateFailed:
 
     if(cl->screen->displayFinishedHook)
       cl->screen->displayFinishedHook(cl, result);
+
+    if (!rfbSendRTTPing(cl))
+        result = FALSE;
+
+    rfbUncorkSock(cl->sock);
+    rfbUpdatePosition(cl, cl->sockOffset);
+
     return result;
 }
 

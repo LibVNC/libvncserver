@@ -431,6 +431,8 @@ typedef struct {
 /* Modif cs@2005 */
 /* PalmVNC 1.4 & 2.0 SetScale Factor message */
 #define rfbPalmVNCSetScaleFactor 0xF
+#define rfbEnableContinuousUpdates 150
+#define rfbEndOfContinuousUpdates 150
 /* Xvp message - bidirectional */
 #define rfbXvp 250
 /* SetDesktopSize client -> server message */
@@ -438,6 +440,11 @@ typedef struct {
 #define rfbQemuEvent 255
 
 
+/*-----------------------------------------------------------------------------
+ * server -> client and client -> server
+ */
+
+#define rfbFence 248
 
 
 /*****************************************************************************
@@ -528,6 +535,9 @@ typedef struct {
 #define rfbEncodingQualityLevel8   0xFFFFFFE8
 #define rfbEncodingQualityLevel9   0xFFFFFFE9
 
+#define rfbEncodingContinuousUpdates    0xFFFFFEC7
+#define rfbEncodingFence                0xFFFFFEC8
+
 #define rfbEncodingQemuExtendedKeyEvent 0xFFFFFEFE /* -258 */
 #define rfbEncodingExtendedClipboard 0xC0A1E5CE
 
@@ -536,6 +546,37 @@ typedef struct {
 #define rfbEncodingSupportedMessages  0xFFFE0001
 #define rfbEncodingSupportedEncodings 0xFFFE0002
 #define rfbEncodingServerIdentity     0xFFFE0003
+
+
+/*****************************************************************************
+ *
+ * Message definitions (server -> client and client -> server)
+ *
+ *****************************************************************************/
+
+/*-----------------------------------------------------------------------------
+ * Fence
+ */
+
+/* flags */
+#define rfbFenceFlagBlockBefore 1
+#define rfbFenceFlagBlockAfter 2
+#define rfbFenceFlagSyncNext 4
+#define rfbFenceFlagRequest 0x80000000
+#define rfbFenceFlagsSupported (rfbFenceFlagBlockBefore | \
+                                rfbFenceFlagBlockAfter | \
+                                rfbFenceFlagSyncNext | \
+                                rfbFenceFlagRequest)
+
+typedef struct _rfbFenceMsg {
+    uint8_t type;                 /* always rfbFence */
+    uint8_t pad[3];
+    uint32_t flags;
+    uint8_t length;
+    /* Followed by char data[length] */
+} rfbFenceMsg;
+
+#define sz_rfbFenceMsg 9
 
 
 /*****************************************************************************
@@ -1267,6 +1308,7 @@ typedef union {
 	rfbTextChatMsg tc;
 	rfbXvpMsg xvp;
 	rfbExtDesktopSizeMsg eds;
+    rfbFenceMsg f;
 } rfbServerToClientMsg;
 
 
@@ -1523,6 +1565,22 @@ typedef struct _rfbSetSWMsg {
 #define sz_rfbSetSWMsg 6
 
 
+/*-----------------------------------------------------------------------------
+ * EnableContinuousUpdates
+ */
+
+typedef struct _rfbEnableContinuousUpdatesMsg {
+    uint8_t type;                 /* always rfbEnableContinuousUpdates */
+    uint8_t enable;
+    uint16_t x;
+    uint16_t y;
+    uint16_t w;
+    uint16_t h;
+} rfbEnableContinuousUpdatesMsg;
+
+#define sz_rfbEnableContinuousUpdatesMsg 10
+
+
 
 /*-----------------------------------------------------------------------------
  * Union of all client->server messages.
@@ -1545,6 +1603,8 @@ typedef union {
 	rfbTextChatMsg tc;
 	rfbXvpMsg xvp;
 	rfbSetDesktopSizeMsg sdm;
+    rfbEnableContinuousUpdatesMsg ecu;
+    rfbFenceMsg f;
 } rfbClientToServerMsg;
 
 /* 
