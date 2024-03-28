@@ -1557,7 +1557,7 @@ typedef union {
 extern int rfbEncryptAndStorePasswd(char *passwd, char *fname);
 extern char *rfbDecryptPasswdFromFile(char *fname);
 extern void rfbRandomBytes(unsigned char *bytes);
-extern void rfbEncryptBytes(unsigned char *bytes, char *passwd);
+extern int rfbEncryptBytes(unsigned char *bytes, char *passwd);
 
 
 #endif
