@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.4)
 
-project(LibVNCServer VERSION 0.9.14 LANGUAGES C)
+set(PROJECT_LANGUAGES C)
+
+if(NOT ${CMAKE_CXX_COMPILER} STREQUAL "")
+  set(CMAKE_CXX_STANDARD 17)
+  set(PROJECT_LANGUAGES C CXX)
+endif(NOT ${CMAKE_CXX_COMPILER} STREQUAL "")
+
+project(LibVNCServer VERSION 0.9.14 LANGUAGES ${PROJECT_LANGUAGES})
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckIncludeFile)
@@ -25,9 +32,6 @@ set(TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-if(${CMAKE_CXX_COMPILER} NOT STREQUAL "")
-  set(CMAKE_CXX_STANDARD 17)
-endif(${CMAKE_CXX_COMPILER} NOT STREQUAL "")
 
 if(CMAKE_GENERATOR MATCHES "Unix Makefiles|Ninja")
 # some LSP servers expect compile_commands.json in the project root
