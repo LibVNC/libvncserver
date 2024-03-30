@@ -69,7 +69,7 @@ option(WITH_SASL "Build with SASL support" ON)
 option(WITH_XCB "Build with XCB support" ON)
 option(WITH_EXAMPLES "Build examples" ON)
 option(WITH_TESTS "Build tests" ON)
-
+option(WITH_QT "Build the Qt client example" ON)
 
 
 if(WITH_ZLIB)
