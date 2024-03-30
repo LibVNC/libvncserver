@@ -149,6 +149,10 @@ if(WITH_GTK)
   find_package(GTK2)
 endif(WITH_GTK)
 
+if(WITH_QT)
+  find_package(Qt5 COMPONENTS Core Widgets REQUIRED)
+endif(WITH_QT)
+
 if(WITH_LIBSSHTUNNEL)
   find_path(LIBSSHTUNNEL_INCLUDE_DIR libsshtunnel.h)
   find_library(LIBSSHTUNNEL_LIBRARY sshtunnel)
