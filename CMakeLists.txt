@@ -150,7 +150,7 @@ if(WITH_GTK)
 endif(WITH_GTK)
 
 if(WITH_QT)
-  find_package(Qt5 COMPONENTS Core Widgets REQUIRED)
+  find_package(Qt5 COMPONENTS Core Widgets QUIET)
 endif(WITH_QT)
 
 if(WITH_LIBSSHTUNNEL)
