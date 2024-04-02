@@ -47,7 +47,7 @@ private:
 
 void VncViewer::finishedFramebufferUpdateStatic(rfbClient *cl)
 {
-    VncViewer *ptr = (VncViewer *) rfbClientGetClientData(cl, nullptr);
+    VncViewer *ptr = static_cast<VncViewer*>(rfbClientGetClientData(cl, nullptr));
     ptr->finishedFramebufferUpdate(cl);
 }
 
