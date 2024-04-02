@@ -92,7 +92,6 @@ void VncViewer::start()
     cl->appData.qualityLevel = 1;
     cl->appData.encodingsString = "tight ultra";
     cl->FinishedFrameBufferUpdate = finishedFramebufferUpdateStatic;
-    cl->canHandleNewFBSize = TRUE;
     cl->serverHost = strdup(serverIp.c_str());
     cl->serverPort = serverPort;
     cl->appData.useRemoteCursor = TRUE;
