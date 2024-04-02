@@ -16,6 +16,17 @@
  * Boston, MA 02111-1307, USA.
  */
 
+ /*
+ * This is an example on how to make a simple VNC client with
+ * Qt5 Widgets. It suitable for desktop apps, but may not be
+ * good for mobile.
+ * It does not implement any form of cryptography,
+ * authentication support, client-side cursors or framebuffer
+ * resizing. If you want to make this a part of your
+ * application, please notice that you may need to change
+ * the while(true) loop to disconnect the client.
+ */
+
 #include <QApplication>
 #include <iostream>
 #include <thread>
