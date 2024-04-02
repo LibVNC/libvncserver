@@ -669,12 +669,12 @@ if(WITH_EXAMPLES)
     target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES} ${LIBSSHTUNNEL_LIBRARY})
   endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 
-  if(Qt5Widgets_FOUND AND WITH_QT)
+  if(Qt5Widgets_FOUND AND WITH_QT AND DEFINED CMAKE_CXX_COMPILER)
     add_executable(client_examples_qt5client ${LIBVNCCLIEXAMPLE_DIR}/qt5client.cpp ${LIBVNCCLIEXAMPLE_DIR}/${qt5client_EXTRA_SOURCES})
     set_target_properties(client_examples_qt5client PROPERTIES OUTPUT_NAME qt5client)
     set_target_properties(client_examples_qt5client PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/client)
     target_link_libraries(client_examples_qt5client vncclient ${CMAKE_THREAD_LIBS_INIT} Qt5::Widgets)
-  endif(Qt5Widgets_FOUND AND WITH_QT)
+  endif(Qt5Widgets_FOUND AND WITH_QT AND DEFINED CMAKE_CXX_COMPILER)
 endif(WITH_EXAMPLES)
 
 #
