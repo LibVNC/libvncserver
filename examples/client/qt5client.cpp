@@ -25,6 +25,12 @@
  * resizing. If you want to make this a part of your
  * application, please notice that you may need to change
  * the while(true) loop to disconnect the client.
+ *
+ * To build this example with all the other components of
+ * libvncserver, you may need to explicitly define a C++
+ * compiler and the path to Qt libs when calling CMake.
+ * e.g. cmake -DCMAKE_PREFIX_PATH=~/Qt/5.15.2/gcc_64
+ * -DCMAKE_CXX_COMPILER=g++
  */
 
 #include <QApplication>
