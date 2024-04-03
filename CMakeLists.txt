@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.4)
 
-project(LibVNCServer VERSION 0.9.14 LANGUAGES C)
+set(PROJECT_LANGUAGES C)
+
+if(DEFINED CMAKE_CXX_COMPILER)
+  set(CMAKE_CXX_STANDARD 17)
+  list(APPEND PROJECT_LANGUAGES CXX)
+endif(DEFINED CMAKE_CXX_COMPILER)
+
+project(LibVNCServer VERSION 0.9.14 LANGUAGES ${PROJECT_LANGUAGES})
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckIncludeFile)
@@ -25,6 +32,7 @@ set(TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if(CMAKE_GENERATOR MATCHES "Unix Makefiles|Ninja")
 # some LSP servers expect compile_commands.json in the project root
 add_custom_target(
@@ -67,7 +75,7 @@ option(WITH_SASL "Build with SASL support" ON)
 option(WITH_XCB "Build with XCB support" ON)
 option(WITH_EXAMPLES "Build examples" ON)
 option(WITH_TESTS "Build tests" ON)
-
+option(WITH_QT "Build the Qt client example" ON)
 
 
 if(WITH_ZLIB)
@@ -146,6 +154,10 @@ endif(WITH_SDL)
 if(WITH_GTK)
   find_package(GTK2)
 endif(WITH_GTK)
+
+if(WITH_QT)
+  find_package(Qt5 COMPONENTS Core Widgets QUIET)
+endif(WITH_QT)
 
 if(WITH_LIBSSHTUNNEL)
   find_path(LIBSSHTUNNEL_INCLUDE_DIR libsshtunnel.h)
@@ -656,6 +668,17 @@ if(WITH_EXAMPLES)
     set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/client)
     target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES} ${LIBSSHTUNNEL_LIBRARY})
   endforeach(e ${LIBVNCCLIENT_EXAMPLES})
+
+  #This example must have its own building instructions,
+  #apart from the other examples because it is written in
+  #C++, so it has a distinct file extension and depends on
+  #a C++ compiler
+  if(Qt5Widgets_FOUND AND WITH_QT AND DEFINED CMAKE_CXX_COMPILER)
+    add_executable(client_examples_qt5client ${LIBVNCCLIEXAMPLE_DIR}/qt5client.cpp ${LIBVNCCLIEXAMPLE_DIR}/${qt5client_EXTRA_SOURCES})
+    set_target_properties(client_examples_qt5client PROPERTIES OUTPUT_NAME qt5client)
+    set_target_properties(client_examples_qt5client PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/client)
+    target_link_libraries(client_examples_qt5client vncclient ${CMAKE_THREAD_LIBS_INIT} ${Qt5Widgets_LIBRARIES})
+  endif(Qt5Widgets_FOUND AND WITH_QT AND DEFINED CMAKE_CXX_COMPILER)
 endif(WITH_EXAMPLES)
 
 #
