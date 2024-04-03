@@ -669,6 +669,10 @@ if(WITH_EXAMPLES)
     target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES} ${LIBSSHTUNNEL_LIBRARY})
   endforeach(e ${LIBVNCCLIENT_EXAMPLES})
 
+  #This example must have its own building instructions,
+  #apart from the other examples because it is written in
+  #C++, so it has a distinct file extension and depends on
+  #a C++ compiler
   if(Qt5Widgets_FOUND AND WITH_QT AND DEFINED CMAKE_CXX_COMPILER)
     add_executable(client_examples_qt5client ${LIBVNCCLIEXAMPLE_DIR}/qt5client.cpp ${LIBVNCCLIEXAMPLE_DIR}/${qt5client_EXTRA_SOURCES})
     set_target_properties(client_examples_qt5client PROPERTIES OUTPUT_NAME qt5client)
