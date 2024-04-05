@@ -732,11 +732,26 @@ rfbDefaultPtrAddEvent(int buttonMask, int x, int y, rfbClientPtr cl)
     if (cl->enableCursorPosUpdates)
       cl->cursorWasMoved = FALSE;
 
+    /* Will become the pointer owner, need to hide the server-side cursor. */
+    if (!cl->screen->pointerOwner) {
+        rfbRedrawAfterHideCursor(cl, NULL);
+        LOCK(cl->updateMutex);
+        TSIGNAL(cl->updateCond);
+        UNLOCK(cl->updateMutex);
+    }
+
     /* But inform all remaining clients about this cursor movement. */
     iterator = rfbGetClientIterator(s);
     while ((other_client = rfbClientIteratorNext(iterator)) != NULL) {
-      if (other_client != cl && other_client->enableCursorPosUpdates) {
-	other_client->cursorWasMoved = TRUE;
+      if (other_client != cl) {
+        if (other_client->enableCursorPosUpdates) {
+	  other_client->cursorWasMoved = TRUE;
+        }
+        if (other_client != cl->screen->pointerOwner) {
+          LOCK(other_client->updateMutex);
+          TSIGNAL(other_client->updateCond);
+          UNLOCK(other_client->updateMutex);
+        }
       }
     }
     rfbReleaseClientIterator(iterator);
@@ -996,6 +1011,13 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 
    screen->permitFileTransfer = FALSE;
 
+   screen->showCursorRefCount = 0;
+   screen->underCursorBufferX = 0;
+   screen->underCursorBufferY = 0;
+   INIT_RWLOCK(screen->showCursorRWLock);
+
+   screen->pointerOwner = NULL;
+
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);
      return NULL;
@@ -1156,6 +1178,8 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
     currentCl=nextCl;
   }
   rfbReleaseClientIterator(i);
+
+  TINI_RWLOCK(screen->showCursorRWLock);
     
 #define FREE_IF(x) if(screen->x) free(screen->x)
   FREE_IF(colourMap.data.bytes);
