@@ -792,7 +792,11 @@ static rfbBool rfbDefaultPasswordCheck(rfbClientPtr cl,const char* response,int 
     return(FALSE);
   }
 
-  rfbEncryptBytes(cl->authChallenge, passwd);
+  if (rfbEncryptBytes(cl->authChallenge, passwd) != 0) {
+    rfbErr("Encryption failed\n");
+    free(passwd);
+    return(FALSE);
+  }
 
   /* Lose the password from memory */
   for (i = strlen(passwd); i >= 0; i--) {
@@ -820,7 +824,10 @@ rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
   for(passwds=(char**)cl->screen->authPasswdData;*passwds;passwds++,i++) {
     uint8_t auth_tmp[CHALLENGESIZE];
     memcpy((char *)auth_tmp, (char *)cl->authChallenge, CHALLENGESIZE);
-    rfbEncryptBytes(auth_tmp, *passwds);
+    if (rfbEncryptBytes(auth_tmp, *passwds) != 0) {
+      rfbErr("Encryption failed\n");
+      return(FALSE);
+    }
 
     if (memcmp(auth_tmp, response, len) == 0) {
       if(i>=cl->screen->authPasswdFirstViewOnly)
