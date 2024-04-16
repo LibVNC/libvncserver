@@ -84,6 +84,10 @@ typedef UINT32 in_addr_t;
 #endif
 #endif
 
+/* Maximum number of threads to use for multithreaded encoding, regardless of
+   the CPU count */
+#define MAX_ENCODING_THREADS 8
+
 struct _rfbClientRec;
 struct _rfbScreenInfo;
 struct rfbCursor;
@@ -372,6 +376,8 @@ typedef struct _rfbScreenInfo
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     rfbSetXCutTextUTF8ProcPtr setXCutTextUTF8;
 #endif
+    rfbBool rfbMT;
+    int rfbNumThreads;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -705,6 +711,16 @@ typedef struct _rfbClientRec {
     rfbBool tightUsePixelFormat24;
     void *tightTJ;
     int tightPngDstDataLen;
+
+    /* Multithreaded tight encoding. */
+
+    rfbBool threadInit;
+#ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
+    pthread_t thnd[MAX_ENCODING_THREADS];
+#elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    uintptr_t thnd[MAX_ENCODING_THREADS];
+#endif
+
 #endif
 #endif
 } rfbClientRec, *rfbClientPtr;

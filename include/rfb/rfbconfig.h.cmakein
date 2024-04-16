@@ -93,6 +93,9 @@
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_SYS_STAT_H  1 
 
+/* Define to 1 if you have the <sys/sysctl.h> header file. */
+#cmakedefine LIBVNCSERVER_HAVE_SYS_SYSCTL_H  1
+
 /* Define to 1 if you have the <sys/time.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_SYS_TIME_H  1 
 
@@ -107,6 +110,9 @@
 
 /* Define to 1 if you have <sys/resource.h> */
 #cmakedefine LIBVNCSERVER_HAVE_SYS_RESOURCE_H  1
+
+/* Define to 1 if you have the <sched.h> header file. */
+#cmakedefine LIBVNCSERVER_HAVE_SCHED_H  1
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_UNISTD_H  1 
