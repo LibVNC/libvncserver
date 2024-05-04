@@ -473,12 +473,15 @@ clientOutput(void *data)
 
 		LOCK(cl->updateMutex);
 
-		if (sraRgnEmpty(cl->requestedRegion)) {
-			; /* always require a FB Update Request (otherwise can crash.) */
+		if (sraRgnEmpty(cl->requestedRegion) && !cl->continuousUpdates) {
+			; /* require a FB Update Request unless continuous updates are enabled (otherwise can crash.) */
 		} else {
 			haveUpdate = FB_UPDATE_PENDING(cl);
 			if(!haveUpdate) {
 				updateRegion = sraRgnCreateRgn(cl->modifiedRegion);
+				if (cl->continuousUpdates) {
+				    sraRgnOr(cl->requestedRegion, cl->cuRegion);
+				}
 				haveUpdate   = sraRgnAnd(updateRegion,cl->requestedRegion);
 				sraRgnDestroy(updateRegion);
 			}
@@ -491,9 +494,11 @@ clientOutput(void *data)
 		UNLOCK(cl->updateMutex);
         }
         
-        /* OK, now, to save bandwidth, wait a little while for more
-           updates to come along. */
-	THREAD_SLEEP_MS(cl->screen->deferUpdateTime);
+        if (!cl->continuousUpdates) {
+            /* OK, now, to save bandwidth, wait a little while for more
+               updates to come along. */
+            THREAD_SLEEP_MS(cl->screen->deferUpdateTime);
+        }
 
         /* Now, get the region we're going to update, and remove
            it from cl->modifiedRegion _before_ we send the update.
@@ -995,6 +1000,8 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->protocolMinorVersion = rfbProtocolMinorVersion;
 
    screen->permitFileTransfer = FALSE;
+
+   screen->rfbCongestionControl = TRUE;
 
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);

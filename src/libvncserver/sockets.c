@@ -20,6 +20,7 @@
  */
 
 /*
+ *  Copyright (C) 2012-2020, 2022-2023 D. R. Commander
  *  Copyright (C) 2011-2012 Christian Beier <dontmind@freeshell.org>
  *  Copyright (C) 2005 Rohit Kumar, Johannes E. Schindelin
  *  OSXvnc Copyright (C) 2001 Dan McGuirk <mcguirk@incompleteness.net>.
@@ -330,6 +331,52 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
 	errno=WSAGetLastError();
 	rfbLogPerror("Could not terminate Windows Sockets\n");
     }
+#endif
+}
+
+/*
+ * rfbCorkSock enables the TCP cork functionality on Linux to inform the TCP
+ * layer to send only complete packets
+ */
+
+void rfbCorkSock(int sock)
+{
+  static int alreadywarned = 0;
+#ifdef TCP_CORK
+  int one = 1;
+
+  if (setsockopt(sock, IPPROTO_TCP, TCP_CORK, (char *)&one, sizeof(one)) < 0) {
+    if (!alreadywarned) {
+      rfbLogPerror("Could not enable TCP corking");
+      alreadywarned = 1;
+    }
+  }
+#else
+  if (!alreadywarned) {
+    rfbLogPerror("TCP corking not available on this system.");
+    alreadywarned = 1;
+  }
+#endif
+}
+
+
+/*
+ * rfbUncorkSock disables corking and sends all partially-complete packets
+ */
+
+void rfbUncorkSock(int sock)
+{
+#ifdef TCP_CORK
+  static int alreadywarned = 0;
+  int zero = 0;
+
+  if (setsockopt(sock, IPPROTO_TCP, TCP_CORK, (char *)&zero,
+                 sizeof(zero)) < 0) {
+    if (!alreadywarned) {
+      rfbLogPerror("Could not disable TCP corking");
+      alreadywarned = 1;
+    }
+  }
 #endif
 }
 
@@ -749,6 +796,36 @@ int rfbReadExact(rfbClientPtr cl,char* buf,int len)
     return(rfbReadExactTimeout(cl,buf,len,rfbMaxClientWait));
 }
 
+#ifndef min
+inline static int min(int a, int b)
+{
+    return a > b ? b : a;
+}
+#endif
+
+/*
+ * SkipExact reads an exact number of bytes on a TCP socket into a temporary
+ * buffer and then discards them.  Returns 1 on success, 0 if the other end has
+ * closed, or -1 if an error occurred (errno is set to ETIMEDOUT if it timed
+ * out).
+ */
+
+int rfbSkipExact(rfbClientPtr cl, int len)
+{
+  char *tmpbuf = NULL;
+  int bufLen = min(len, 65536), i, retval = 1;
+
+  tmpbuf = (char *)malloc(bufLen);
+
+  for (i = 0; i < len; i += bufLen) {
+    retval = rfbReadExact(cl, tmpbuf, min(bufLen, len - i));
+    if (retval <= 0) break;
+  }
+
+  free(tmpbuf);
+  return retval;
+}
+
 /*
  * PeekExact peeks at an exact number of bytes from a client.  Returns 1 if
  * those bytes have been read, 0 if the other end has closed, or -1 if an
@@ -848,7 +925,7 @@ rfbWriteExact(rfbClientPtr cl,
     return 1;
 #endif
     rfbSocket sock = cl->sock;
-    int n;
+    int n, bytesWritten = 0;
     fd_set fds;
     struct timeval tv;
     int totalTimeWaited = 0;
@@ -899,6 +976,7 @@ rfbWriteExact(rfbClientPtr cl,
 
             buf += n;
             len -= n;
+            bytesWritten += n;
 
         } else if (n == 0) {
 
@@ -950,6 +1028,7 @@ rfbWriteExact(rfbClientPtr cl,
         }
     }
     UNLOCK(cl->outputMutex);
+    cl->sockOffset += bytesWritten;
     return 1;
 }
 
