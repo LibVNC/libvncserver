@@ -715,7 +715,9 @@ rfbProcessClientProtocolVersion(rfbClientPtr cl)
     pv[sz_rfbProtocolVersionMsg] = 0;
     if (sscanf(pv,rfbProtocolVersionFormat,&major_,&minor_) != 2) {
 	rfbErr("rfbProcessClientProtocolVersion: not a valid RFB client: %s\n", pv);
-	rfbCloseClient(cl);
+        rfbClientSetErr(
+            cl, "rfbProcessClientProtocolVersion: not a valid RFB client: %s\n", pv);
+        rfbCloseClient(cl);
 	return;
     }
     rfbLog("Client Protocol Version %d.%d\n", major_, minor_);

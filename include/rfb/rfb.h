@@ -138,6 +138,9 @@ typedef int  (*rfbFileTransferPermitted) (struct _rfbClientRec* cl);
 /** Handle the textchat messages */
 typedef void (*rfbSetTextChat) (struct _rfbClientRec* cl, int length, char *string);
 
+/* error handling (server side) */
+typedef void (*ClientErrorChangedProc)(struct _rfbClientRec *client);
+
 typedef struct {
   uint32_t count;
   rfbBool is16; /**< is the data format short? */
@@ -302,6 +305,8 @@ typedef struct _rfbScreenInfo
     rfbFileTransferPermitted  getFileTransferPermission;
     rfbSetTextChat            setTextChat;
 
+    ClientErrorChangedProc clientErrorChanged;
+
     /** newClientHook is called just after a new client is created */
     rfbNewClientHookPtr newClientHook;
     /** displayHook is called just before a frame buffer update */
@@ -440,6 +445,13 @@ typedef struct _rfbClientRec {
      * This is useful if the IO functions have to behave client specific.
      */
     void* clientData;
+    
+    /**
+     * error handling
+    */
+
+    char* lastError;
+
     ClientGoneHookPtr clientGoneHook;
 
     rfbSocket sock;
@@ -1017,6 +1029,8 @@ extern rfbBool rfbProcessSizeArguments(int* width,int* height,int* bpp,int* argc
 
 extern void rfbLogEnable(int enabled);
 typedef void (*rfbLogProc)(const char *format, ...);
+typedef void (*rfbClientSetErrProc)(rfbClientPtr cl, const char *format, ...);
+extern rfbClientSetErrProc rfbClientSetErr;
 extern rfbLogProc rfbLog, rfbErr;
 extern void rfbLogPerror(const char *str);
 
