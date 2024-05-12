@@ -283,8 +283,7 @@ static void rfbDefaultClientSetErr(rfbClientPtr cl, const char *format, ...) {
     if (cl->screen->clientErrorChanged != NULL)
         cl->screen->clientErrorChanged(cl);
 
-    if (oldError)
-        free(oldError);
+    free(oldError);
 }
 
 rfbLogProc rfbLog=rfbDefaultLog;
