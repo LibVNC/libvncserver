@@ -660,6 +660,8 @@ rfbClientConnectionGone(rfbClientPtr cl)
     rfbPrintStats(cl);
     rfbResetStats(cl);
 
+    if(cl->lastError)
+        free(cl->lastError);
     free(cl);
 }
 
