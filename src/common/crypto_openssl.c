@@ -42,6 +42,10 @@ static unsigned char reverseByte(unsigned char b) {
 
 int hash_md5(void *out, const void *in, const size_t in_len)
 {
+#if defined(LIBVNCSERVER_HAVE_LIBWOLFSSL) && defined(NO_MD5)
+    /* wolfSSL in MacOS brew doesn't have md5 enabled */
+    return 0;
+#else
     MD5_CTX md5;
     if(!MD5_Init(&md5))
 	return 0;
@@ -50,6 +54,7 @@ int hash_md5(void *out, const void *in, const size_t in_len)
     if(!MD5_Final(out, &md5))
 	return 0;
     return 1;
+#endif
 }
 
 int hash_sha1(void *out, const void *in, const size_t in_len)
@@ -71,6 +76,10 @@ void random_bytes(void *out, size_t len)
 
 int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
 {
+#if defined(LIBVNCSERVER_HAVE_LIBWOLFSSL) && (defined(NO_DES3) || !defined(WOLFSSL_DES_ECB))
+    /* wolfSSL in MacOS brew doesn't have des enabled */
+    return 0;
+#else
     int result = 0;
     EVP_CIPHER_CTX *des = NULL;
     unsigned char mungedkey[8];
@@ -110,10 +119,15 @@ int encrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
       OSSL_PROVIDER_unload(providerDefault);
 #endif
     return result;
+#endif
 }
 
 int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const void *in, const size_t in_len)
 {
+#if defined(LIBVNCSERVER_HAVE_LIBWOLFSSL) && (defined(NO_DES3) || !defined(WOLFSSL_DES_ECB))
+    /* wolfSSL in MacOS brew doesn't have des enabled */
+    return 0;
+#else
     int result = 0;
     EVP_CIPHER_CTX *des = NULL;
     unsigned char mungedkey[8];
@@ -155,10 +169,15 @@ int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
 	OSSL_PROVIDER_unload(providerDefault);
 #endif
     return result;
+#endif
 }
 
 int encrypt_aes128ecb(void *out, int *out_len, const unsigned char key[16], const void *in, const size_t in_len)
 {
+#if defined(LIBVNCSERVER_HAVE_LIBWOLFSSL) && (!defined(HAVE_AES_ECB) || !defined(WOLFSSL_AES_128))
+    /* wolfSSL in MacOS brew doesn't have aes-ecb enabled */
+    return 0;
+#else
     int result = 0;
     EVP_CIPHER_CTX *aes;
 
@@ -175,6 +194,7 @@ int encrypt_aes128ecb(void *out, int *out_len, const unsigned char key[16], cons
  out:
     EVP_CIPHER_CTX_free(aes);
     return result;
+#endif
 }
 
 static void pad_leading_zeros(uint8_t *out, const size_t current_len, const size_t expected_len) {
