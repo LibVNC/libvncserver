@@ -2170,7 +2170,7 @@ HandleRFBServerMessage(rfbClient* client)
           if (!ReadFromRFBServer(client, ((char *)&screen), sz_rfbExtDesktopScreen)) {
             return FALSE;
           }
-          if (screen.id != 0 && screen.width && screen.height) {
+          if (screen.width && screen.height) {
             client->screen = screen;
           } else {
             invalidScreen = TRUE;
