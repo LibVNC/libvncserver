@@ -7,7 +7,7 @@ if(DEFINED CMAKE_CXX_COMPILER)
   list(APPEND PROJECT_LANGUAGES CXX)
 endif(DEFINED CMAKE_CXX_COMPILER)
 
-project(LibVNCServer VERSION 0.9.14 LANGUAGES ${PROJECT_LANGUAGES})
+project(LibVNCServer VERSION 0.9.15 LANGUAGES ${PROJECT_LANGUAGES})
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckIncludeFile)
