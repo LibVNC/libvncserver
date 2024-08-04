@@ -150,6 +150,11 @@ void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
 /*
  * httpCheckFds is called from ProcessInputEvents to check for input on the
  * HTTP socket(s).  If there is input to process, httpProcessInput is called.
+ * TODO When a new client connects, the active HTTP connection is abruptly
+ * terminated, the ongoing download or data transfer for the active client will
+ * be cut off because the server closes the socket without waiting for the
+ * transfer to complete. The new client then takes over the single httpSock, and
+ * the previous client loses its connection.
  */
 
 void
