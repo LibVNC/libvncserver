@@ -623,6 +623,7 @@ listenerRun(void *data)
     rfbClientPtr cl = NULL;
     socklen_t len;
     fd_set listen_fds;  /* temp file descriptor list for select() */
+    struct timeval tv;
 
     /*
       Only checking socket state here and not using rfbIsActive()
@@ -634,9 +635,9 @@ listenerRun(void *data)
       return true, not ending the listener, making the join in rfbShutdownServer()
       wait forever...
     */
-    /* TODO: HTTP is not handled */
     while (screen->socketState != RFB_SOCKET_SHUTDOWN) {
         client_fd = -1;
+        cl = NULL;
         FD_ZERO(&listen_fds);
 	if(screen->listenSock != RFB_INVALID_SOCKET)
 	  FD_SET(screen->listenSock, &listen_fds);
@@ -647,7 +648,9 @@ listenerRun(void *data)
 	screen->maxFd = rfbMax(screen->maxFd, screen->pipe_notify_listener_thread[0]);
 #endif
 
-        if (select(screen->maxFd+1, &listen_fds, NULL, NULL, NULL) == -1) {
+        tv.tv_sec = 0;
+	tv.tv_usec = screen->select_timeout_usec;
+        if (select(screen->maxFd+1, &listen_fds, NULL, NULL, &tv) == -1) {
             rfbLogPerror("listenerRun: error in select");
             return THREAD_ROUTINE_RETURN_VALUE;
         }
@@ -663,7 +666,7 @@ listenerRun(void *data)
 	}
 #endif
 
-	/* there is something on the listening sockets, handle new connections */
+	/* If there is something on the listening sockets, handle new connections */
 	len = sizeof (peer);
 	if (FD_ISSET(screen->listenSock, &listen_fds)) 
 	    client_fd = accept(screen->listenSock, (struct sockaddr*)&peer, &len);
@@ -674,6 +677,9 @@ listenerRun(void *data)
 	  cl = rfbNewClient(screen,client_fd);
 	if (cl && !cl->onHold )
 	  rfbStartOnHoldClient(cl);
+
+        /* handle HTTP  */
+        rfbHttpCheckFds(screen);
     }
     return THREAD_ROUTINE_RETURN_VALUE;
 }
@@ -1346,6 +1352,11 @@ rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo) {
 
 void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground)
 {
+  if(usec<0)
+    usec=screen->deferUpdateTime*1000;
+
+  screen->select_timeout_usec = usec;
+
   if(runInBackground) {
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
        screen->backgroundLoop = TRUE;
@@ -1367,9 +1378,6 @@ void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground
     return;
 #endif
   }
-
-  if(usec<0)
-    usec=screen->deferUpdateTime*1000;
 
   while(rfbIsActive(screen))
     rfbProcessEvents(screen,usec);

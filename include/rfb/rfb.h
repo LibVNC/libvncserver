@@ -372,6 +372,8 @@ typedef struct _rfbScreenInfo
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     rfbSetXCutTextUTF8ProcPtr setXCutTextUTF8;
 #endif
+    /* Timeout value for select() calls, mainly used for multithreaded servers. */
+    int select_timeout_usec;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
