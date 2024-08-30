@@ -203,7 +203,8 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
 	httpProcessInput(rfbScreen);
     }
 
-    if (FD_ISSET(rfbScreen->httpListenSock, &fds) || FD_ISSET(rfbScreen->httpListen6Sock, &fds)) {
+    if ((rfbScreen->httpListenSock != RFB_INVALID_SOCKET && FD_ISSET(rfbScreen->httpListenSock, &fds))
+        || (rfbScreen->httpListen6Sock != RFB_INVALID_SOCKET && FD_ISSET(rfbScreen->httpListen6Sock, &fds))) {
 	if (rfbScreen->httpSock != RFB_INVALID_SOCKET) rfbCloseSocket(rfbScreen->httpSock);
 
 	if(FD_ISSET(rfbScreen->httpListenSock, &fds)) {
