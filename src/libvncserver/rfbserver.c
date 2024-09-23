@@ -2184,7 +2184,8 @@ rfbProcessExtendedServerCutTextData(rfbClientPtr cl, uint32_t flags, const char 
         }
         stream.avail_out = size;
         stream.next_out = (unsigned char *)buf;
-        if (inflate(&stream, Z_NO_FLUSH) != Z_OK) {
+        err = inflate(&stream, Z_NO_FLUSH);
+        if (err != Z_OK && err != Z_STREAM_END) {
             rfbLogPerror("rfbProcessExtendedServerCutTextData: zlib inflation error");
             free(buf);
             inflateEnd(&stream);
