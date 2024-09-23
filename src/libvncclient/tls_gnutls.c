@@ -25,7 +25,7 @@
 #include "tls.h"
 
 
-static const char *rfbTLSPriority = "NORMAL:+DHE-DSS:+RSA:+DHE-RSA:+SRP";
+static const char *rfbTLSPriority = "NORMAL:+DHE-DSS:+RSA:+DHE-RSA";
 static const char *rfbAnonTLSPriority = "NORMAL:+ANON-ECDH:+ANON-DH";
 
 #define DH_BITS 1024
