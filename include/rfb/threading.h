@@ -57,6 +57,7 @@
 #define THREAD_ROUTINE_RETURN_VALUE   NULL
 #define THREAD_SLEEP_MS(ms)           usleep(ms*1000)
 #define THREAD_JOIN(thread)           pthread_join(thread, NULL)
+#define THREAD_DETACH(thread)         pthread_detach(thread)
 #define CURRENT_THREAD_ID             pthread_self()
 #endif
 #elif defined(LIBVNCSERVER_HAVE_WIN32THREADS)
@@ -77,6 +78,7 @@
 #define THREAD_ROUTINE_RETURN_VALUE
 #define THREAD_SLEEP_MS(ms)           Sleep(ms)
 #define THREAD_JOIN(thread)           WaitForSingleObject((HANDLE)thread, INFINITE)
+#define THREAD_DETACH(thread)         CloseHandle((HANDLE)thread)
 #define CURRENT_THREAD_ID             GetCurrentThreadId()
 #else
 #define LOCK(mutex)

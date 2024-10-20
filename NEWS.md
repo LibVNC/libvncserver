@@ -3,6 +3,9 @@
 ## Overall changes:
 
   * Added fuzzing with OSS-Fuzz thanks to Catena Cyber.
+  * Improved build system to have files where they are expected in contemporary open source projects.
+    Also split out Mac OS server example to own repo at https://github.com/LibVNC/macVNC
+  * Added Windows CI on GitHub.
 
 ## LibVNCServer/LibVNCClient:
 
@@ -12,10 +15,15 @@
 
   * Fixed LibVNCClient handling of UltraVNC MSLogonII when built with OpenSSL.
   * Added UTF8 clipboard handling.
+  * Added API to allow the client to specify a subregion of the server's framebuffer and
+    have LibVNCClient only ask for this, not the whole framebuffer.
+  * Fixed Tight decoding endianness issues.
+  * Added a Qt-based client example.
 
 ## LibVNCServer:
 
   * Added a proof-of-concept X11 example server.
+  * Improved SSH example by having it use [libsshtunnel](https://github.com/bk138/libsshtunnel/) instead of custom code.
 
 
 # 2022-12-18: Version 0.9.14

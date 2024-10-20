@@ -89,7 +89,7 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
     if(!argc) return TRUE;
     
     for (i = i1 = 1; i < *argc;) {
-        if (strcmp(argv[i], "-help") == 0) {
+        if (strcmp(argv[i], "-help") == 0 || strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
 	    rfbUsage();
 	    return FALSE;
 	} else if (strcmp(argv[i], "-rfbport") == 0) { /* -rfbport port */
