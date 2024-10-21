@@ -962,6 +962,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
 #endif
 
    screen->fdQuota = 0.5;
+   screen->fdSufficientFreeCount = 100000;
 
    screen->httpInitDone=FALSE;
    screen->httpEnableProxyConnect=FALSE;
