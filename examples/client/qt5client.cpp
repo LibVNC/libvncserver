@@ -70,7 +70,7 @@ void VncViewer::finishedFramebufferUpdateStatic(rfbClient *cl)
 
 void VncViewer::finishedFramebufferUpdate(rfbClient *cl)
 {
-    m_image = QImage(cl->frameBuffer, cl->width, cl->height, QImage::Format_RGB16);
+    m_image = QImage(cl->frameBuffer, cl->width, cl->height, QImage::Format_RGBA8888);
 
     update();
 }
@@ -85,22 +85,23 @@ void VncViewer::paintEvent(QPaintEvent *event)
 void VncViewer::start()
 {
     cl = rfbGetClient(8, 3, 4);
-    cl->format.depth = 24;
-    cl->format.depth = 16;
-    cl->format.bitsPerPixel = 16;
-    cl->format.redShift = 11;
-    cl->format.greenShift = 5;
-    cl->format.blueShift = 0;
-    cl->format.redMax = 0x1f;
-    cl->format.greenMax = 0x3f;
-    cl->format.blueMax = 0x1f;
-    cl->appData.compressLevel = 9;
-    cl->appData.qualityLevel = 1;
-    cl->appData.encodingsString = "tight ultra";
+    cl->format.depth = 32;
+    // cl->format.depth = 16;
+    // cl->format.bitsPerPixel = 16;
+    // cl->format.redShift = 11;
+    // cl->format.greenShift = 5;
+    // cl->format.blueShift = 0;
+    // cl->format.redMax = 0x1f;
+    // cl->format.greenMax = 0x3f;
+    // cl->format.blueMax = 0x1f;
+    // cl->appData.compressLevel = 9;
+    // cl->appData.qualityLevel = 1;
+    // cl->appData.encodingsString = "tight ultra";
+    cl->appData.forceTrueColour = TRUE;
+    cl->appData.useRemoteCursor = FALSE;
     cl->FinishedFrameBufferUpdate = finishedFramebufferUpdateStatic;
     cl->serverHost = strdup(serverIp.c_str());
     cl->serverPort = serverPort;
-    cl->appData.useRemoteCursor = TRUE;
 
     rfbClientSetClientData(cl, nullptr, this);
 
@@ -109,6 +110,9 @@ void VncViewer::start()
         std::cout << "[INFO] disconnected" << std::endl;
         return;
     }
+
+    std::cout << "[INFO] screen size: " << cl->width << " x " << cl->height << std::endl;   
+    this->resize(cl->width, cl->height);
 
     m_vncThread = new std::thread([this]() {
         while (true) {
