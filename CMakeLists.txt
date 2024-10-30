@@ -224,6 +224,7 @@ if(NOT HAVE_STDINT_H)
   message(FATAL_ERROR "Could NOT find required header stdint.h")
 endif()
 
+check_function_exists(getrlimit       LIBVNCSERVER_HAVE_GETRLIMIT)
 check_function_exists(gettimeofday    LIBVNCSERVER_HAVE_GETTIMEOFDAY)
 check_function_exists(vfork           LIBVNCSERVER_HAVE_VFORK)
 check_function_exists(vprintf         LIBVNCSERVER_HAVE_VPRINTF)

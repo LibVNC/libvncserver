@@ -600,7 +600,7 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
     rfbSocket sock = RFB_INVALID_SOCKET;
     fd_set listen_fds; 
     rfbSocket chosen_listen_sock = RFB_INVALID_SOCKET;
-#if defined LIBVNCSERVER_HAVE_SYS_RESOURCE_H && defined LIBVNCSERVER_HAVE_FCNTL_H
+#if defined LIBVNCSERVER_HAVE_GETRLIMIT && defined LIBVNCSERVER_HAVE_FCNTL_H
     struct rlimit rlim;
     size_t maxfds, curfds, i;
 #endif
@@ -629,7 +629,7 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
       Our approach is to deny new clients when we have reached a certain fraction of the per-process limit of file descriptors.
       TODO: add Windows support.
      */
-#if defined LIBVNCSERVER_HAVE_SYS_RESOURCE_H && defined LIBVNCSERVER_HAVE_FCNTL_H
+#if defined LIBVNCSERVER_HAVE_GETRLIMIT && defined LIBVNCSERVER_HAVE_FCNTL_H
     if(getrlimit(RLIMIT_NOFILE, &rlim) < 0)
 	maxfds = 100;  /* use a sane default if getting the limit fails */
     else
