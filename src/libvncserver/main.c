@@ -1041,7 +1041,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->ptrAddEvent = rfbDefaultPtrAddEvent;
    screen->setXCutText = rfbDefaultSetXCutText;
 #ifdef LIBVNCSERVER_HAVE_LIBZ
-   screen->setXCutTextUTF8 = rfbDefaultSetXCutText;
+   screen->setXCutTextUTF8 = NULL;
 #endif
    screen->getCursorPtr = rfbDefaultGetCursorPtr;
    screen->setTranslateFunction = rfbSetTranslateFunction;

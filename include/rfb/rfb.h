@@ -370,6 +370,8 @@ typedef struct _rfbScreenInfo
     uintptr_t listener_thread;
 #endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
+    /** This is called when UTF-8 cut-text is received from a client.
+     *  Set this callback to enable ExtendedClipboard support. */
     rfbSetXCutTextUTF8ProcPtr setXCutTextUTF8;
 #endif
     /* Timeout value for select() calls, mainly used for multithreaded servers. */

@@ -2193,7 +2193,7 @@ rfbProcessExtendedServerCutTextData(rfbClientPtr cl, uint32_t flags, const char 
         }
         if (i == 0) {
             /* text */
-            if (!cl->viewOnly) {
+            if (!cl->viewOnly && cl->screen->setXCutTextUTF8) {
                 cl->screen->setXCutTextUTF8(buf, size, cl);
             }
         }
@@ -2465,14 +2465,16 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                 break;
 #ifdef LIBVNCSERVER_HAVE_LIBZ
             case rfbEncodingExtendedClipboard:
-                if (!cl->enableExtendedClipboard) {
-                    rfbLog("Enabling ExtendedClipboard extension for client "
-                           "%s\n", cl->host);
-                    cl->enableExtendedClipboard = TRUE;
-                }
-                /* send the capabilities we support, currently only text */
-                if (!rfbSendExtendedClipboardCapability(cl)) {
-                    return;
+                if (cl->screen->setXCutTextUTF8) {
+                    if (!cl->enableExtendedClipboard) {
+                        rfbLog("Enabling ExtendedClipboard extension for client "
+                               "%s\n", cl->host);
+                        cl->enableExtendedClipboard = TRUE;
+                    }
+                    /* send the capabilities we support, currently only text */
+                    if (!rfbSendExtendedClipboardCapability(cl)) {
+                        return;
+                    }
                 }
                 break;
 #endif
