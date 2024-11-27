@@ -32,8 +32,8 @@
 rfbBool sock_set_nonblocking(rfbSocket sock, rfbBool non_blocking, void (*log)(const char *format, ...))
 {
 #ifdef WIN32
-  unsigned long block = non_blocking ? 0 : 1;
-  if(ioctlsocket(sock, FIONBIO, &block) == SOCKET_ERROR) {
+  unsigned long non_blocking_ulong = non_blocking;
+  if(ioctlsocket(sock, FIONBIO, &non_blocking_ulong) == SOCKET_ERROR) {
     errno=WSAGetLastError();
 #else
   int flags = fcntl(sock, F_GETFL);
