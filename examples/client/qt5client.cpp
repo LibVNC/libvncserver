@@ -53,8 +53,13 @@ public:
     int serverPort;
     std::thread *vncThread() const;
     void paintEvent(QPaintEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private:
+    bool m_startFlag = false;
     QImage m_image;
     rfbClient *cl;
     std::thread *m_vncThread;
@@ -74,12 +79,52 @@ void VncViewer::finishedFramebufferUpdate(rfbClient *cl)
 
     update();
 }
+
 void VncViewer::paintEvent(QPaintEvent *event)
 {
     event->accept();
 
     QPainter painter(this);
     painter.drawImage(this->rect(), m_image);
+}
+
+void VncViewer::mouseMoveEvent(QMouseEvent *event)
+{
+    if (m_startFlag) {
+        SendPointerEvent(cl,
+                         event->localPos().x() / width() * cl->width,
+                         event->localPos().y() / height() * cl->height,
+                         (event->buttons() & Qt::LeftButton) ? 1 : 0);
+    }
+}
+
+void VncViewer::mousePressEvent(QMouseEvent *event)
+{
+    if (m_startFlag) {
+        SendPointerEvent(cl,
+                         event->localPos().x() / width() * cl->width,
+                         event->localPos().y() / height() * cl->height,
+                         1);
+    }
+}
+
+void VncViewer::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (m_startFlag) {
+        SendPointerEvent(cl,
+                         event->localPos().x() / width() * cl->width,
+                         event->localPos().y() / height() * cl->height,
+                         0);
+    }
+}
+
+void VncViewer::closeEvent(QCloseEvent *event)
+{
+    m_startFlag = false;
+    if (m_vncThread->joinable()) {
+        m_vncThread->join();
+    }
+    QWidget::closeEvent(event);
 }
 
 void VncViewer::start()
@@ -109,9 +154,13 @@ void VncViewer::start()
         std::cout << "[INFO] disconnected" << std::endl;
         return;
     }
+    m_startFlag = true;
+
+    std::cout << "[INFO] screen size: " << cl->width << " x " << cl->height << std::endl;
+    this->resize(cl->width, cl->height);
 
     m_vncThread = new std::thread([this]() {
-        while (true) {
+        while (m_startFlag) {
             int i = WaitForMessage(cl, 500);
             if (i < 0) {
                 std::cout << "[INFO] disconnected" << std::endl;

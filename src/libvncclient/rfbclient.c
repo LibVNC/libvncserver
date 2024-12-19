@@ -1870,6 +1870,43 @@ sendExtClientCutTextNotify(rfbClient *client)
   return ret;
 }
 
+/**
+ * Due to bugs, many servers (including most versions of LibVNCServer) can't
+ * properly handle zlib streams created by compress() function of zlib library.
+ *
+ * Primary bug is that these servers don't expect inflate() to return Z_STREAM_END
+ * which is the case for (correct) streams created by compress().
+ *
+ * So this function creates a compatible stream, for which inflate() returns Z_OK.
+ * This is how some clients create zlib streams, unintentionally avoiding the bug.
+ */
+static int
+CompressClipData(Bytef *dest, uLongf *destLen, Bytef *source, uLong sourceLen)
+{
+  int ret;
+  z_stream *zs = (z_stream*)malloc(sizeof(z_stream));
+  memset(zs, 0, sizeof(z_stream));
+
+  zs->zfree = Z_NULL;
+  zs->zalloc = Z_NULL;
+  zs->opaque = Z_NULL;
+  ret = deflateInit(zs, Z_DEFAULT_COMPRESSION);
+  if (ret == Z_OK) {
+    zs->avail_in = sourceLen;
+    zs->next_in = source;
+    zs->avail_out = *destLen;
+    zs->next_out = dest;
+
+    do {
+      // Using Z_SYNC_FLUSH instead of Z_FINISH is the key here.
+      ret = deflate(zs, Z_SYNC_FLUSH);
+    } while (ret >= 0 && zs->avail_in > 0);
+
+    *destLen = zs->total_out;
+    deflateEnd(zs);
+  }
+  return ret;
+}
 
 /*
  * sendExtClientCutTextProvide
@@ -1880,20 +1917,21 @@ static rfbBool
 sendExtClientCutTextProvide(rfbClient *client, char* data, int len)
 {
   rfbClientCutTextMsg cct = {0, };
+  int sentLen = len + 1;  /* Sent data is null terminated*/
   const uint32_t be_flags = rfbClientSwap32IfLE(rfbExtendedClipboard_Provide
                                                 | rfbExtendedClipboard_Text); /*text and provide*/
-  const uint32_t be_size = rfbClientSwap32IfLE(len);
-  const size_t sz_to_compressed = sizeof(be_size) + len; /*size, data*/
-  uLong csz = compressBound(sz_to_compressed + 1); /*tricky, some server need extar byte to flush data*/
+  const uint32_t be_size = rfbClientSwap32IfLE(sentLen);
+  const size_t sz_to_compressed = sizeof(be_size) + sentLen; /*size, data*/
+  uLong csz = compressBound(sz_to_compressed);
 
-  unsigned char *buf = malloc(sz_to_compressed + 1); /*tricky, some server need extra byte to flush data*/
+  unsigned char *buf = malloc(sz_to_compressed);
   if (!buf) {
     rfbClientLog("sendExtClientCutTextProvide. alloc buf failed\n");
     return FALSE;
   }
   memcpy(buf, &be_size, sizeof(be_size));
   memcpy(buf + sizeof(be_size), data, len);
-  buf[sz_to_compressed] = 0;
+  buf[sz_to_compressed - 1] = 0;  /* Null terminate sent data */
 
   unsigned char *cbuf = malloc(sizeof(be_flags) + csz); /*flag, compressed*/
   if (!cbuf) {
@@ -1902,7 +1940,7 @@ sendExtClientCutTextProvide(rfbClient *client, char* data, int len)
     return FALSE;
   }
   memcpy(cbuf, &be_flags, sizeof(be_flags));
-  if (compress(cbuf + sizeof(be_flags), &csz, buf, sz_to_compressed + 1) != Z_OK) {
+  if (CompressClipData(cbuf + sizeof(be_flags), &csz, buf, sz_to_compressed) != Z_OK) {
     rfbClientLog("sendExtClientCutTextProvide: compress cbuf failed\n");
     free(buf);
     free(cbuf);
