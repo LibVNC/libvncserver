@@ -3,7 +3,7 @@ Makefile
 *.pc
 LibVNCServer*.tar.gz
 build/
-doc/
+doc/html/
 .ccls-cache
 .cachexs
 .log
