@@ -3,6 +3,10 @@
 0.9.15 sees some internal code structure cleanup, UTF-8 clipboard handling improvements
 and HTTP server support for multithreaded VNC servers. [27 issues and pull requests](https://github.com/LibVNC/libvncserver/issues?q=milestone%3A%22Release+0.9.15%22+is%3Aclosed) were closed/merged since 0.9.14.
 
+🕯 I'd like to dedicate this release to those affected by the [2024 Magdeburg car attack](https://en.wikipedia.org/wiki/2024_Magdeburg_car_attack)
+which happened two days ago. In these sad times, let's hope that all these alt-right AfD alternative-facts explainer news that are popping up
+right now (and their prominent supporters) don't get the upper hand in people's heads.
+
 ## Overall changes:
 
   * Added fuzzing with OSS-Fuzz thanks to Catena Cyber.
