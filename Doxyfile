@@ -1073,7 +1073,7 @@ ENUM_VALUES_PER_LINE   = 4
 # JavaScript, DHTML, CSS and frames is required (i.e. any modern browser). 
 # Windows users are probably better off using the HTML help feature.
 
-GENERATE_TREEVIEW      = NO
+GENERATE_TREEVIEW      = YES
 
 # By enabling USE_INLINE_TREES, doxygen will generate the Groups, Directories, 
 # and Class Hierarchy pages using a tree view instead of an ordered list.
@@ -1673,3 +1673,9 @@ GENERATE_LEGEND        = YES
 # the various graphs.
 
 DOT_CLEANUP            = YES
+
+# As per https://github.com/jothepro/doxygen-awesome-css?tab=readme-ov-file#choosing-a-layout
+
+FULL_SIDEBAR           = NO
+HTML_EXTRA_STYLESHEET  = doc/doxygen-awesome-css/doxygen-awesome.css
+HTML_COLORSTYLE        = LIGHT
