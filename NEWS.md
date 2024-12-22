@@ -1,4 +1,7 @@
-# xxx-xx-xx: Version 0.9.15
+# 2024-12-22: Version 0.9.15
+
+0.9.15 sees some internal code structure cleanup, UTF-8 clipboard handling improvements
+and HTTP server support for multithreaded VNC servers. [27 issues and pull requests](https://github.com/LibVNC/libvncserver/issues?q=milestone%3A%22Release+0.9.15%22+is%3Aclosed) were closed/merged since 0.9.14.
 
 ## Overall changes:
 
@@ -10,11 +13,12 @@
 ## LibVNCServer/LibVNCClient:
 
   * Fixed building with OpenSSL >= 3.0.0.
+  * Fixed UTF-8 clipboard handling compatibility cases.
 
 ## LibVNCClient:
 
   * Fixed LibVNCClient handling of UltraVNC MSLogonII when built with OpenSSL.
-  * Added UTF8 clipboard handling.
+  * Added UTF-8 clipboard handling.
   * Added API to allow the client to specify a subregion of the server's framebuffer and
     have LibVNCClient only ask for this, not the whole framebuffer.
   * Fixed Tight decoding endianness issues.
@@ -24,7 +28,8 @@
 
   * Added a proof-of-concept X11 example server.
   * Improved SSH example by having it use [libsshtunnel](https://github.com/bk138/libsshtunnel/) instead of custom code.
-
+  * Fixed HTTPD for multithreaded servers.
+  * Fixed UTF-8 clipboard crash.
 
 # 2022-12-18: Version 0.9.14
 
