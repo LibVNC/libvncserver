@@ -1701,8 +1701,10 @@ ResizeClientBuffer(rfbClient* client, int width, int height)
 rfbBool
 SendExtDesktopSize(rfbClient* client, uint16_t width, uint16_t height)
 {
-  rfbSetDesktopSizeMsg sdm;
-  rfbExtDesktopScreen screen;
+  struct {
+    rfbSetDesktopSizeMsg sdm;
+    rfbExtDesktopScreen screen;
+  } fullSdm;
 
   if (client->screen.width == 0 && client->screen.height == 0 ) {
     rfbClientLog("Screen not yet received from server - not sending dimensions %dx%d\n", width, height);
@@ -1711,18 +1713,23 @@ SendExtDesktopSize(rfbClient* client, uint16_t width, uint16_t height)
 
   if (client->screen.width != rfbClientSwap16IfLE(width) || client->screen.height != rfbClientSwap16IfLE(height)) {
     rfbClientLog("Sending dimensions %dx%d\n", width, height);
-    sdm.type = rfbSetDesktopSize;
-    sdm.width = rfbClientSwap16IfLE(width);
-    sdm.height = rfbClientSwap16IfLE(height);
-    sdm.numberOfScreens = 1;
-    screen.width = rfbClientSwap16IfLE(width);
-    screen.height = rfbClientSwap16IfLE(height);
 
-    if (!WriteToRFBServer(client, (char *)&sdm, sz_rfbSetDesktopSizeMsg)) return FALSE;
-    if (!WriteToRFBServer(client, (char *)&screen, sz_rfbExtDesktopScreen)) return FALSE;
+    fullSdm.sdm.type = rfbSetDesktopSize;
+    fullSdm.sdm.width = rfbClientSwap16IfLE(width);
+    fullSdm.sdm.height = rfbClientSwap16IfLE(height);
+    fullSdm.sdm.numberOfScreens = 1;
 
-    client->screen.width = screen.width;
-    client->screen.height = screen.height;
+    fullSdm.screen.id = rfbClientSwap32IfLE(client->screen.id);
+    fullSdm.screen.width = rfbClientSwap16IfLE(width);
+    fullSdm.screen.height = rfbClientSwap16IfLE(height);
+    fullSdm.screen.x = 0;
+    fullSdm.screen.y = 0;
+    fullSdm.screen.flags = client->screen.flags;
+
+    if (!WriteToRFBServer(client, (char *)&fullSdm, sizeof(rfbSetDesktopSizeMsg) + sizeof(rfbExtDesktopScreen))) return FALSE;
+
+    client->screen.width = fullSdm.screen.width;
+    client->screen.height = fullSdm.screen.height;
 
     client->requestedResize = FALSE;
 
