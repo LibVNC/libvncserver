@@ -2174,6 +2174,7 @@ HandleRFBServerMessage(rfbClient* client)
             return FALSE;
           }
           rfbClientLog("Updated desktop size: %dx%d\n", rect.r.w, rect.r.h);
+          client->ScreenSizeChanged(client, rect.r.w, rect.r.h);
         }
         client->requestedResize = FALSE;
 

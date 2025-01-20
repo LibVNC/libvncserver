@@ -239,6 +239,9 @@ typedef char* (*GetUserProc)(struct _rfbClient* client);
 typedef char* (*GetSASLMechanismProc)(struct _rfbClient* client, char* mechlist);
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
+/** Callback when the screen size of the client has changed. */
+typedef void (*ScreenSizeChangedProc)(struct _rfbClient* client, int width, int height);
+
 typedef struct _rfbClient {
 	uint8_t* frameBuffer;
 	int width, height;
@@ -452,6 +455,9 @@ typedef struct _rfbClient {
         GetUserProc GetUser;
 
 #endif /* LIBVNCSERVER_HAVE_SASL */
+
+	/** screen size changed nofication */
+	ScreenSizeChangedProc ScreenSizeChanged;
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
