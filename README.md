@@ -306,4 +306,14 @@ Contact
 
 * To file an issue, go to https://github.com/LibVNC/libvncserver/issues
 * For non-public contact please see [SECURITY.md](SECURITY.md).
+## AI-generated ProductMaps
 
+
+
+| Github file | ProductMap |
+|-------------|------------|
+| [websockets.c](https://github.com/LibVNC/libvncserver/blob/master/src/libvncserver/websockets.c) | [Link to Map](https://product-map.ai/app/public?url=https://github.com/LibVNC/libvncserver/blob/master/src/libvncserver/websockets.c) |
+
+Contact ProductMap if you have any questions at [juan@product-map.ai](juan@product-map.ai).
+
+Last updated on Mon Feb 03 22:58:28 UTC 2025.
