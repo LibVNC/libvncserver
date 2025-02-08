@@ -32,6 +32,7 @@ set(TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_SKIP_RPATH TRUE)
 
 if(CMAKE_GENERATOR MATCHES "Unix Makefiles|Ninja")
 # some LSP servers expect compile_commands.json in the project root
