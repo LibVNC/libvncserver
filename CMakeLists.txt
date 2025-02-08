@@ -856,4 +856,35 @@ if(LIBVNCSERVER_INSTALL)
         ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
         )
+
+    install(DIRECTORY
+        ${CMAKE_CURRENT_BINARY_DIR}/examples/server/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/libvncserver/examples/server
+        USE_SOURCE_PERMISSIONS
+        )
+
+    install(DIRECTORY
+        ${CMAKE_CURRENT_BINARY_DIR}/examples/client/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/libvncserver/examples/client
+        USE_SOURCE_PERMISSIONS
+        )
+
+    install(DIRECTORY
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/server/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/libvncserver/examples/server
+        FILES_MATCHING PATTERN "*"
+        PATTERN "*.o" EXCLUDE
+        PATTERN "*.a" EXCLUDE
+        PATTERN "*.so" EXCLUDE
+    )
+
+    install(DIRECTORY
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/client/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/libvncserver/examples/client
+        FILES_MATCHING PATTERN "*"
+        PATTERN "*.o" EXCLUDE
+        PATTERN "*.a" EXCLUDE
+        PATTERN "*.so" EXCLUDE
+    )
+
 endif()
