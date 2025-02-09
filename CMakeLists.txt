@@ -5,6 +5,8 @@ set(PROJECT_LANGUAGES C)
 if(DEFINED CMAKE_CXX_COMPILER)
   set(CMAKE_CXX_STANDARD 17)
   list(APPEND PROJECT_LANGUAGES CXX)
+else()
+    message(STATUS "CMAKE_CXX_COMPILER not DEFINED")
 endif(DEFINED CMAKE_CXX_COMPILER)
 
 project(LibVNCServer VERSION 0.9.15 LANGUAGES ${PROJECT_LANGUAGES})
@@ -595,6 +597,8 @@ if(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
     ${LIBVNCSERVER_EXAMPLES}
     filetransfer
   )
+else()
+  message(STATUS "Skipping filetransfer example")
 endif(WITH_THREADS AND WITH_TIGHTVNC_FILETRANSFER AND CMAKE_USE_PTHREADS_INIT)
 
 if(ANDROID)
@@ -614,6 +618,7 @@ else()
   unset(X11_xcb_LIB CACHE)
   unset(X11_xcb_xtest_LIB CACHE)
   unset(X11_xcb_keysyms_LIB CACHE)
+  message(STATUS "Skipping x11 example")
 endif(X11_xcb_FOUND AND X11_xcb_xtest_FOUND AND X11_xcb_keysyms_FOUND)
 
 set(LIBVNCCLIENT_EXAMPLES
@@ -627,6 +632,8 @@ if(SDL2_FOUND)
     ${LIBVNCCLIENT_EXAMPLES}
     SDLvncviewer
   )
+else()
+  message(STATUS "Skipping SDLvncviewer example")
 endif(SDL2_FOUND)
 
 if(GTK2_FOUND)
@@ -635,6 +642,8 @@ if(GTK2_FOUND)
     ${LIBVNCCLIENT_EXAMPLES}
     gtkvncviewer
   )
+else()
+  message(STATUS "Skipping gtkvncviewer example")
 endif(GTK2_FOUND)
 
 if(WITH_LIBSSHTUNNEL AND LIBSSHTUNNEL_LIBRARY AND LIBSSHTUNNEL_INCLUDE_DIR)
@@ -644,6 +653,8 @@ if(WITH_LIBSSHTUNNEL AND LIBSSHTUNNEL_LIBRARY AND LIBSSHTUNNEL_INCLUDE_DIR)
     ${LIBVNCCLIENT_EXAMPLES}
     sshtunnel
   )
+else()
+  message(STATUS "Skipping sshtunnel example")
 endif()
 
 if(FFMPEG_FOUND)
@@ -652,6 +663,8 @@ if(FFMPEG_FOUND)
     ${LIBVNCCLIENT_EXAMPLES}
     vnc2mpg
   )
+else()
+  message(STATUS "Skipping vnc2mpg example")
 endif(FFMPEG_FOUND)
 
 if(WITH_EXAMPLES)
@@ -678,6 +691,8 @@ if(WITH_EXAMPLES)
     set_target_properties(client_examples_qt5client PROPERTIES OUTPUT_NAME qt5client)
     set_target_properties(client_examples_qt5client PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/client)
     target_link_libraries(client_examples_qt5client vncclient ${CMAKE_THREAD_LIBS_INIT} ${Qt5Widgets_LIBRARIES})
+  else()
+    message(STATUS "Skipping qt5client example")
   endif(Qt5Widgets_FOUND AND WITH_QT AND DEFINED CMAKE_CXX_COMPILER)
 endif(WITH_EXAMPLES)
 
