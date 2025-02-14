@@ -84,6 +84,11 @@ typedef UINT32 in_addr_t;
 #endif
 #endif
 
+/* region stuff */
+struct sraRegion;
+typedef struct sraRegion* sraRegionPtr;
+
+
 struct _rfbClientRec;
 struct _rfbScreenInfo;
 struct rfbCursor;
@@ -363,6 +368,7 @@ typedef struct _rfbScreenInfo
 	of file descriptors LibVNCServer uses before denying new client connections.
 	It is set to 0.5 per default. */
     float fdQuota;
+
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_t listener_thread;
     int pipe_notify_listener_thread[2];
@@ -374,8 +380,49 @@ typedef struct _rfbScreenInfo
      *  Set this callback to enable ExtendedClipboard support. */
     rfbSetXCutTextUTF8ProcPtr setXCutTextUTF8;
 #endif
+
     /* Timeout value for select() calls, mainly used for multithreaded servers. */
     int select_timeout_usec;
+
+    /*
+      multicast stuff 
+    */
+    rfbBool multicastVNC;
+    char*   multicastAddr;
+    int     multicastPort;
+    char    multicastTTL;
+    rfbSocket  multicastSock;
+    struct sockaddr_storage multicastSockAddr;
+    uint16_t multicastPacketSize;
+#define MULTICAST_DFLT_PACKETSIZE 1452
+    char *multicastUpdateBuf;
+    uint16_t  mcublen;
+    rfbBool multicastUseCopyRect;            /**< All multicast clients support CopyRect */
+    sraRegionPtr multicastUpdateRegion;
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    MUTEX(multicastOutputMutex);             /**< Ensures that exactly one thread is sending multicast output */
+    MUTEX(multicastUpdateMutex);             /**< Ensures that exactly one thread is processing a multicast framebuffer update */
+    MUTEX(multicastSharedMutex);             /**< Ensures that exactly one thread is modifying the shared variables
+						multicastUseCopyRect, multicastUpdateRegion, multicastUpdPendingPtr, multicastPartUpdRgnBuf,
+						multicastWholeUpdId, multicastPartialUpdId,
+						multicastMaxSendRate, multicastMaxSendRateIncrement, multicastMaxSendRateIncrementCount
+						and multicastMaxSendRateIncrementInterval */
+#endif
+    int multicastDeferUpdateTime;
+    /* multicast flow control stuff */
+#define MULTICAST_MAXSENDRATE_RATE_START 131072            /**< Initial maximum multicast send rate */
+#define MULTICAST_MAXSENDRATE_INCREMENT_START 32096        /**< Initial multicast send rate increment value*/
+#define MULTICAST_MAXSENDRATE_CHANGE_FACTOR 1.2            /**< Factor by which max send rate is decreased and increment value changed */
+#define MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER 10        /**< After this many consecutive increments the increment itself is increased */
+#define MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL 50        /**< This regulates how long to wait between send rate increments */
+#define MULTICAST_MAXSENDRATE_NACKS_REQUIRED 3             /**< The number of consecutive NACKs required to decrease max send rate */
+    struct timeval lastMulticastSendCreditRefill;
+    uint32_t multicastSendCredit;
+    uint32_t multicastMaxSendRate;
+    uint32_t multicastMaxSendRateIncrement;
+    uint8_t multicastMaxSendRateIncrementCount;
+    struct timeval lastMulticastMaxSendRateIncrement; 
+    uint32_t multicastMaxSendRateFixed;     /**< Set this to a fixed maximum send rate in bytes/s to disable multicast flow  control */
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -390,10 +437,6 @@ typedef void (*rfbTranslateFnType)(char *table, rfbPixelFormat *in,
                                    int width, int height);
 
 
-/* region stuff */
-
-struct sraRegion;
-typedef struct sraRegion* sraRegionPtr;
 
 /*
  * Per-client structure.
@@ -667,11 +710,11 @@ typedef struct _rfbClientRec {
 
   /* buffers to hold pixel data before and after encoding.
      per-client for thread safety */
-  char *beforeEncBuf;
-  int beforeEncBufSize;
-  char *afterEncBuf;
-  int afterEncBufSize;
-  int afterEncBufLen;
+    char *beforeEncBuf;
+    int beforeEncBufSize;
+    char *afterEncBuf;
+    int afterEncBufSize;
+    int afterEncBufLen;
 #if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
     uint32_t tightEncoding;  /* rfbEncodingTight or rfbEncodingTightPng */
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
@@ -697,7 +740,7 @@ typedef struct _rfbClientRec {
     int requestedDesktopSizeChange;
     int lastDesktopSizeChangeError;
 
-#ifdef LIBVNCSERVER_HAVE_LIBZ
+    #ifdef LIBVNCSERVER_HAVE_LIBZ
     rfbBool enableExtendedClipboard;
     uint32_t extClipboardUserCap;
     uint32_t extClipboardMaxUnsolicitedSize;
@@ -711,6 +754,26 @@ typedef struct _rfbClientRec {
     int tightPngDstDataLen;
 #endif
 #endif
+
+    /* multicast stuff */
+    rfbBool  enableMulticastVNC;      /* client supports multicast FramebufferUpdates messages */
+    rfbBool  useMulticastVNC;         /* framebuffer updates should be sent via multicast socket*/
+    uint16_t multicastPixelformatEncId;  /* identifier assigned to client's pixelformat and encoding */
+    int preferredMulticastEncoding;   /* client's preferred encoding for multicast */
+    struct timeval startMulticastDeferring; /* this per-client tv is actually used per every combination
+					       of pixelformat and encoding, see main.c, each client is a
+					       representative of the (pixelformat, encoding) class it 
+					       belongs to */
+    rfbBool* multicastUpdPendingPtr;  /**< this bool on the heap is shared by all clients with the
+					 same pixelformat and encoding */
+    uint16_t* multicastWholeUpdId;    /**< shared by all clients with the same pixelformat and encoding */
+    uint32_t* multicastPartialUpdId;  /**< shared by all clients with the same pixelformat and encoding */
+    /* multicast NACK stuff */
+#define MULTICAST_PART_UPD_RGN_BUF_SIZE 52428800 /**< Server should keep a backlog of at max this many sent bytes */
+    void* multicastPartUpdRgnBuf;      /**< a ringbuffer holding partial update <-> region mappings.
+					this is allocated on the heap and shared by all clients
+					with the same pixelformat and encoding*/
+
 } rfbClientRec, *rfbClientPtr;
 
 /**
@@ -753,6 +816,11 @@ extern char rfbEndianTest;
 #define Swap24IfBE(l) (rfbEndianTest ? (l) : Swap24(l))
 #define Swap32IfBE(l) (rfbEndianTest ? (l) : Swap32(l))
 
+/* macros for bit (un)setting of buffers */
+#define rfbSetBit(buffer, position)  (buffer[(position & 255) / 8] |= (1 << (position % 8)))
+#define rfbUnsetBit(buffer, position)  (buffer[(position & 255) / 8] &= ~(1 << (position % 8)))
+
+
 /* sockets.c */
 
 extern int rfbMaxClientWait;
@@ -765,6 +833,7 @@ extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
 extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbPeekExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
+extern int rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char *buf, int len);
 extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern rfbSocket rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern rfbSocket rfbConnectToTcpAddr(char* host, int port);
@@ -807,8 +876,13 @@ extern void rfbClientConnFailed(rfbClientPtr cl, const char *reason);
 extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,rfbSocket sock);
 extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
 extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
+extern rfbBool rfbSendMulticastFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
+extern rfbBool rfbSendMulticastRepairUpdate(rfbClientPtr cl);
 extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
+extern int rfbPutMulticastRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
+extern int rfbPutMulticastRectEncodingUltra(rfbClientPtr cl, int x,int y,int w,int h);
 extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);
+extern rfbBool rfbSendMulticastUpdateBuf(rfbScreenInfoPtr rfbScreen);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 extern void rfbSendServerCutTextUTF8(rfbScreenInfoPtr rfbScreen,char *str, int len, char *fallbackLatin1Str, int latin1Len);
