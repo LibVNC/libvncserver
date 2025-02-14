@@ -363,6 +363,9 @@ typedef struct _rfbScreenInfo
 	of file descriptors LibVNCServer uses before denying new client connections.
 	It is set to 0.5 per default. */
     float fdQuota;
+    /** The amount of free file descriptors after which checking for more file
+    descriptors is not necessary anymore. Set to 100_000 by default. */
+    int fdSufficientFreeCount;
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     pthread_t listener_thread;
     int pipe_notify_listener_thread[2];
