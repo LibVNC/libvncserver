@@ -636,7 +636,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
     sraRgnDestroy(cl->requestedRegion);
     sraRgnDestroy(cl->copyRegion);
 
-    if (cl->translateLookupTable) free(cl->translateLookupTable);
+    free(cl->translateLookupTable);
 
     TINI_COND(cl->updateCond);
     TINI_MUTEX(cl->updateMutex);
@@ -1115,7 +1115,7 @@ rfbSetServerVersionIdentity(rfbScreenInfoPtr screen, char *fmt, ...)
     vsnprintf(buffer, sizeof(buffer)-1, fmt, ap);
     va_end(ap);
     
-    if (screen->versionString!=NULL) free(screen->versionString);
+    free(screen->versionString);
     screen->versionString = strdup(buffer);
 }
 

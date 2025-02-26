@@ -265,7 +265,7 @@ void compTest(tjhandle handle, unsigned char **dstBuf,
 	printf("  %f ms\n  Result in %s\n", t*1000., tempStr);
 
 	bailout:
-	if(srcBuf) free(srcBuf);
+	free(srcBuf);
 }
 
 
@@ -306,7 +306,7 @@ void _decompTest(tjhandle handle, unsigned char *jpegBuf,
 	printf("  %f ms\n", t*1000.);
 
 	bailout:
-	if(dstBuf) free(dstBuf);
+	free(dstBuf);
 }
 
 
@@ -370,7 +370,7 @@ void doTest(int w, int h, const int *formats, int nformats, int subsamp,
 	if(chandle) tjDestroy(chandle);
 	if(dhandle) tjDestroy(dhandle);
 
-	if(dstBuf) free(dstBuf);
+	free(dstBuf);
 }
 
 
@@ -433,8 +433,8 @@ void bufSizeTest(void)
 	printf("Done.      \n");
 
 	bailout:
-	if(srcBuf) free(srcBuf);
-	if(jpegBuf) free(jpegBuf);
+	free(srcBuf);
+	free(jpegBuf);
 	if(handle) tjDestroy(handle);
 }
 
