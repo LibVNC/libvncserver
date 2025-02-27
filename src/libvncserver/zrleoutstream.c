@@ -40,8 +40,7 @@ static rfbBool zrleBufferAlloc(zrleBuffer *buffer, int size)
 
 static void zrleBufferFree(zrleBuffer *buffer)
 {
-  if (buffer->start)
-    free(buffer->start);
+  free(buffer->start);
   buffer->start = buffer->ptr = buffer->end = NULL;
 }
 

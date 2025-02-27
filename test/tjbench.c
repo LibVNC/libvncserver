@@ -658,6 +658,6 @@ int main(int argc, char *argv[])
 	printf("\n");
 
 	bailout:
-	if(srcbuf) free(srcbuf);
+	free(srcbuf);
 	return retval;
 }
