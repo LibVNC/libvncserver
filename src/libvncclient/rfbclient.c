@@ -324,6 +324,11 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     return TRUE;
   }
 
+  if(client->ConnectToRFBServer)
+  {
+      client->sock = client->ConnectToRFBServer(client, hostname, port);
+  }
+  else
 #ifndef WIN32
   if(IsUnixSocket(hostname))
     /* serverHost is a UNIX socket. */
@@ -1424,8 +1429,6 @@ SetFormatAndEncodings(rfbClient* client)
   /* New Frame Buffer Size */
   if (se->nEncodings < MAX_ENCODINGS && client->canHandleNewFBSize)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingNewFBSize);
-  if (se->nEncodings < MAX_ENCODINGS)
-    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingExtDesktopSize);
 
   /* Last Rect */
   if (se->nEncodings < MAX_ENCODINGS && requestLastRectEncoding)
