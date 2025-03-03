@@ -837,7 +837,8 @@ extern int WaitForMessage(rfbClient* client,unsigned int usecs);
  */
 rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,int bytesPerPixel);
 /**
- * Initializes the client. The format is {PROGRAM_NAME, [OPTIONS]..., HOST}. This
+ * Initializes the client, doing connect and initialisation in one step.
+ * The format is {PROGRAM_NAME, [OPTIONS]..., HOST}. This
  * function does not initialize the program name if the rfbClient's program
  * name is set already. The options are as follows:
  * <table>
@@ -861,13 +862,21 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,int bytesPerPixel)
  * </table>
  *
  * The host may include a port number (delimited by a ':').
- * @param client The client to initialize
+ * @param client The client to initialize. This functions calls rfbClientCleanup() itself on error!
  * @param argc The number of arguments to the initializer
  * @param argv The arguments to the initializer as an array of NULL terminated
  * strings
  * @return true if the client was initialized successfully, false otherwise.
  */
 rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv);
+/**
+ * Connects the client to the remote. rfbClientInitialise() needs to be called after this.
+ */
+rfbBool rfbClientConnect(rfbClient* client);
+/**
+ * Initialises the client connections. rfbClientConnect() needs to be called before this.
+ */
+rfbBool rfbClientInitialise(rfbClient* client);
 /**
  * Cleans up the client structure and releases the memory allocated for it. You
  * should call this when you're done with the rfbClient structure that you

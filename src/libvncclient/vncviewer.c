@@ -369,8 +369,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   return client;
 }
 
-static rfbBool rfbInitConnection(rfbClient* client)
-{
+rfbBool rfbClientConnect(rfbClient* client) {
   /* Unless we accepted an incoming connection, make a TCP connection to the
      given VNC server */
 
@@ -385,7 +384,11 @@ static rfbBool rfbInitConnection(rfbClient* client)
         return FALSE;
     }
   }
+  return TRUE;
+}
 
+
+rfbBool rfbClientInitialise(rfbClient* client) {
   /* Initialise the VNC connection, including reading the password */
 
   if (!InitialiseRFBConnection(client))
@@ -501,7 +504,7 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
     }
   }
 
-  if(!rfbInitConnection(client)) {
+  if(!rfbClientConnect(client) || !rfbClientInitialise(client)) {
     rfbClientCleanup(client);
     return FALSE;
   }
