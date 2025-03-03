@@ -617,8 +617,8 @@ HandleVncAuth(rfbClient *client)
 static void
 FreeUserCredential(rfbCredential *cred)
 {
-  if (cred->userCredential.username) free(cred->userCredential.username);
-  if (cred->userCredential.password) free(cred->userCredential.password);
+  free(cred->userCredential.username);
+  free(cred->userCredential.password);
   free(cred);
 }
 
@@ -1884,26 +1884,26 @@ static int
 CompressClipData(Bytef *dest, uLongf *destLen, Bytef *source, uLong sourceLen)
 {
   int ret;
-  z_stream *zs = (z_stream*)malloc(sizeof(z_stream));
-  memset(zs, 0, sizeof(z_stream));
+  z_stream zs;
+  memset(&zs, 0, sizeof(z_stream));
 
-  zs->zfree = Z_NULL;
-  zs->zalloc = Z_NULL;
-  zs->opaque = Z_NULL;
-  ret = deflateInit(zs, Z_DEFAULT_COMPRESSION);
+  zs.zfree = Z_NULL;
+  zs.zalloc = Z_NULL;
+  zs.opaque = Z_NULL;
+  ret = deflateInit(&zs, Z_DEFAULT_COMPRESSION);
   if (ret == Z_OK) {
-    zs->avail_in = sourceLen;
-    zs->next_in = source;
-    zs->avail_out = *destLen;
-    zs->next_out = dest;
+    zs.avail_in = sourceLen;
+    zs.next_in = source;
+    zs.avail_out = *destLen;
+    zs.next_out = dest;
 
     do {
       // Using Z_SYNC_FLUSH instead of Z_FINISH is the key here.
-      ret = deflate(zs, Z_SYNC_FLUSH);
-    } while (ret >= 0 && zs->avail_in > 0);
+      ret = deflate(&zs, Z_SYNC_FLUSH);
+    } while (ret >= 0 && zs.avail_in > 0);
 
-    *destLen = zs->total_out;
-    deflateEnd(zs);
+    *destLen = zs.total_out;
+    deflateEnd(&zs);
   }
   return ret;
 }

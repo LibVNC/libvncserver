@@ -1262,9 +1262,9 @@ void rfbScreenCleanup(rfbScreenInfoPtr screen)
   }
   rfbReleaseClientIterator(i);
     
-#define FREE_IF(x) if(screen->x) free(screen->x)
-  FREE_IF(colourMap.data.bytes);
-  FREE_IF(underCursorBuffer);
+#define FREE_SCREEN_MEMBER(member) free(screen->member)
+  FREE_SCREEN_MEMBER(colourMap.data.bytes);
+  FREE_SCREEN_MEMBER(underCursorBuffer);
   TINI_MUTEX(screen->cursorMutex);
 
   if(screen->cursor != &myCursor)

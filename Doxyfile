@@ -590,19 +590,19 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                  = rfb \
-                         client_examples/SDLvncviewer.c \
-                         client_examples/ppmtest.c \
-                         client_examples/vnc2mpg.c \
-                         examples/camera.c \
-                         examples/example.c \
-			 examples/blooptest.c \
-                         examples/filetransfer.c \
-			 examples/fontsel.c \
-                         examples/pnmshow.c \
-                         examples/pnmshow24.c \
-			 examples/storepasswd.c \
-                         examples/vncev.c
+INPUT                  = include/rfb \
+                         examples/client/SDLvncviewer.c \
+                         examples/client/ppmtest.c \
+                         examples/client/vnc2mpg.c \
+                         examples/server/camera.c \
+                         examples/server/example.c \
+			 examples/server/blooptest.c \
+                         examples/server/filetransfer.c \
+			 examples/server/fontsel.c \
+                         examples/server/pnmshow.c \
+                         examples/server/pnmshow24.c \
+			 examples/server/storepasswd.c \
+                         examples/server/vncev.c
 
 # This tag can be used to specify the character encoding of the source files 
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding, which is 
@@ -661,8 +661,8 @@ RECURSIVE              = YES
 # excluded from the INPUT source files. This way you can easily exclude a 
 # subdirectory from a directory tree whose root is specified with the INPUT tag.
 
-EXCLUDE                = rfb/rfbconfig.h \
-                         rfb/default8x16.h
+EXCLUDE                = include/rfb/rfbconfig.h \
+                         include/rfb/default8x16.h
 
 # The EXCLUDE_SYMLINKS tag can be used select whether or not files or 
 # directories that are symbolic links (a Unix filesystem feature) are excluded 
@@ -690,8 +690,8 @@ EXCLUDE_SYMBOLS        =
 # directories that contain example code fragments that are included (see 
 # the \include command).
 
-EXAMPLE_PATH           = client_examples \
-                         examples
+EXAMPLE_PATH           = examples/client \
+                         examples/server
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the 
 # EXAMPLE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
@@ -1073,7 +1073,7 @@ ENUM_VALUES_PER_LINE   = 4
 # JavaScript, DHTML, CSS and frames is required (i.e. any modern browser). 
 # Windows users are probably better off using the HTML help feature.
 
-GENERATE_TREEVIEW      = NO
+GENERATE_TREEVIEW      = YES
 
 # By enabling USE_INLINE_TREES, doxygen will generate the Groups, Directories, 
 # and Class Hierarchy pages using a tree view instead of an ordered list.
@@ -1673,3 +1673,9 @@ GENERATE_LEGEND        = YES
 # the various graphs.
 
 DOT_CLEANUP            = YES
+
+# As per https://github.com/jothepro/doxygen-awesome-css?tab=readme-ov-file#choosing-a-layout
+
+FULL_SIDEBAR           = NO
+HTML_EXTRA_STYLESHEET  = doc/doxygen-awesome-css/doxygen-awesome.css
+HTML_COLORSTYLE        = LIGHT

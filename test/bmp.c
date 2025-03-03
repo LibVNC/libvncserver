@@ -168,7 +168,7 @@ int loadppm(int *fd, unsigned char **buf, int *w, int *h,
 
 	finally:
 	if(fs) {fclose(fs);  *fd=-1;}
-	if(tempbuf) free(tempbuf);
+	free(tempbuf);
 	return retcode;
 }
 
@@ -262,7 +262,7 @@ int loadbmp(char *filename, unsigned char **buf, int *w, int *h,
 		srcbottomup!=dstbottomup);
 
 	finally:
-	if(tempbuf) free(tempbuf);
+	free(tempbuf);
 	if(fd!=-1) close(fd);
 	return retcode;
 }
@@ -291,7 +291,7 @@ int saveppm(char *filename, unsigned char *buf, int w, int h,
 	if((fwrite(tempbuf, w*h*3, 1, fs))!=1) _throw("Write error");
 
 	finally:
-	if(tempbuf) free(tempbuf);
+	free(tempbuf);
 	if(fs) fclose(fs);
 	return retcode;
 }
@@ -379,7 +379,7 @@ int savebmp(char *filename, unsigned char *buf, int w, int h,
 		_throw(strerror(errno));
 
 	finally:
-	if(tempbuf) free(tempbuf);
+	free(tempbuf);
 	if(fd!=-1) close(fd);
 	return retcode;
 }

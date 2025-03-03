@@ -1,3 +1,635 @@
+2024-12-22  Christian Beier <info@christianbeier.net>
+
+	* Doxyfile: doc: configure Doxygen for doxygen-awesome-css
+
+2024-12-22  Christian Beier <info@christianbeier.net>
+
+	* .gitignore: .gitignore: update
+
+2024-12-22  Christian Beier <info@christianbeier.net>
+
+	* .gitmodules, doc/doxygen-awesome-css: build: add
+	doxygen-awesome-css submodule
+
+2024-12-22  Christian Beier <info@christianbeier.net>
+
+	* .gitignore: .gitignore: clean up
+
+2024-12-22  Christian Beier <info@christianbeier.net>
+
+	* Doxyfile: docs: adapt Doxyfile to new structure
+
+2024-12-22  Christian Beier <info@christianbeier.net>
+
+	* NEWS.md: NEWS: update
+
+2024-12-22  Christian Beier <info@christianbeier.net>
+
+	* AUTHORS: AUTHORS: update
+
+2023-03-05  Gaurav Ujjwal <gujjwal00@gmail.com>
+
+	* src/libvncclient/rfbclient.c: libvncclient: Improve Extended
+	Clipboard encoding compatibility Many servers can't handle zlib streams created by compress()
+	function of zlib library. Primary bug is that these servers don't
+	expect inflate() to return Z_STREAM_END, which is the case for
+	streams created by compress().  Affected servers: LibVNCServer UltraVNC TigerVNC (<= 1.10)
+
+2023-03-05  Gaurav Ujjwal <gujjwal00@gmail.com>
+
+	* src/libvncclient/rfbclient.c: libvncclient: Fix text length in
+	extended clipboard encoding Text data sent via extended clipboard encoding is null-terminated
+	and this null character is counted in the length field sent to
+	server.  E.g. for "abc", bytes  {'a', 'b', 'c', '\0'} are sent with length =
+	4.
+
+2023-03-05  Gaurav Ujjwal <gujjwal00@gmail.com>
+
+	* src/libvncserver/rfbserver.c:  libvncserver: Handle 'Z_STREAM_END' in zlib stream decompression According to zlib manual (https://zlib.net/manual.htm): "inflate() returns Z_OK if some progress has been made (more input
+	processed or more output produced), Z_STREAM_END if the end of the
+	compressed data has been reached and all uncompressed output has
+	been produced"
+
+2024-12-19  Christian Beier <info@christianbeier.net>
+
+	* src/libvncserver/rfbserver.c: libvncserver: fix fallback Latin1
+	sending in rfbSendServerCutTextUTF8()
+
+2024-11-19  Gaurav Ujjwal <gujjwal00@gmail.com>
+
+	* include/rfb/rfb.h, src/libvncserver/main.c,
+	src/libvncserver/rfbserver.c: Libvncserver: Enable ExtendedClipboard
+	encoding only when app signals support for UTF-8 cut-text A UTF-8 capable client will usually prefer to send cut-text via
+	ExtendedClipboard encoding once libvncserver declares support for
+	it. If app doesn't assign a setXCutTextUTF8() callback, the default
+	handler is used which is no-op. So client-to-server clipboard
+	transfer will not work.  Re: #638
+
+2024-10-31  re2zero <yangwu@uniontech.com>
+
+	* examples/client/qt5client.cpp: examples: add mouse events handle
+	for Qt example Resize the widget to after client init success; and the mouse events
+	handle.  Log: add mouse events handle for Qt example.
+
+2024-10-20  Christian Beier <info@christianbeier.net>
+
+	* src/libvncclient/tls_openssl.c: libvncclient: tls_openssl: fix
+	connection setup w/ newer LibreSSL This needs the security level setting as well.  re https://github.com/bk138/multivnc/issues/245
+
+2024-09-23  Chih-Hsuan Yen <645432-yan12125@users.noreply.gitlab.com>
+
+	* src/libvncclient/tls_gnutls.c: libvncclient: improve compatibility
+	with GnuTLS 3.8 Since GnuTLS 3.8, TTLS-SRP is disabled by default at compile time
+	[1].  As a result, connecting to a server via TLS fails with: > Warning: Failed to set TLS priority: The request is invalid.
+	(+SRP).  > TLS handshake failed: No or insufficient priorities were set.  On the other hand, TLS-SRP is apparently unused in libvncclient. It
+	seems TLS-SRP requires providing serveral parameters, including a
+	username and a password, via specific GnuTLS API [2], which I didn't
+	find in the codebase.  [1] https://gitlab.com/gnutls/gnutls/-/merge_requests/1681 [2]
+
+	https://www.gnutls.org/manual/html_node/Authentication-using-SRP.html
+
+2024-08-30  Christian Beier <info@christianbeier.net>
+
+	* src/libvncserver/httpd.c: libvncserver: check for invalid socket
+	before FD_ISSET in httpd A mere workaround/mitigation for when the socket is closed by
+	another thread...
+
+2024-08-26  Christian Beier <info@christianbeier.net>
+
+	* src/libvncserver/main.c: libvncserver: mitigate FORTIFY crash in
+	listenerRun() With the previous commit acac77968d6ea9a8f09d7b758fe1bffac31da7eb
+	the select() call now times out, opening up for a race condition
+	where rfbShutdownSockets() would set the listening sockets to -1,
+	the select would time out and the FD_ISSET() call encounter a -1
+	socket.  This is not 100% threadsafe but better than before.
+
+2024-08-15  Christian Beier <info@christianbeier.net>
+
+	* include/rfb/rfb.h, src/libvncserver/main.c: libvncserver: fix
+	HTTPD for multithreaded servers This changes the select() call in listenerRun() to obey the usec
+	value passed in from rfbRunEventloop(), aligning the multithreaded
+	implementations to the single-threaded one. This in turn allows us
+	to handle incoming HTTP connections as well.  Closes #514
+
+2024-08-04  Christian Beier <info@christianbeier.net>
+
+	* src/libvncserver/httpd.c: libvncserver/httpd: add comment about
+	client handling shortcomings
+
+2024-08-04  Christian Beier <info@christianbeier.net>
+
+	* src/common/sockets.c: common/sockets: fix logic error in WIN32
+	sock_set_nonblocking() impl According to
+
+	https://learn.microsoft.com/en-us/windows/win32/winsock/winsock-ioctls"The lpvInBuffer parameter points at an unsigned long (QoS), which
+	is nonzero if non-blocking mode is to be enabled and zero if it is
+	to be disabled." Closes #613
+
+2024-07-02  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt: CMake: set version to 0.9.15
+
+2024-07-02  Christian Beier <info@christianbeier.net>
+
+	* webclients/novnc: webclients: update noVNC to v1.5.0
+
+2024-07-02  Christian Beier <info@christianbeier.net>
+
+	* NEWS.md: NEWS: update
+
+2024-07-02  Christian Beier <info@christianbeier.net>
+
+	* AUTHORS: AUTHORS: update again
+
+2024-07-02  Christian Beier <info@christianbeier.net>
+
+	* AUTHORS: AUTHORS: update
+
+2024-04-03  Nicolas Morais <45640048+nicmorais@users.noreply.github.com>
+
+	* CMakeLists.txt, examples/client/qt5client.cpp: examples,build: add
+	Qt client example * CMake: Adds C++ as project language * CMake: Adds WITH_QT option to build Qt client example * Examples: Adds qt5client.cpp * CMake: adds specific way of building Qt client example * CMake: try to find Qt if needed * CMake: makes Qt not required, quiet if not found * CMake: removes CXX as language * CMake: checks if we have C++ compiler before setting standard * CMake: checks C++ compiler before setting project languages I could not find a better solution. It seems like the languages must
+	be set before almost everything.  * CMake: check if C++ compiler defined instead of string comparison * CMake: appends CXX to languages, in a better syntax As suggested by dantti * Examples: changes to static_cast in Qt5 client example As suggested by @dantti * Examples: adds description to Qt example * Examples: Qt example can't handle new fb size * Examples: adds additional condition to build Qt example This is need to remove the following message: 'CMake Error: Cannot
+	determine link language for target' * CMake: adds comment about C++ example (Qt client) * Examples: adds CMake remarks to Qt client example * CMake: changes Qt5::Widgets to Qt5Widgets_LIBRARIES Just for standardization
+
+2024-03-28  Christian Hitz <christian@klarinett.li>
+
+	* src/common/crypto_openssl.c: common/crypto_openssl: load legacy
+	provider in decrypt_rfbdes() Commit f135856fc3ce515afd16dbf91c44b89bab332726 added the same code
+	to encrypt_rfbdes() Signed-off-by: Christian Hitz <christian.hitz@bbv.ch>
+
+2024-03-17  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: remove zlibhex from supported encodings It's in fact not processed.  Closes #609
+
+2024-03-08  flyqie <flyqie@outlook.com>
+
+	* README.md: README: fix links to rfbproto
+
+2024-03-07  Christian Beier <info@christianbeier.net>
+
+	* src/libvncserver/cargs.c: libvncserver: make usage display more
+	discoverable
+
+2024-03-03  Christian Beier <info@christianbeier.net>
+
+	* examples/server/README.md: build: add README for server examples
+
+2024-03-03  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt, examples/server/mac.c: build: remove macOS server
+	example This was split off LibVNCServer and now resides in
+	https://github.com/LibVNC/macVNC
+
+2024-02-03  Jeffrey Knockel <jeff@jeffreyknockel.com>
+
+	* src/libvncclient/tight.c: libvncclient: fix tight decoding
+	endianness issues When the host byte order of a client is different from that of the
+	RFB pixel format it is using, we must swap bytes before delivering
+	them to the client.  This commit addresses places where we were not
+	properly doing that during tight decoding, manifesting in issues in
+	which solid filled rectangles and gradients could be decoded to the
+	wrong color.  As the RFB protocol says: "Swap the pixel value
+	according to big-endian-flag (e.g. if big-endian-flag is zero
+	(false) and host byte order is big endian, then swap)."
+
+2023-12-02  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt: CMake: log when libjpeg-turbo was found via header
+	file
+
+2023-11-25  Christian Beier <info@christianbeier.net>
+
+	* .clang-format: build: add first .clang-format re #395
+
+2023-11-24  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt, cmake/Modules/FindLibSSH2.cmake,
+	examples/client/sshtunnel.c: build,examples: use libsshtunnel for
+	ssh tunnel example ...instead of libssh2 directly and lots of application logic.
+
+2023-11-19  Sérgio Basto <sergio@serjux.com>
+
+	* CMakeLists.txt: build: use FFMPEG_INCLUDE_DIRS ... for building vnc2mpg example.
+
+2023-11-17  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: document where to find libwinpthread-1.dll re #482
+
+2023-08-30  Christian Beier <info@christianbeier.net>
+
+	* src/libvncserver/main.c: Revert "libvncserver: detach client
+	thread before ending it" This reverts commit 8560a5a72d76fc3ab3484ca41f604116807f34e8.  It caused several crashes when ending a server: client threads would
+	sometimes linger around until after the server was stopped and its
+	rfbScreen internals free()ed, with these client threads trying to
+	access rfbScreen and friends: ðŸ’£.  Reopens #570
+
+2023-08-22  Christian Beier <info@christianbeier.net>
+
+	* src/libvncserver/main.c: libvncserver: make client names in
+	rfbScreenCleanup() less cryptic
+
+2023-08-16  Christian Beier <info@christianbeier.net>
+
+	* test/blooptest.c: test: remove unused blooptest Already in server/examples.
+
+2023-08-05  Christian Beier <info@christianbeier.net>
+
+	* src/libvncserver/main.c: libvncserver: detach client thread before
+	ending it Before, we were joining the thread in rfbShutdownServer(), which
+	cleaned up after its resources in that case, but there was no
+	cleanup when a client disconnected on its own, as noted in #570.  Closes #570.  Builds upon and closes #574.
+
+2023-08-05  Christian Beier <info@christianbeier.net>
+
+	* include/rfb/threading.h: common/threading: add THREAD_DETACH
+
+2023-07-07  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: add pointer to chat and issues
+
+2023-07-04  Christian Beier <info@christianbeier.net>
+
+	* include/rfb/rfbclient.h, src/libvncclient/rfbclient.c,
+	src/libvncclient/vncviewer.c: libvncclient: add functionality to set
+	what a client is requesting With this new API, the caller can tell the client to only request a
+	subset of the remote framebuffer during incremental framebuffer
+	requests.
+
+2023-07-04  Christian Beier <info@christianbeier.net>
+
+	* examples/client/SDLvncviewer.c: examples/client: don't set
+	updateRect in SDLvncviewer This is already done by the library.
+
+2023-07-04  Christian Beier <info@christianbeier.net>
+
+	* .github/workflows/ci.yml: .github: fix MacOS CI re https://github.com/orgs/Homebrew/discussions/4612
+
+2023-07-04  Christian Beier <info@christianbeier.net>
+
+	* include/rfb/rfbclient.h: libvncclient: change comment to reflect
+	file rename
+
+2023-07-03  Christian Beier <info@christianbeier.net>
+
+	* src/libvncclient/rfbclient.c: libvncclient: de-dup client width
+	and height setting code
+
+2023-06-26  Christian Beier <info@christianbeier.net>
+
+	* examples/server/1instance.c: examples/server/1instance: remove
+	unused file
+
+2023-06-22  Christian Beier <info@christianbeier.net>
+
+	* src/libvncserver/sockets.c: libvncserver: null extension data
+	after closing in rfbCloseClient If the function 'close' points to does a free() _and_ checks for
+	NULL (as is the case for rfbTightExtensionClientClose()), this
+	prevents double free()s.  If the function 'close' points to does not do a free(), nulling out
+	the data after closing out should (semantically) not do harm.  Closes #585
+
+2023-05-25  Mingjie Shen <shen497@purdue.edu>
+
+	* examples/server/pnmshow.c, examples/server/pnmshow24.c,
+	test/bmp.c: examples,test: fix integer overflows in calculating
+	alloc sizes Allocating memory with a size controlled by an external user can
+	result in integer overflow.
+
+2023-05-25  JorisHansMeijer <36713790+JorisHansMeijer@users.noreply.github.com>
+
+	* src/libvncserver/rfbserver.c: libvncserver: fix memory leak on
+	webclient disconnect The webocket context was not free'd on client disconnect.
+
+2023-05-19  Mingjie Shen <shen497@purdue.edu>
+
+	* examples/client/SDLvncviewer.c: examples: check return values of
+	malloc for null
+
+2023-05-20  Mingjie Shen <mjshen137@gmail.com>
+
+	* test/tjbench.c: test: fix offset used before range check This use of offset 'i' should follow the range check.
+
+2023-05-20  Mingjie Shen <mjshen137@gmail.com>
+
+	* test/tjbench.c: test: fix comparison that is always false If srcsize is an unsigned long, then the comparison
+	(srcsize=ftell(file))<0 is always false.
+
+2023-05-20  Mingjie Shen <mjshen137@gmail.com>
+
+	* examples/server/pnmshow.c, examples/server/pnmshow24.c,
+	test/bmp.c: examples,test: check that calls to 'sscanf' write to
+	output vars
+
+2023-05-16  Christian Beier <info@christianbeier.net>
+
+	* src/libvncclient/vncviewer.c: libvncclient: close listening IPv6
+	sockets in rfbClientCleanup() too
+
+2023-04-03  Volodymyr Samokhatko <samokhatko@anatoscope.com>
+
+	* src/libvncserver/cursor.c: libvncserver: fix vertical blank stripe
+	on cursor converted from alpha source
+
+2023-02-20  Nicolas Morais <45640048+nicmorais@users.noreply.github.com>
+
+	* examples/server/x11.c: examples: fix visual artifacts with Tight
+	encoding in x11 server * Sets bpp to 4 in X11 Server example * Undoes changing of types from signed int to unsigned --------- Co-authored-by: Nicolas Morais <nsantos10@lenovo.com>
+
+2023-02-17  Tobias Junghans <tobydox@veyon.io>
+
+	* src/libvncclient/rfbclient.c: libvncclient: cast buf when calling
+	GotXCutTextUTF8() buf is an unsigned char pointer while GotXCutTextUTF8() takes a char
+	pointer.
+
+2023-02-17  Tobias Junghans <tobydox@veyon.io>
+
+	* src/libvncclient/rfbclient.c: libvncclient: fix type of csz zlib's compress() takes a pointer to a uLong variable. uLong may be
+	32 bit only while size_t is 64 bit on 64 bit platforms. This causes
+	a compiler warning/error and potentially UB.
+
+2023-02-13  Christian Beier <info@christianbeier.net>
+
+	* README.md: README: fix links to examples
+
+2023-02-13  Christian Beier <info@christianbeier.net>
+
+	* src/libvncclient/rfbclient.c: libvncclient: make client callback
+	indicative for Extended Clipboard A client which has GotXCutTextUTF8 set indicates it can handle UTF8
+	cuttext from the server. Older clients will not have this set and
+	thus not opt in for UTF8 (and depending on the server
+	implementation, thus not opt out from Latin1, resulting in no
+	cuttext from server at all for them).  re
+
+	https://github.com/LibVNC/libvncserver/pull/552#issuecomment-1427874738
+
+2023-02-13  Christian Beier <info@christianbeier.net>
+
+	* NEWS.md: NEWS: update with latest changes
+
+2023-02-13  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt, src/libvncclient/{rfbproto.c => rfbclient.c}: 
+	build: rename libvnclient/rfbproto.c to libvncclient/rfbclient.c
+
+2023-01-08  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt, {rfb => include/rfb}/default8x16.h, {rfb =>
+	include/rfb}/keysym.h, {rfb => include/rfb}/rfb.h, {rfb =>
+	include/rfb}/rfbclient.h, {rfb => include/rfb}/rfbconfig.h.cmakein,
+	{rfb => include/rfb}/rfbproto.h, {rfb => include/rfb}/rfbregion.h,
+	{rfb => include/rfb}/threading.h, {common => src/common}/base64.c,
+	{common => src/common}/base64.h, {common => src/common}/crypto.h,
+	{common => src/common}/crypto_included.c, {common =>
+	src/common}/crypto_libgcrypt.c, {common =>
+	src/common}/crypto_openssl.c, {common => src/common}/d3des.c,
+	{common => src/common}/d3des.h, {common => src/common}/lzoconf.h,
+	{common => src/common}/lzodefs.h, {common => src/common}/minilzo.c,
+	{common => src/common}/minilzo.h, {common =>
+	src/common}/sha-private.h, {common => src/common}/sha.h, {common =>
+	src/common}/sha1.c, {common => src/common}/sockets.c, {common =>
+	src/common}/sockets.h, {common => src/common}/turbojpeg.c, {common
+	=> src/common}/turbojpeg.h, {common => src/common}/vncauth.c,
+	{common => src/common}/zywrletemplate.c, {libvncclient =>
+	src/libvncclient}/corre.c, {libvncclient =>
+	src/libvncclient}/cursor.c, {libvncclient =>
+	src/libvncclient}/hextile.c, {libvncclient =>
+	src/libvncclient}/libvncclient.pc.cmakein, {libvncclient =>
+	src/libvncclient}/listen.c, {libvncclient =>
+	src/libvncclient}/rfbproto.c, {libvncclient =>
+	src/libvncclient}/rre.c, {libvncclient => src/libvncclient}/sasl.c,
+	{libvncclient => src/libvncclient}/sasl.h, {libvncclient =>
+	src/libvncclient}/sockets.c, {libvncclient =>
+	src/libvncclient}/tight.c, {libvncclient =>
+	src/libvncclient}/tls.h, {libvncclient =>
+	src/libvncclient}/tls_gnutls.c, {libvncclient =>
+	src/libvncclient}/tls_none.c, {libvncclient =>
+	src/libvncclient}/tls_openssl.c, {libvncclient =>
+	src/libvncclient}/trle.c, {libvncclient =>
+	src/libvncclient}/ultra.c, {libvncclient =>
+	src/libvncclient}/vncviewer.c, {libvncclient =>
+	src/libvncclient}/zlib.c, {libvncclient =>
+	src/libvncclient}/zrle.c, {libvncserver =>
+	src/libvncserver}/auth.c, {libvncserver =>
+	src/libvncserver}/cargs.c, {libvncserver =>
+	src/libvncserver}/corre.c, {libvncserver =>
+	src/libvncserver}/cursor.c, {libvncserver =>
+	src/libvncserver}/cutpaste.c, {libvncserver =>
+	src/libvncserver}/draw.c, {libvncserver =>
+	src/libvncserver}/font.c, {libvncserver =>
+	src/libvncserver}/hextile.c, {libvncserver =>
+	src/libvncserver}/httpd.c, {libvncserver =>
+	src/libvncserver}/libvncserver.pc.cmakein, {libvncserver =>
+	src/libvncserver}/main.c, {libvncserver =>
+	src/libvncserver}/private.h, {libvncserver =>
+	src/libvncserver}/rfbregion.c, {libvncserver =>
+	src/libvncserver}/rfbserver.c, {libvncserver =>
+	src/libvncserver}/rfbssl.h, {libvncserver =>
+	src/libvncserver}/rfbssl_gnutls.c, {libvncserver =>
+	src/libvncserver}/rfbssl_none.c, {libvncserver =>
+	src/libvncserver}/rfbssl_openssl.c, {libvncserver =>
+	src/libvncserver}/rre.c, {libvncserver =>
+	src/libvncserver}/scale.c, {libvncserver =>
+	src/libvncserver}/scale.h, {libvncserver =>
+	src/libvncserver}/selbox.c, {libvncserver =>
+	src/libvncserver}/sockets.c, {libvncserver =>
+	src/libvncserver}/stats.c, {libvncserver =>
+	src/libvncserver}/tableinit24.c, {libvncserver =>
+	src/libvncserver}/tableinitcmtemplate.c, {libvncserver =>
+	src/libvncserver}/tableinittctemplate.c, {libvncserver =>
+	src/libvncserver}/tabletrans24template.c, {libvncserver =>
+	src/libvncserver}/tabletranstemplate.c, {libvncserver =>
+	src/libvncserver}/tight.c, {libvncserver =>
+	src/libvncserver}/tightvnc-filetransfer/filelistinfo.c,
+	{libvncserver =>
+	src/libvncserver}/tightvnc-filetransfer/filelistinfo.h,
+	{libvncserver =>
+	src/libvncserver}/tightvnc-filetransfer/filetransfermsg.c,
+	{libvncserver =>
+	src/libvncserver}/tightvnc-filetransfer/filetransfermsg.h,
+	{libvncserver =>
+	src/libvncserver}/tightvnc-filetransfer/handlefiletransferrequest.c
+	, {libvncserver =>
+	src/libvncserver}/tightvnc-filetransfer/handlefiletransferrequest.h
+	, {libvncserver =>
+	src/libvncserver}/tightvnc-filetransfer/rfbtightproto.h,
+	{libvncserver =>
+	src/libvncserver}/tightvnc-filetransfer/rfbtightserver.c,
+	{libvncserver => src/libvncserver}/translate.c, {libvncserver =>
+	src/libvncserver}/ultra.c, {libvncserver =>
+	src/libvncserver}/websockets.c, {libvncserver =>
+	src/libvncserver}/ws_decode.c, {libvncserver =>
+	src/libvncserver}/ws_decode.h, {libvncserver =>
+	src/libvncserver}/zlib.c, {libvncserver =>
+	src/libvncserver}/zrle.c, {libvncserver =>
+	src/libvncserver}/zrleencodetemplate.c, {libvncserver =>
+	src/libvncserver}/zrleoutstream.c, {libvncserver =>
+	src/libvncserver}/zrleoutstream.h, {libvncserver =>
+	src/libvncserver}/zrlepalettehelper.c, {libvncserver =>
+	src/libvncserver}/zrlepalettehelper.h, {libvncserver =>
+	src/libvncserver}/zrletypes.h: build: centralise sources in src dir,
+	move rfb to include dir
+
+2023-02-13  Christian Beier <info@christianbeier.net>
+
+	* examples/client/SDLvncviewer.c: examples: wire up utf-8 clipboard
+	handling in SDLVncviewer
+
+2023-02-13  Christian Beier <info@christianbeier.net>
+
+	* libvncclient/rfbproto.c, rfb/rfbclient.h: libvncclient: rework
+	utf-8 clipboard API to resemble libvncserver one Public LibVNCServer API has * `rfbSendServerCutTextUTF8(rfbScreenInfoPtr rfbScreen,char *str,
+	int len, char *fallbackLatin1Str, int latin1Len);` * and `typedef void (*rfbSetXCutTextUTF8ProcPtr) (char* str,int len,
+	  struct _rfbClientRec* cl);` which is wired up as `setXCutTextUTF8`, i.e. it's got a unicode sender w/ Latin1 fallback and a dedicated
+	unicode receiver.  This commit reworks the libvncclient API to have a dedicated UTF8
+	clipboard sending function and a dedicated on-receive callback.  Applications can use those functions instead of changing state with
+	some rfbClient member.
+
+2023-02-13  Christian Beier <info@christianbeier.net>
+
+	* SECURITY.md: SECURITY: hint at at GitHub form
+
+2023-02-11  Christian Beier <info@christianbeier.net>
+
+	* webclients/novnc: webclients: update noVNC to v1.4.0
+
+2023-02-06  kai <wuhanck@hotmail.com>
+
+	* libvncclient/rfbproto.c, rfb/rfbclient.h: libvncclient: add utf-8
+	clipboard support Closes #552
+
+2023-01-30  Christian Beier <info@christianbeier.net>
+
+	* .github/workflows/ci.yml: .github: remove fuzzing_build re
+
+	https://github.com/LibVNC/libvncserver/pull/556#issuecomment-1408127231
+
+2023-01-30  Christian Beier <info@christianbeier.net>
+
+	* test/fuzz_server.c: test: document fuzz_server usage, by OSS-Fuzz
+	and locally re
+
+	https://github.com/LibVNC/libvncserver/pull/556#issuecomment-1408127231
+
+2023-01-29  Catena cyber <35799796+catenacyber@users.noreply.github.com>
+
+	* .github/workflows/cifuzz.yml: .github: add CIFuzz workflow This is
+
+	https://google.github.io/oss-fuzz/getting-started/continuous-integration/* ci: add CIFuzz workflow * 30 seconds of fuzzing
+
+2023-01-26  Catena cyber <35799796+catenacyber@users.noreply.github.com>
+
+	* libvncserver/tableinittctemplate.c: libvncserver: check before
+	shifting in table init As it can turn into undefined behavior like shift exponent 32 is too
+	large for 32-bit type 'uint32_t'
+
+2023-01-25  Catena cyber <35799796+catenacyber@users.noreply.github.com>
+
+	* libvncserver/tableinittctemplate.c: libvncserver: add an explicit
+	cast before shift Shifting a signed integer can result in undefined behavior.
+
+2023-01-25  kai <wuhanck@hotmail.com>
+
+	* libvncclient/sasl.c: libvncclient: plug more memleaks in SASL
+	handling
+
+2023-01-24  Christian Beier <info@christianbeier.net>
+
+	* .github/workflows/ci.yml: .github: install some build deps for Win
+	CI, remove useless runs
+
+2023-01-23  Gaurav Ujjwal <gujjwal00@gmail.com>
+
+	* common/crypto_openssl.c: common/crypto_openssl: pad DH key buffers
+	with leading zeros for smaller keys Re: https://github.com/LibVNC/libvncserver/issues/493 Re:
+	https://github.com/bk138/multivnc/issues/202
+
+2023-01-22  Christian Beier <info@christianbeier.net>
+
+	* examples/client/sshtunnel.c: examples/client/sshtunnel: include
+	headers req'd by some OS's ...namely FreeBSD where accept requires <sys/types.h> and
+	<sys/socket.h> and close requires <unistd.h>.  Closes #548
+
+2023-01-21  Christian Beier <info@christianbeier.net>
+
+	* libvncclient/vncviewer.c: libvncclient: include header for
+	tjDestroy()
+
+2022-09-29  Obermayr Johann <johann.obermayr@sigmatek.at>
+
+	* libvncclient/cursor.c, libvncclient/vncviewer.c: libvncclient: fix
+	possible memory leak in some parts of the code it was possible to lose track of
+	resources. Cleaning them up fixes the possibility for memory leaks.
+
+2023-01-20  Peter V <peter.vicman@gmail.com>
+
+	* common/crypto_openssl.c: common/crypto_openssl: fix build with
+	openssl >= 3.0.0 DES encryption is considered legacy and is no longer available by
+	default. To use it legacy provider must be load.
+
+2023-01-18  Christian Beier <info@christianbeier.net>
+
+	* .github/workflows/ci.yml: .github: provide a ctest configuration needed for Windows
+
+2023-01-18  Christian Beier <info@christianbeier.net>
+
+	* .github/workflows/ci.yml: .github: split test prep into own step
+	to only run it for ubuntu
+
+2023-01-18  Christian Beier <info@christianbeier.net>
+
+	* .github/workflows/ci.yml: .github: add first bare Windows CI
+
+2023-01-18  Plan C <hubenchang0515@outlook.com>
+
+	* examples/server/x11.c: examples: fix type mismatch in x11 server
+	example
+
+2023-01-11  Plan C <hubenchang0515@outlook.com>
+
+	* .gitignore, CMakeLists.txt, examples/server/x11.c: examples: add
+	an XCB-based X11 example * examples/x11vncserver: add X11 example * examples/x11vncserver: add comments abot compiling * add `x11vncserver.c` in the CMake build system * use `FindX11.cmake` and clear `NOTFOUND` * add some comments * add some comments * rename x11vncserver to x11 * Need CMake 3.24.0 to find X11 libraries * Need CMake 3.24.0 to find XCB libraries
+
+2023-01-08  Catena cyber <35799796+catenacyber@users.noreply.github.com>
+
+	* .github/workflows/ci.yml, CMakeLists.txt,
+	libvncserver/rfbserver.c, libvncserver/sockets.c,
+	test/fuzz_server.c: test: add one first fuzz target re google/oss-fuzz#5137 for oss-fuzz integration
+
+2023-01-08  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt, {client_examples =>
+	examples/client}/SDLvncviewer.c, {client_examples =>
+	examples/client}/backchannel.c, {client_examples =>
+	examples/client}/gtkvncviewer.c, {client_examples =>
+	examples/client}/ppmtest.c, {client_examples =>
+	examples/client}/sshtunnel.c, {client_examples =>
+	examples/client}/vnc2mpg.c, examples/{ => server}/1instance.c,
+	examples/{ => server}/androidvncserver.c, examples/{ =>
+	server}/backchannel.c, examples/{ => server}/blooptest.c,
+	examples/{ => server}/camera.c, examples/{ =>
+	server}/colourmaptest.c, examples/{ => server}/cursors.c,
+	examples/{ => server}/example.c, examples/{ =>
+	server}/filetransfer.c, examples/{ => server}/fontsel.c, examples/{
+	=> server}/mac.c, examples/{ => server}/pnmshow.c, examples/{ =>
+	server}/pnmshow24.c, examples/{ => server}/radon.h, examples/{ =>
+	server}/regiontest.c, examples/{ => server}/repeater.c, examples/{
+	=> server}/rotate.c, examples/{ => server}/rotatetemplate.c,
+	examples/{ => server}/simple.c, examples/{ => server}/simple15.c,
+	examples/{ => server}/storepasswd.c, examples/{ => server}/vncev.c,
+	examples/{ => server}/zippy.c: build: move client and server
+	examples to one examples dir
+
+2023-01-08  Christian Beier <info@christianbeier.net>
+
+	* CMakeLists.txt, libvncclient.pc.cmakein =>
+	libvncclient/libvncclient.pc.cmakein, libvncserver.pc.cmakein =>
+	libvncserver/libvncserver.pc.cmakein: build: remove pkg-config
+	templates out of root dir
+
+2022-12-18  Christian Beier <info@christianbeier.net>
+
+	* ChangeLog: Update ChangeLog for 0.9.14
+
 2022-12-18  Christian Beier <info@christianbeier.net>
 
 	* README.md: README: document Changelog update tool

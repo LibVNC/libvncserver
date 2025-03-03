@@ -379,8 +379,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   return client;
 }
 
-static rfbBool rfbInitConnection(rfbClient* client)
-{
+rfbBool rfbClientConnect(rfbClient* client) {
   /* Unless we accepted an incoming connection, make a TCP connection to the
      given VNC server */
 
@@ -395,7 +394,11 @@ static rfbBool rfbInitConnection(rfbClient* client)
         return FALSE;
     }
   }
+  return TRUE;
+}
 
+
+rfbBool rfbClientInitialise(rfbClient* client) {
   /* Initialise the VNC connection, including reading the password */
 
   if (!InitialiseRFBConnection(client))
@@ -479,9 +482,8 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
       } else if (i+1<*argc && strcmp(argv[i], "-repeaterdest") == 0) {
 	char* colon=strchr(argv[i+1],':');
 
-	if(client->destHost)
-	  free(client->destHost);
-        client->destPort = 5900;
+	free(client->destHost);
+	client->destPort = 5900;
 
 	client->destHost = strdup(argv[i+1]);
 	if(client->destHost && colon) {
@@ -492,8 +494,7 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
       } else {
 	char* colon=strrchr(argv[i],':');
 
-	if(client->serverHost)
-	  free(client->serverHost);
+	free(client->serverHost);
 
 	if(colon) {
 	  client->serverHost = strdup(argv[i]);
@@ -516,7 +517,7 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
     }
   }
 
-  if(!rfbInitConnection(client)) {
+  if(!rfbClientConnect(client) || !rfbClientInitialise(client)) {
     rfbClientCleanup(client);
     return FALSE;
   }
@@ -550,11 +551,8 @@ void rfbClientCleanup(rfbClient* client) {
 #endif /* LIBVNCSERVER_HAVE_LIBJPEG */
 #endif
 
-  if (client->ultra_buffer)
-    free(client->ultra_buffer);
-
-  if (client->raw_buffer)
-    free(client->raw_buffer);
+  free(client->ultra_buffer);
+  free(client->raw_buffer);
 
   FreeTLS(client);
 
@@ -564,8 +562,7 @@ void rfbClientCleanup(rfbClient* client) {
     client->clientData = next;
   }
 
-  if(client->vncRec)
-	  free(client->vncRec);
+  free(client->vncRec);
 
   if (client->sock != RFB_INVALID_SOCKET)
     rfbCloseSocket(client->sock);
@@ -579,18 +576,13 @@ void rfbClientCleanup(rfbClient* client) {
 
   free(client->desktopName);
   free(client->serverHost);
-  if (client->destHost)
-    free(client->destHost);
-  if (client->clientAuthSchemes)
-    free(client->clientAuthSchemes);
-  if(client->rcSource)
-    free(client->rcSource);
-  if(client->rcMask)
-    free(client->rcMask);
+  free(client->destHost);
+  free(client->clientAuthSchemes);
+  free(client->rcSource);
+  free(client->rcMask);
 
 #ifdef LIBVNCSERVER_HAVE_SASL
-  if (client->saslSecret)
-    free(client->saslSecret);
+  free(client->saslSecret);
   if (client->saslconn)
     sasl_dispose(&client->saslconn);
 #endif /* LIBVNCSERVER_HAVE_SASL */
