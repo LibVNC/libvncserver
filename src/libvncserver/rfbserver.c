@@ -1575,6 +1575,10 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
     /* If not sending, or no file open...   Return as if we sent something! */
     if ((cl->fileTransfer.fd!=-1) && (cl->fileTransfer.sending==1))
     {
+        if(cl->sock == RFB_INVALID_SOCKET) {
+            errno = EBADF;
+            return FALSE;
+        }
 	FD_ZERO(&wfds);
         FD_SET(cl->sock, &wfds);
 

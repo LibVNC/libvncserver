@@ -672,6 +672,10 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
     struct timeval tv;
 
     while (len > 0) {
+        if(sock == RFB_INVALID_SOCKET) {
+            errno = EBADF;
+            return -1;
+        }
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
         if (cl->wsctx) {
             n = webSocketsDecode(cl, buf, len);
@@ -772,6 +776,10 @@ rfbPeekExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
     struct timeval tv;
 
     while (len > 0) {
+        if(sock == RFB_INVALID_SOCKET) {
+            errno = EBADF;
+            return -1;
+        }
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 	if (cl->sslctx)
 	    n = rfbssl_peek(cl, buf, len);
@@ -888,6 +896,10 @@ rfbWriteExact(rfbClientPtr cl,
 
     LOCK(cl->outputMutex);
     while (len > 0) {
+        if(sock == RFB_INVALID_SOCKET) {
+            errno = EBADF;
+            return -1;
+        }
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
         if (cl->sslctx)
 	    n = rfbssl_write(cl, buf, len);
