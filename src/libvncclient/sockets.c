@@ -1004,7 +1004,7 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
     return num;
   }
 
-  if(FD_ISSET(client->sock, &fds))
+  if(client->sock != RFB_INVALID_SOCKET && FD_ISSET(client->sock, &fds))
     client->serverMsg = TRUE;
   if(client->multicastSock >= 0 && FD_ISSET(client->multicastSock, &fds))
     client->serverMsgMulticast = TRUE;
