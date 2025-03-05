@@ -83,8 +83,8 @@ struct timeval
 ;
 #endif
 
-#ifdef LIBVNCSERVER_HAVE_FCNTL_H
-#include <fcntl.h>
+#if LIBVNCSERVER_HAVE_DIRENT_H
+#include <dirent.h>
 #endif
 
 #include <errno.h>
@@ -476,10 +476,6 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
     rfbSocket sock = RFB_INVALID_SOCKET;
     fd_set listen_fds; 
     rfbSocket chosen_listen_sock = RFB_INVALID_SOCKET;
-#if defined LIBVNCSERVER_HAVE_SYS_RESOURCE_H && defined LIBVNCSERVER_HAVE_FCNTL_H
-    struct rlimit rlim;
-    size_t maxfds, curfds, i;
-#endif
     /* Do another select() call to find out which listen socket
        has an incoming connection pending. We know that at least 
        one of them has, so this should not block for too long! */
@@ -505,23 +501,32 @@ rfbProcessNewConnection(rfbScreenInfoPtr rfbScreen)
       Our approach is to deny new clients when we have reached a certain fraction of the per-process limit of file descriptors.
       TODO: add Windows support.
      */
-#if defined LIBVNCSERVER_HAVE_SYS_RESOURCE_H && defined LIBVNCSERVER_HAVE_FCNTL_H
-    if(getrlimit(RLIMIT_NOFILE, &rlim) < 0)
-	maxfds = 100;  /* use a sane default if getting the limit fails */
-    else
-	maxfds = rlim.rlim_cur;
+#if defined LIBVNCSERVER_HAVE_SYS_RESOURCE_H && defined LIBVNCSERVER_HAVE_DIRENT_H
+    DIR* fd_dir = opendir("/proc/self/fd");
+    // Warning: only supports Linux
+    if (fd_dir) {
+        struct rlimit rlim;
+        int maxfds = 100;  /* use a sane default if getting the limit fails */
+        int curfds = 0;
 
-    /* get the number of currently open fds as per https://stackoverflow.com/a/7976880/361413 */
-    curfds = 0;
-    for(i = 0; i < maxfds; ++i)
-	if(fcntl(i, F_GETFD) != -1)
-	    ++curfds;
+        if (getrlimit(RLIMIT_NOFILE, &rlim) >= 0)
+            maxfds = rlim.rlim_cur;
 
-    if(curfds > maxfds * rfbScreen->fdQuota) {
-	rfbErr("rfbProcessNewconnection: open fd count of %lu exceeds quota %.1f of limit %lu, denying connection\n", curfds, rfbScreen->fdQuota, maxfds);
-	sock = accept(chosen_listen_sock, NULL, NULL);
-	rfbCloseSocket(sock);
-	return FALSE;
+        struct dirent* entry;
+        while(entry = readdir(fd_dir)) {
+            curfds++;
+        }
+
+        closedir(fd_dir);
+
+        if (curfds > maxfds * rfbScreen->fdQuota) {
+            rfbErr("rfbProcessNewconnection: open fd count of %lu exceeds quota "
+                "%.1f of limit %lu, denying connection\n",
+                curfds, rfbScreen->fdQuota, maxfds);
+            sock = accept(chosen_listen_sock, NULL, NULL);
+            rfbCloseSocket(sock);
+            return FALSE;
+        }
     }
 #endif
 
