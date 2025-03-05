@@ -102,9 +102,9 @@ listenForIncomingConnections(rfbClient* client)
     r = select(rfbMax(listenSocket, listen6Socket)+1, &fds, NULL, NULL, NULL);
 
     if (r > 0) {
-      if (FD_ISSET(listenSocket, &fds))
+      if (listenSocket != RFB_INVALID_SOCKET && FD_ISSET(listenSocket, &fds))
 	client->sock = AcceptTcpConnection(client->listenSock); 
-      else if (FD_ISSET(listen6Socket, &fds))
+      else if (listen6Socket != RFB_INVALID_SOCKET && FD_ISSET(listen6Socket, &fds))
 	client->sock = AcceptTcpConnection(client->listen6Sock);
 
       if (client->sock == RFB_INVALID_SOCKET)
@@ -201,9 +201,9 @@ listenForIncomingConnectionsNoFork(rfbClient* client, int timeout)
 
   if (r > 0)
     {
-      if (FD_ISSET(client->listenSock, &fds))
+      if (client->listenSock != RFB_INVALID_SOCKET && FD_ISSET(client->listenSock, &fds))
 	client->sock = AcceptTcpConnection(client->listenSock); 
-      else if (FD_ISSET(client->listen6Sock, &fds))
+      else if (client->listen6Sock != RFB_INVALID_SOCKET && FD_ISSET(client->listen6Sock, &fds))
 	client->sock = AcceptTcpConnection(client->listen6Sock);
 
       if (client->sock == RFB_INVALID_SOCKET)
