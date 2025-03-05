@@ -167,6 +167,11 @@ static int sock_read_ready(SSL *ssl, uint32_t ms)
 
 	FD_ZERO(&fds);
 
+        if(SSL_get_fd(ssl) == RFB_INVALID_SOCKET) {
+            errno = EBADF;
+            return -1;
+        }
+
 	FD_SET(SSL_get_fd(ssl), &fds);
 
 	tv.tv_sec = ms / 1000;

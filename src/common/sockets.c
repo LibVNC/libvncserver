@@ -60,6 +60,11 @@ rfbBool sock_wait_for_connected(int socket, unsigned int timeout_seconds)
   timeout.tv_sec=timeout_seconds;
   timeout.tv_usec=0;
 
+  if(socket == RFB_INVALID_SOCKET) {
+      errno = EBADF;
+      return FALSE;
+  }
+
   FD_ZERO(&writefds);
   FD_SET(socket, &writefds);
   FD_ZERO(&exceptfds);
