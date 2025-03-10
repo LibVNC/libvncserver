@@ -108,6 +108,9 @@
 /* Define to 1 if you have <sys/resource.h> */
 #cmakedefine LIBVNCSERVER_HAVE_SYS_RESOURCE_H  1
 
+/* Define to 1 if you have the `getrlimit' function. */
+#cmakedefine LIBVNCSERVER_HAVE_GETRLIMIT  1
+
 /* Define to 1 if you have the <unistd.h> header file. */
 #cmakedefine LIBVNCSERVER_HAVE_UNISTD_H  1 
 

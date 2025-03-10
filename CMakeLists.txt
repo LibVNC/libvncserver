@@ -77,7 +77,6 @@ option(WITH_EXAMPLES "Build examples" ON)
 option(WITH_TESTS "Build tests" ON)
 option(WITH_QT "Build the Qt client example" ON)
 
-
 if(WITH_ZLIB)
   find_package(ZLIB)
 endif(WITH_ZLIB)
@@ -225,6 +224,7 @@ if(NOT HAVE_STDINT_H)
   message(FATAL_ERROR "Could NOT find required header stdint.h")
 endif()
 
+check_function_exists(getrlimit       LIBVNCSERVER_HAVE_GETRLIMIT)
 check_function_exists(gettimeofday    LIBVNCSERVER_HAVE_GETTIMEOFDAY)
 check_function_exists(vfork           LIBVNCSERVER_HAVE_VFORK)
 check_function_exists(vprintf         LIBVNCSERVER_HAVE_VPRINTF)
@@ -406,6 +406,7 @@ set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_DIR}/cargs.c
     ${LIBVNCSERVER_DIR}/ultra.c
     ${LIBVNCSERVER_DIR}/scale.c
+    ${COMMON_DIR}/ghpringbuf.c
     ${CRYPTO_SOURCES}
 )
 
@@ -415,6 +416,7 @@ set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/rfbclient.c
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
+    ${COMMON_DIR}/ghpringbuf.c
     ${COMMON_DIR}/sockets.c
     ${CRYPTO_SOURCES}
 )
@@ -581,6 +583,7 @@ set(LIBVNCSERVER_EXAMPLES
     simple15
     storepasswd
     vncev
+    multicast
   )
 
 if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT))
