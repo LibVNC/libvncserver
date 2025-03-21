@@ -89,6 +89,8 @@ static size_t buf_filled=0;
  * httpInitSockets sets up the TCP socket to listen for HTTP connections.
  */
 
+static rfbClientRec cl;
+
 void
 rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
 {
@@ -125,6 +127,9 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
     rfbLog("Listening for HTTP connections on TCP6 port %d\n", rfbScreen->http6Port);
     rfbLog("  URL http://%s:%d\n",rfbScreen->thisHost,rfbScreen->http6Port);
 #endif
+    INIT_MUTEX(cl.outputMutex);
+    INIT_MUTEX(cl.refCountMutex);
+    INIT_MUTEX(cl.sendMutex);
 }
 
 void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
@@ -145,6 +150,17 @@ void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
 	rfbCloseSocket(rfbScreen->httpListen6Sock);
 	rfbScreen->httpListen6Sock=RFB_INVALID_SOCKET;
     }
+    LOCK(cl.outputMutex);
+    UNLOCK(cl.outputMutex);
+    TINI_MUTEX(cl.outputMutex);
+
+    LOCK(cl.sendMutex);
+    UNLOCK(cl.sendMutex);
+    TINI_MUTEX(cl.sendMutex);
+
+    LOCK(cl.refCountMutex);
+    UNLOCK(cl.refCountMutex);
+    TINI_MUTEX(cl.refCountMutex);
 }
 
 /*
@@ -256,8 +272,6 @@ httpCloseSock(rfbScreenInfoPtr rfbScreen)
     rfbScreen->httpSock = RFB_INVALID_SOCKET;
     buf_filled = 0;
 }
-
-static rfbClientRec cl;
 
 /*
  * httpProcessInput is called when input is received on the HTTP socket.
