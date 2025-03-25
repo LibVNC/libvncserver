@@ -711,6 +711,12 @@ typedef struct _rfbClientRec {
     int tightPngDstDataLen;
 #endif
 #endif
+
+    /** for thread safety for updateBuf in rfbSendFBUpdate() */
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    MUTEX(updateBufMutex);
+#endif
+
 } rfbClientRec, *rfbClientPtr;
 
 /**
