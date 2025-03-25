@@ -39,6 +39,7 @@
 #include <time.h>
 #include <rfb/rfbclient.h>
 #include "tls.h"
+#include "ghpringbuf.h"
 #if defined(LIBVNCSERVER_HAVE_LIBZ) && defined(LIBVNCSERVER_HAVE_LIBJPEG)
 #include "turbojpeg.h"
 #endif
@@ -347,6 +348,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->subAuthScheme = 0;
   client->GetCredential = NULL;
   client->tlsSession = NULL;
+
   client->LockWriteToTLS = NULL;
   client->UnlockWriteToTLS = NULL;
   client->sock = RFB_INVALID_SOCKET;
@@ -354,6 +356,14 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->listenAddress = NULL;
   client->listen6Sock = RFB_INVALID_SOCKET;
   client->listen6Address = NULL;
+
+  client->multicastSock = -1;
+  client->multicastTimeout = 10;
+  client->multicastSocketRcvBufSize = 5242880;
+  client->multicastRcvBufSize = 5242880;
+  client->multicastLastWholeUpd = -1;
+  client->multicastLastPartialUpd = -1;
+
   client->clientAuthSchemes = NULL;
 
 #ifdef LIBVNCSERVER_HAVE_SASL
@@ -450,6 +460,9 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
 	break;
       } else if (strcmp(argv[i], "-play") == 0) {
 	client->serverPort = -1;
+	j++;
+      } else if (strcmp(argv[i], "-multicast") == 0) {
+	client->canHandleMulticastVNC = TRUE;
 	j++;
       } else if (i+1<*argc && strcmp(argv[i], "-encodings") == 0) {
 	client->appData.encodingsString = argv[i+1];
@@ -557,6 +570,10 @@ void rfbClientCleanup(rfbClient* client) {
     rfbCloseSocket(client->listenSock);
   if (client->listen6Sock != RFB_INVALID_SOCKET)
     rfbCloseSocket(client->listen6Sock);
+  if (client->multicastSock != RFB_INVALID_SOCKET)
+    close(client->multicastSock);
+  ghpringbuf_destroy(client->multicastPacketBuf);
+
   free(client->desktopName);
   free(client->serverHost);
   free(client->destHost);
@@ -578,4 +595,52 @@ void rfbClientCleanup(rfbClient* client) {
 #endif
 
   free(client);
+}
+
+
+
+rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
+{
+  int r;
+  struct timeval now;
+
+  if(client->multicastSock >= 0 && !client->multicastDisabled) {
+      /* see if it's time for a request */
+      gettimeofday(&now, NULL);
+      if(now.tv_sec < client->multicastRequestTimestamp.tv_sec /* at midnight on win32 */
+	 || (size_t)((now.tv_sec - client->multicastRequestTimestamp.tv_sec)*1000
+		     + (now.tv_usec - client->multicastRequestTimestamp.tv_usec)/1000) > client->multicastUpdInterval) {
+	client->multicastRequestTimestamp = now;
+	SendMulticastFramebufferUpdateRequest(client, TRUE);
+      }
+  }
+  
+  r = WaitForMessage(client, usec_timeout); 
+
+  if(r<0)  /* error while waiting */
+    return FALSE;
+  
+  if(r==0) { /* timeout */
+    if(client->multicastSock >= 0 && !client->multicastDisabled
+       && client->multicastTimeout
+       && (client->multicastPendingRequestTimestamp.tv_sec || client->multicastPendingRequestTimestamp.tv_usec)) {
+          /* check if the fallback timeout has expired */
+	  gettimeofday(&now, NULL);
+	  if(now.tv_sec < client->multicastPendingRequestTimestamp.tv_sec /* at midnight on win32 */
+	     || (size_t)((now.tv_sec - client->multicastPendingRequestTimestamp.tv_sec)*1000
+			 +(now.tv_usec - client->multicastPendingRequestTimestamp.tv_usec)/1000) > client->multicastTimeout*1000) {
+	    rfbClientLog("MulticastVNC: Timed out after %ds, falling back to unicast\n", client->multicastTimeout);
+	    client->multicastDisabled = TRUE;
+	    SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
+	  }
+	}
+      return TRUE; 
+    }
+  
+  /* there are messages */
+  if(client->serverMsgMulticast) {
+    client->multicastPendingRequestTimestamp.tv_sec = 0;
+    client->multicastPendingRequestTimestamp.tv_usec = 0;
+  }
+  return HandleRFBServerMessage(client);
 }

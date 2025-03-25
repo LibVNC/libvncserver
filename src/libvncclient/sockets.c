@@ -40,6 +40,8 @@
 #include "sockets.h"
 #include "tls.h"
 #include "sasl.h"
+#include "ghpringbuf.h"
+#include "packet.h"
 
 void PrintInHex(char *buf, int len);
 
@@ -176,6 +178,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	}
       }
       client->buffered += i;
+      client->bytesRcvd += i;
     }
 
     memcpy(out, client->bufoutptr, n);
@@ -226,6 +229,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       }
       out += i;
       n -= i;
+      client->bytesRcvd += i;
     }
   }
 
@@ -240,6 +244,113 @@ hexdump:
 
   return TRUE;
 }
+
+
+
+
+/**
+ * This reads packets from the multicast socket into the packet buffer
+ * and writes n requested bytes into the out buffer.
+ */
+
+rfbBool
+ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n)
+{
+  ghpringbuf *pbuf = client->multicastPacketBuf;
+  Packet p;
+  
+  if(client->multicastSock < 0 || !pbuf)
+    return FALSE;
+
+  /* 
+     read until packet buffer (potentially) full or nothing more to read 
+  */
+  while(client->multicastRcvBufLen + MULTICAST_READBUF_SZ <= client->multicastRcvBufSize
+	&& ghpringbuf_count(pbuf) < pbuf->capacity) {
+    int r;
+    r = recvfrom(client->multicastSock, client->multicastReadBuf, MULTICAST_READBUF_SZ, 0, NULL, NULL);
+    if (r <= 0) {
+      if (r < 0) { /* some error */
+#ifdef WIN32
+	errno=WSAGetLastError();
+#endif
+	if (errno == EWOULDBLOCK || errno == EAGAIN) { /* nothing more to read */
+	  r = 0;
+	  break;
+	}
+	else {
+	  rfbClientErr("ReadFromRFBServerMulticast (%d: %s)\n", errno, strerror(errno));
+	  return FALSE;
+	}
+      } 
+      else { /* read returned 0 */
+	if (errorMessageOnReadFailure) 
+	  rfbClientLog("VNC server closed connection\n");
+	return FALSE;
+      }
+    }
+
+    /* successfully read a packet at this point */
+    client->multicastBytesRcvd += r;
+    p.datalen = r;
+    p.data = malloc(p.datalen);
+    memcpy(p.data, client->multicastReadBuf, p.datalen);
+
+    ghpringbuf_put(pbuf, &p);
+
+    client->multicastRcvBufLen += p.datalen;
+   
+#ifdef MULTICAST_DEBUG
+    rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() read %d bytes from socket.\n", r);
+    rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() %d packets buffered now.\n", pbuf->count);
+#endif
+  }
+
+ 
+
+  /*
+    now service the request of n bytes (which have to be <= what's buffered of the packet)
+  */
+#ifdef MULTICAST_DEBUG
+  rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() bytes requested: %d \n", n);
+  rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() bytes in buffer: %d \n", client->multicastRcvBufLen);
+  rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() pckts in buffer: %d \n", ghpringbuf_count(pbuf));
+#endif
+
+  if (n) {
+    Packet *p_ptr = ghpringbuf_at(pbuf, 0);
+    if(p_ptr)
+	memcpy(&p, p_ptr, sizeof(Packet));
+
+    if(p_ptr /* we do have a packet */
+       && n <= p.datalen
+       && (client->multicastbuffered ? n <= client->multicastbuffered : 1)) {
+
+      if(client->multicastbuffered == 0) { /* new packet to be consumed */
+	client->multicastbuffered = p.datalen;
+	client->multicastbufoutptr = p.data;
+      }
+
+      /* copy requested number of bytes to out buffer */
+      memcpy(out, client->multicastbufoutptr, n);
+      client->multicastbufoutptr += n;
+      client->multicastbuffered -= n;
+
+      if(client->multicastbuffered == 0) { /* packet consumed */ 
+	client->multicastRcvBufLen -= p.datalen;
+	ghpringbuf_pop(pbuf);
+#ifdef MULTICAST_DEBUG
+	rfbClientLog("MulticastVNC DEBUG: ReadFromRFBServerMulticast() packet consumed, now %d packets in buffer.\n", pbuf->count);
+#endif
+      }
+    }
+    else
+      return FALSE;
+  }
+
+  return TRUE;
+}
+
 
 
 /*
@@ -856,10 +967,16 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
   fd_set fds;
   struct timeval timeout;
   int num;
+  int maxfd; 
 
   if (client->serverPort==-1)
-    /* playing back vncrec file */
-    return 1;
+    {
+      /* playing back vncrec file */
+      client->serverMsg = TRUE;
+      return 1;
+    }
+
+  client->serverMsg = client->serverMsgMulticast = FALSE;
   
   timeout.tv_sec=(usecs/1000000);
   timeout.tv_usec=(usecs%1000000);
@@ -871,16 +988,178 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 
   FD_ZERO(&fds);
   FD_SET(client->sock,&fds);
+  maxfd = client->sock;
+  if(client->multicastSock >= 0 && !client->multicastDisabled)
+    {
+      FD_SET(client->multicastSock,&fds);
+      maxfd = rfbMax(client->sock, client->multicastSock);
+    }
 
-  num=select(client->sock+1, &fds, NULL, NULL, &timeout);
+  num=select(maxfd+1, &fds, NULL, NULL, &timeout);
   if(num<0) {
 #ifdef WIN32
     errno=WSAGetLastError();
 #endif
     rfbClientLog("Waiting for message failed: %d (%s)\n",errno,strerror(errno));
+    return num;
+  }
+
+  if(FD_ISSET(client->sock, &fds))
+    client->serverMsg = TRUE;
+  if(client->multicastSock >= 0 && FD_ISSET(client->multicastSock, &fds))
+    client->serverMsgMulticast = TRUE;
+  if(client->multicastPacketBuf && ghpringbuf_count(client->multicastPacketBuf)) {
+    client->serverMsgMulticast = TRUE;
+    ++num;
   }
 
   return num;
 }
 
 
+rfbSocket CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int so_recvbuf)
+{
+  rfbSocket sock; 
+  struct sockaddr_storage localAddr;
+  int optval;
+  socklen_t optval_len = sizeof(optval);
+  int dfltrcvbuf;
+
+  localAddr = multicastSockAddr;
+  /* set source addr of localAddr to ANY, 
+     the rest is the same as in multicastSockAddr */
+  if(localAddr.ss_family == AF_INET) 
+    ((struct sockaddr_in*) &localAddr)->sin_addr.s_addr = htonl(INADDR_ANY);
+  else
+    if(localAddr.ss_family == AF_INET6)
+       ((struct sockaddr_in6*) &localAddr)->sin6_addr = in6addr_any;
+    else
+      {
+	rfbClientErr("CreateMulticastSocket: neither IPv4 nor IPv6 address received\n");
+	return RFB_INVALID_SOCKET;
+      }
+
+ 
+  optval = 1;
+  if((sock = socket(localAddr.ss_family, SOCK_DGRAM, 0)) < 0)
+    {
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error creating socket: %s\n", strerror(errno));
+      return RFB_INVALID_SOCKET;
+    }
+
+  optval = 1;
+  if(setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,(char*)&optval,sizeof(optval)) < 0) 
+    {
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error setting reuse addr: %s\n", strerror(errno));
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
+    } 
+
+  /* get/set socket receive buffer */
+  if(getsockopt(sock, SOL_SOCKET, SO_RCVBUF,(char*)&optval, &optval_len) <0)
+    {
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error getting rcv buf size: %s\n", strerror(errno));
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
+    } 
+  dfltrcvbuf = optval;
+  optval = so_recvbuf;
+  if(setsockopt(sock,SOL_SOCKET,SO_RCVBUF,(char*)&optval,sizeof(optval)) < 0) 
+    {
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error setting rcv buf size: %s\n", strerror(errno));
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
+    } 
+  if(getsockopt(sock, SOL_SOCKET, SO_RCVBUF,(char*)&optval, &optval_len) <0)
+    {
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error getting set rcv buf size: %s\n", strerror(errno));
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
+    } 
+  rfbClientLog("MulticastVNC: tried to set socket receive buffer from %d to %d, got %d\n",
+	       dfltrcvbuf, so_recvbuf, optval);
+
+
+  if(bind(sock, (struct sockaddr*)&localAddr, sizeof(localAddr)) < 0)
+    {
+#ifdef WIN32
+      errno=WSAGetLastError();
+#endif
+      rfbClientErr("CreateMulticastSocket: error binding socket: %s\n", strerror(errno));
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
+    }
+
+  
+  /* Join the multicast group. We do this seperately for IPv4 and IPv6. */
+  if(multicastSockAddr.ss_family == AF_INET)
+    {
+      struct ip_mreq multicastRequest;  
+ 
+      memcpy(&multicastRequest.imr_multiaddr,
+	     &((struct sockaddr_in*) &multicastSockAddr)->sin_addr,
+	     sizeof(multicastRequest.imr_multiaddr));
+
+      multicastRequest.imr_interface.s_addr = htonl(INADDR_ANY);
+
+      if(setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &multicastRequest, sizeof(multicastRequest)) < 0)
+        {
+#ifdef WIN32
+	  errno=WSAGetLastError();
+#endif
+	  rfbClientErr("CreateMulticastSocket: error joining IPv4 multicast group: %s\n", strerror(errno));
+	  rfbCloseSocket(sock);
+	  return RFB_INVALID_SOCKET;
+        }
+    }
+  else 
+    if(multicastSockAddr.ss_family == AF_INET6)
+      {
+	struct ipv6_mreq multicastRequest;  
+
+	memcpy(&multicastRequest.ipv6mr_multiaddr,
+	       &((struct sockaddr_in6*) &multicastSockAddr)->sin6_addr,
+	       sizeof(multicastRequest.ipv6mr_multiaddr));
+
+	multicastRequest.ipv6mr_interface = 0;
+
+	if(setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, (char*) &multicastRequest, sizeof(multicastRequest)) < 0)
+	  {
+#ifdef WIN32
+  	    errno=WSAGetLastError();
+#endif
+	    rfbClientErr("CreateMulticastSocket: error joining IPv6 multicast group: %s\n", strerror(errno));
+	    rfbCloseSocket(sock);
+	    return RFB_INVALID_SOCKET;
+	  }
+      }
+    else
+      {
+	rfbClientErr("CreateMulticastSocket: neither IPv6 nor IPv6 specified");
+	rfbCloseSocket(sock);
+	return RFB_INVALID_SOCKET;
+      }
+
+  /* this is important for ReadFromRFBServerMulticast() */
+  if(!SetNonBlocking(sock)) {
+    rfbCloseSocket(sock);
+    return RFB_INVALID_SOCKET;
+  }
+    
+  return sock;
+}

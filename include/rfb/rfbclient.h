@@ -489,6 +489,35 @@ typedef struct _rfbClient {
 
         /* flag to indicate wheter updateRect is managed by lib or user */
         rfbBool isUpdateRectManagedByLib;
+
+        /** Counts bytes received by this client. */
+        size_t  bytesRcvd;
+
+        /* all the multicast stuff */
+        rfbBool canHandleMulticastVNC;
+        int multicastSock;
+        int multicastSocketRcvBufSize;
+        int multicastRcvBufSize;   /**< Size of the multicast receive buffer */
+        int multicastRcvBufLen;    /**< Current fill of the multicast receive buffer */
+        size_t multicastTimeout;   /**< Fall back to unicast this many seconds after unanswered multicast framebuffer request. Set to 0 to disable fallback. */
+        void *multicastPacketBuf;
+        char *multicastbufoutptr;
+        size_t multicastbuffered;
+#define MULTICAST_READBUF_SZ 65507 /* max UDP payload */
+        char multicastReadBuf[MULTICAST_READBUF_SZ];
+        size_t multicastUpdInterval;
+        struct timeval multicastRequestTimestamp; /* gets set when multicast framebuffer update was requested */
+        struct timeval multicastPendingRequestTimestamp; /* time when last unanswered request was sent */
+        int multicastPixelformatEncId;
+        rfbBool serverMsgMulticast; /* this flag is set by WaitForMessage() if there's multicast input */
+        rfbBool serverMsg;          /* this flag is set by WaitForMessage() if there's unicast input */
+        int     multicastLastWholeUpd;
+        int64_t multicastLastPartialUpd;
+        size_t  multicastBytesRcvd;    /* counts received multicast bytes */
+        size_t  multicastPktsRcvd;     /* counts received multicast packets */
+        size_t  multicastPktsNACKed;   /* counts NACKed multicast packets */
+        size_t  multicastPktsLost;     /* counts lost multicast packets */
+        rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
 } rfbClient;
 
 /* cursor.c */
@@ -556,6 +585,8 @@ extern rfbBool SendIncrementalFramebufferUpdateRequest(rfbClient* client);
 extern rfbBool SendFramebufferUpdateRequest(rfbClient* client,
 					 int x, int y, int w, int h,
 					 rfbBool incremental);
+extern rfbBool SendMulticastFramebufferUpdateRequest(rfbClient* client, rfbBool incremental);
+extern rfbBool SendMulticastFramebufferUpdateNACK(rfbClient* client, uint32_t idPartialUpd, uint16_t nPartialUpds);
 extern rfbBool SendScaleSetting(rfbClient* client,int scaleSetting);
 /**
  * Sends a pointer event to the server. A pointer event includes a cursor
@@ -744,6 +775,7 @@ void rfbClientRegisterExtension(rfbClientProtocolExtension* e);
 extern rfbBool errorMessageOnReadFailure;
 
 extern rfbBool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
+extern rfbBool ReadFromRFBServerMulticast(rfbClient* client, char *out, unsigned int n);
 extern rfbBool WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n);
 extern int FindFreeTcpPort(void);
 extern rfbSocket ListenAtTcpPort(int port);
@@ -885,6 +917,8 @@ rfbBool rfbClientInitialise(rfbClient* client);
  * @param client The client to clean up
  */
 void rfbClientCleanup(rfbClient* client);
+rfbBool rfbProcessServerMessage(rfbClient* client, int timeout);
+
 
 #if(defined __cplusplus)
 }
