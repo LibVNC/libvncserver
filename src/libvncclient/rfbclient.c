@@ -404,8 +404,8 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
   return TRUE;
 }
 
-extern void rfbClientEncryptBytes(unsigned char* bytes, char* passwd);
-extern void rfbClientEncryptBytes2(unsigned char *where, const int length, unsigned char *key);
+extern int rfbClientEncryptBytes(unsigned char* bytes, char* passwd);
+extern int rfbClientEncryptBytes2(unsigned char *where, const int length, unsigned char *key);
 
 static void
 ReadReason(rfbClient* client)
@@ -585,7 +585,10 @@ HandleVncAuth(rfbClient *client)
         passwd[8] = '\0';
       }
 
-      rfbClientEncryptBytes(challenge, passwd);
+      if (rfbClientEncryptBytes(challenge, passwd) != 0) {
+        rfbClientLog("Encryption failed\n");
+        return FALSE;
+      }
 
       /* Lose the password from memory */
       for (i = strlen(passwd); i >= 0; i--) {
@@ -733,8 +736,14 @@ HandleUltraMSLogonIIAuth(rfbClient *client)
   strncpy((char *)password, cred->userCredential.password, sizeof(password)-1);
   FreeUserCredential(cred);
 
-  rfbClientEncryptBytes2(username, sizeof(username), (unsigned char *)key);
-  rfbClientEncryptBytes2(password, sizeof(password), (unsigned char *)key);
+  if (rfbClientEncryptBytes2(username, sizeof(username), (unsigned char *)key) != 0) {
+    rfbClientLog("Encrypting username failed\n");
+    return FALSE;
+  }
+  if (rfbClientEncryptBytes2(password, sizeof(password), (unsigned char *)key) != 0) {
+    rfbClientLog("Encrypting password failed\n");
+    return FALSE;
+  }
 
   if (!WriteToRFBServer(client, (char *)pub, sizeof(pub))) return FALSE;
   if (!WriteToRFBServer(client, (char *)username, sizeof(username))) return FALSE;
@@ -789,8 +798,14 @@ HandleMSLogonAuth(rfbClient *client)
   pub = rfbClientSwap64IfLE(pub);
   key = rfbClientSwap64IfLE(key);
 
-  rfbClientEncryptBytes2(username, sizeof(username), (unsigned char *)&key);
-  rfbClientEncryptBytes2(password, sizeof(password), (unsigned char *)&key);
+  if (rfbClientEncryptBytes2(username, sizeof(username), (unsigned char *)key) != 0) {
+    rfbClientLog("Encrypting username failed\n");
+    return FALSE;
+  }
+  if (rfbClientEncryptBytes2(password, sizeof(password), (unsigned char *)key) != 0) {
+    rfbClientLog("Encrypting password failed\n");
+    return FALSE;
+  }
 
   if (!WriteToRFBServer(client, (char *)&pub, 8)) return FALSE;
   if (!WriteToRFBServer(client, (char *)username, sizeof(username))) return FALSE;
