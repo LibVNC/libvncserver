@@ -409,23 +409,24 @@ CreateX509CertCredential(rfbCredential *cred)
   gnutls_certificate_credentials_t x509_cred;
   int ret;
 
-  if (!cred->x509Credential.x509CACertFile)
-  {
-    rfbClientLog("No CA certificate provided.\n");
-    return NULL;
-  }
-
   if ((ret = gnutls_certificate_allocate_credentials(&x509_cred)) < 0)
   {
     rfbClientLog("Cannot allocate credentials: %s.\n", gnutls_strerror(ret));
     return NULL;
   }
-  if ((ret = gnutls_certificate_set_x509_trust_file(x509_cred,
-    cred->x509Credential.x509CACertFile, GNUTLS_X509_FMT_PEM)) < 0)
+  if (cred->x509Credential.x509CACertFile)
   {
-    rfbClientLog("Cannot load CA credentials: %s.\n", gnutls_strerror(ret));
-    gnutls_certificate_free_credentials (x509_cred);
-    return NULL;
+      if ((ret = gnutls_certificate_set_x509_trust_file(x509_cred,
+                                                        cred->x509Credential.x509CACertFile, GNUTLS_X509_FMT_PEM)) < 0)
+          {
+              rfbClientLog("Cannot load CA credentials: %s.\n", gnutls_strerror(ret));
+              gnutls_certificate_free_credentials (x509_cred);
+              return NULL;
+          }
+  } else
+  {
+      int certs = gnutls_certificate_set_x509_system_trust (x509_cred);
+      rfbClientLog("Using default paths for certificate verification, %d certs found\n", certs);
   }
   if (cred->x509Credential.x509ClientCertFile && cred->x509Credential.x509ClientKeyFile)
   {
