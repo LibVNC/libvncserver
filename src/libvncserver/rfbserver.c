@@ -361,6 +361,8 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
       if(!rfbSetNonBlocking(sock)) {
 	rfbCloseSocket(sock);
+	rfbCloseClient(cl);
+        rfbClientConnectionGone(cl);
 	return NULL;
       }
 
