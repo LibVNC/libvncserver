@@ -64,6 +64,7 @@ option(WITH_THREADS "Search for a threading library to build with multithreading
 option(PREFER_WIN32THREADS "When searching for a threading library, prefer win32 threads if they are found" OFF)
 option(WITH_GNUTLS "Search for the GnuTLS secure communications library to support TLS" ON)
 option(WITH_OPENSSL "Search for the OpenSSL cryptography library to support TLS and use as crypto backend" ON)
+option(WITH_WOLFSSL "Search for the wolfSSL cryptography library to support TLS and use as crypto backend" OFF)
 option(WITH_SYSTEMD "Search for libsystemd to build with systemd socket activation support" ON)
 option(WITH_GCRYPT "Search for Libgcrypt to use as crypto backend" ON)
 option(WITH_FFMPEG "Search for FFMPEG to build an example VNC to MPEG encoder" ON)
@@ -182,6 +183,14 @@ if(WITH_OPENSSL)
   find_package(OpenSSL)
 endif(WITH_OPENSSL)
 
+if(WITH_WOLFSSL)
+  find_package(PkgConfig)
+  pkg_check_modules(WOLFSSL "wolfssl")
+  if(WOLFSSL_FOUND)
+    link_directories(${WOLFSSL_LIBRARY_DIRS})
+  endif(WOLFSSL_FOUND)
+endif(WITH_WOLFSSL)
+
 
 if(WITH_SYSTEMD AND NOT ANDROID AND NOT WIN32)
   find_package(PkgConfig)
@@ -275,6 +284,9 @@ endif(PNG_FOUND)
 if(NOT OPENSSL_FOUND)
     unset(OPENSSL_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
 endif()
+if(NOT WOLFSSL_FOUND)
+  unset(WOLFSSL_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
+endif()
 if(SYSTEMD_FOUND)
   add_definitions(-DLIBVNCSERVER_WITH_SYSTEMD)
   include_directories(${SYSTEMD_INCLUDE_DIRS})
@@ -289,6 +301,10 @@ if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
 elseif(OPENSSL_FOUND)
   message(STATUS "Building crypto with OpenSSL")
   set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
+  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl.c)
+elseif(WOLFSSL_FOUND)
+  message(STATUS "Building crypto with wolfSSL")
+  set(CRYPTO_LIBRARIES ${WOLFSSL_LIBRARIES})
   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl.c)
 else()
   message(STATUS "Building crypto with builtin functions, only including SHA1 and D3DES")
@@ -311,6 +327,13 @@ if(OPENSSL_FOUND)
   include_directories(${OPENSSL_INCLUDE_DIR})
   set(LIBVNCSERVER_HAVE_LIBSSL 1)
 endif(OPENSSL_FOUND)
+
+if(WOLFSSL_FOUND)
+  include_directories("${WOLFSSL_INCLUDE_DIRS}" "${WOLFSSL_INCLUDEDIR}/wolfssl")
+  set(LIBVNCSERVER_HAVE_LIBWOLFSSL 1)
+  set(LIBVNCSERVER_HAVE_LIBSSL 1)
+  add_definitions(-DEXTERNAL_OPTS_OPENVPN -DOPENSSL_VERSION_NUMBER=0x10001040L)
+endif(WOLFSSL_FOUND)
 
 if(WITH_IPv6)
   if(WIN32 AND LIBVNCSERVER_HAVE_WS2TCPIP_H AND LIBVNCSERVER_HAVE_VPRINTF)
@@ -448,6 +471,17 @@ elseif(OPENSSL_FOUND)
     ${LIBVNCSERVER_DIR}/rfbssl_openssl.c
   )
   include_directories(${OPENSSL_INCLUDE_DIR})
+elseif(WOLFSSL_FOUND)
+  message(STATUS "Building TLS with wolfSSL")
+  set(LIBVNCCLIENT_SOURCES
+    ${LIBVNCCLIENT_SOURCES}
+    ${LIBVNCCLIENT_DIR}/tls_openssl.c
+  )
+  set(LIBVNCSERVER_SOURCES
+    ${LIBVNCSERVER_SOURCES}
+    ${LIBVNCSERVER_DIR}/rfbssl_openssl.c
+  )
+  include_directories("${WOLFSSL_INCLUDE_DIRS}" "${WOLFSSL_INCLUDEDIR}/wolfssl")
 else()
   message(STATUS "Building without TLS")
   set(LIBVNCCLIENT_SOURCES
@@ -548,6 +582,7 @@ target_link_libraries(vncclient
 		      ${CRYPTO_LIBRARIES}
                       ${GNUTLS_LIBRARIES}
                       ${OPENSSL_LIBRARIES}
+                      ${WOLFSSL_LIBRARIES}
 )
 target_link_libraries(vncserver
                       ${ADDITIONAL_LIBS}
@@ -558,6 +593,7 @@ target_link_libraries(vncserver
 		      ${CRYPTO_LIBRARIES}
                       ${GNUTLS_LIBRARIES}
                       ${OPENSSL_LIBRARIES}
+                      ${WOLFSSL_LIBRARIES}
 )
 
 SET_TARGET_PROPERTIES(vncclient vncserver
