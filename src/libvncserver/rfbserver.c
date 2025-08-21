@@ -378,6 +378,8 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       INIT_MUTEX(cl->sendMutex);
       INIT_COND(cl->deleteCond);
 
+      INIT_MUTEX(cl->updateBufMutex);
+
       cl->state = RFB_PROTOCOL_VERSION;
 
       cl->reverseConnection = FALSE;
@@ -649,6 +651,11 @@ rfbClientConnectionGone(rfbClientPtr cl)
     LOCK(cl->sendMutex);
     UNLOCK(cl->sendMutex);
     TINI_MUTEX(cl->sendMutex);
+
+    /* make sure updateBufMutex is unlocked before destroying */
+    LOCK(cl->updateBufMutex);
+    UNLOCK(cl->updateBufMutex);
+    TINI_MUTEX(cl->updateBufMutex);
 
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
     if (cl->screen->backgroundLoop) {

@@ -1305,7 +1305,9 @@ rfbUpdateClient(rfbClientPtr cl)
         !sraRgnEmpty(cl->requestedRegion)) {
       result=TRUE;
       if(screen->deferUpdateTime == 0) {
+          LOCK(cl->updateBufMutex);
           rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
+          UNLOCK(cl->updateBufMutex);
       } else if(cl->startDeferring.tv_usec == 0) {
         gettimeofday(&cl->startDeferring,NULL);
         if(cl->startDeferring.tv_usec == 0)
@@ -1317,7 +1319,9 @@ rfbUpdateClient(rfbClientPtr cl)
                +(tv.tv_usec-cl->startDeferring.tv_usec)/1000)
              > screen->deferUpdateTime) {
           cl->startDeferring.tv_usec = 0;
+          LOCK(cl->updateBufMutex);
           rfbSendFramebufferUpdate(cl,cl->modifiedRegion);
+          UNLOCK(cl->updateBufMutex);
         }
       }
     }
