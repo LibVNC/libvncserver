@@ -426,6 +426,8 @@ ReadReason(rfbClient* client)
     free(reason);
 }
 
+static rfbBool Authentication(rfbClient *client);
+
 rfbBool
 rfbHandleAuthResult(rfbClient* client)
 {
@@ -452,6 +454,9 @@ rfbHandleAuthResult(rfbClient* client)
     case rfbVncAuthTooMany:
       rfbClientLog("VNC authentication failed - too many tries\n");
       return FALSE;
+    case rfbVncAuthContinue:
+       return Authentication(client);
+       break;
     }
 
     rfbClientLog("Unknown VNC authentication result: %d\n",
@@ -511,7 +516,7 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
                 }
             }
         }
-        if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth ||
+        if (tAuth[loop]==rfbVncAuth || tAuth[loop]==rfbNoAuth || tAuth[loop] == rfbUltra ||
 			extAuthHandler ||
 #if defined(LIBVNCSERVER_HAVE_GNUTLS) || defined(LIBVNCSERVER_HAVE_LIBSSL)
 	    (!subAuth && (tAuth[loop]==rfbTLS || tAuth[loop]==rfbVeNCrypt)) ||
@@ -956,6 +961,205 @@ SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size)
   }
 }
 
+static rfbBool Authentication(rfbClient *client) 
+{
+    uint32_t authScheme;
+    uint32_t subAuthScheme;
+
+    /* 3.7 and onwards sends a # of security types first */
+    if (client->major == 3 && client->minor > 6) {
+        if (!ReadSupportedSecurityType(client, &authScheme, FALSE))
+            return FALSE;
+    } else {
+        if (!ReadFromRFBServer(client, (char *)&authScheme, 4))
+            return FALSE;
+        authScheme = rfbClientSwap32IfLE(authScheme);
+    }
+
+    rfbClientLog("Selected Security Scheme %d\n", authScheme);
+    client->authScheme = authScheme;
+
+    switch (authScheme) {
+
+    case rfbConnFailed:
+        ReadReason(client);
+        return FALSE;
+
+    case rfbNoAuth:
+        rfbClientLog("No authentication needed\n");
+
+        /* 3.8 and upwards sends a Security Result for rfbNoAuth */
+        if ((client->major == 3 && client->minor > 7) || client->major > 3)
+            if (!rfbHandleAuthResult(client))
+                return FALSE;
+
+        break;
+
+    case rfbVncAuth:
+        if (!HandleVncAuth(client))
+            return FALSE;
+        break;
+
+    case rfbUltra:
+        /* Handle the SecurityResult message */
+        if (!rfbHandleAuthResult(client))
+            return FALSE;
+        break;
+
+#ifdef LIBVNCSERVER_HAVE_SASL
+    case rfbSASL:
+        if (!HandleSASLAuth(client))
+            return FALSE;
+        break;
+#endif /* LIBVNCSERVER_HAVE_SASL */
+
+    case rfbUltraMSLogonII:
+        if (!HandleUltraMSLogonIIAuth(client))
+            return FALSE;
+        break;
+
+    case rfbMSLogon:
+        if (!HandleMSLogonAuth(client))
+            return FALSE;
+        break;
+
+    case rfbARD:
+        if (!HandleARDAuth(client))
+            return FALSE;
+        break;
+
+    case rfbTLS:
+    if (!HandleAnonTLSAuth(client)) return FALSE;
+        /* After the TLS session is established, sub auth types are expected.
+         * Note that all following reading/writing are through the TLS session
+         * from here.
+         */
+        if (!ReadSupportedSecurityType(client, &subAuthScheme, TRUE))
+            return FALSE;
+        client->subAuthScheme = subAuthScheme;
+
+        switch (subAuthScheme) {
+
+        case rfbConnFailed:
+            ReadReason(client);
+            return FALSE;
+
+        case rfbNoAuth:
+            rfbClientLog("No sub authentication needed\n");
+            /* 3.8 and upwards sends a Security Result for rfbNoAuth */
+            if ((client->major == 3 && client->minor > 7) || client->major > 3)
+                if (!rfbHandleAuthResult(client))
+                    return FALSE;
+            break;
+
+        case rfbVncAuth:
+            if (!HandleVncAuth(client))
+                return FALSE;
+            break;
+
+#ifdef LIBVNCSERVER_HAVE_SASL
+        case rfbSASL:
+            if (!HandleSASLAuth(client))
+                return FALSE;
+            break;
+#endif /* LIBVNCSERVER_HAVE_SASL */
+
+        default:
+            rfbClientLog(
+                "Unknown sub authentication scheme from VNC server: %d\n",
+                (int)subAuthScheme);
+            return FALSE;
+        }
+
+        break;
+
+    case rfbVeNCrypt:
+        if (!HandleVeNCryptAuth(client))
+            return FALSE;
+
+        switch (client->subAuthScheme) {
+            /*
+             * rfbNoAuth and rfbVncAuth are not actually part of VeNCrypt,
+             * however it is important to support them to ensure better
+             * compatibility. When establishing a connection, the client does
+             * not know whether the server supports encryption, and always
+             * prefers VeNCrypt if enabled. Next, if encryption is not available
+             * on the server, the connection will fail. Since the RFB doesn't
+             * have any downgrade methods in case of failure, a client that does
+             * not support unencrypted VeNCrypt methods will never be able to
+             * connect.
+             *
+             * The RFB specification also considers any ordinary subauths are
+             * valid, which legitimizes this solution.
+             *
+             * rfbVeNCryptPlain is also supported for better compatibility.
+             */
+
+        case rfbNoAuth:
+        case rfbVeNCryptTLSNone:
+        case rfbVeNCryptX509None:
+            rfbClientLog("No sub authentication needed\n");
+            if (!rfbHandleAuthResult(client))
+                return FALSE;
+            break;
+
+        case rfbVncAuth:
+        case rfbVeNCryptTLSVNC:
+        case rfbVeNCryptX509VNC:
+            if (!HandleVncAuth(client))
+                return FALSE;
+            break;
+
+        case rfbVeNCryptPlain:
+        case rfbVeNCryptTLSPlain:
+        case rfbVeNCryptX509Plain:
+            if (!HandlePlainAuth(client))
+                return FALSE;
+            break;
+
+#ifdef LIBVNCSERVER_HAVE_SASL
+        case rfbVeNCryptX509SASL:
+        case rfbVeNCryptTLSSASL:
+            if (!HandleSASLAuth(client))
+                return FALSE;
+            break;
+#endif /* LIBVNCSERVER_HAVE_SASL */
+        default:
+            rfbClientLog(
+                "Unknown sub authentication scheme from VNC server: %d\n",
+                client->subAuthScheme);
+            return FALSE;
+        }
+
+        break;
+
+    default: {
+        rfbBool authHandled = FALSE;
+        rfbClientProtocolExtension *e;
+        for (e = rfbClientExtensions; e; e = e->next) {
+            uint32_t const *secType;
+            if (!e->handleAuthentication)
+                continue;
+            for (secType = e->securityTypes; secType && *secType; secType++) {
+                if (authScheme == *secType) {
+                    if (!e->handleAuthentication(client, authScheme))
+                        return FALSE;
+                    if (!rfbHandleAuthResult(client))
+                        return FALSE;
+                    authHandled = TRUE;
+                }
+            }
+        }
+        if (authHandled)
+            break;
+    }
+        rfbClientLog("Unknown authentication scheme from VNC server: %d\n",
+                     (int)authScheme);
+        return FALSE;
+    }
+    return TRUE;
+}
+
 /*
  * InitialiseRFBConnection.
  */
@@ -965,8 +1169,6 @@ InitialiseRFBConnection(rfbClient* client)
 {
   rfbProtocolVersionMsg pv;
   int major,minor;
-  uint32_t authScheme;
-  uint32_t subAuthScheme;
   rfbClientInitMsg ci;
 
   /* if the connection is immediately closed, don't report anything, so
@@ -1032,172 +1234,7 @@ InitialiseRFBConnection(rfbClient* client)
 
   if (!WriteToRFBServer(client, pv, sz_rfbProtocolVersionMsg)) return FALSE;
 
-
-  /* 3.7 and onwards sends a # of security types first */
-  if (client->major==3 && client->minor > 6)
-  {
-    if (!ReadSupportedSecurityType(client, &authScheme, FALSE)) return FALSE;
-  }
-  else
-  {
-    if (!ReadFromRFBServer(client, (char *)&authScheme, 4)) return FALSE;
-    authScheme = rfbClientSwap32IfLE(authScheme);
-  }
-  
-  rfbClientLog("Selected Security Scheme %d\n", authScheme);
-  client->authScheme = authScheme;
-  
-  switch (authScheme) {
-
-  case rfbConnFailed:
-    ReadReason(client);
-    return FALSE;
-
-  case rfbNoAuth:
-    rfbClientLog("No authentication needed\n");
-
-    /* 3.8 and upwards sends a Security Result for rfbNoAuth */
-    if ((client->major==3 && client->minor > 7) || client->major>3)
-        if (!rfbHandleAuthResult(client)) return FALSE;        
-
-    break;
-
-  case rfbVncAuth:
-    if (!HandleVncAuth(client)) return FALSE;
-    break;
-
-#ifdef LIBVNCSERVER_HAVE_SASL
-  case rfbSASL:
-    if (!HandleSASLAuth(client)) return FALSE;
-    break;
-#endif /* LIBVNCSERVER_HAVE_SASL */
-
-  case rfbUltraMSLogonII:
-    if (!HandleUltraMSLogonIIAuth(client)) return FALSE;
-    break;
-
-  case rfbMSLogon:
-    if (!HandleMSLogonAuth(client)) return FALSE;
-    break;
-
-  case rfbARD:
-    if (!HandleARDAuth(client)) return FALSE;
-    break;
-
-  case rfbTLS:
-    if (!HandleAnonTLSAuth(client)) return FALSE;
-    /* After the TLS session is established, sub auth types are expected.
-     * Note that all following reading/writing are through the TLS session from here.
-     */
-    if (!ReadSupportedSecurityType(client, &subAuthScheme, TRUE)) return FALSE;
-    client->subAuthScheme = subAuthScheme;
-
-    switch (subAuthScheme) {
-
-      case rfbConnFailed:
-        ReadReason(client);
-        return FALSE;
-
-      case rfbNoAuth:
-        rfbClientLog("No sub authentication needed\n");
-        /* 3.8 and upwards sends a Security Result for rfbNoAuth */
-        if ((client->major==3 && client->minor > 7) || client->major>3)
-            if (!rfbHandleAuthResult(client)) return FALSE;
-        break;
-
-      case rfbVncAuth:
-        if (!HandleVncAuth(client)) return FALSE;
-        break;
-
-#ifdef LIBVNCSERVER_HAVE_SASL
-      case rfbSASL:
-        if (!HandleSASLAuth(client)) return FALSE;
-        break;
-#endif /* LIBVNCSERVER_HAVE_SASL */
-
-      default:
-        rfbClientLog("Unknown sub authentication scheme from VNC server: %d\n",
-            (int)subAuthScheme);
-        return FALSE;
-    }
-
-    break;
-
-  case rfbVeNCrypt:
-    if (!HandleVeNCryptAuth(client)) return FALSE;
-
-    switch (client->subAuthScheme) {
-      /*
-       * rfbNoAuth and rfbVncAuth are not actually part of VeNCrypt, however
-       * it is important to support them to ensure better compatibility.
-       * When establishing a connection, the client does not know whether
-       * the server supports encryption, and always prefers VeNCrypt if enabled.
-       * Next, if encryption is not available on the server, the connection
-       * will fail. Since the RFB doesn't have any downgrade methods in case
-       * of failure, a client that does not support unencrypted VeNCrypt methods
-       * will never be able to connect.
-       *
-       * The RFB specification also considers any ordinary subauths are valid,
-       * which legitimizes this solution.
-       *
-       * rfbVeNCryptPlain is also supported for better compatibility.
-       */
-
-      case rfbNoAuth:
-      case rfbVeNCryptTLSNone:
-      case rfbVeNCryptX509None:
-        rfbClientLog("No sub authentication needed\n");
-        if (!rfbHandleAuthResult(client)) return FALSE;
-        break;
-
-      case rfbVncAuth:
-      case rfbVeNCryptTLSVNC:
-      case rfbVeNCryptX509VNC:
-        if (!HandleVncAuth(client)) return FALSE;
-        break;
-
-      case rfbVeNCryptPlain:
-      case rfbVeNCryptTLSPlain:
-      case rfbVeNCryptX509Plain:
-        if (!HandlePlainAuth(client)) return FALSE;
-        break;
-
-#ifdef LIBVNCSERVER_HAVE_SASL
-      case rfbVeNCryptX509SASL:
-      case rfbVeNCryptTLSSASL:
-        if (!HandleSASLAuth(client)) return FALSE;
-        break;
-#endif /* LIBVNCSERVER_HAVE_SASL */
-
-      default:
-        rfbClientLog("Unknown sub authentication scheme from VNC server: %d\n",
-            client->subAuthScheme);
-        return FALSE;
-    }
-
-    break;
-
-  default:
-    {
-      rfbBool authHandled=FALSE;
-      rfbClientProtocolExtension* e;
-      for (e = rfbClientExtensions; e; e = e->next) {
-        uint32_t const* secType;
-        if (!e->handleAuthentication) continue;
-        for (secType = e->securityTypes; secType && *secType; secType++) {
-          if (authScheme==*secType) {
-            if (!e->handleAuthentication(client, authScheme)) return FALSE;
-            if (!rfbHandleAuthResult(client)) return FALSE;
-            authHandled=TRUE;
-          }
-        }
-      }
-      if (authHandled) break;
-    }
-    rfbClientLog("Unknown authentication scheme from VNC server: %d\n",
-	    (int)authScheme);
-    return FALSE;
-  }
+  if (!Authentication(client))return FALSE;
 
   ci.shared = (client->appData.shareDesktop ? 1 : 0);
 
