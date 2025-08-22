@@ -600,6 +600,9 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
   int compressedLen;
   uint8_t *compressedData, *dst;
   int pixelSize, pitch, flags = 0;
+#if BPP == 32
+  int convertingRequired = 0;
+#endif
 
   compressedLen = (int)ReadCompactLen(client);
   if (compressedLen <= 0) {
@@ -629,20 +632,40 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
     }
   }
 
-#if BPP == 16
-  flags = 0;
-  pixelSize = 3;
-  pitch = w * pixelSize;
-  dst = (uint8_t *)client->buffer;
-#else
-  if (client->format.bigEndian) flags |= TJ_ALPHAFIRST;
-  if (client->format.redShift == 16 && client->format.blueShift == 0)
-    flags |= TJ_BGR;
-  if (client->format.bigEndian) flags ^= TJ_BGR;
-  pixelSize = BPP / 8;
-  pitch = client->width * pixelSize;
-  dst = &client->frameBuffer[y * pitch + x * pixelSize];
+#if BPP == 32
+  if (client->format.depth == 24 && client->format.redMax == 0xFF &&
+      client->format.greenMax == 0xFF && client->format.blueMax == 0xFF) {
+    /* TurboJPEG can directly output some 24-bit depth 32 bpp pixel formats */
+    if (client->format.redShift == 24 &&
+        client->format.greenShift == 16 && client->format.blueShift == 8) {
+      flags |= TJ_ALPHAFIRST | TJ_BGR; /* ABGR */
+    } else if (client->format.redShift == 16 &&
+        client->format.greenShift == 8 && client->format.blueShift == 0) {
+      flags |= TJ_BGR; /* BGRA */
+    } else if (client->format.redShift == 8 &&
+        client->format.greenShift == 16 && client->format.blueShift == 24) {
+      flags |= TJ_ALPHAFIRST; /* ARGB */
+    } else if (client->format.redShift == 0 &&
+        client->format.greenShift == 8 && client->format.blueShift == 16) {
+      flags |= 0; /* RGBA */
+    } else {
+      convertingRequired = 1; /* TurboJPEG cannot output this 24-bit depth format */
+    }
+  } else {
+    convertingRequired = 1; /* TurboJPEG cannot output formats with this color depth and these maximums */
+  }
+  if (!convertingRequired) {
+    if (client->format.bigEndian) flags ^= TJ_ALPHAFIRST | TJ_BGR;
+    pixelSize = BPP / 8;
+    pitch = client->width * pixelSize;
+    dst = &client->frameBuffer[y * pitch + x * pixelSize];
+  } else
 #endif
+  {
+    pixelSize = 3; /* RGB */
+    pitch = w * pixelSize;
+    dst = (uint8_t *)client->buffer;
+  }
 
   if (tjDecompress(client->tjhnd, compressedData, (unsigned long)compressedLen,
                    dst, w, pitch, h, pixelSize, flags)==-1) {
@@ -653,23 +676,26 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
 
   free(compressedData);
 
-#if BPP == 16
-  pixelSize = BPP / 8;
-  pitch = client->width * pixelSize;
-  dst = &client->frameBuffer[y * pitch + x * pixelSize];
+#if BPP == 32
+  if (convertingRequired)
+#endif
   {
-    CARDBPP *dst16=(CARDBPP *)dst, *dst2;
-    char *src = client->buffer;
-    int i, j;
+    pixelSize = BPP / 8;
+    pitch = client->width * pixelSize;
+    dst = &client->frameBuffer[y * pitch + x * pixelSize];
+    {
+      CARDBPP *dstbpp=(CARDBPP *)dst, *dst2;
+      char *src = client->buffer;
+      int i, j;
 
-    for (j = 0; j < h; j++) {
-      for (i = 0, dst2 = dst16; i < w; i++, dst2++, src += 3) {
-        *dst2 = RGB24_TO_PIXEL(BPP, src[0], src[1], src[2]);
+      for (j = 0; j < h; j++) {
+        for (i = 0, dst2 = dstbpp; i < w; i++, dst2++, src += 3) {
+          *dst2 = RGB24_TO_PIXEL(BPP, src[0], src[1], src[2]);
+        }
+        dstbpp += client->width;
       }
-      dst16 += client->width;
     }
   }
-#endif
 
   return TRUE;
 }
