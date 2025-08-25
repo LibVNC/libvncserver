@@ -217,6 +217,10 @@ static int wait_for_data(SSL *ssl, int ret, int timeout)
 static rfbBool
 load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
 {
+#if defined(LIBVNCSERVER_HAVE_LIBWOLFSSL) && (!defined(OPENSSL_ALL) || defined(NO_BIO))
+  /* wolfSSL in Windows vcpkg is missing API */
+  return 0;
+#else
   X509_STORE *st;
   int i;
   int count = 0;
@@ -250,6 +254,7 @@ load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
     return TRUE;
   else
     return FALSE;
+#endif
 }
 
 static SSL *
@@ -356,7 +361,10 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
   }
 
   SSL_set_fd (ssl, sockfd);
+#if !defined(LIBVNCSERVER_HAVE_LIBWOLFSSL) || defined(OPENSSL_ALL)
+  /* wolfSSL in Windows vcpkg is missing API */
   SSL_CTX_set_app_data (ssl_ctx, client);
+#endif
 
   do
   {
