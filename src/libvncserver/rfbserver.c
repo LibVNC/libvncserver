@@ -271,6 +271,7 @@ rfbReverseConnection(rfbScreenInfoPtr rfbScreen,
 
     if (cl) {
         cl->reverseConnection = TRUE;
+        cl->destPort = port;
         if (!cl->onHold)
             rfbStartOnHoldClient(cl);
     }

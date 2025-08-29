@@ -711,6 +711,8 @@ typedef struct _rfbClientRec {
     int tightPngDstDataLen;
 #endif
 #endif
+    /** Destination port in case of an outgoing/reverse connection  */
+    int destPort;
 } rfbClientRec, *rfbClientPtr;
 
 /**
