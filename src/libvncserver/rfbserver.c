@@ -353,6 +353,8 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->host = strdup(inet_ntoa(addr.sin_addr));
 #endif
 
+      cl->destPort = -1;
+
       iterator = rfbGetClientIterator(rfbScreen);
       while ((cl_ = rfbClientIteratorNext(iterator)) != NULL)
 	  ++otherClientsCount;
