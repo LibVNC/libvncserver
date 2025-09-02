@@ -33,9 +33,6 @@ static void clientGone(rfbClientPtr cl)
 
 int main(int argc,char** argv)
 {
-  char *repeaterHost;
-  int repeaterPort, sock;
-  char id[250];
   rfbClientPtr cl;
 
   int i,j;
@@ -47,14 +44,6 @@ int main(int argc,char** argv)
       "Usage: %s <id> <repeater-host> [<repeater-port>]\n", argv[0]);
     exit(1);
   }
-  memset(id, 0, sizeof(id));
-  if(snprintf(id, sizeof(id), "ID:%s", argv[1]) >= (int)sizeof(id)) {
-      /* truncated! */
-      fprintf(stderr, "Error, given ID is too long.\n");
-      return 1;
-  }
-  repeaterHost = argv[2];
-  repeaterPort = argc < 4 ? 5500 : atoi(argv[3]);
 
   /* The initialization is identical to simple15.c */
   rfbScreenInfoPtr server=rfbGetScreen(&argc,argv,400,300,5,3,2);
@@ -77,21 +66,13 @@ int main(int argc,char** argv)
   /* Make sure to call this _before_ connecting out to the repeater */
   rfbInitServer(server);
 
-  sock = rfbConnectToTcpAddr(repeaterHost, repeaterPort);
-  if (sock == RFB_INVALID_SOCKET) {
-    perror("connect to repeater");
-    return 1;
-  }
-  if (send(sock, id, sizeof(id),0) != sizeof(id)) {
-    perror("writing id");
-    return 1;
-  }
-  cl = rfbNewClient(server, sock);
+  cl = rfbUltraVNCRepeaterMode2Connection(server, argv[2], argc < 4 ? 5500 : atoi(argv[3]), argv[1]);
+
   if (!cl) {
-    perror("new client");
-    return 1;
+      fprintf(stderr, "Connecting to repeater failed!\n");
+      exit(EXIT_FAILURE);
   }
-  cl->reverseConnection = 0;
+
   cl->clientGoneHook = clientGone;
 
   /* Run the server */
