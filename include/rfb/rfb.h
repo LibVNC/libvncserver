@@ -713,6 +713,8 @@ typedef struct _rfbClientRec {
 #endif
     /** Destination port in case of an outgoing/reverse connection  */
     int destPort;
+    /** ID on repeater in case of an UltraVNC mode 2 repeater connection */
+    char *repeaterId;
 } rfbClientRec, *rfbClientPtr;
 
 /**
@@ -803,6 +805,19 @@ extern void rfbNewClientConnection(rfbScreenInfoPtr rfbScreen,rfbSocket sock);
 extern rfbClientPtr rfbNewClient(rfbScreenInfoPtr rfbScreen,rfbSocket sock);
 extern rfbClientPtr rfbNewUDPClient(rfbScreenInfoPtr rfbScreen);
 extern rfbClientPtr rfbReverseConnection(rfbScreenInfoPtr rfbScreen,char *host, int port);
+/**
+ * @brief Make a connection to an UltraVNC repeater in mode 2
+ *
+ * This function connects to the given UltraVNC mode 2 repeater host and sends
+ * the given repeater id, see https://uvnc.com/pchelpware/sc/repeater.html
+ *
+ * @param rfbScreen The VNC server handle.
+ * @param repeaterHost The hostname of the repeater to connect to.
+ * @param repeaterPort The port of the repeater to connect to.
+ * @param repeaterId The id on the repeater without the 'ID:' prefix, must be parseable to long for UltraVNC compatibility.
+ * @return A valid client pointer (also when there is no viewer counterpart yet on the repeater), NULL on failure.
+ */
+extern rfbClientPtr rfbUltraVNCRepeaterMode2Connection(rfbScreenInfoPtr rfbScreen, char *repeaterHost, int repeaterPort, const char* repeaterId);
 extern void rfbClientConnectionGone(rfbClientPtr cl);
 extern void rfbProcessClientMessage(rfbClientPtr cl);
 extern void rfbClientConnFailed(rfbClientPtr cl, const char *reason);

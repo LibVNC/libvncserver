@@ -280,6 +280,60 @@ rfbReverseConnection(rfbScreenInfoPtr rfbScreen,
 }
 
 
+rfbClientPtr rfbUltraVNCRepeaterMode2Connection(rfbScreenInfoPtr rfbScreen,
+                                                char *repeaterHost,
+                                                int repeaterPort,
+                                                const char* repeaterId)
+{
+    rfbSocket sock;
+    rfbClientPtr cl;
+    // Using 250 here as this is what UltraVNC repeaters expect to read in one
+    // go. If we send less bytes as an id, the repeater will read our
+    // rfbProtocolVersion message into its id buffer, thus rfbProtocolVersion
+    // will never reach the viewer.
+    char id[250];
+    rfbLog("rfbUltraVNCRepeaterMode2Connection: connecting to repeater %s:%d\n", repeaterHost, repeaterPort);
+
+    if ((sock = rfbConnect(rfbScreen, repeaterHost, repeaterPort)) == RFB_INVALID_SOCKET) {
+        return NULL;
+    }
+
+    memset(id, 0, sizeof(id));
+    if (snprintf(id, sizeof(id), "ID:%s", repeaterId) >= (int)sizeof(id)) {
+        /* truncated! */
+        rfbErr("rfbUltraVNCRepeaterMode2Connection: error, given ID is too long.\n");
+        return NULL;
+    }
+
+    if (send(sock, id, sizeof(id), 0) != sizeof(id)) {
+        rfbErr("rfbUltraVNCRepeaterMode2Connection: sending repeater ID failed\n");
+        return NULL;
+    }
+
+    cl = rfbNewClient(rfbScreen, sock);
+    if (!cl) {
+        rfbErr("rfbUltraVNCRepeaterMode2Connection: new client failed\n");
+        return NULL;
+    }
+
+    cl->reverseConnection = 0;
+
+    // Save repeater id without the 'ID:' prefix
+    cl->repeaterId = malloc(sizeof(id) - 3);
+    if(cl->repeaterId) {
+        memcpy(cl->repeaterId, id + 3, sizeof(id) - 3);
+    } else {
+        rfbErr("rfbUltraVNCRepeaterMode2Connection: could not allocate memory for saving repeater id\n");
+    }
+
+    if (!cl->onHold) {
+        rfbStartOnHoldClient(cl);
+    }
+
+    return cl;
+}
+
+
 void
 rfbSetProtocolVersion(rfbScreenInfoPtr rfbScreen, int major_, int minor_)
 {
@@ -610,7 +664,8 @@ rfbClientConnectionGone(rfbClientPtr cl)
 
     rfbLog("Client %s gone\n",cl->host);
     free(cl->host);
-	
+    free(cl->repeaterId);
+
     if (cl->wsctx != NULL){
         free(cl->wsctx);
         cl->wsctx = NULL;
