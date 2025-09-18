@@ -781,7 +781,12 @@ if(WITH_LIBVNCSERVER)
   add_test(NAME cargs COMMAND test_cargstest)
 endif(WITH_LIBVNCSERVER)
 if(UNIX)
-  add_test(NAME includetest COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} ${CMAKE_MAKE_PROGRAM})
+  if(WITH_LIBVNCSERVER)
+    add_test(NAME includetest_server COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} ${CMAKE_MAKE_PROGRAM} "rfb/rfb.h")
+  endif(WITH_LIBVNCSERVER)
+  if(WITH_LIBVNCCLIENT)
+    add_test(NAME includetest_client COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} ${CMAKE_MAKE_PROGRAM} "rfb/rfbclient.h")
+  endif(WITH_LIBVNCCLIENT)
 endif(UNIX)
 if(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
     add_test(NAME turbojpeg COMMAND test_tjunittest)
@@ -815,25 +820,33 @@ function(get_link_libraries OUT TARGET)
     set(${OUT} ${RESULT} PARENT_SCOPE)
 endfunction()
 
+set(LIBVNCSERVER_PC_FILES )
 if(WITH_LIBVNCSERVER)
   get_link_libraries(PRIVATE_LIBS vncserver)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/libvncserver/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
+  list(APPEND LIBVNCSERVER_PC_FILES ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc)
 endif(WITH_LIBVNCSERVER)
 if(WITH_LIBVNCCLIENT)
   get_link_libraries(PRIVATE_LIBS vncclient)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/libvncclient/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
+  list(APPEND LIBVNCSERVER_PC_FILES ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc)
 endif(WITH_LIBVNCCLIENT)
 
 if(LIBVNCSERVER_INSTALL)
     set(INSTALL_HEADER_FILES
         include/rfb/keysym.h
         include/rfb/threading.h
-        include/rfb/rfb.h
-        include/rfb/rfbclient.h
         ${CMAKE_CURRENT_BINARY_DIR}/include/rfb/rfbconfig.h
         include/rfb/rfbproto.h
         include/rfb/rfbregion.h
         )
+
+    if(WITH_LIBVNCSERVER)
+        list(APPEND INSTALL_HEADER_FILES include/rfb/rfb.h)
+    endif(WITH_LIBVNCSERVER)
+    if(WITH_LIBVNCCLIENT)
+        list(APPEND INSTALL_HEADER_FILES include/rfb/rfbclient.h)
+    endif(WITH_LIBVNCCLIENT)
 
     foreach(LIB ${LIBVNCSERVER_LIBRARIES})
       set_property(TARGET ${LIB} PROPERTY PUBLIC_HEADER ${INSTALL_HEADER_FILES})
@@ -883,8 +896,7 @@ if(LIBVNCSERVER_INSTALL)
     
   
     install(FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc
-        ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc
+        ${LIBVNCSERVER_PC_FILES}
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
         )
 endif()

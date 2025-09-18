@@ -15,6 +15,10 @@ jobs:
           - "-DWITH_OPENSSL=OFF -DWITH_GNUTLS=ON  -DWITH_GCRYPT=ON"  # build with GnuTLS and Libgrypt
           - "-DWITH_OPENSSL=OFF -DWITH_GNUTLS=OFF -DWITH_GCRYPT=OFF" # build without external encryption libraries
           - "-DCMAKE_TOOLCHAIN_FILE=../cmake/Toolchain-cross-mingw32-linux.cmake" # crosscompile with MinGW toolchain
+        disable_libs:
+          - "" # Build both
+          - "-DWITH_LIBVNCSERVER=OFF" # Without the server
+          - "-DWITH_LIBVNCCLIENT=OFF" # Without the client
         include:
           - os: macos-latest
             macos_cmake_options: "-DOPENSSL_ROOT_DIR=/usr/local/opt/openssl" # set this extra var for OSX
@@ -52,10 +56,10 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake ${{ matrix.cmake_options }} ${{ matrix.macos_cmake_options }} ${{ matrix.windows_cmake_options }} ..
+          cmake ${{ matrix.cmake_options }} ${{ matrix.disable_libs }} ${{ matrix.macos_cmake_options }} ${{ matrix.windows_cmake_options }} ..
           cmake --build .
       - name: Prepare Test
-        if: ${{ matrix.os == 'ubuntu-latest' }} # only ubuntu does crosscompile with MinGW toolchain
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.disable_libs != '-DWITH_LIBVNCSERVER=OFF' }} # only ubuntu does crosscompile with MinGW toolchain, and without vncserver we have no tests
         run: |
           cp /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll build/test/
       - name: Test
