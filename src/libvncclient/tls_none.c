@@ -23,21 +23,21 @@
 
 rfbBool HandleAnonTLSAuth(rfbClient* client) 
 {
-  rfbClientLog("TLS is not supported.\n");
+  rfbClientLog2(client, "TLS is not supported.\n");
   return FALSE;
 }
 
 
 rfbBool HandleVeNCryptAuth(rfbClient* client)
 {
-  rfbClientLog("TLS is not supported.\n");
+  rfbClientLog2(client, "TLS is not supported.\n");
   return FALSE;
 }
 
 
 int ReadFromTLS(rfbClient* client, char *out, unsigned int n)
 {
-  rfbClientLog("TLS is not supported.\n");
+  rfbClientLog2(client, "TLS is not supported.\n");
   errno = EINTR;
   return -1;
 }
@@ -45,7 +45,7 @@ int ReadFromTLS(rfbClient* client, char *out, unsigned int n)
 
 int WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
 {
-  rfbClientLog("TLS is not supported.\n");
+  rfbClientLog2(client, "TLS is not supported.\n");
   errno = EINTR;
   return -1;
 }
@@ -60,7 +60,7 @@ void FreeTLS(rfbClient* client)
 int
 GetTLSCipherBits(rfbClient* client)
 {
-  rfbClientLog("TLS is not supported.\n");
+  rfbClientLog2(client, "TLS is not supported.\n");
   return 0;
 }
 #endif /* LIBVNCSERVER_HAVE_SASL */

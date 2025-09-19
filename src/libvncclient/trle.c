@@ -76,7 +76,7 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
     client->raw_buffer = (char *)malloc(client->raw_buffer_size);
   }
 
-  rfbClientLog("Update %d %d %d %d\n", rx, ry, rw, rh);
+  rfbClientLog2(client, "Update %d %d %d %d\n", rx, ry, rw, rh);
 
   for (y = ry; y < ry + rh; y += 16) {
     for (x = rx; x < rx + rw; x += 16) {
@@ -198,7 +198,7 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
             }
           }
           if (length > 0)
-            rfbClientLog("Warning: possible TRLE corruption\n");
+            rfbClientLog2(client, "Warning: possible TRLE corruption\n");
         }
 
         type = last_type;
@@ -244,7 +244,7 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
             }
           }
           if (length > 0)
-            rfbClientLog("Warning: possible TRLE corruption\n");
+            rfbClientLog2(client, "Warning: possible TRLE corruption\n");
         }
 
         if (type == 129) {

@@ -35,7 +35,7 @@ static void sendMessage(rfbClient* client, char* text)
 	msg.size = rfbClientSwap32IfLE(length);
 	if(!WriteToRFBServer(client, (char*)&msg, sizeof(msg)) ||
 			!WriteToRFBServer(client, text, length)) {
-		rfbClientLog("enableBackChannel: write error (%d: %s)", errno, strerror(errno));
+		rfbClientLog2(client, "enableBackChannel: write error (%d: %s)", errno, strerror(errno));
 	}
 }
 
@@ -59,7 +59,7 @@ static rfbBool handleBackChannelMessage(rfbClient* client,
 		return TRUE;
 	}
 
-	rfbClientLog("got back channel message: %s\n", text);
+	rfbClientLog2(client, "got back channel message: %s\n", text);
 	free(text);
 
 	return TRUE;

@@ -29,7 +29,7 @@
 #include "sockets.h"
 
 
-rfbBool sock_set_nonblocking(rfbSocket sock, rfbBool non_blocking, void (*log)(const char *format, ...))
+rfbBool sock_set_nonblocking(void* client, rfbSocket sock, rfbBool non_blocking, void (*log)(void* client, const char *format, ...))
 {
 #ifdef WIN32
   unsigned long non_blocking_ulong = non_blocking;
@@ -44,7 +44,7 @@ rfbBool sock_set_nonblocking(rfbSocket sock, rfbBool non_blocking, void (*log)(c
       new_flags = flags & ~O_NONBLOCK;
   if(flags < 0 || fcntl(sock, F_SETFL, new_flags) < 0) {
 #endif
-    log("Setting socket to %sblocking mode failed: %s\n", non_blocking ? "non-" : "", strerror(errno));
+    log(client, "Setting socket to %sblocking mode failed: %s\n", non_blocking ? "non-" : "", strerror(errno));
     return FALSE;
   }
   return TRUE;

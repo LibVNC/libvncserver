@@ -50,7 +50,7 @@ listenForIncomingConnections(rfbClient* client)
 {
 #ifdef WIN32
   /* FIXME */
-  rfbClientErr("listenForIncomingConnections on MinGW32 NOT IMPLEMENTED\n");
+  rfbClientErr2(client, "listenForIncomingConnections on MinGW32 NOT IMPLEMENTED\n");
   return;
 #else
   int listenSocket = RFB_INVALID_SOCKET, listen6Socket = RFB_INVALID_SOCKET;
@@ -63,9 +63,9 @@ listenForIncomingConnections(rfbClient* client)
   if (listenSocket == RFB_INVALID_SOCKET)
     return;
 
-  rfbClientLog("%s -listen: Listening on port %d\n",
+  rfbClientLog2(client, "%s -listen: Listening on port %d\n",
 	  client->programName,client->listenPort);
-  rfbClientLog("%s -listen: Command line errors are not reported until "
+  rfbClientLog2(client, "%s -listen: Command line errors are not reported until "
 	  "a connection comes in.\n", client->programName);
 
 #ifdef LIBVNCSERVER_IPv6 /* only try that if we're IPv6-capable, otherwise we may try to bind to the same port which would make all that listening fail */ 
@@ -77,9 +77,9 @@ listenForIncomingConnections(rfbClient* client)
       if (listen6Socket == RFB_INVALID_SOCKET)
 	return;
 
-      rfbClientLog("%s -listen: Listening on IPV6 port %d\n",
+      rfbClientLog2(client, "%s -listen: Listening on IPV6 port %d\n",
 		   client->programName,client->listenPort);
-      rfbClientLog("%s -listen: Command line errors are not reported until "
+      rfbClientLog2(client, "%s -listen: Command line errors are not reported until "
 		   "a connection comes in.\n", client->programName);
     }
 #endif
@@ -109,7 +109,7 @@ listenForIncomingConnections(rfbClient* client)
 
       if (client->sock == RFB_INVALID_SOCKET)
 	return;
-      if (!SetNonBlocking(client->sock))
+      if (!SetNonBlocking(client, client->sock))
 	return;
 
       /* Now fork off a new process to deal with it... */
@@ -117,7 +117,7 @@ listenForIncomingConnections(rfbClient* client)
       switch (fork()) {
 
       case -1: 
-	rfbClientErr("fork\n"); 
+	rfbClientErr2(client, "fork\n"); 
 	return;
 
       case 0:
@@ -160,14 +160,14 @@ listenForIncomingConnectionsNoFork(rfbClient* client, int timeout)
 
   if (client->listenSock == RFB_INVALID_SOCKET)
     {
-      client->listenSock = ListenAtTcpPortAndAddress(client->listenPort, client->listenAddress);
+      client->listenSock = ListenAtTcpPortAndAddress(client, client->listenPort, client->listenAddress);
 
       if (client->listenSock == RFB_INVALID_SOCKET)
 	return -1;
 
-      rfbClientLog("%s -listennofork: Listening on port %d\n",
+      rfbClientLog2(client, "%s -listennofork: Listening on port %d\n",
 		   client->programName,client->listenPort);
-      rfbClientLog("%s -listennofork: Command line errors are not reported until "
+      rfbClientLog2(client, "%s -listennofork: Command line errors are not reported until "
 		   "a connection comes in.\n", client->programName);
     }
 
@@ -180,9 +180,9 @@ listenForIncomingConnectionsNoFork(rfbClient* client, int timeout)
       if (client->listen6Sock == RFB_INVALID_SOCKET)
 	return -1;
 
-      rfbClientLog("%s -listennofork: Listening on IPV6 port %d\n",
+      rfbClientLog2(client, "%s -listennofork: Listening on IPV6 port %d\n",
 		   client->programName,client->listenPort);
-      rfbClientLog("%s -listennofork: Command line errors are not reported until "
+      rfbClientLog2(client, "%s -listennofork: Command line errors are not reported until "
 		   "a connection comes in.\n", client->programName);
     }
 #endif
@@ -202,13 +202,13 @@ listenForIncomingConnectionsNoFork(rfbClient* client, int timeout)
   if (r > 0)
     {
       if (client->listenSock != RFB_INVALID_SOCKET && FD_ISSET(client->listenSock, &fds))
-	client->sock = AcceptTcpConnection(client->listenSock); 
+	client->sock = AcceptTcpConnection(client, client->listenSock); 
       else if (client->listen6Sock != RFB_INVALID_SOCKET && FD_ISSET(client->listen6Sock, &fds))
-	client->sock = AcceptTcpConnection(client->listen6Sock);
+	client->sock = AcceptTcpConnection(client, client->listen6Sock);
 
       if (client->sock == RFB_INVALID_SOCKET)
 	return -1;
-      if (!SetNonBlocking(client->sock))
+      if (!SetNonBlocking(client, client->sock))
 	return -1;
 
       if(client->listenSock != RFB_INVALID_SOCKET) {

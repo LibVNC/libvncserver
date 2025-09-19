@@ -41,7 +41,7 @@
 #include "tls.h"
 #include "sasl.h"
 
-void PrintInHex(char *buf, int len);
+void PrintInHex(rfbClient* client, char *buf, int len);
 
 rfbBool errorMessageOnReadFailure = TRUE;
 
@@ -68,7 +68,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 #ifdef DEBUG_READ_EXACT
 	char* oout=out;
 	unsigned int nn=n;
-	rfbClientLog("ReadFromRFBServer %d bytes\n",n);
+	rfbClientLog2(client, "ReadFromRFBServer %d bytes\n",n);
 #endif
 
   /* Handle attempts to write to NULL out buffer that might occur
@@ -156,7 +156,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	    if (client->readTimeout > 0 &&
 		++retries > (client->readTimeout * 1000 * 1000 / USECS_WAIT_PER_RETRY))
 	    {
-	      rfbClientLog("Connection timed out\n");
+	      rfbClientLog2(client, "Connection timed out\n");
 	      return FALSE;
 	    }
 	    /* TODO:
@@ -165,12 +165,12 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	    WaitForMessage(client, USECS_WAIT_PER_RETRY);
 	    i = 0;
 	  } else {
-	    rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
+	    rfbClientErr2(client, "read (%d: %s)\n",errno,strerror(errno));
 	    return FALSE;
 	  }
 	} else {
 	  if (errorMessageOnReadFailure) {
-	    rfbClientLog("VNC server closed connection\n");
+	    rfbClientLog2(client, "VNC server closed connection\n");
 	  }
 	  return FALSE;
 	}
@@ -205,7 +205,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	    if (client->readTimeout > 0 &&
 		++retries > (client->readTimeout * 1000 * 1000 / USECS_WAIT_PER_RETRY))
 	    {
-		rfbClientLog("Connection timed out\n");
+		rfbClientLog2(client, "Connection timed out\n");
 		return FALSE;
 	    }
 	    /* TODO:
@@ -214,12 +214,12 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	    WaitForMessage(client, USECS_WAIT_PER_RETRY);
 	    i = 0;
 	  } else {
-	    rfbClientErr("read (%s)\n",strerror(errno));
+	    rfbClientErr2(client, "read (%s)\n",strerror(errno));
 	    return FALSE;
 	  }
 	} else {
 	  if (errorMessageOnReadFailure) {
-	    rfbClientLog("VNC server closed connection\n");
+	    rfbClientLog2(client, "VNC server closed connection\n");
 	  }
 	  return FALSE;
 	}
@@ -275,7 +275,7 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
                       buf, n,
                       &output, &outputlen);
     if (err != SASL_OK) {
-      rfbClientLog("Failed to encode SASL data %s",
+      rfbClientLog2(client, "Failed to encode SASL data %s",
                    sasl_errstring(err, NULL, NULL));
       return FALSE;
     }
@@ -298,7 +298,7 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 		errno == EAGAIN) {
           if(client->sock == RFB_INVALID_SOCKET) {
               errno = EBADF;
-              rfbClientErr("socket invalid\n");
+              rfbClientErr2(client, "socket invalid\n");
               return FALSE;
           }
 
@@ -306,16 +306,16 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 	  FD_SET(client->sock,&fds);
 
 	  if (select(client->sock+1, NULL, &fds, NULL, NULL) <= 0) {
-	    rfbClientErr("select\n");
+	    rfbClientErr2(client, "select\n");
 	    return FALSE;
 	  }
 	  j = 0;
 	} else {
-	  rfbClientErr("write\n");
+	  rfbClientErr2(client, "write\n");
 	  return FALSE;
 	}
       } else {
-	rfbClientLog("write failed\n");
+	rfbClientLog2(client, "write failed\n");
 	return FALSE;
       }
     }
@@ -326,18 +326,18 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 
 
 rfbSocket
-ConnectClientToTcpAddr(unsigned int host, int port)
+ConnectClientToTcpAddr(rfbClient* client, unsigned int host, int port)
 {
-  rfbSocket sock = ConnectClientToTcpAddrWithTimeout(host, port, DEFAULT_CONNECT_TIMEOUT);
+  rfbSocket sock = ConnectClientToTcpAddrWithTimeout(client, host, port, DEFAULT_CONNECT_TIMEOUT);
   /* put socket back into blocking mode for compatibility reasons */
   if (sock != RFB_INVALID_SOCKET) {
-    SetBlocking(sock);
+    SetBlocking(client, sock);
   }
   return sock;
 }
 
 rfbSocket
-ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int timeout)
+ConnectClientToTcpAddrWithTimeout(rfbClient* client, unsigned int host, int port, unsigned int timeout)
 {
   rfbSocket sock;
   struct sockaddr_in addr;
@@ -352,11 +352,11 @@ ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int time
 #ifdef WIN32
     errno=WSAGetLastError();
 #endif
-    rfbClientErr("ConnectToTcpAddr: socket (%s)\n",strerror(errno));
+    rfbClientErr2(client, "ConnectToTcpAddr: socket (%s)\n",strerror(errno));
     return RFB_INVALID_SOCKET;
   }
 
-  if (!SetNonBlocking(sock))
+  if (!SetNonBlocking(client, sock))
     return FALSE;
 
   if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
@@ -364,7 +364,7 @@ ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int time
     errno=WSAGetLastError();
 #endif
     if (!((errno == EWOULDBLOCK || errno == EINPROGRESS) && sock_wait_for_connected(sock, timeout))) {
-      rfbClientErr("ConnectToTcpAddr: connect\n");
+      rfbClientErr2(client, "ConnectToTcpAddr: connect\n");
       rfbCloseSocket(sock);
       return RFB_INVALID_SOCKET;
     }
@@ -372,7 +372,7 @@ ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int time
 
   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		 (char *)&one, sizeof(one)) < 0) {
-    rfbClientErr("ConnectToTcpAddr: setsockopt\n");
+    rfbClientErr2(client, "ConnectToTcpAddr: setsockopt\n");
     rfbCloseSocket(sock);
     return RFB_INVALID_SOCKET;
   }
@@ -381,18 +381,18 @@ ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int time
 }
 
 rfbSocket
-ConnectClientToTcpAddr6(const char *hostname, int port)
+ConnectClientToTcpAddr6(rfbClient* client, const char *hostname, int port)
 {
-  rfbSocket sock = ConnectClientToTcpAddr6WithTimeout(hostname, port, DEFAULT_CONNECT_TIMEOUT);
+  rfbSocket sock = ConnectClientToTcpAddr6WithTimeout(client, hostname, port, DEFAULT_CONNECT_TIMEOUT);
   /* put socket back into blocking mode for compatibility reasons */
   if (sock != RFB_INVALID_SOCKET) {
-    SetBlocking(sock);
+    SetBlocking(client, sock);
   }
   return sock;
 }
 
 rfbSocket
-ConnectClientToTcpAddr6WithTimeout(const char *hostname, int port, unsigned int timeout)
+ConnectClientToTcpAddr6WithTimeout(rfbClient* client, const char *hostname, int port, unsigned int timeout)
 {
 #ifdef LIBVNCSERVER_IPv6
   rfbSocket sock;
@@ -407,7 +407,7 @@ ConnectClientToTcpAddr6WithTimeout(const char *hostname, int port, unsigned int 
   hints.ai_socktype = SOCK_STREAM;
   if ((n = getaddrinfo(strcmp(hostname,"") == 0 ? "localhost": hostname, port_s, &hints, &res)))
   {
-    rfbClientErr("ConnectClientToTcpAddr6: getaddrinfo (%s)\n", gai_strerror(n));
+    rfbClientErr2(client, "ConnectClientToTcpAddr6: getaddrinfo (%s)\n", gai_strerror(n));
     return RFB_INVALID_SOCKET;
   }
 
@@ -418,7 +418,7 @@ ConnectClientToTcpAddr6WithTimeout(const char *hostname, int port, unsigned int 
     sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (sock != RFB_INVALID_SOCKET)
     {
-      if (SetNonBlocking(sock)) {
+      if (SetNonBlocking(client, sock)) {
         if (connect(sock, res->ai_addr, res->ai_addrlen) == 0) {
           break;
         } else {
@@ -441,13 +441,13 @@ ConnectClientToTcpAddr6WithTimeout(const char *hostname, int port, unsigned int 
 
   if (sock == RFB_INVALID_SOCKET)
   {
-    rfbClientErr("ConnectClientToTcpAddr6: connect\n");
+    rfbClientErr2(client, "ConnectClientToTcpAddr6: connect\n");
     return RFB_INVALID_SOCKET;
   }
 
   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		 (char *)&one, sizeof(one)) < 0) {
-    rfbClientErr("ConnectToTcpAddr: setsockopt\n");
+    rfbClientErr2(client, "ConnectToTcpAddr: setsockopt\n");
     rfbCloseSocket(sock);
     return RFB_INVALID_SOCKET;
   }
@@ -456,51 +456,51 @@ ConnectClientToTcpAddr6WithTimeout(const char *hostname, int port, unsigned int 
 
 #else
 
-  rfbClientErr("ConnectClientToTcpAddr6: IPv6 disabled\n");
+  rfbClientErr2(client, "ConnectClientToTcpAddr6: IPv6 disabled\n");
   return RFB_INVALID_SOCKET;
 
 #endif
 }
 
 rfbSocket
-ConnectClientToUnixSock(const char *sockFile)
+ConnectClientToUnixSock(rfbClient* client, const char *sockFile)
 {
-  rfbSocket sock = ConnectClientToUnixSockWithTimeout(sockFile, DEFAULT_CONNECT_TIMEOUT);
+  rfbSocket sock = ConnectClientToUnixSockWithTimeout(client, sockFile, DEFAULT_CONNECT_TIMEOUT);
   /* put socket back into blocking mode for compatibility reasons */
   if (sock != RFB_INVALID_SOCKET) {
-    SetBlocking(sock);
+    SetBlocking(client, sock);
   }
   return sock;
 }
 
 rfbSocket
-ConnectClientToUnixSockWithTimeout(const char *sockFile, unsigned int timeout)
+ConnectClientToUnixSockWithTimeout(rfbClient* client, const char *sockFile, unsigned int timeout)
 {
 #ifdef WIN32
-  rfbClientErr("Windows doesn't support UNIX sockets\n");
+  rfbClientErr2(client, "Windows doesn't support UNIX sockets\n");
   return RFB_INVALID_SOCKET;
 #else
   rfbSocket sock;
   struct sockaddr_un addr;
   addr.sun_family = AF_UNIX;
   if(strlen(sockFile) + 1 > sizeof(addr.sun_path)) {
-      rfbClientErr("ConnectToUnixSock: socket file name too long\n");
+      rfbClientErr2(client, "ConnectToUnixSock: socket file name too long\n");
       return RFB_INVALID_SOCKET;
   }
   strcpy(addr.sun_path, sockFile);
 
   sock = socket(AF_UNIX, SOCK_STREAM, 0);
   if (sock == RFB_INVALID_SOCKET) {
-    rfbClientErr("ConnectToUnixSock: socket (%s)\n",strerror(errno));
+    rfbClientErr2(client, "ConnectToUnixSock: socket (%s)\n",strerror(errno));
     return RFB_INVALID_SOCKET;
   }
 
-  if (!SetNonBlocking(sock))
+  if (!SetNonBlocking(client, sock))
     return RFB_INVALID_SOCKET;
 
   if (connect(sock, (struct sockaddr *)&addr, sizeof(addr.sun_family) + strlen(addr.sun_path)) < 0 &&
       !(errno == EINPROGRESS && sock_wait_for_connected(sock, timeout))) {
-    rfbClientErr("ConnectToUnixSock: connect\n");
+    rfbClientErr2(client, "ConnectToUnixSock: connect\n");
     rfbCloseSocket(sock);
     return RFB_INVALID_SOCKET;
   }
@@ -517,7 +517,7 @@ ConnectClientToUnixSockWithTimeout(const char *sockFile, unsigned int timeout)
  */
 
 int
-FindFreeTcpPort(void)
+FindFreeTcpPort(rfbClient* client)
 {
   rfbSocket sock;
   int port;
@@ -528,7 +528,7 @@ FindFreeTcpPort(void)
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock == RFB_INVALID_SOCKET) {
-    rfbClientErr(": FindFreeTcpPort: socket\n");
+    rfbClientErr2(client, ": FindFreeTcpPort: socket\n");
     return 0;
   }
 
@@ -550,9 +550,9 @@ FindFreeTcpPort(void)
  */
 
 rfbSocket
-ListenAtTcpPort(int port)
+ListenAtTcpPort(rfbClient* client, int port)
 {
-  return ListenAtTcpPortAndAddress(port, NULL);
+  return ListenAtTcpPortAndAddress(client, port, NULL);
 }
 
 
@@ -563,7 +563,7 @@ ListenAtTcpPort(int port)
  */
 
 rfbSocket
-ListenAtTcpPortAndAddress(int port, const char *address)
+ListenAtTcpPortAndAddress(rfbClient* client, int port, const char *address)
 {
   rfbSocket sock = RFB_INVALID_SOCKET;
   int one = 1;
@@ -580,19 +580,19 @@ ListenAtTcpPortAndAddress(int port, const char *address)
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock == RFB_INVALID_SOCKET) {
-    rfbClientErr("ListenAtTcpPort: socket\n");
+    rfbClientErr2(client, "ListenAtTcpPort: socket\n");
     return RFB_INVALID_SOCKET;
   }
 
   if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 		 (const char *)&one, sizeof(one)) < 0) {
-    rfbClientErr("ListenAtTcpPort: setsockopt\n");
+    rfbClientErr2(client, "ListenAtTcpPort: setsockopt\n");
     rfbCloseSocket(sock);
     return RFB_INVALID_SOCKET;
   }
 
   if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-    rfbClientErr("ListenAtTcpPort: bind\n");
+    rfbClientErr2(client, "ListenAtTcpPort: bind\n");
     rfbCloseSocket(sock);
     return RFB_INVALID_SOCKET;
   }
@@ -610,7 +610,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
   hints.ai_flags = AI_PASSIVE; /* fill in wildcard address if address == NULL */
 
   if ((rv = getaddrinfo(address, port_str, &hints, &servinfo)) != 0) {
-    rfbClientErr("ListenAtTcpPortAndAddress: error in getaddrinfo: %s\n", gai_strerror(rv));
+    rfbClientErr2(client, "ListenAtTcpPortAndAddress: error in getaddrinfo: %s\n", gai_strerror(rv));
     return RFB_INVALID_SOCKET;
   }
 
@@ -623,7 +623,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
 #ifdef IPV6_V6ONLY
     /* we have separate IPv4 and IPv6 sockets since some OS's do not support dual binding */
     if (p->ai_family == AF_INET6 && setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof(one)) < 0) {
-      rfbClientErr("ListenAtTcpPortAndAddress: error in setsockopt IPV6_V6ONLY: %s\n", strerror(errno));
+      rfbClientErr2(client, "ListenAtTcpPortAndAddress: error in setsockopt IPV6_V6ONLY: %s\n", strerror(errno));
       rfbCloseSocket(sock);
       freeaddrinfo(servinfo);
       return RFB_INVALID_SOCKET;
@@ -631,7 +631,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
 #endif
 
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one)) < 0) {
-      rfbClientErr("ListenAtTcpPortAndAddress: error in setsockopt SO_REUSEADDR: %s\n", strerror(errno));
+      rfbClientErr2(client, "ListenAtTcpPortAndAddress: error in setsockopt SO_REUSEADDR: %s\n", strerror(errno));
       rfbCloseSocket(sock);
       freeaddrinfo(servinfo);
       return RFB_INVALID_SOCKET;
@@ -646,7 +646,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
   }
 
   if (p == NULL)  {
-    rfbClientErr("ListenAtTcpPortAndAddress: error in bind: %s\n", strerror(errno));
+    rfbClientErr2(client, "ListenAtTcpPortAndAddress: error in bind: %s\n", strerror(errno));
     return RFB_INVALID_SOCKET;
   }
 
@@ -655,7 +655,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
 #endif
 
   if (listen(sock, 5) < 0) {
-    rfbClientErr("ListenAtTcpPort: listen\n");
+    rfbClientErr2(client, "ListenAtTcpPort: listen\n");
     rfbCloseSocket(sock);
     return RFB_INVALID_SOCKET;
   }
@@ -669,7 +669,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
  */
 
 rfbSocket
-AcceptTcpConnection(rfbSocket listenSock)
+AcceptTcpConnection(rfbClient* client, rfbSocket listenSock)
 {
   rfbSocket sock;
   struct sockaddr_in addr;
@@ -678,13 +678,13 @@ AcceptTcpConnection(rfbSocket listenSock)
 
   sock = accept(listenSock, (struct sockaddr *) &addr, &addrlen);
   if (sock == RFB_INVALID_SOCKET) {
-    rfbClientErr("AcceptTcpConnection: accept\n");
+    rfbClientErr2(client, "AcceptTcpConnection: accept\n");
     return RFB_INVALID_SOCKET;
   }
 
   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		 (char *)&one, sizeof(one)) < 0) {
-    rfbClientErr("AcceptTcpConnection: setsockopt\n");
+    rfbClientErr2(client, "AcceptTcpConnection: setsockopt\n");
     rfbCloseSocket(sock);
     return RFB_INVALID_SOCKET;
   }
@@ -698,15 +698,15 @@ AcceptTcpConnection(rfbSocket listenSock)
  */
 
 rfbBool
-SetNonBlocking(rfbSocket sock)
+SetNonBlocking(rfbClient* client, rfbSocket sock)
 {
-    return sock_set_nonblocking(sock, TRUE, rfbClientErr);
+    return sock_set_nonblocking(client, sock, TRUE, rfbClientErr2);
 }
 
 
-rfbBool SetBlocking(rfbSocket sock)
+rfbBool SetBlocking(rfbClient* client, rfbSocket sock)
 {
-    return sock_set_nonblocking(sock, FALSE, rfbClientErr);
+    return sock_set_nonblocking(client, sock, FALSE, rfbClientErr2);
 }
 
 
@@ -715,10 +715,10 @@ rfbBool SetBlocking(rfbSocket sock)
  */
 
 rfbBool
-SetDSCP(rfbSocket sock, int dscp)
+SetDSCP(rfbClient* client, rfbSocket sock, int dscp)
 {
 #ifdef WIN32
-  rfbClientErr("Setting of QoS IP DSCP not implemented for Windows\n");
+  rfbClientErr2(client, "Setting of QoS IP DSCP not implemented for Windows\n");
   return TRUE;
 #else
   int level, cmd;
@@ -726,7 +726,7 @@ SetDSCP(rfbSocket sock, int dscp)
   socklen_t addrlen = sizeof(addr);
 
   if(getsockname(sock, &addr, &addrlen) != 0) {
-    rfbClientErr("Setting socket QoS failed while getting socket address: %s\n",strerror(errno));
+    rfbClientErr2(client, "Setting socket QoS failed while getting socket address: %s\n",strerror(errno));
     return FALSE;
   }
 
@@ -743,12 +743,12 @@ SetDSCP(rfbSocket sock, int dscp)
       cmd = IP_TOS;
       break;
     default:
-      rfbClientErr("Setting socket QoS failed: Not bound to IP address");
+      rfbClientErr2(client, "Setting socket QoS failed: Not bound to IP address");
       return FALSE;
     }
 
   if(setsockopt(sock, level, cmd, (void*)&dscp, sizeof(dscp)) != 0) {
-    rfbClientErr("Setting socket QoS failed: %s\n", strerror(errno));
+    rfbClientErr2(client, "Setting socket QoS failed: %s\n", strerror(errno));
     return FALSE;
   }
 
@@ -813,39 +813,39 @@ SameMachine(rfbSocket sock)
  */
 
 void
-PrintInHex(char *buf, int len)
+PrintInHex(rfbClient* client, char *buf, int len)
 {
   int i, j;
   char c, str[17];
 
   str[16] = 0;
 
-  rfbClientLog("ReadExact: ");
+  rfbClientLog2(client, "ReadExact: ");
 
   for (i = 0; i < len; i++)
     {
       if ((i % 16 == 0) && (i != 0)) {
-	rfbClientLog("           ");
+	rfbClientLog2(client, "           ");
       }
       c = buf[i];
       str[i % 16] = (((c > 31) && (c < 127)) ? c : '.');
-      rfbClientLog("%02x ",(unsigned char)c);
+      rfbClientLog2(client, "%02x ",(unsigned char)c);
       if ((i % 4) == 3)
-	rfbClientLog(" ");
+	rfbClientLog2(client, " ");
       if ((i % 16) == 15)
 	{
-	  rfbClientLog("%s\n",str);
+	  rfbClientLog2(client, "%s\n",str);
 	}
     }
   if ((i % 16) != 0)
     {
       for (j = i % 16; j < 16; j++)
 	{
-	  rfbClientLog("   ");
-	  if ((j % 4) == 3) rfbClientLog(" ");
+	  rfbClientLog2(client, "   ");
+	  if ((j % 4) == 3) rfbClientLog2(client, " ");
 	}
       str[i % 16] = 0;
-      rfbClientLog("%s\n",str);
+      rfbClientLog2(client, "%s\n",str);
     }
 
   fflush(stderr);
@@ -877,7 +877,7 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 #ifdef WIN32
     errno=WSAGetLastError();
 #endif
-    rfbClientLog("Waiting for message failed: %d (%s)\n",errno,strerror(errno));
+    rfbClientLog2(client, "Waiting for message failed: %d (%s)\n",errno,strerror(errno));
   }
 
   return num;

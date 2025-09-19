@@ -73,7 +73,7 @@
    Set (non)blocking mode for a socket.
    Returns TRUE on succcess, FALSE on failure.
  */
-rfbBool sock_set_nonblocking(rfbSocket sock, rfbBool non_blocking, void (*log)(const char *format, ...));
+rfbBool sock_set_nonblocking(void* client, rfbSocket sock, rfbBool non_blocking, void (*log)(void* client, const char *format, ...));
 
 
 /*

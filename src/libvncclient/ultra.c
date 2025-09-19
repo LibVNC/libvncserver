@@ -46,13 +46,13 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   if (toRead==0) return TRUE;
 
   if (toRead < 0) {
-      rfbClientErr("ultra error: remote sent negative payload size\n");
+      rfbClientErr2(client, "ultra error: remote sent negative payload size\n");
       return FALSE;
   }
 
   if (uncompressedBytes==0)
   {
-      rfbClientLog("ultra error: rectangle has 0 uncomressed bytes ((%dw * %dh) * (%d / 8))\n", rw, rh, BPP); 
+      rfbClientLog2(client, "ultra error: rectangle has 0 uncomressed bytes ((%dw * %dh) * (%d / 8))\n", rw, rh, BPP); 
       return FALSE;
   }
 
@@ -100,7 +100,7 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   
   /* Note that uncompressedBytes will be 0 on output overrun */
   if ((rw * rh * (BPP / 8)) != uncompressedBytes)
-      rfbClientLog("Ultra decompressed unexpected amount of data (%d != %d)\n", (rw * rh * (BPP / 8)), uncompressedBytes);
+      rfbClientLog2(client, "Ultra decompressed unexpected amount of data (%d != %d)\n", (rw * rh * (BPP / 8)), uncompressedBytes);
   
   /* Put the uncompressed contents of the update on the screen. */
   if ( inflateResult == LZO_E_OK ) 
@@ -109,7 +109,7 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   }
   else
   {
-    rfbClientLog("ultra decompress returned error: %d\n",
+    rfbClientLog2(client, "ultra decompress returned error: %d\n",
             inflateResult);
     return FALSE;
   }
@@ -137,13 +137,13 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   if (toRead==0) return TRUE;
 
   if (toRead < 0) {
-      rfbClientErr("ultrazip error: remote sent negative payload size\n");
+      rfbClientErr2(client, "ultrazip error: remote sent negative payload size\n");
       return FALSE;
   }
 
   if (uncompressedBytes==0)
   {
-      rfbClientLog("ultrazip error: rectangle has 0 uncomressed bytes (%dy + (%dw * 65535)) (%d rectangles)\n", ry, rw, rx); 
+      rfbClientLog2(client, "ultrazip error: rectangle has 0 uncomressed bytes (%dy + (%dw * 65535)) (%d rectangles)\n", ry, rw, rx); 
       return FALSE;
   }
 
@@ -187,7 +187,7 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
               (lzo_byte *)client->raw_buffer, &uncompressedBytes, NULL);
   if ( inflateResult != LZO_E_OK ) 
   {
-    rfbClientLog("ultra decompress returned error: %d\n",
+    rfbClientLog2(client, "ultra decompress returned error: %d\n",
             inflateResult);
     return FALSE;
   }

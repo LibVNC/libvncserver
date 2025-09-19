@@ -77,7 +77,7 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     inflateResult = inflateInit( &client->decompStream );
 
     if ( inflateResult != Z_OK ) {
-      rfbClientLog(
+      rfbClientLog2(client, 
               "inflateInit returned error: %d, msg: %s\n",
               inflateResult,
               client->decompStream.msg);
@@ -115,11 +115,11 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
     /* We never supply a dictionary for compression. */
     if ( inflateResult == Z_NEED_DICT ) {
-      rfbClientLog("zlib inflate needs a dictionary!\n");
+      rfbClientLog2(client, "zlib inflate needs a dictionary!\n");
       return FALSE;
     }
     if ( inflateResult < 0 ) {
-      rfbClientLog(
+      rfbClientLog2(client, 
               "zlib inflate returned error: %d, msg: %s\n",
               inflateResult,
               client->decompStream.msg);
@@ -131,7 +131,7 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
      */
     if (( client->decompStream.avail_in > 0 ) &&
         ( client->decompStream.avail_out <= 0 )) {
-      rfbClientLog("zlib inflate ran out of space!\n");
+      rfbClientLog2(client, "zlib inflate ran out of space!\n");
       return FALSE;
     }
 
@@ -146,7 +146,7 @@ HandleZlibBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   }
   else {
 
-    rfbClientLog(
+    rfbClientLog2(client, 
             "zlib inflate returned error: %d, msg: %s\n",
             inflateResult,
             client->decompStream.msg);
