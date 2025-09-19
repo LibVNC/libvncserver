@@ -93,7 +93,7 @@ static rfbBool InitLockingCb()
 {
   mutex_buf = malloc(CRYPTO_num_locks() * MUTEX_SIZE);
   if (mutex_buf == NULL) {
-    rfbClientLog("Failed to initialized OpenSSL: memory.\n");
+    rfbClientLog2(client, "Failed to initialized OpenSSL: memory.\n");
     return FALSE;
   }
 
@@ -154,7 +154,7 @@ InitializeTLS(void)
   SSLeay_add_ssl_algorithms();
   RAND_load_file("/dev/urandom", 1024);
 
-  rfbClientLog("OpenSSL version %s initialized.\n", SSLeay_version(SSLEAY_VERSION));
+  rfbClientLog2(client, "OpenSSL version %s initialized.\n", SSLeay_version(SSLEAY_VERSION));
   rfbTLSInitialized = TRUE;
   return TRUE;
 }
@@ -204,7 +204,7 @@ static int wait_for_data(SSL *ssl, int ret, int timeout)
       retval = 3;
       long verify_res = SSL_get_verify_result(ssl);
       if (verify_res != X509_V_OK)
-        rfbClientLog("Could not verify server certificate: %s.\n",
+        rfbClientLog2(client, "Could not verify server certificate: %s.\n",
                      X509_verify_cert_error_string(verify_res));
       break;
    }
@@ -263,7 +263,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
 
   if (!(ssl_ctx = SSL_CTX_new(SSLv23_client_method())))
   {
-    rfbClientLog("Could not create new SSL context.\n");
+    rfbClientLog2(client, "Could not create new SSL context.\n");
     return NULL;
   }
 
@@ -277,12 +277,12 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
     {
       if (!SSL_CTX_load_verify_locations(ssl_ctx, cred->x509Credential.x509CACertFile, NULL))
       {
-        rfbClientLog("Failed to load CA certificate from %s.\n",
+        rfbClientLog2(client, "Failed to load CA certificate from %s.\n",
                      cred->x509Credential.x509CACertFile);
         goto error_free_ctx;
       }
     } else {
-      rfbClientLog("Using default paths for certificate verification.\n");
+      rfbClientLog2(client, "Using default paths for certificate verification.\n");
       SSL_CTX_set_default_verify_paths (ssl_ctx);
     }
 
@@ -290,7 +290,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
     {
       if (!load_crls_from_file(cred->x509Credential.x509CACrlFile, ssl_ctx))
       {
-        rfbClientLog("CRLs could not be loaded.\n");
+        rfbClientLog2(client, "CRLs could not be loaded.\n");
         goto error_free_ctx;
       }
       if (verify_crls == rfbX509CrlVerifyNone) verify_crls = rfbX509CrlVerifyAll;
@@ -300,19 +300,19 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
     {
       if (SSL_CTX_use_certificate_chain_file(ssl_ctx, cred->x509Credential.x509ClientCertFile) != 1)
       {
-        rfbClientLog("Client certificate could not be loaded.\n");
+        rfbClientLog2(client, "Client certificate could not be loaded.\n");
         goto error_free_ctx;
       }
 
       if (SSL_CTX_use_PrivateKey_file(ssl_ctx, cred->x509Credential.x509ClientKeyFile,
                                       SSL_FILETYPE_PEM) != 1)
       {
-        rfbClientLog("Client private key could not be loaded.\n");
+        rfbClientLog2(client, "Client private key could not be loaded.\n");
         goto error_free_ctx;
       }
 
       if (SSL_CTX_check_private_key(ssl_ctx) == 0) {
-        rfbClientLog("Client certificate and private key do not match.\n");
+        rfbClientLog2(client, "Client certificate and private key do not match.\n");
         goto error_free_ctx;
       }
     }
@@ -326,7 +326,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
 
     if(!X509_VERIFY_PARAM_set1_host(param, client->serverHost, strlen(client->serverHost)))
     {
-      rfbClientLog("Could not set server name for verification.\n");
+      rfbClientLog2(client, "Could not set server name for verification.\n");
       goto error_free_ctx;
     }
     SSL_CTX_set1_param(ssl_ctx, param);
@@ -351,7 +351,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
 
   if (!(ssl = SSL_new (ssl_ctx)))
   {
-    rfbClientLog("Could not create a new SSL session.\n");
+    rfbClientLog2(client, "Could not create a new SSL session.\n");
     goto error_free_ctx;
   }
 
@@ -400,7 +400,7 @@ InitializeTLSSession(rfbClient* client, rfbBool anonTLS, rfbCredential *cred)
 
   INIT_MUTEX(client->tlsRwMutex);
 
-  rfbClientLog("TLS session initialized.\n");
+  rfbClientLog2(client, "TLS session initialized.\n");
 
   return TRUE;
 }
@@ -417,7 +417,7 @@ return TRUE;
   {
     if (ret != -1)
     {
-      rfbClientLog("TLS handshake blocking.\n");
+      rfbClientLog2(client, "TLS handshake blocking.\n");
 #ifdef WIN32
       Sleep(1000);
 #else
@@ -426,7 +426,7 @@ return TRUE;
       timeout--;
       continue;
     }
-    rfbClientLog("TLS handshake failed.\n");
+    rfbClientLog2(client, "TLS handshake failed.\n");
 
     FreeTLS(client);
     return FALSE;
@@ -434,12 +434,12 @@ return TRUE;
 
   if (timeout <= 0)
   {
-    rfbClientLog("TLS handshake timeout.\n");
+    rfbClientLog2(client, "TLS handshake timeout.\n");
     FreeTLS(client);
     return FALSE;
   }
 
-  rfbClientLog("TLS handshake done.\n");
+  rfbClientLog2(client, "TLS handshake done.\n");
   return TRUE;
 }
 
@@ -457,18 +457,18 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
 
     if (count==0)
     {
-        rfbClientLog("List of security types is ZERO. Giving up.\n");
+        rfbClientLog2(client, "List of security types is ZERO. Giving up.\n");
         return FALSE;
     }
 
-    rfbClientLog("We have %d security types to read\n", count);
+    rfbClientLog2(client, "We have %d security types to read\n", count);
     authScheme=0;
     /* now, we have a list of available security types to read ( uint8_t[] ) */
     for (loop=0;loop<count;loop++)
     {
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 4)) return FALSE;
         t=rfbClientSwap32IfLE(tAuth[loop]);
-        rfbClientLog("%d) Received security type %d\n", loop, t);
+        rfbClientLog2(client, "%d) Received security type %d\n", loop, t);
         if (t==rfbNoAuth ||
             t==rfbVncAuth ||
             t==rfbVeNCryptPlain ||
@@ -505,13 +505,13 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
             snprintf(buf2, sizeof(buf2), (loop>0 ? ", %d" : "%d"), (int)tAuth[loop]);
             strncat(buf1, buf2, sizeof(buf1)-strlen(buf1)-1);
         }
-        rfbClientLog("Unknown VeNCrypt authentication scheme from VNC server: %s\n",
+        rfbClientLog2(client, "Unknown VeNCrypt authentication scheme from VNC server: %s\n",
                buf1);
         return FALSE;
     }
     else
     {
-        rfbClientLog("Selecting security type %d\n", authScheme);
+        rfbClientLog2(client, "Selecting security type %d\n", authScheme);
         /* send back 4 bytes (in original byte order!) indicating which security type to use */
         if (!WriteToRFBServer(client, (char *)&origAuthScheme, 4)) return FALSE;
     }
@@ -554,11 +554,11 @@ HandleVeNCryptAuth(rfbClient* client)
   {
     return FALSE;
   }
-  rfbClientLog("Got VeNCrypt version %d.%d from server.\n", (int)major, (int)minor);
+  rfbClientLog2(client, "Got VeNCrypt version %d.%d from server.\n", (int)major, (int)minor);
 
   if (major != 0 && minor != 2)
   {
-    rfbClientLog("Unsupported VeNCrypt version.\n");
+    rfbClientLog2(client, "Unsupported VeNCrypt version.\n");
     return FALSE;
   }
 
@@ -571,7 +571,7 @@ HandleVeNCryptAuth(rfbClient* client)
 
   if (status != 0)
   {
-    rfbClientLog("Server refused VeNCrypt version %d.%d.\n", (int)major, (int)minor);
+    rfbClientLog2(client, "Server refused VeNCrypt version %d.%d.\n", (int)major, (int)minor);
     return FALSE;
   }
 
@@ -605,7 +605,7 @@ HandleVeNCryptAuth(rfbClient* client)
   /* Ack is only requred for the encrypted connection */
   if (!ReadFromRFBServer(client, (char *)&status, 1) || status != 1)
   {
-    rfbClientLog("Server refused VeNCrypt authentication %d (%d).\n", authScheme, (int)status);
+    rfbClientLog2(client, "Server refused VeNCrypt authentication %d (%d).\n", authScheme, (int)status);
     return FALSE;
   }
 
@@ -617,13 +617,13 @@ HandleVeNCryptAuth(rfbClient* client)
 
     if (!client->GetCredential)
     {
-      rfbClientLog("GetCredential callback is not set.\n");
+      rfbClientLog2(client, "GetCredential callback is not set.\n");
       return FALSE;
     }
     cred = client->GetCredential(client, rfbCredentialTypeX509);
     if (!cred)
     {
-      rfbClientLog("Reading credential failed\n");
+      rfbClientLog2(client, "Reading credential failed\n");
       return FALSE;
     }
   }
@@ -658,7 +658,7 @@ ReadFromTLS(rfbClient* client, char *out, unsigned int n)
   else {
     errno = ssl_error_to_errno(ssl_error);
     if (errno != EAGAIN) {
-      rfbClientLog("Error reading from TLS: -.\n");
+      rfbClientLog2(client, "Error reading from TLS: -.\n");
     }
   }
 
@@ -686,7 +686,7 @@ WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
     {
       errno = ssl_error_to_errno(ssl_error);
       if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
-      rfbClientLog("Error writing to TLS: -\n");
+      rfbClientLog2(client, "Error writing to TLS: -\n");
       return -1;
     }
     offset += (unsigned int)ret;

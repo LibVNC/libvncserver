@@ -10,7 +10,7 @@
 #include <rfb/rfbclient.h>
 
 static void PrintRect(rfbClient* client, int x, int y, int w, int h) {
-	rfbClientLog("Received an update for %d,%d,%d,%d.\n",x,y,w,h);
+	rfbClientLog2(client, "Received an update for %d,%d,%d,%d.\n",x,y,w,h);
 }
 
 static void SaveFramebufferAsPPM(rfbClient* client, int x, int y, int w, int h) {
@@ -30,13 +30,13 @@ static void SaveFramebufferAsPPM(rfbClient* client, int x, int y, int w, int h) 
 
 	/* assert bpp=4 */
 	if(bpp!=4 && bpp!=2) {
-		rfbClientLog("bpp = %d (!=4)\n",bpp);
+		rfbClientLog2(client, "bpp = %d (!=4)\n",bpp);
 		return;
 	}
 
 	f=fopen("framebuffer.ppm","wb");
 	if(!f) {
-		rfbClientErr("Could not open framebuffer.ppm\n");
+		rfbClientErr2(client, "Could not open framebuffer.ppm\n");
 		return;
 	}
 

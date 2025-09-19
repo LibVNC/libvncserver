@@ -64,7 +64,7 @@ static int log_func(void *context,
                     int level,
                     const char *message)
 {
-   rfbClientLog("SASL: %s\n", message);
+   rfbClientLog2(client, "SASL: %s\n", message);
 
    return SASL_OK;
 }
@@ -77,12 +77,12 @@ static int user_callback_adapt(void *context,
    rfbClient* client = (rfbClient *)context;
 
    if (id != SASL_CB_AUTHNAME) {
-       rfbClientLog("Unrecognized SASL callback ID %d\n", id);
+       rfbClientLog2(client, "Unrecognized SASL callback ID %d\n", id);
        return SASL_FAIL;
    }
 
    if (!client->GetUser) {
-       rfbClientLog("Client user callback not found\n");
+       rfbClientLog2(client, "Client user callback not found\n");
        return SASL_FAIL;
    }
 
@@ -102,7 +102,7 @@ static int password_callback_adapt(sasl_conn_t *conn,
    char * password;
 
    if (id != SASL_CB_PASS) {
-       rfbClientLog("Unrecognized SASL callback ID %d\n", id);
+       rfbClientLog2(client, "Unrecognized SASL callback ID %d\n", id);
        return SASL_FAIL;
    }
 
@@ -112,7 +112,7 @@ static int password_callback_adapt(sasl_conn_t *conn,
    }
 
    if (!client->GetPassword) {
-       rfbClientLog("Client password callback not found\n");
+       rfbClientLog2(client, "Client password callback not found\n");
        return SASL_FAIL;
    }
 
@@ -122,7 +122,7 @@ static int password_callback_adapt(sasl_conn_t *conn,
 
    sasl_secret_t *lsec = (sasl_secret_t *)malloc(sizeof(sasl_secret_t) + strlen(password));
    if (!lsec) {
-       rfbClientLog("Could not allocate sasl_secret_t\n");
+       rfbClientLog2(client, "Could not allocate sasl_secret_t\n");
        return SASL_FAIL;
    }
 
@@ -177,9 +177,9 @@ HandleSASLAuth(rfbClient *client)
 
     /* Sets up the SASL library as a whole */
     err = sasl_client_init(NULL);
-    rfbClientLog("Client initialize SASL authentication %d\n", err);
+    rfbClientLog2(client, "Client initialize SASL authentication %d\n", err);
     if (err != SASL_OK) {
-        rfbClientLog("failed to initialize SASL library: %d (%s)\n",
+        rfbClientLog2(client, "failed to initialize SASL library: %d (%s)\n",
                   err, sasl_errstring(err, NULL, NULL));
         goto error;
     }
@@ -191,7 +191,7 @@ HandleSASLAuth(rfbClient *client)
     int  port;
 
     if (getsockname(client->sock, (struct sockaddr*)&localAddress, &addressLength)) {
-        rfbClientLog("failed to get local address\n");
+        rfbClientLog2(client, "failed to get local address\n");
         goto error;
     }
 
@@ -206,14 +206,14 @@ HandleSASLAuth(rfbClient *client)
         port = ntohs(sa_in->sin6_port);
         localAddr = vnc_connection_addr_to_string(buf, port);
     } else {
-        rfbClientLog("failed to get local address\n");
+        rfbClientLog2(client, "failed to get local address\n");
         goto error;
     }
 
     /* Get remote address in form  IPADDR:PORT */
     remoteAddr = vnc_connection_addr_to_string(client->serverHost, client->serverPort);
 
-    rfbClientLog("Client SASL new host:'%s' local:'%s' remote:'%s'\n", client->serverHost, localAddr, remoteAddr);
+    rfbClientLog2(client, "Client SASL new host:'%s' local:'%s' remote:'%s'\n", client->serverHost, localAddr, remoteAddr);
 
     /* Setup a handle for being a client */
     err = sasl_client_new("vnc",
@@ -227,7 +227,7 @@ HandleSASLAuth(rfbClient *client)
     free(remoteAddr);
 
     if (err != SASL_OK) {
-        rfbClientLog("Failed to create SASL client context: %d (%s)\n",
+        rfbClientLog2(client, "Failed to create SASL client context: %d (%s)\n",
                   err, sasl_errstring(err, NULL, NULL));
         goto error;
     }
@@ -235,14 +235,14 @@ HandleSASLAuth(rfbClient *client)
     /* Initialize some connection props we care about */
     if (client->tlsSession) {
         if (!(ssf = (sasl_ssf_t)GetTLSCipherBits(client))) {
-            rfbClientLog("%s", "invalid cipher size for TLS session\n");
+            rfbClientLog2(client, "%s", "invalid cipher size for TLS session\n");
             goto error;
         }
 
-        rfbClientLog("Setting external SSF %d\n", ssf);
+        rfbClientLog2(client, "Setting external SSF %d\n", ssf);
         err = sasl_setprop(saslconn, SASL_SSF_EXTERNAL, &ssf);
         if (err != SASL_OK) {
-            rfbClientLog("cannot set external SSF %d (%s)\n",
+            rfbClientLog2(client, "cannot set external SSF %d (%s)\n",
                       err, sasl_errstring(err, NULL, NULL));
             goto error;
         }
@@ -259,20 +259,20 @@ HandleSASLAuth(rfbClient *client)
 
     err = sasl_setprop(saslconn, SASL_SEC_PROPS, &secprops);
     if (err != SASL_OK) {
-        rfbClientLog("cannot set security props %d (%s)\n",
+        rfbClientLog2(client, "cannot set security props %d (%s)\n",
                   err, sasl_errstring(err, NULL, NULL));
         goto error;
     }
 
     /* Get the supported mechanisms from the server */
     if (!ReadFromRFBServer(client, (char *)&mechlistlen, 4)) {
-        rfbClientLog("failed to read mechlistlen\n");
+        rfbClientLog2(client, "failed to read mechlistlen\n");
         goto error;
     }
     mechlistlen = rfbClientSwap32IfLE(mechlistlen);
-    rfbClientLog("mechlistlen is %d\n", mechlistlen);
+    rfbClientLog2(client, "mechlistlen is %d\n", mechlistlen);
     if (mechlistlen > SASL_MAX_MECHLIST_LEN) {
-        rfbClientLog("mechlistlen %d too long\n", mechlistlen);
+        rfbClientLog2(client, "mechlistlen %d too long\n", mechlistlen);
         goto error;
     }
 
@@ -289,7 +289,7 @@ HandleSASLAuth(rfbClient *client)
         
         if (wantmech && *wantmech != 0) {
             if (strstr(mechlist, wantmech) == NULL) {
-                rfbClientLog("Client requested SASL mechanism %s not supported by server\n",
+                rfbClientLog2(client, "Client requested SASL mechanism %s not supported by server\n",
                              wantmech);
                 free(mechlist);
                 free(wantmech);
@@ -301,7 +301,7 @@ HandleSASLAuth(rfbClient *client)
         }
     }
 
-    rfbClientLog("Client start negotiation mechlist '%s'\n", mechlist);
+    rfbClientLog2(client, "Client start negotiation mechlist '%s'\n", mechlist);
 
     /* Start the auth negotiation on the client end first */
     err = sasl_client_start(saslconn,
@@ -311,7 +311,7 @@ HandleSASLAuth(rfbClient *client)
                             &clientoutlen,
                             &mechname);
     if (err != SASL_OK && err != SASL_CONTINUE && err != SASL_INTERACT) {
-        rfbClientLog("Failed to start SASL negotiation: %d (%s)\n",
+        rfbClientLog2(client, "Failed to start SASL negotiation: %d (%s)\n",
                   err, sasl_errdetail(saslconn));
         free(mechlist);
         mechlist = NULL;
@@ -320,15 +320,15 @@ HandleSASLAuth(rfbClient *client)
 
     /* Need to gather some credentials from the client */
     if (err == SASL_INTERACT) {
-        rfbClientLog("User interaction required but not currently supported\n");
+        rfbClientLog2(client, "User interaction required but not currently supported\n");
         goto error;
     }
 
-    rfbClientLog("Server start negotiation with mech %s. Data %d bytes %p '%s'\n",
+    rfbClientLog2(client, "Server start negotiation with mech %s. Data %d bytes %p '%s'\n",
               mechname, clientoutlen, clientout, clientout);
 
     if (clientoutlen > SASL_MAX_DATA_LEN) {
-        rfbClientLog("SASL negotiation data too long: %d bytes\n",
+        rfbClientLog2(client, "SASL negotiation data too long: %d bytes\n",
                   clientoutlen);
         goto error;
     }
@@ -348,13 +348,13 @@ HandleSASLAuth(rfbClient *client)
         if (!WriteToRFBServer(client, (char *)&temp, 4)) goto error;
     }
 
-    rfbClientLog("%s", "Getting sever start negotiation reply\n");
+    rfbClientLog2(client, "%s", "Getting sever start negotiation reply\n");
     /* Read the 'START' message reply from server */
     if (!ReadFromRFBServer(client, (char *)&serverinlen, 4)) goto error;
     serverinlen = rfbClientSwap32IfLE(serverinlen);
 
     if (serverinlen > SASL_MAX_DATA_LEN) {
-        rfbClientLog("SASL negotiation data too long: %d bytes\n",
+        rfbClientLog2(client, "SASL negotiation data too long: %d bytes\n",
                   serverinlen);
         goto error;
     }
@@ -370,7 +370,7 @@ HandleSASLAuth(rfbClient *client)
     }
     if (!ReadFromRFBServer(client, (char *)&complete, 1)) goto error;
 
-    rfbClientLog("Client start result complete: %d. Data %d bytes %p '%s'\n",
+    rfbClientLog2(client, "Client start result complete: %d. Data %d bytes %p '%s'\n",
               complete, serverinlen, serverin, serverin);
 
     /* Loop-the-loop...
@@ -384,14 +384,14 @@ HandleSASLAuth(rfbClient *client)
                                &clientout,
                                &clientoutlen);
         if (err != SASL_OK && err != SASL_CONTINUE && err != SASL_INTERACT) {
-            rfbClientLog("Failed SASL step: %d (%s)\n",
+            rfbClientLog2(client, "Failed SASL step: %d (%s)\n",
                       err, sasl_errdetail(saslconn));
             goto error;
         }
 
         /* Need to gather some credentials from the client */
         if (err == SASL_INTERACT) {
-            rfbClientLog("User interaction required but not currently supported\n");
+            rfbClientLog2(client, "User interaction required but not currently supported\n");
             goto error;
         }
 
@@ -400,7 +400,7 @@ HandleSASLAuth(rfbClient *client)
             serverin = NULL;
         }
 
-        rfbClientLog("Client step result %d. Data %d bytes %p '%s'\n", err, clientoutlen, clientout, clientout);
+        rfbClientLog2(client, "Client step result %d. Data %d bytes %p '%s'\n", err, clientoutlen, clientout, clientout);
 
         /* Previous server call showed completion & we're now locally complete too */
         if (complete && err == SASL_OK)
@@ -418,13 +418,13 @@ HandleSASLAuth(rfbClient *client)
             if (!WriteToRFBServer(client, (char *)&temp, 4)) goto error;
         }
 
-        rfbClientLog("Server step with %d bytes %p\n", clientoutlen, clientout);
+        rfbClientLog2(client, "Server step with %d bytes %p\n", clientoutlen, clientout);
 
         if (!ReadFromRFBServer(client, (char *)&serverinlen, 4)) goto error;
         serverinlen = rfbClientSwap32IfLE(serverinlen);
 
         if (serverinlen > SASL_MAX_DATA_LEN) {
-            rfbClientLog("SASL negotiation data too long: %d bytes\n",
+            rfbClientLog2(client, "SASL negotiation data too long: %d bytes\n",
                       serverinlen);
             goto error;
         }
@@ -440,7 +440,7 @@ HandleSASLAuth(rfbClient *client)
         }
         if (!ReadFromRFBServer(client, (char *)&complete, 1)) goto error;
 
-        rfbClientLog("Client step result complete: %d. Data %d bytes %p '%s'\n",
+        rfbClientLog2(client, "Client step result complete: %d. Data %d bytes %p '%s'\n",
                   complete, serverinlen, serverin, serverin);
 
         /* This server call shows complete, and earlier client step was OK */
@@ -455,32 +455,32 @@ HandleSASLAuth(rfbClient *client)
     if (!client->tlsSession) {
         err = sasl_getprop(saslconn, SASL_SSF, &val);
         if (err != SASL_OK) {
-            rfbClientLog("cannot query SASL ssf on connection %d (%s)\n",
+            rfbClientLog2(client, "cannot query SASL ssf on connection %d (%s)\n",
                       err, sasl_errstring(err, NULL, NULL));
             goto error;
         }
         ssf = *(const int *)val;
-        rfbClientLog("SASL SSF value %d\n", ssf);
+        rfbClientLog2(client, "SASL SSF value %d\n", ssf);
         if (ssf < 56) { /* 56 == DES level, good for Kerberos */
-            rfbClientLog("negotiation SSF %d was not strong enough\n", ssf);
+            rfbClientLog2(client, "negotiation SSF %d was not strong enough\n", ssf);
             goto error;
         }
     }
 
-    rfbClientLog("%s", "SASL authentication complete\n");
+    rfbClientLog2(client, "%s", "SASL authentication complete\n");
 
     uint32_t result;
     if (!ReadFromRFBServer(client, (char *)&result, 4)) {
-        rfbClientLog("Failed to read authentication result\n");
+        rfbClientLog2(client, "Failed to read authentication result\n");
         goto error;
     }
     result = rfbClientSwap32IfLE(result);
 
     if (result != 0) {
-        rfbClientLog("Authentication failure\n");
+        rfbClientLog2(client, "Authentication failure\n");
         goto error;
     }
-    rfbClientLog("Authentication successful - switching to SSF\n");
+    rfbClientLog2(client, "Authentication successful - switching to SSF\n");
 
     /* This must come *after* check-auth-result, because the former
      * is defined to be sent unencrypted, and setting saslconn turns
@@ -541,7 +541,7 @@ ReadFromSASL(rfbClient* client, char *out, unsigned int n)
                           &client->saslDecoded, &client->saslDecodedLength);
         free(encoded);
         if (err != SASL_OK) {
-	    rfbClientLog("Failed to decode SASL data %s\n",
+	    rfbClientLog2(client, "Failed to decode SASL data %s\n",
                       sasl_errstring(err, NULL, NULL));
             return -EINVAL;
         }

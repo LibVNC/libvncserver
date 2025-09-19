@@ -50,7 +50,7 @@ static rfbBool resize(rfbClient* client) {
 					      depth,
 					      0,0,0,0);
 	if(!sdl)
-	    rfbClientErr("resize: error creating surface: %s\n", SDL_GetError());
+	    rfbClientErr2(client, "resize: error creating surface: %s\n", SDL_GetError());
 
 	rfbClientSetClientData(client, SDL_Init, sdl);
 	client->width = sdl->pitch / (depth / 8);
@@ -74,7 +74,7 @@ static rfbBool resize(rfbClient* client) {
 					 height,
 					 sdlFlags);
 	    if(!sdlWindow)
-		rfbClientErr("resize: error creating window: %s\n", SDL_GetError());
+		rfbClientErr2(client, "resize: error creating window: %s\n", SDL_GetError());
 	} else {
 	    SDL_SetWindowSize(sdlWindow, width, height);
 	}
@@ -83,7 +83,7 @@ static rfbBool resize(rfbClient* client) {
 	if(!sdlRenderer) {
 	    sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, 0);
 	    if(!sdlRenderer)
-		rfbClientErr("resize: error creating renderer: %s\n", SDL_GetError());
+		rfbClientErr2(client, "resize: error creating renderer: %s\n", SDL_GetError());
 	    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");  /* make the scaled rendering look smoother. */
 	}
 	SDL_RenderSetLogicalSize(sdlRenderer, width, height);  /* this is a departure from the SDL1.2-based version, but more in the sense of a VNC viewer in keeeping aspect ratio */
@@ -96,7 +96,7 @@ static rfbBool resize(rfbClient* client) {
 				       SDL_TEXTUREACCESS_STREAMING,
 				       width, height);
 	if(!sdlTexture)
-	    rfbClientErr("resize: error creating texture: %s\n", SDL_GetError());
+	    rfbClientErr2(client, "resize: error creating texture: %s\n", SDL_GetError());
 	return TRUE;
 }
 
@@ -198,12 +198,12 @@ static void update(rfbClient* cl,int x,int y,int w,int h) {
 	/* update texture from surface->pixels */
 	SDL_Rect r = {x,y,w,h};
  	if(SDL_UpdateTexture(sdlTexture, &r, sdl->pixels + y*sdl->pitch + x*4, sdl->pitch) < 0)
-	    rfbClientErr("update: failed to update texture: %s\n", SDL_GetError());
+	    rfbClientErr2(client, "update: failed to update texture: %s\n", SDL_GetError());
 	/* copy texture to renderer and show */
 	if(SDL_RenderClear(sdlRenderer) < 0)
-	    rfbClientErr("update: failed to clear renderer: %s\n", SDL_GetError());
+	    rfbClientErr2(client, "update: failed to clear renderer: %s\n", SDL_GetError());
 	if(SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL) < 0)
-	    rfbClientErr("update: failed to copy texture to renderer: %s\n", SDL_GetError());
+	    rfbClientErr2(client, "update: failed to copy texture to renderer: %s\n", SDL_GetError());
 	SDL_RenderPresent(sdlRenderer);
 }
 
@@ -303,7 +303,7 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
                 if (SDL_HasClipboardText()) {
 		        char *text = SDL_GetClipboardText();
 			if(text) {
-			    rfbClientLog("sending clipboard text '%s'\n", text);
+			    rfbClientLog2(client, "sending clipboard text '%s'\n", text);
 			    if(!SendClientCutTextUTF8(cl, text, strlen(text)))
 			       SendClientCutText(cl, text, strlen(text));
 			}
@@ -314,12 +314,12 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		if (rightAltKeyDown) {
 			SendKeyEvent(cl, XK_Alt_R, FALSE);
 			rightAltKeyDown = FALSE;
-			rfbClientLog("released right Alt key\n");
+			rfbClientLog2(client, "released right Alt key\n");
 		}
 		if (leftAltKeyDown) {
 			SendKeyEvent(cl, XK_Alt_L, FALSE);
 			leftAltKeyDown = FALSE;
-			rfbClientLog("released left Alt key\n");
+			rfbClientLog2(client, "released left Alt key\n");
 		}
 		break;
 	    }
@@ -413,23 +413,23 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		    exit(0);
 		  }
 	default:
-		rfbClientLog("ignore SDL event: 0x%x\n", e->type);
+		rfbClientLog2(client, "ignore SDL event: 0x%x\n", e->type);
 	}
 	return TRUE;
 }
 
 static void got_selection_latin1(rfbClient *cl, const char *text, int len)
 {
-        rfbClientLog("received latin1 clipboard text '%s'\n", text);
+        rfbClientLog2(client, "received latin1 clipboard text '%s'\n", text);
         if(SDL_SetClipboardText(text) != 0)
-	    rfbClientErr("could not set received latin1 clipboard text: %s\n", SDL_GetError());
+	    rfbClientErr2(client, "could not set received latin1 clipboard text: %s\n", SDL_GetError());
 }
 
 static void got_selection_utf8(rfbClient *cl, const char *buf, int len)
 {
-        rfbClientLog("received utf8 clipboard text '%s'\n", buf);
+        rfbClientLog2(client, "received utf8 clipboard text '%s'\n", buf);
         if(SDL_SetClipboardText(buf) != 0)
-	    rfbClientErr("could not set received utf8 clipboard text: %s\n", SDL_GetError());
+	    rfbClientErr2(client, "could not set received utf8 clipboard text: %s\n", SDL_GetError());
 }
 
 
@@ -451,11 +451,11 @@ static rfbCredential* get_credential(rfbClient* cl, int credentialType){
 	}
 
 	if(credentialType != rfbCredentialTypeUser) {
-	    rfbClientErr("something else than username and password required for authentication\n");
+	    rfbClientErr2(client, "something else than username and password required for authentication\n");
 	    return NULL;
 	}
 
-	rfbClientLog("username and password required for authentication!\n");
+	rfbClientLog2(client, "username and password required for authentication!\n");
 	printf("user: ");
 	fgets(c->userCredential.username, RFB_BUF_SIZE, stdin);
 	printf("pass: ");

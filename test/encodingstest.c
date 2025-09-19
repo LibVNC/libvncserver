@@ -127,7 +127,7 @@ static void update(rfbClient* client,int x,int y,int w,int h) {
 	fprintf(stderr,"%c\r",progress[counter]);
 #else
 	clientData* cd = (clientData*)rfbClientGetClientData(client, clientLoop);
-	rfbClientLog("Got update (encoding=%s): (%d,%d)-(%d,%d)\n",
+	rfbClientLog2(client, "Got update (encoding=%s): (%d,%d)-(%d,%d)\n",
 			testEncodings[cd->encodingIndex].str,
 			x,y,x+w,y+h);
 #endif
@@ -157,11 +157,11 @@ static THREAD_ROUTINE_RETURN_TYPE clientLoop(void* data) {
 	client->appData.qualityLevel = 7; /* ZYWRLE fails the test with standard settings */
 
 	THREAD_SLEEP_MS(1000);
-	rfbClientLog("Starting client (encoding %s, display %s)\n",
+	rfbClientLog2(client, "Starting client (encoding %s, display %s)\n",
 			testEncodings[cd->encodingIndex].str,
 			cd->display);
 	if(!rfbInitClient(client,NULL,NULL)) {
-		rfbClientErr("Had problems starting client (encoding %s)\n",
+		rfbClientErr2(client, "Had problems starting client (encoding %s)\n",
 				testEncodings[cd->encodingIndex].str);
 		updateStatistics(cd->encodingIndex,TRUE);
 		free(cd);

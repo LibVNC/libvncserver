@@ -509,7 +509,9 @@ extern int listenForIncomingConnectionsNoFork(rfbClient* viewer, int usec_timeou
 
 extern rfbBool rfbEnableClientLogging;
 typedef void (*rfbClientLogProc)(const char *format, ...);
-extern rfbClientLogProc rfbClientLog,rfbClientErr;
+typedef void (*rfbClientLogProc2)(rfbClient* client, const char *format, ...);
+//extern rfbClientLogProc rfbClientLog,rfbClientErr;
+extern rfbClientLogProc2 rfbClientLog2,rfbClientErr2;
 extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
 extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
 extern void SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size);
@@ -670,7 +672,7 @@ extern rfbBool TextChatFinish(rfbClient* client);
 extern rfbBool PermitServerInput(rfbClient* client, int enabled);
 extern rfbBool SendXvpMsg(rfbClient* client, uint8_t version, uint8_t code);
 
-extern void PrintPixelFormat(rfbPixelFormat *format);
+extern void PrintPixelFormat(rfbClient* client, rfbPixelFormat *format);
 
 extern rfbBool SupportsClient2Server(rfbClient* client, int messageType);
 extern rfbBool SupportsServer2Client(rfbClient* client, int messageType);
@@ -745,29 +747,29 @@ extern rfbBool errorMessageOnReadFailure;
 
 extern rfbBool ReadFromRFBServer(rfbClient* client, char *out, unsigned int n);
 extern rfbBool WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n);
-extern int FindFreeTcpPort(void);
-extern rfbSocket ListenAtTcpPort(int port);
-extern rfbSocket ListenAtTcpPortAndAddress(int port, const char *address);
+extern int FindFreeTcpPort(rfbClient* client);
+extern rfbSocket ListenAtTcpPort(rfbClient* client, int port);
+extern rfbSocket ListenAtTcpPortAndAddress(rfbClient* client, int port, const char *address);
 /**
    Tries to connect to an IPv4 host.
    @param host Binary IPv4 address
    @param port Port
    @return A blocking socket or RFB_INVALID_SOCKET if the connection failed
 */
-extern rfbSocket ConnectClientToTcpAddr(unsigned int host, int port);
+extern rfbSocket ConnectClientToTcpAddr(rfbClient* client, unsigned int host, int port);
 /**
    Tries to connect to an IPv4 or IPv6 host.
    @param hostname A hostname or IP address
    @param port Port
    @return A blocking socket or RFB_INVALID_SOCKET if the connection failed
 */
-extern rfbSocket ConnectClientToTcpAddr6(const char *hostname, int port);
+extern rfbSocket ConnectClientToTcpAddr6(rfbClient* client, const char *hostname, int port);
 /**
    Tries to connect to a Unix socket.
    @param sockFile Path of the socket file
    @return A blocking socket or RFB_INVALID_SOCKET if the connection failed
 */
-extern rfbSocket ConnectClientToUnixSock(const char *sockFile);
+extern rfbSocket ConnectClientToUnixSock(rfbClient* client, const char *sockFile);
 /**
    Tries to connect to an IPv4 host using the given timeout value.
    @param host Binary IPv4 address
@@ -775,7 +777,7 @@ extern rfbSocket ConnectClientToUnixSock(const char *sockFile);
    @param timeout The time in seconds to wait for a connection
    @return A nonblocking socket or RFB_INVALID_SOCKET if the connection failed
 */
-extern rfbSocket ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int timeout);
+extern rfbSocket ConnectClientToTcpAddrWithTimeout(rfbClient* client, unsigned int host, int port, unsigned int timeout);
 /**
    Tries to connect to an IPv4 or IPv6 host using the given timeout value.
    @param hostname A hostname or IP address
@@ -783,18 +785,18 @@ extern rfbSocket ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, 
    @param timeout The time in seconds to wait for a connection
    @return A nonblocking socket or RFB_INVALID_SOCKET if the connection failed
 */
-extern rfbSocket ConnectClientToTcpAddr6WithTimeout(const char *hostname, int port, unsigned int timeout);
+extern rfbSocket ConnectClientToTcpAddr6WithTimeout(rfbClient* client, const char *hostname, int port, unsigned int timeout);
 /**
    Tries to connect to a Unix socket using the given timeout value.
    @param sockFile Path of the socket file
    @param timeout The time in seconds to wait for a connection
    @return A nonblocking socket or RFB_INVALID_SOCKET if the connection failed
 */
-extern rfbSocket ConnectClientToUnixSockWithTimeout(const char *sockFile, unsigned int timeout);
-extern rfbSocket AcceptTcpConnection(rfbSocket listenSock);
-extern rfbBool SetNonBlocking(rfbSocket sock);
-extern rfbBool SetBlocking(rfbSocket sock);
-extern rfbBool SetDSCP(rfbSocket sock, int dscp);
+extern rfbSocket ConnectClientToUnixSockWithTimeout(rfbClient* client, const char *sockFile, unsigned int timeout);
+extern rfbSocket AcceptTcpConnection(rfbClient* client, rfbSocket listenSock);
+extern rfbBool SetNonBlocking(rfbClient *client, rfbSocket sock);
+extern rfbBool SetBlocking(rfbClient *client, rfbSocket sock);
+extern rfbBool SetDSCP(rfbClient* client, rfbSocket sock, int dscp);
 
 extern rfbBool StringToIPAddr(const char *str, unsigned int *addr);
 extern rfbBool SameMachine(rfbSocket sock);
