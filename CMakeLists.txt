@@ -59,6 +59,7 @@ option(WITH_ZLIB "Search for the zlib compression library to support additional 
 option(WITH_LZO "Search for the LZO compression library to omit internal miniLZO implementation" ON)
 option(WITH_JPEG "Search for the libjpeg compression library to support additional encodings" ON)
 option(WITH_PNG "Search for the PNG compression library to support additional encodings" ON)
+option(WITH_FFMPEG "Search for FFMPEG to support H.264 encoding and build an example VNC to MPEG encoder" ON)
 option(WITH_SDL "Search for the Simple Direct Media Layer library to build an example SDL vnc client" ON)
 option(WITH_GTK "Search for the GTK library to build an example GTK vnc client" ON)
 option(WITH_LIBSSHTUNNEL "Search for libsshtunnel to build an example ssh-tunneled client" ON)
@@ -68,7 +69,6 @@ option(WITH_GNUTLS "Search for the GnuTLS secure communications library to suppo
 option(WITH_OPENSSL "Search for the OpenSSL cryptography library to support TLS and use as crypto backend" ON)
 option(WITH_SYSTEMD "Search for libsystemd to build with systemd socket activation support" ON)
 option(WITH_GCRYPT "Search for Libgcrypt to use as crypto backend" ON)
-option(WITH_FFMPEG "Search for FFMPEG to build an example VNC to MPEG encoder" ON)
 option(WITH_TIGHTVNC_FILETRANSFER "Enable filetransfer if there is pthreads support" ON)
 option(WITH_24BPP "Allow 24 bpp" ON)
 option(WITH_IPv6 "Enable IPv6 Support" ON)
@@ -274,6 +274,13 @@ if(PNG_FOUND)
 else()
   unset(PNG_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
 endif(PNG_FOUND)
+if(FFMPEG_FOUND)
+  set(LIBVNCSERVER_HAVE_LIBAVCODEC 1)
+  set(LIBVNCSERVER_HAVE_LIBSWSCALE 1)
+else()
+  unset(FFMPEG_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
+  unset(FFMPEG_INCLUDE_DIRS)
+endif()
 if(NOT OPENSSL_FOUND)
     unset(OPENSSL_LIBRARIES) # would otherwise contain -NOTFOUND, confusing target_link_libraries()
 endif()
@@ -508,6 +515,16 @@ if(PNG_FOUND)
   include_directories(${PNG_INCLUDE_DIR})
 endif(PNG_FOUND)
 
+if(FFMPEG_FOUND)
+  add_definitions(-DLIBVNCSERVER_HAVE_LIBAVCODEC)
+  add_definitions(-DLIBVNCSERVER_HAVE_LIBSWSCALE)
+  include_directories(${FFMPEG_INCLUDE_DIRS})
+  set(LIBVNCSERVER_SOURCES
+    ${LIBVNCSERVER_SOURCES}
+    ${LIBVNCSERVER_DIR}/h264.c
+  )
+endif()
+
 set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_SOURCES}
     ${TIGHT_C}
@@ -548,6 +565,7 @@ if(WITH_LIBVNCCLIENT)
                         ${ZLIB_LIBRARIES}
                         ${LZO_LIBRARIES}
                         ${JPEG_LIBRARIES}
+                        ${FFMPEG_LIBRARIES}
                         ${CRYPTO_LIBRARIES}
                         ${GNUTLS_LIBRARIES}
                         ${OPENSSL_LIBRARIES}
@@ -562,6 +580,7 @@ if(WITH_LIBVNCSERVER)
                         ${LZO_LIBRARIES}
                         ${JPEG_LIBRARIES}
                         ${PNG_LIBRARIES}
+                        ${FFMPEG_LIBRARIES}
                         ${CRYPTO_LIBRARIES}
                         ${GNUTLS_LIBRARIES}
                         ${OPENSSL_LIBRARIES}
@@ -660,13 +679,13 @@ if(WITH_LIBSSHTUNNEL AND LIBSSHTUNNEL_LIBRARY AND LIBSSHTUNNEL_INCLUDE_DIR)
   )
 endif()
 
-if(FFMPEG_FOUND)
+if(FFMPEG_FOUND AND NOT WIN32)
   include_directories(${FFMPEG_INCLUDE_DIRS})
   set(LIBVNCCLIENT_EXAMPLES
     ${LIBVNCCLIENT_EXAMPLES}
     vnc2mpg
   )
-endif(FFMPEG_FOUND)
+endif(FFMPEG_FOUND AND NOT WIN32)
 
 if(WITH_EXAMPLES)
   if(WITH_LIBVNCSERVER)
