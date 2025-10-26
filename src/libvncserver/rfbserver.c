@@ -317,6 +317,7 @@ rfbClientPtr rfbUltraVNCRepeaterMode2Connection(rfbScreenInfoPtr rfbScreen,
     }
 
     cl->reverseConnection = 0;
+    cl->destPort = repeaterPort;
 
     // Save repeater id without the 'ID:' prefix
     cl->repeaterId = malloc(sizeof(id) - 3);
