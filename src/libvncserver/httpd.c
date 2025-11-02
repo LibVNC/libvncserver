@@ -161,6 +161,8 @@ void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
     LOCK(cl.refCountMutex);
     UNLOCK(cl.refCountMutex);
     TINI_MUTEX(cl.refCountMutex);
+
+    memset(&cl, 0, sizeof(rfbClientRec));
 }
 
 /*
