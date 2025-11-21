@@ -495,8 +495,10 @@ ConnectClientToUnixSockWithTimeout(const char *sockFile, unsigned int timeout)
     return RFB_INVALID_SOCKET;
   }
 
-  if (!SetNonBlocking(sock))
-    return RFB_INVALID_SOCKET;
+  if (!SetNonBlocking(sock)) {
+      rfbCloseSocket(sock);
+      return RFB_INVALID_SOCKET;
+  }
 
   if (connect(sock, (struct sockaddr *)&addr, sizeof(addr.sun_family) + strlen(addr.sun_path)) < 0 &&
       !(errno == EINPROGRESS && sock_wait_for_connected(sock, timeout))) {
