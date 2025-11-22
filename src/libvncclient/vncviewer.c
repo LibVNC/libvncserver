@@ -272,7 +272,10 @@ static void parse_host_and_port(const char *input, char **host, int *port) {
             // check IPv4 vs IPv6
             if (first_colon == last_colon) {
                 // one colon, i.e. IPv4 with port, allocate and copy IP (before last colon)
-                *host = strndup(input, first_colon - input);
+                size_t ip_len = first_colon - input;
+                *host = malloc(ip_len + 1);
+                strncpy(*host, input, ip_len);
+                (*host)[ip_len] = '\0';
                 // Parse port as integer
                 *port = atoi(first_colon + 1);
             } else {
