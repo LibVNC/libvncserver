@@ -248,6 +248,44 @@ static void initAppData(AppData* data) {
 	data->useRemoteCursor=FALSE;
 }
 
+static void parse_host_and_port(const char *input, char **host, int *port) {
+    char *open_bracket = strchr(input, '[');
+    char *close_bracket = strchr(input, ']');
+
+    if (open_bracket && close_bracket && close_bracket > open_bracket) {
+        // IPv6 address with brackets, allocate and copy IP inside brackets
+        size_t ip_len = close_bracket - open_bracket - 1;
+        *host = malloc(ip_len + 1);
+        strncpy(*host, open_bracket + 1, ip_len);
+        (*host)[ip_len] = '\0';
+        // check for port via last colon
+        char *colon = strchr(close_bracket, ':');
+        if (colon) {
+            // Parse port as integer
+            *port = atoi(colon + 1);
+        }
+    } else {
+        // IPv4 or IPv6 w/o brackets, look for colons to decide which one
+        char *first_colon = strchr(input, ':');
+        char *last_colon = strrchr(input, ':');
+        if (first_colon) {
+            // check IPv4 vs IPv6
+            if (first_colon == last_colon) {
+                // one colon, i.e. IPv4 with port, allocate and copy IP (before last colon)
+                *host = strndup(input, first_colon - input);
+                // Parse port as integer
+                *port = atoi(first_colon + 1);
+            } else {
+                // IPv6, just copy input
+                *host = strdup(input);
+            }
+        } else {
+            // No colon, i.e. IPv4 w/o port, just copy input
+            *host = strdup(input);
+        }
+    }
+}
+
 rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 			int bytesPerPixel) {
 #ifdef WIN32
@@ -467,31 +505,17 @@ rfbBool rfbInitClient(rfbClient* client,int* argc,char** argv) {
         client->QoS_DSCP = atoi(argv[i+1]);
         j+=2;
       } else if (i+1<*argc && strcmp(argv[i], "-repeaterdest") == 0) {
-	char* colon=strchr(argv[i+1],':');
-
 	free(client->destHost);
 	client->destPort = 5900;
 
-	client->destHost = strdup(argv[i+1]);
-	if(client->destHost && colon) {
-	  client->destHost[(int)(colon-argv[i+1])] = '\0';
-	  client->destPort = atoi(colon+1);
-	}
+        parse_host_and_port(argv[i], &client->destHost, &client->destPort);
+
         j+=2;
       } else {
-	char* colon=strrchr(argv[i],':');
-
 	free(client->serverHost);
 
-	if(colon) {
-	  client->serverHost = strdup(argv[i]);
-	  if(client->serverHost) {
-	    client->serverHost[(int)(colon-argv[i])] = '\0';
-	    client->serverPort = atoi(colon+1);
-	  }
-	} else {
-	  client->serverHost = strdup(argv[i]);
-	}
+        parse_host_and_port(argv[i], &client->serverHost, &client->serverPort);
+
 	if(client->serverPort >= 0 && client->serverPort < 5900)
 	  client->serverPort += 5900;
       }
