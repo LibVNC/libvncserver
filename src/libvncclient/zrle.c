@@ -32,6 +32,8 @@
 #define REALBPP BPP
 #endif
 
+#define REALBytesPP ((REALBPP + 7) / 8)
+
 #if !defined(UNCOMP) || UNCOMP==0
 #define HandleZRLE CONCAT2E(HandleZRLE,REALBPP)
 #define HandleZRLETile CONCAT2E(HandleZRLETile,REALBPP)
@@ -87,7 +89,7 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 	int remaining;
 	int inflateResult;
 	int toRead;
-	int min_buffer_size = rw * rh * (REALBPP / 8) * 2;
+	int min_buffer_size = rw * rh * REALBytesPP * 2;
 
 	/* First make sure we have a large enough raw buffer to hold the
 	 * decompressed data.  In practice, with a fixed REALBPP, fixed frame
@@ -269,29 +271,29 @@ static int HandleZRLETile(rfbClient* client,
 #if REALBPP!=BPP
 			int i,j;
 
-			if(1+w*h*REALBPP/8>buffer_length) {
-				rfbClientLog("expected %d bytes, got only %d (%dx%d)\n",1+w*h*REALBPP/8,buffer_length,w,h);
+			if(1+w*h*REALBytesPP>buffer_length) {
+				rfbClientLog("expected %d bytes, got only %d (%dx%d)\n",1+w*h*REALBytesPP,buffer_length,w,h);
 				return -3;
 			}
 
 			for(j=y*client->width; j<(y+h)*client->width; j+=client->width)
-				for(i=x; i<x+w; i++,buffer+=REALBPP/8)
+				for(i=x; i<x+w; i++,buffer+=REALBytesPP)
 					((CARDBPP*)client->frameBuffer)[j+i] = UncompressCPixel(buffer);
 #else
 			client->GotBitmap(client, buffer, x, y, w, h);
-			buffer+=w*h*REALBPP/8;
+			buffer+=w*h*REALBytesPP;
 #endif
 		}
 		else if( type == 1 ) /* solid */
 		{
 			CARDBPP color = UncompressCPixel(buffer);
 
-			if(1+REALBPP/8>buffer_length)
+			if(1+REALBytesPP>buffer_length)
 				return -4;
 				
 			client->GotFillRect(client, x, y, w, h, color);
 
-			buffer+=REALBPP/8;
+			buffer+=REALBytesPP;
 
 		}
 		else if( type <= 127 ) /* packed Palette */
@@ -302,11 +304,11 @@ static int HandleZRLETile(rfbClient* client,
 				mask=(1<<bpp)-1,
 				divider=(8/bpp);
 
-			if(1+type*REALBPP/8+((w+divider-1)/divider)*h>buffer_length)
+			if(1+type*REALBytesPP+((w+divider-1)/divider)*h>buffer_length)
 				return -5;
 
 			/* read palette */
-			for(i=0; i<type; i++,buffer+=REALBPP/8)
+			for(i=0; i<type; i++,buffer+=REALBytesPP)
 				palette[i] = UncompressCPixel(buffer);
 
 			/* read palettized pixels */
@@ -331,10 +333,10 @@ static int HandleZRLETile(rfbClient* client,
 			while(j<h) {
 				int color,length;
 				/* read color */
-				if(buffer+REALBPP/8+1>buffer_end)
+				if(buffer+REALBytesPP+1>buffer_end)
 					return -7;
 				color = UncompressCPixel(buffer);
-				buffer+=REALBPP/8;
+				buffer+=REALBytesPP;
 				/* read run length */
 				length=1;
 				while(*buffer==0xff) {
@@ -368,11 +370,11 @@ static int HandleZRLETile(rfbClient* client,
 			CARDBPP palette[128];
 			int i,j;
 
-			if(2+(type-128)*REALBPP/8>buffer_length)
+			if(2+(type-128)*REALBytesPP>buffer_length)
 				return -9;
 
 			/* read palette */
-			for(i=0; i<type-128; i++,buffer+=REALBPP/8)
+			for(i=0; i<type-128; i++,buffer+=REALBytesPP)
 				palette[i] = UncompressCPixel(buffer);
 			/* read palettized pixels */
 			i=j=0;
