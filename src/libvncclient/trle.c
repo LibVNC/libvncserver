@@ -40,7 +40,6 @@
 #define HandleTRLE CONCAT3E(HandleTRLE, REALBPP, Up)
 #endif
 #define CARDBPP CONCAT3E(uint, BPP, _t)
-#define CARDREALBPP CONCAT3E(uint, REALBPP, _t)
 
 #if REALBPP != BPP && defined(UNCOMP) && UNCOMP != 0
 #if UNCOMP > 0
@@ -294,7 +293,6 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
 }
 
 #undef CARDBPP
-#undef CARDREALBPP
 #undef HandleTRLE
 #undef UncompressCPixel
 #undef REALBPP

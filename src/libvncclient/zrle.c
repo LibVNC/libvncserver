@@ -45,7 +45,6 @@
 #define HandleZRLETile CONCAT3E(HandleZRLETile,REALBPP,Up)
 #endif
 #define CARDBPP CONCAT3E(uint,BPP,_t)
-#define CARDREALBPP CONCAT3E(uint,REALBPP,_t)
 
 #define ENDIAN_LITTLE 0
 #define ENDIAN_BIG 1
@@ -418,7 +417,6 @@ static int HandleZRLETile(rfbClient* client,
 }
 
 #undef CARDBPP
-#undef CARDREALBPP
 #undef HandleZRLE
 #undef HandleZRLETile
 #undef UncompressCPixel
