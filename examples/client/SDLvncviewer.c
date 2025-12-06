@@ -44,11 +44,19 @@ static rfbBool resize(rfbClient* client) {
 
 	/* (re)create the surface used as the client's framebuffer */
 	SDL_FreeSurface(rfbClientGetClientData(client, SDL_Init));
-	SDL_Surface* sdl=SDL_CreateRGBSurface(0,
-					      width,
-					      height,
-					      depth,
-					      0,0,0,0);
+	SDL_Surface* sdl;
+	if (depth == 8) /* by default SDL uses palette for depth == 8 */
+	    sdl=SDL_CreateRGBSurfaceWithFormat(0,
+					       width,
+					       height,
+					       depth,
+					       SDL_PIXELFORMAT_RGB332);
+	else
+	    sdl=SDL_CreateRGBSurface(0,
+				     width,
+				     height,
+				     depth,
+				     0,0,0,0);
 	if(!sdl)
 	    rfbClientErr("resize: error creating surface: %s\n", SDL_GetError());
 
@@ -92,7 +100,7 @@ static rfbBool resize(rfbClient* client) {
 	if(sdlTexture)
 	    SDL_DestroyTexture(sdlTexture);
 	sdlTexture = SDL_CreateTexture(sdlRenderer,
-				       SDL_PIXELFORMAT_ARGB8888,
+				       sdl->format->format,
 				       SDL_TEXTUREACCESS_STREAMING,
 				       width, height);
 	if(!sdlTexture)
@@ -197,7 +205,8 @@ static void update(rfbClient* cl,int x,int y,int w,int h) {
 	SDL_Surface *sdl = rfbClientGetClientData(cl, SDL_Init);
 	/* update texture from surface->pixels */
 	SDL_Rect r = {x,y,w,h};
- 	if(SDL_UpdateTexture(sdlTexture, &r, sdl->pixels + y*sdl->pitch + x*4, sdl->pitch) < 0)
+	int bytes_per_pixel = cl->format.bitsPerPixel == 16 ? 2 : 4;
+ 	if(SDL_UpdateTexture(sdlTexture, &r, sdl->pixels + y*sdl->pitch + x*bytes_per_pixel, sdl->pitch) < 0)
 	    rfbClientErr("update: failed to update texture: %s\n", SDL_GetError());
 	/* copy texture to renderer and show */
 	if(SDL_RenderClear(sdlRenderer) < 0)
@@ -477,6 +486,7 @@ int main(int argc,char** argv) {
 	rfbClient* cl;
 	int i, j;
 	SDL_Event e;
+        int bpp = 32;
 
 #ifdef LOG_TO_FILE
 	rfbClientLog=rfbClientErr=log_to_file;
@@ -494,6 +504,12 @@ int main(int argc,char** argv) {
 			argv[i] = "-listennofork";
                         ++j;
 		}
+		else if (!strcmp(argv[i], "-8"))
+                        bpp = 8;
+		else if (!strcmp(argv[i], "-16"))
+                        bpp = 16;
+		else if (!strcmp(argv[i], "-32"))
+                        bpp = 32;
 		else {
 			if (i != j)
 				argv[j] = argv[i];
@@ -506,8 +522,12 @@ int main(int argc,char** argv) {
 	signal(SIGINT, exit);
 
 	do {
-	  /* 16-bit: cl=rfbGetClient(5,3,2); */
-	  cl=rfbGetClient(8,3,4);
+          if (bpp == 8)
+              cl=rfbGetClient(2,3,1);
+          else if (bpp == 16)
+	      cl=rfbGetClient(5,3,2);
+          else
+	      cl=rfbGetClient(8,3,4);
 	  cl->MallocFrameBuffer=resize;
 	  cl->canHandleNewFBSize = TRUE;
 	  cl->GotFrameBufferUpdate=update;
