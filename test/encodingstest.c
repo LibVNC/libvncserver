@@ -10,6 +10,10 @@
 #error "I need pthreads or win32 threads for that."
 #endif
 
+#ifndef MAX
+#define MAX(x,y) ((x) > (y) ? (x) : (y))
+#endif /* MAX */
+
 #define ALL_AT_ONCE
 /*#define VERY_VERBOSE*/
 
@@ -39,7 +43,7 @@ static encoding_t testEncodings[]={
 
 /* Here come the variables/functions to handle the test output */
 
-static const int width=400,height=300;
+static int width=400,height=300;
 static unsigned int statistics[2][NUMBER_OF_ENCODINGS_TO_TEST];
 static unsigned int totalFailed,totalCount;
 static unsigned int countGotUpdate;
@@ -68,6 +72,34 @@ static void updateStatistics(int encodingIndex,rfbBool failed) {
 /* Here begin the functions for the client. They will be called in a
  * thread. */
 
+static void getRGBAt(const unsigned char *buffer,
+                     int width,
+                     const rfbPixelFormat *fmt,
+                     int x, int y,
+                     unsigned int rgb[3])
+{
+    int bytesPerPixel = fmt->bitsPerPixel / 8;
+    const unsigned char *p = buffer + (y * width + x) * bytesPerPixel;
+
+    unsigned int pixel = 0;
+
+    if (fmt->bigEndian) {
+        for (int i = 0; i < bytesPerPixel; ++i)
+            pixel = (pixel << 8) | p[i];
+    } else {
+        for (int i = bytesPerPixel - 1; i >= 0; --i)
+            pixel = (pixel << 8) | p[i];
+    }
+
+    unsigned int r = (pixel >> fmt->redShift) & fmt->redMax;
+    unsigned int g = (pixel >> fmt->greenShift) & fmt->greenMax;
+    unsigned int b = (pixel >> fmt->blueShift) & fmt->blueMax;
+
+    rgb[0] = (fmt->redMax ? (r * 255u / fmt->redMax) : 0u);
+    rgb[1] = (fmt->greenMax ? (g * 255u / fmt->greenMax) : 0u);
+    rgb[2] = (fmt->blueMax ? (b * 255u / fmt->blueMax) : 0u);
+}
+
 /* maxDelta=0 means they are expected to match exactly;
  * maxDelta>0 means that the average difference must be lower than maxDelta */
 static rfbBool doFramebuffersMatch(rfbScreenInfo* server,rfbClient* client,
@@ -80,19 +112,28 @@ static rfbBool doFramebuffersMatch(rfbScreenInfo* server,rfbClient* client,
 	LOCK(frameBufferMutex);
 	/* TODO: write unit test for colour transformation, use here, too */
 	for(i=0;i<server->width;i++)
-		for(j=0;j<server->height;j++)
-			for(k=0;k<3/*server->serverFormat.bitsPerPixel/8*/;k++) {
-				unsigned char s=server->frameBuffer[k+i*4+j*server->paddedWidthInBytes];
-				unsigned char cl=client->frameBuffer[k+i*4+j*client->width*4];
-
-				if(maxDelta==0 && s!=cl) {
+		for(j=0;j<server->height;j++) {
+			unsigned int s[3], c[3];
+			getRGBAt(server->frameBuffer,
+				 server->width,
+				 &server->serverFormat,
+				 i, j,
+				 s);
+			getRGBAt(client->frameBuffer,
+				 client->width,
+				 &client->format,
+				 i, j,
+				 c);
+			for(k=0;k<3;k++) {
+				if(maxDelta==0 && s[k]!=c[k]) {
 					UNLOCK(frameBufferMutex);
 					return FALSE;
 				} else {
 					total++;
-					diff+=(s>cl?s-cl:cl-s);
+					diff+=(s[k]>c[k]?s[k]-c[k]:c[k]-s[k]);
 				}
 			}
+		}
 	UNLOCK(frameBufferMutex);
 	if(maxDelta>0 && diff/total>=maxDelta)
 		return FALSE;
@@ -135,14 +176,19 @@ static void update(rfbClient* client,int x,int y,int w,int h) {
 
 static void update_finished(rfbClient* client) {
 	clientData* cd = (clientData*)rfbClientGetClientData(client, clientLoop);
-        int maxDelta=0;
+	rfbPixelFormat *cfmt = &client->format;
+	rfbPixelFormat *sfmt = &cd->server->serverFormat;
+	int maxDelta = MAX(MAX(
+	    abs(256 / (cfmt->redMax+1) - 256 / (sfmt->redMax+1)),
+	    abs(256 / (cfmt->greenMax+1) - 256 / (sfmt->greenMax+1))),
+	    abs(256 / (cfmt->blueMax+1) - 256 / (sfmt->blueMax+1))) / 2;
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	if(testEncodings[cd->encodingIndex].id==rfbEncodingZYWRLE)
-		maxDelta=5;
+		maxDelta+=5;
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	if(testEncodings[cd->encodingIndex].id==rfbEncodingTight)
-		maxDelta=5;
+		maxDelta+=5;
 #endif
 #endif
 	updateStatistics(cd->encodingIndex,
@@ -187,8 +233,15 @@ static uintptr_t all_threads[NUMBER_OF_ENCODINGS_TO_TEST];
 #endif
 static int thread_counter;
 
-static void startClient(int encodingIndex,rfbScreenInfo* server) {
-	rfbClient* client=rfbGetClient(8,3,4);
+static void startClient(int encodingIndex,rfbScreenInfo* server,int cbpp) {
+	rfbClient* client;
+	if (cbpp == 32)
+		client=rfbGetClient(8,3,4);
+	else if (cbpp == 16)
+		client=rfbGetClient(5,3,2);
+	else
+		client=rfbGetClient(2,3,1);
+
 	clientData* cd;
 
 	cd=calloc(sizeof(clientData), 1);
@@ -237,10 +290,10 @@ static void idle(rfbScreenInfo* server)
 		if(x1>x2) { i=x1; x1=x2; x2=i; }
 		if(y1>y2) { i=y1; y1=y2; y2=i; }
 		x2++; y2++;
-		for(c=0;c<3;c++) {
+		for(c=0;c<server->serverFormat.bitsPerPixel/8;c++) {
 			for(i=x1;i<x2;i++)
 				for(j=y1;j<y2;j++)
-					server->frameBuffer[i*4+c+j*server->paddedWidthInBytes]=255*(i-x1+j-y1)/(x2-x1+y2-y1);
+					server->frameBuffer[i*(server->bitsPerPixel/8)+c+j*server->paddedWidthInBytes]=255*(i-x1+j-y1)/(x2-x1+y2-y1);
 		}
 		rfbMarkRectAsModified(server,x1,y1,x2,y2);
 
@@ -285,18 +338,46 @@ int main(int argc,char** argv)
 
 	rfbClientLog=rfbTestLog;
 	rfbClientErr=rfbTestLog;
+	int cbpp = 32;
+	int sbpp = 32;
+
+	for (i = 1, j = 1; i < argc; i++)
+		if (!strcmp(argv[i], "-s32"))
+			sbpp = 32;
+		else if (!strcmp(argv[i], "-s16"))
+			sbpp = 16;
+		else if (!strcmp(argv[i], "-s8"))
+			sbpp = 8;
+		else if (!strcmp(argv[i], "-c32"))
+			cbpp = 32;
+		else if (!strcmp(argv[i], "-c16"))
+			cbpp = 16;
+		else if (!strcmp(argv[i], "-c8"))
+			cbpp = 8;
+		else if (!strcmp(argv[i], "-large")) {
+			width = 1024;
+			height = 768;
+		} else {
+			fprintf(stderr, "Invalid option: %s\n", argv[i]);
+			return 1;
+		}
 
 	/* Initialize server */
-	server=rfbGetScreen(&argc,argv,width,height,8,3,4);
+	if (sbpp == 32)
+		server=rfbGetScreen(&argc,argv,width,height,8,3,4);
+	else if (sbpp == 16)
+		server=rfbGetScreen(&argc,argv,width,height,5,3,2);
+	else
+		server=rfbGetScreen(&argc,argv,width,height,2,3,1);
         if(!server)
           return 1;
 
-	server->frameBuffer=malloc(400*300*4);
+	server->frameBuffer=malloc(width*height*(server->bitsPerPixel/8));
 	if (!server->frameBuffer)
 		return 1;
 
 	server->cursor=NULL;
-	for(j=0;j<400*300*4;j++)
+	for(j=0;j<width*height*(server->bitsPerPixel/8);j++)
 		server->frameBuffer[j]=j;
 	rfbInitServer(server);
 	rfbProcessEvents(server,0);
@@ -310,7 +391,7 @@ int main(int argc,char** argv)
 	/* Initialize clients */
 	for(i=0;i<NUMBER_OF_ENCODINGS_TO_TEST;i++)
 #endif
-		startClient(i,server);
+		startClient(i,server,cbpp);
 
 	t=time(NULL);
 	/* test 20 seconds */
