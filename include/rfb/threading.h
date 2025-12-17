@@ -55,7 +55,11 @@
 #define IF_PTHREADS(x)                x
 #define THREAD_ROUTINE_RETURN_TYPE    void*
 #define THREAD_ROUTINE_RETURN_VALUE   NULL
+#ifdef WIN32
+#define THREAD_SLEEP_MS(ms)           Sleep(ms)
+#else
 #define THREAD_SLEEP_MS(ms)           usleep(ms*1000)
+#endif
 #define THREAD_JOIN(thread)           pthread_join(thread, NULL)
 #define THREAD_DETACH(thread)         pthread_detach(thread)
 #define CURRENT_THREAD_ID             pthread_self()
