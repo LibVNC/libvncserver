@@ -197,6 +197,8 @@ rfbClientIteratorHead(rfbClientIteratorPtr i)
     rfbDecrClientRef(i->next);
     rfbIncrClientRef(i->screen->clientHead);
   }
+  else
+    rfbIncrClientRef(i->screen->clientHead);
 #endif
   LOCK(rfbClientListMutex);
   i->next = i->screen->clientHead;
