@@ -203,6 +203,15 @@ rfbClientIteratorHead(rfbClientIteratorPtr i)
   LOCK(rfbClientListMutex);
   i->next = i->screen->clientHead;
   UNLOCK(rfbClientListMutex);
+
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+  if(!i->closedToo)
+    while(i->next && i->next->sock<0)
+      i->next = i->next->next;
+  if(i->next)
+    rfbIncrClientRef(i->next);
+#endif
+
   return i->next;
 }
 
