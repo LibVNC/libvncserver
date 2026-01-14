@@ -97,48 +97,12 @@ if(WITH_JPEG)
   if(JPEG_FOUND)
     # Check whether the version of libjpeg we found was libjpeg-turbo and print a
     # warning if not.
-    set(CMAKE_REQUIRED_LIBRARIES ${JPEG_LIBRARIES})
-    if(JPEG_INCLUDE_DIRS) # this was not present in 3.4
-      set(CMAKE_REQUIRED_INCLUDES ${JPEG_INCLUDE_DIRS})
-    else()
-      set(CMAKE_REQUIRED_INCLUDES ${JPEG_INCLUDE_DIR})
-    endif()
-
-    set(JPEG_TEST_SOURCE "\n
-    #include <stdio.h>\n
-    #include <jpeglib.h>\n
-    int main(void) {\n
-      struct jpeg_compress_struct cinfo;\n
-      struct jpeg_error_mgr jerr;\n
-      cinfo.err=jpeg_std_error(&jerr);\n
-      jpeg_create_compress(&cinfo);\n
-      cinfo.input_components = 3;\n
-      jpeg_set_defaults(&cinfo);\n
-      cinfo.in_color_space = JCS_EXT_RGB;\n
-      jpeg_default_colorspace(&cinfo);\n
-      return 0;\n
-    }")
-
-    if(CMAKE_CROSSCOMPILING)
-      check_c_source_compiles("${JPEG_TEST_SOURCE}" FOUND_LIBJPEG_TURBO)
-    else()
-      check_c_source_runs("${JPEG_TEST_SOURCE}" FOUND_LIBJPEG_TURBO)
-    endif()
-
-    set(CMAKE_REQUIRED_LIBRARIES)
-    set(CMAKE_REQUIRED_INCLUDES)
-    set(CMAKE_REQUIRED_DEFINITIONS)
-
+    get_filename_component(JPEGLIB_H_PATH "${JPEG_INCLUDE_DIR}/jpeglib.h" REALPATH BASE_DIR "${CMAKE_SOURCE_DIR}")
+    file(STRINGS ${JPEGLIB_H_PATH} FOUND_LIBJPEG_TURBO REGEX "JCS_EXT_RGB")
     if(NOT FOUND_LIBJPEG_TURBO)
-      # last-resort grep check (when using LibVNCServer as a CMake subdir together with turbojpeg CMake subdir, the build check above fails since turbojpeg is not yet built when LibVNCServer is configured)
-      get_filename_component(JPEGLIB_H_PATH "${JPEG_INCLUDE_DIR}/jpeglib.h" REALPATH BASE_DIR "${CMAKE_SOURCE_DIR}")
-      message(STATUS "Runtime check for libjpeg-turbo failed, inspecting ${JPEGLIB_H_PATH}")
-      file(STRINGS ${JPEGLIB_H_PATH} FOUND_LIBJPEG_TURBO REGEX "JCS_EXT_RGB")
-      if(NOT FOUND_LIBJPEG_TURBO)
-	message(WARNING "*** The libjpeg library you are building against is not libjpeg-turbo.  Performance will be reduced.  You can obtain libjpeg-turbo from:  https://sourceforge.net/projects/libjpeg-turbo/files/ ***")
-      else()
-        message(STATUS "Detected libjpeg-turbo via ${JPEGLIB_H_PATH}")
-      endif()
+      message(WARNING "*** The libjpeg library you are building against is not libjpeg-turbo.  Performance will be reduced.  You can obtain libjpeg-turbo from:  https://sourceforge.net/projects/libjpeg-turbo/files/ ***")
+    else()
+      message(STATUS "Detected libjpeg-turbo via ${JPEGLIB_H_PATH}")
     endif()
   endif(JPEG_FOUND)
 endif(WITH_JPEG)
