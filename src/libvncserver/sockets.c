@@ -1213,9 +1213,11 @@ rfbListenOnUDPPort(int port,
     }
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 		   (const char *)&one, sizeof(one)) < 0) {
+	rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+	rfbCloseSocket(sock);
 	return RFB_INVALID_SOCKET;
     }
 
