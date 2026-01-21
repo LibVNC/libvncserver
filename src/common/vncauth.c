@@ -57,6 +57,25 @@
 #include <sys/time.h>
 #endif
 
+/*
+ * make a string 8 Bytes long.
+ * If longer, shorten it.
+ * If shorter, zeropad it.
+ */
+
+static
+void
+zeroPadString(unsigned char *out, const char *in)
+{
+    int inLen = strlen(in);
+    if(inLen > MAXPWLEN) {
+        inLen = MAXPWLEN;
+    }
+
+    memcpy(out, in, inLen);
+    memset(out+inLen, 0, MAXPWLEN-inLen);
+}
+
 
 /* libvncclient does not need this */
 #ifndef rfbEncryptBytes
@@ -67,8 +86,7 @@
  * as plaintext.
  */
 
-static unsigned char fixedkey[8] = {23,82,107,6,35,78,88,7};
-
+static unsigned char fixedkey[MAXPWLEN] = {23,82,107,6,35,78,88,7};
 
 /*
  * Encrypt a password and store it in a file.  Returns 0 if successful,
@@ -91,22 +109,13 @@ rfbEncryptAndStorePasswd(char *passwd, char *fname)
 #endif
 
     /* pad password with nulls */
-
-    for (i = 0; i < 8; i++) {
-	if (i < strlen(passwd)) {
-	    encryptedPasswd[i] = passwd[i];
-	} else {
-	    encryptedPasswd[i] = 0;
-	}
-    }
+    zeroPadString(encryptedPasswd, passwd);
 
     /* Do encryption in-place - this way we overwrite our copy of the plaintext
        password */
     encrypt_rfbdes(encryptedPasswd, &out_len, fixedkey, encryptedPasswd, sizeof(encryptedPasswd));
 
-    for (i = 0; i < 8; i++) {
-	putc(encryptedPasswd[i], fp);
-    }
+    fwrite(encryptedPasswd, 1, sizeof(encryptedPasswd), fp);
 
     fclose(fp);
     return 0;
@@ -124,7 +133,7 @@ rfbDecryptPasswdFromFile(char *fname)
 {
     FILE *fp;
     int i, ch;
-    unsigned char *passwd = (unsigned char *)malloc(9);
+    unsigned char *passwd = (unsigned char *)malloc(MAXPWLEN+1);
     int out_len;
 
     if (!passwd || (fp = fopen(fname,"r")) == NULL) {
@@ -132,20 +141,18 @@ rfbDecryptPasswdFromFile(char *fname)
 	return NULL;
     }
 
-    for (i = 0; i < 8; i++) {
-	ch = getc(fp);
-	if (ch == EOF) {
-	    fclose(fp);
-	    free(passwd);
-	    return NULL;
-	}
-	passwd[i] = ch;
-    }
-
+    size_t read = fread(passwd, 1, MAXPWLEN, fp);
     fclose(fp);
 
-    if(!decrypt_rfbdes(passwd, &out_len, fixedkey, passwd, 8))
-	return NULL;
+    if (read < MAXPWLEN) {
+        free(passwd);
+        return NULL;
+    }
+
+    if(!decrypt_rfbdes(passwd, &out_len, fixedkey, passwd, MAXPWLEN)) {
+        free(passwd);
+        return NULL;
+    }
 
     passwd[8] = 0;
 
@@ -188,14 +195,7 @@ rfbEncryptBytes(unsigned char *bytes, char *passwd)
     int out_len;
 
     /* key is simply password padded with nulls */
-
-    for (i = 0; i < 8; i++) {
-	if (i < strlen(passwd)) {
-	    key[i] = passwd[i];
-	} else {
-	    key[i] = 0;
-	}
-    }
+    zeroPadString(key, passwd);
 
     encrypt_rfbdes(bytes, &out_len, key, bytes, CHALLENGESIZE);
 }
