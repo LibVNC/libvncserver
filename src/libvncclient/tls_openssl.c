@@ -182,37 +182,6 @@ static int sock_read_ready(SSL *ssl, uint32_t ms)
 	return r;
 }
 
-static int wait_for_data(SSL *ssl, int ret, int timeout)
-{
-  int err;
-  int retval = 1;
-
-  err = SSL_get_error(ssl, ret);
-	
-  switch(err)
-  {
-    case SSL_ERROR_WANT_READ:
-    case SSL_ERROR_WANT_WRITE:
-      ret = sock_read_ready(ssl, timeout*1000);
-			
-      if (ret == -1) {
-        retval = 2;
-      }
-				
-      break;
-    default:
-      retval = 3;
-      long verify_res = SSL_get_verify_result(ssl);
-      if (verify_res != X509_V_OK)
-        rfbClientLog("Could not verify server certificate: %s.\n",
-                     X509_verify_cert_error_string(verify_res));
-      break;
-   }
-	
-  ERR_clear_error();
-				
-  return retval;
-}
 
 static rfbBool
 load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
@@ -257,7 +226,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
 {
   SSL_CTX *ssl_ctx = NULL;
   SSL *ssl = NULL;
-  int n, finished = 0;
+  int n;
   X509_VERIFY_PARAM *param;
   uint8_t verify_crls;
 
@@ -364,15 +333,36 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
 		
     if (n != 1) 
     {
-      if (wait_for_data(ssl, n, 1) != 1) 
-      {
-        finished = 1;
-        SSL_shutdown(ssl);
+      int ready;
+      long verify_res;
 
-        goto error_free_ssl;
-      }
+      switch(SSL_get_error(ssl, n))
+          {
+          case SSL_ERROR_WANT_READ:
+          case SSL_ERROR_WANT_WRITE:
+              ready = sock_read_ready(ssl, 1000);
+
+              if (ready == -1) {
+                  ERR_clear_error();
+                  SSL_shutdown(ssl);
+                  goto error_free_ssl;
+              }
+
+              break;
+          default:
+              verify_res = SSL_get_verify_result(ssl);
+              if (verify_res != X509_V_OK)
+                  rfbClientLog("Could not verify server certificate: %s.\n",
+                               X509_verify_cert_error_string(verify_res));
+
+              ERR_clear_error();
+              SSL_shutdown(ssl);
+              goto error_free_ssl;
+              break;
+          }
+      ERR_clear_error();
     }
-  } while( n != 1 && finished != 1 );
+  } while( n != 1 );
 
   X509_VERIFY_PARAM_free(param);
   return ssl;
