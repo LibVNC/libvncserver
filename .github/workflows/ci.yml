@@ -40,18 +40,18 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt update
-          sudo apt install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev mingw-w64-x86-64-dev binutils-mingw-w64-x86-64 gcc-mingw-w64-x86-64 wine
+          sudo apt install libsdl2-dev liblzo2-dev libssl-dev gnutls-dev libgcrypt-dev libavformat-dev libavcodec-dev libavutil-dev libswscale-dev mingw-w64-x86-64-dev binutils-mingw-w64-x86-64 gcc-mingw-w64-x86-64 wine
       - name: Install MacOS Build Dependencies
         if: ${{ matrix.os == 'macos-latest' }}
         run: |
           unset HOMEBREW_NO_INSTALL_FROM_API
           brew untap homebrew/core homebrew/cask
           brew update
-          brew install sdl2 lzo
+          brew install sdl2 lzo 
       - name: Install Windows Build Dependencies
         if: ${{ matrix.os == 'windows-latest' }}
         run: |
-          vcpkg install zlib libjpeg-turbo libpng --triplet=x64-windows # could install more but should use run-vcpkg with caching for this
+          vcpkg install zlib libjpeg-turbo libpng ffmpeg --triplet=x64-windows # could install more but should use run-vcpkg with caching for this
       - name: Build
         run: |
           mkdir build
