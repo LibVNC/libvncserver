@@ -260,8 +260,35 @@ rfbDefaultLog(const char *format, ...)
     UNLOCK(logMutex);
 }
 
+static void rfbDefaultClientSetErr(rfbClientPtr cl, const char *format, ...) {
+    // props to josemr goudetalvim (@josealvim) for this logic
+    va_list ap;
+    va_start(ap, format);
+    size_t len = (size_t)vsnprintf(NULL, 0, format, ap);
+    va_end(ap);
+
+    char *buffer = malloc(len + 1);
+    if (!buffer)
+        return;
+
+    va_start(ap, format);
+    vsprintf(buffer, format, ap);
+
+    va_end(ap);
+
+    char *oldError = cl->lastError;
+    cl->lastError = buffer;
+
+    // call the callback if it exists
+    if (cl->screen->clientErrorChanged != NULL)
+        cl->screen->clientErrorChanged(cl);
+
+    free(oldError);
+}
+
 rfbLogProc rfbLog=rfbDefaultLog;
 rfbLogProc rfbErr=rfbDefaultLog;
+rfbClientSetErrProc rfbClientSetErr = rfbDefaultClientSetErr;
 
 void rfbLogPerror(const char *str)
 {

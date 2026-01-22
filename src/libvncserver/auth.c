@@ -382,6 +382,7 @@ rfbAuthProcessClientMessage(rfbClientPtr cl)
 
     if(!cl->screen->passwordCheck(cl,(const char*)response,CHALLENGESIZE)) {
         rfbErr("rfbAuthProcessClientMessage: password check failed\n");
+        rfbClientSetErr(cl, "rfbAuthProcessClientMessage: password check failed");
         authResult = Swap32IfLE(rfbVncAuthFailed);
         if (rfbWriteExact(cl, (char *)&authResult, 4) < 0) {
             rfbLogPerror("rfbAuthProcessClientMessage: write");
