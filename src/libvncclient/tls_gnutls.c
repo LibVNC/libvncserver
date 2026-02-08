@@ -61,6 +61,11 @@ static int cert_fingerprint_mismatch_callback(rfbClient *client, gnutls_x509_crt
     /* Validity */
     time_t not_before = gnutls_x509_crt_get_activation_time(cert);
     time_t not_after = gnutls_x509_crt_get_expiration_time(cert);
+    
+    if (not_before == (time_t)-1 || not_after == (time_t)-1) {
+        rfbClientErr("Failed to get certificate validity times\n");
+        return 0;
+    }
 
     /* SHA-256 fingerprint */
     unsigned char fingerprint[32];
@@ -221,15 +226,15 @@ verify_certificate_callback (gnutls_session_t session)
       return GNUTLS_E_CERTIFICATE_ERROR;
   }
 
-  int fingerprint_verified = 0;
+  rfbBool fingerprint_verified = FALSE;
   if (expected_fingerprint && 
       memcmp(remote_fingerprint, expected_fingerprint, 32) == 0) {
       /* Expected fingerprint matches */
       rfbClientLog("Certificate fingerprint matches expected value\n");
-      fingerprint_verified = 1;
+      fingerprint_verified = TRUE;
   } else {
       /* Ask user */
-      fingerprint_verified = cert_fingerprint_mismatch_callback(sptr, cert);
+      fingerprint_verified = cert_fingerprint_mismatch_callback(sptr, cert) ? TRUE : FALSE;
   }
 
   gnutls_x509_crt_deinit (cert);
@@ -699,7 +704,7 @@ HandleVeNCryptAuth(rfbClient* client)
 
   /* Start up the TLS session */
   if (!InitializeTLSSession(client, anonTLS)) {
-    if (verify_data) free(verify_data);
+    free(verify_data);
     return FALSE;
   }
 
@@ -725,12 +730,12 @@ HandleVeNCryptAuth(rfbClient* client)
   }
 
   if (!HandshakeTLS(client)) {
-    if (verify_data) free(verify_data);
+    free(verify_data);
     return FALSE;
   }
 
   /* Clean up verify data after handshake */
-  if (verify_data) free(verify_data);
+  free(verify_data);
 
   /* We are done here. The caller should continue with client->subAuthScheme
    * to do actual sub authentication.
