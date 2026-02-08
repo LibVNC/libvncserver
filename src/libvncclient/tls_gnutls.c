@@ -33,6 +33,55 @@ static gnutls_dh_params_t rfbDHParams;
 
 static rfbBool rfbTLSInitialized = FALSE;
 
+/* Structure to pass both expected fingerprint and client to verify callback */
+typedef struct {
+  const uint8_t *expected_fingerprint;
+  rfbClient *client;
+} rfbTLSVerifyData;
+
+/** Convert gnutls time to time_t */
+static time_t gnutls_time_to_time_t(time_t t) {
+    /* gnutls_x509_crt_get_*_time() already returns time_t */
+    return t;
+}
+
+static int cert_fingerprint_mismatch_callback(rfbClient *client, gnutls_x509_crt_t cert) {
+    if(!cert) {
+        rfbClientErr("No cert given in fingerprint mismatch handling\n");
+        return 0;
+    }
+
+    if (!client || !client->GetX509CertFingerprintMismatchDecision) {
+        rfbClientErr("No client callback given in fingerprint mismatch handling\n");
+        return 0;
+    }
+
+    /* Subject */
+    char subject[512];
+    size_t subject_size = sizeof(subject);
+    if (gnutls_x509_crt_get_dn(cert, subject, &subject_size) < 0) {
+        rfbClientErr("Failed to get certificate subject\n");
+        return 0;
+    }
+
+    /* Validity */
+    time_t not_before = gnutls_time_to_time_t(gnutls_x509_crt_get_activation_time(cert));
+    time_t not_after = gnutls_time_to_time_t(gnutls_x509_crt_get_expiration_time(cert));
+
+    /* SHA-256 fingerprint */
+    unsigned char fingerprint[32];
+    size_t fingerprint_size = sizeof(fingerprint);
+    if (gnutls_x509_crt_get_fingerprint(cert, GNUTLS_DIG_SHA256, fingerprint, &fingerprint_size) < 0) {
+        rfbClientErr("Failed to get certificate fingerprint\n");
+        return 0;
+    }
+
+    /* Call the callback (just reads values) */
+    rfbBool decision = client->GetX509CertFingerprintMismatchDecision(client, subject, not_before, not_after, fingerprint, fingerprint_size);
+
+    return decision ? 1 : 0;
+}
+
 static int
 verify_certificate_callback (gnutls_session_t session)
 {
@@ -43,8 +92,26 @@ verify_certificate_callback (gnutls_session_t session)
   gnutls_x509_crt_t cert;
   rfbClient *sptr;
   char *hostname;
+  rfbTLSVerifyData *verify_data;
+  void *session_ptr;
 
-  sptr = (rfbClient *)gnutls_session_get_ptr(session);
+  /* Get session pointer - could be rfbTLSVerifyData or rfbClient */
+  session_ptr = gnutls_session_get_ptr(session);
+  if (!session_ptr) {
+    rfbClientLog("Failed to validate certificate - missing session data\n");
+    return GNUTLS_E_CERTIFICATE_ERROR;
+  }
+
+  /* Try to determine if it's verify_data or client directly */
+  verify_data = (rfbTLSVerifyData *)session_ptr;
+  sptr = verify_data->client;
+  
+  /* Sanity check - if client pointer seems invalid, treat session_ptr as client */
+  if (!sptr || !sptr->serverHost) {
+    sptr = (rfbClient *)session_ptr;
+    verify_data = NULL;
+  }
+
   if (!sptr) {
     rfbClientLog("Failed to validate certificate - missing client data\n");
     return GNUTLS_E_CERTIFICATE_ERROR;
@@ -66,6 +133,53 @@ verify_certificate_callback (gnutls_session_t session)
       return GNUTLS_E_CERTIFICATE_ERROR;
     }
 
+  /* If certificate is trusted, we're done */
+  if (!status) {
+    rfbClientLog("Server cert trusted\n");
+    /* Still need to check hostname */
+    if (gnutls_certificate_type_get (session) != GNUTLS_CRT_X509) {
+      rfbClientLog("The certificate was not X509\n");
+      return GNUTLS_E_CERTIFICATE_ERROR;
+    }
+
+    if (gnutls_x509_crt_init (&cert) < 0)
+      {
+        rfbClientLog("Error initialising certificate structure\n");
+        return GNUTLS_E_CERTIFICATE_ERROR;
+      }
+
+    cert_list = gnutls_certificate_get_peers (session, &cert_list_size);
+    if (cert_list == NULL)
+      {
+        rfbClientLog("No certificate was found!\n");
+        gnutls_x509_crt_deinit (cert);
+        return GNUTLS_E_CERTIFICATE_ERROR;
+      }
+
+    if (gnutls_x509_crt_import (cert, &cert_list[0], GNUTLS_X509_FMT_DER) < 0)
+      {
+        rfbClientLog("Error parsing certificate\n");
+        gnutls_x509_crt_deinit (cert);
+        return GNUTLS_E_CERTIFICATE_ERROR;
+      }
+
+    if (!gnutls_x509_crt_check_hostname (cert, hostname))
+      {
+        rfbClientLog("The certificate's owner does not match hostname '%s'\n",
+                hostname);
+        gnutls_x509_crt_deinit (cert);
+        return GNUTLS_E_CERTIFICATE_ERROR;
+      }
+
+    gnutls_x509_crt_deinit (cert);
+    /* notify gnutls to continue handshake normally */
+    return 0;
+  }
+
+  /*
+    If certificate is not trusted, try to match against expected fingerprint
+    or ask the user
+  */
   if (status & GNUTLS_CERT_INVALID)
     rfbClientLog("The certificate is not trusted.\n");
 
@@ -81,13 +195,7 @@ verify_certificate_callback (gnutls_session_t session)
   if (status & GNUTLS_CERT_NOT_ACTIVATED)
     rfbClientLog("The certificate is not yet activated\n");
 
-  if (status)
-    return GNUTLS_E_CERTIFICATE_ERROR;
-
-  /* Up to here the process is the same for X.509 certificates and
-   * OpenPGP keys. From now on X.509 certificates are assumed. This can
-   * be easily extended to work with openpgp keys as well.
-   */
+  /* Get the certificate */
   if (gnutls_certificate_type_get (session) != GNUTLS_CRT_X509) {
     rfbClientLog("The certificate was not X509\n");
     return GNUTLS_E_CERTIFICATE_ERROR;
@@ -103,26 +211,45 @@ verify_certificate_callback (gnutls_session_t session)
   if (cert_list == NULL)
     {
       rfbClientLog("No certificate was found!\n");
+      gnutls_x509_crt_deinit (cert);
       return GNUTLS_E_CERTIFICATE_ERROR;
     }
 
   if (gnutls_x509_crt_import (cert, &cert_list[0], GNUTLS_X509_FMT_DER) < 0)
     {
       rfbClientLog("Error parsing certificate\n");
+      gnutls_x509_crt_deinit (cert);
       return GNUTLS_E_CERTIFICATE_ERROR;
     }
 
-  if (!gnutls_x509_crt_check_hostname (cert, hostname))
-    {
-      rfbClientLog("The certificate's owner does not match hostname '%s'\n",
-              hostname);
+  /* Compute remote certificate fingerprint */
+  unsigned char remote_fingerprint[32];
+  size_t remote_fingerprint_size = sizeof(remote_fingerprint);
+  if (gnutls_x509_crt_get_fingerprint(cert, GNUTLS_DIG_SHA256, remote_fingerprint, &remote_fingerprint_size) < 0) {
+      rfbClientLog("Failed to get certificate fingerprint\n");
+      gnutls_x509_crt_deinit (cert);
       return GNUTLS_E_CERTIFICATE_ERROR;
-    }
+  }
+
+  int verify = 0;
+  if (verify_data && verify_data->expected_fingerprint && 
+      memcmp(remote_fingerprint, verify_data->expected_fingerprint, 32) == 0) {
+      /* Expected fingerprint matches */
+      rfbClientLog("Certificate fingerprint matches expected value\n");
+      verify = 1;
+  } else {
+      /* Ask user */
+      verify = cert_fingerprint_mismatch_callback(sptr, cert);
+  }
 
   gnutls_x509_crt_deinit (cert);
 
-  /* notify gnutls to continue handshake normally */
-  return 0;
+  if (verify) {
+    /* notify gnutls to continue handshake normally */
+    return 0;
+  } else {
+    return GNUTLS_E_CERTIFICATE_ERROR;
+  }
 }
 
 static rfbBool
@@ -400,6 +527,7 @@ FreeX509Credential(rfbCredential *cred)
   if (cred->x509Credential.x509CACrlFile) free(cred->x509Credential.x509CACrlFile);
   if (cred->x509Credential.x509ClientCertFile) free(cred->x509Credential.x509ClientCertFile);
   if (cred->x509Credential.x509ClientKeyFile) free(cred->x509Credential.x509ClientKeyFile);
+  if (cred->x509Credential.x509ExpectedFingerprint) free(cred->x509Credential.x509ExpectedFingerprint);
   free(cred);
 }
 
@@ -480,6 +608,7 @@ HandleVeNCryptAuth(rfbClient* client)
   rfbBool anonTLS;
   gnutls_certificate_credentials_t x509_cred = NULL;
   int ret;
+  rfbTLSVerifyData *verify_data = NULL;
 
   /* Read VeNCrypt version */
   if (!ReadFromRFBServer(client, (char *)&major, 1) ||
@@ -561,33 +690,62 @@ HandleVeNCryptAuth(rfbClient* client)
       return FALSE;
     }
 
+    /* Prepare verify data structure */
+    verify_data = (rfbTLSVerifyData *)malloc(sizeof(rfbTLSVerifyData));
+    if (verify_data) {
+      verify_data->expected_fingerprint = cred->x509Credential.x509ExpectedFingerprint;
+      verify_data->client = client;
+    }
+
     x509_cred = CreateX509CertCredential(cred);
     FreeX509Credential(cred);
-    if (!x509_cred) return FALSE;
+    if (!x509_cred) {
+      if (verify_data) free(verify_data);
+      return FALSE;
+    }
   }
 
   /* Start up the TLS session */
-  if (!InitializeTLSSession(client, anonTLS)) return FALSE;
+  if (!InitializeTLSSession(client, anonTLS)) {
+    if (verify_data) free(verify_data);
+    return FALSE;
+  }
 
   if (anonTLS)
   {
-    if (!SetTLSAnonCredential(client)) return FALSE;
+    if (!SetTLSAnonCredential(client)) {
+      if (verify_data) free(verify_data);
+      return FALSE;
+    }
   }
   else
   {
     /* Set the certificate verification callback. */
     gnutls_certificate_set_verify_function (x509_cred, verify_certificate_callback);
-    gnutls_session_set_ptr ((gnutls_session_t)client->tlsSession, (void *)client);
+    
+    /* Store verify data with expected fingerprint and client pointer */
+    if (verify_data) {
+      gnutls_session_set_ptr ((gnutls_session_t)client->tlsSession, (void *)verify_data);
+    } else {
+      gnutls_session_set_ptr ((gnutls_session_t)client->tlsSession, (void *)client);
+    }
 
     if ((ret = gnutls_credentials_set((gnutls_session_t)client->tlsSession, GNUTLS_CRD_CERTIFICATE, x509_cred)) < 0)
     {
       rfbClientLog("Cannot set x509 credential: %s.\n", gnutls_strerror(ret));
+      if (verify_data) free(verify_data);
       FreeTLS(client);
       return FALSE;
     }
   }
 
-  if (!HandshakeTLS(client)) return FALSE;
+  if (!HandshakeTLS(client)) {
+    if (verify_data) free(verify_data);
+    return FALSE;
+  }
+
+  /* Clean up verify data after handshake */
+  if (verify_data) free(verify_data);
 
   /* We are done here. The caller should continue with client->subAuthScheme
    * to do actual sub authentication.
