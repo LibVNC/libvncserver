@@ -149,6 +149,9 @@ typedef union _rfbCredential
     char *x509ClientCertFile;
     char *x509ClientKeyFile;
     uint8_t x509CrlVerifyMode; /* Only required for OpenSSL - see meanings below */
+    uint8_t *x509ExpectedFingerprint; /**< When none of the x509*CertFile paths are given, this can be used to
+                                         convey to the library the expected SHA256 fingerprint of the remote's
+                                         certificate. When not NULL, must be 32 bytes. */
   } x509Credential;
   /** Plain (VeNCrypt), MSLogon (UltraVNC) */
   struct
@@ -215,6 +218,17 @@ typedef void (*GotFrameBufferUpdateProc)(struct _rfbClient* client, int x, int y
 typedef void (*FinishedFrameBufferUpdateProc)(struct _rfbClient* client);
 typedef char* (*GetPasswordProc)(struct _rfbClient* client);
 typedef rfbCredential* (*GetCredentialProc)(struct _rfbClient* client, int credentialType);
+/**
+   Callback that is invoked with the remote's cert's details if the remote cert
+   could not be validated against the system CA and, failing that, its fingerprint
+   does not match the one indicated in rfbCredential.x509Credential.x509ExpectedFingerprint.
+ */
+typedef rfbBool (*GetX509CertFingerprintMismatchDecisionProc)(struct _rfbClient* client,
+                                                              const char *remote_cert_subject,
+                                                              time_t remote_cert_valid_from,
+                                                              time_t remote_cert_valid_until,
+                                                              const uint8_t *remote_cert_sha256_fingerprint,
+                                                              size_t remote_cert_sha256_fingerprint_len);
 typedef rfbBool (*MallocFrameBufferProc)(struct _rfbClient* client);
 typedef void (*GotXCutTextProc)(struct _rfbClient* client, const char *text, int textlen);
 typedef void (*GotXCutTextUTF8Proc)(struct _rfbClient* client, const char* buffer, int buffer_len);
@@ -489,6 +503,8 @@ typedef struct _rfbClient {
 
         /* flag to indicate wheter updateRect is managed by lib or user */
         rfbBool isUpdateRectManagedByLib;
+
+        GetX509CertFingerprintMismatchDecisionProc GetX509CertFingerprintMismatchDecision;
 
         /** Counts bytes received by this client. */
         size_t  bytesRcvd;
