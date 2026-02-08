@@ -433,39 +433,134 @@ static void got_selection_utf8(rfbClient *cl, const char *buf, int len)
 }
 
 
+static int hex_to_bytes(const char *hex_str, unsigned char *bytes, size_t max_bytes) {
+    size_t i = 0;
+    size_t byte_index = 0;
+
+    while (hex_str[i] != '\0' && byte_index < max_bytes) {
+        // Skip colons
+        if (hex_str[i] == ':') {
+            i++;
+            continue;
+        }
+
+        // Read two hex characters
+        char hex_byte[3] = {hex_str[i], hex_str[i+1], '\0'};
+
+        // Convert to byte
+        unsigned char byte = (unsigned char)strtol(hex_byte, NULL, 16);
+        bytes[byte_index++] = byte;
+
+        // Move to next pair
+        i += 2;
+    }
+
+    return byte_index;
+}
+
+
 static rfbCredential* get_credential(rfbClient* cl, int credentialType){
-	rfbCredential *c = malloc(sizeof(rfbCredential));
-	if (!c) {
-		return NULL;
-	}
-	c->userCredential.username = malloc(RFB_BUF_SIZE);
-	if (!c->userCredential.username) {
-		free(c);
-		return NULL;
-	}
-	c->userCredential.password = malloc(RFB_BUF_SIZE);
-	if (!c->userCredential.password) {
-		free(c->userCredential.username);
-		free(c);
-		return NULL;
-	}
+    rfbCredential *c = calloc(1, sizeof(rfbCredential));
 
-	if(credentialType != rfbCredentialTypeUser) {
-	    rfbClientErr("something else than username and password required for authentication\n");
-	    return NULL;
-	}
+    if (c && credentialType == rfbCredentialTypeUser) {
+        c->userCredential.username = malloc(RFB_BUF_SIZE);
+        if (!c->userCredential.username) {
+            free(c);
+            return NULL;
+        }
+        c->userCredential.password = malloc(RFB_BUF_SIZE);
+        if (!c->userCredential.password) {
+            free(c->userCredential.username);
+            free(c);
+            return NULL;
+        }
 
-	rfbClientLog("username and password required for authentication!\n");
-	printf("user: ");
-	fgets(c->userCredential.username, RFB_BUF_SIZE, stdin);
-	printf("pass: ");
-	fgets(c->userCredential.password, RFB_BUF_SIZE, stdin);
+        rfbClientLog("username and password required for authentication!\n");
+        printf("user: ");
+        fgets(c->userCredential.username, RFB_BUF_SIZE, stdin);
+        printf("pass: ");
+        fgets(c->userCredential.password, RFB_BUF_SIZE, stdin);
 
-	/* remove trailing newlines */
-	c->userCredential.username[strcspn(c->userCredential.username, "\n")] = 0;
-	c->userCredential.password[strcspn(c->userCredential.password, "\n")] = 0;
+        /* remove trailing newlines */
+        c->userCredential.username[strcspn(c->userCredential.username, "\n")] = 0;
+        c->userCredential.password[strcspn(c->userCredential.password, "\n")] = 0;
 
-	return c;
+        return c;
+    }
+
+    if (c && credentialType == rfbCredentialTypeX509) {
+        // We do intentionally not give any cert files here,
+        // only the fingerprint we expect in case there is a
+        // self-signed cert.
+        rfbClientLog("X.509 required for authentication!\n");
+        c->x509Credential.x509ExpectedFingerprint = malloc(32);
+        if (!c->x509Credential.x509ExpectedFingerprint) {
+            free(c);
+            return NULL;
+        }
+
+        printf("Expected SHA256 fingerprint of the server: ");
+        char buf[RFB_BUF_SIZE];
+        fgets(buf, RFB_BUF_SIZE, stdin);
+        /* remove trailing newline */
+        buf[strcspn(buf, "\n")] = 0;
+        // is a colon-separated hex string
+        if (hex_to_bytes(buf, c->x509Credential.x509ExpectedFingerprint, 32) != 32) {
+            fprintf(stderr, "Given SHA256 fingerprint has wrong length, not setting expected SHA256 fingerprint\n");
+            free(c->x509Credential.x509ExpectedFingerprint);
+            c->x509Credential.x509ExpectedFingerprint = NULL;
+        }
+
+        return c;
+    }
+
+    return NULL;
+}
+
+static int bytes_to_colon_hex(const uint8_t *bytes, size_t len, char *out_str, size_t out_str_size) {
+    if (!bytes || !out_str) return -1;
+
+    // Required buffer: len*3 - 1 + 1 = len*3
+    if (out_str_size < len * 3) return -1;
+
+    size_t pos = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (i > 0) {
+            out_str[pos++] = ':'; // add colon between bytes
+        }
+        pos += snprintf(out_str + pos, out_str_size - pos, "%02X", bytes[i]);
+    }
+
+    out_str[pos] = '\0'; // null-terminate
+    return 0;
+}
+
+static rfbBool get_x509_cert_mismatch_decision(rfbClient *client,
+                                               const char *remote_cert_subject,
+                                               time_t remote_cert_valid_from,
+                                               time_t remote_cert_valid_until,
+                                               const uint8_t *remote_cert_sha256_fingerprint,
+                                               size_t remote_cert_sha256_fingerprint_len) {
+    char buf[RFB_BUF_SIZE];
+
+    printf("Could not validate server certificate by system CA or known fingerprint — review details and accept?\n");
+    printf("Subject: %s\n", remote_cert_subject);
+
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S UTC", gmtime(&remote_cert_valid_from));
+    printf("Valid From: %s\n", buf);
+
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S UTC", gmtime(&remote_cert_valid_until));
+    printf("Valid Until: %s\n", buf);
+
+    bytes_to_colon_hex(remote_cert_sha256_fingerprint, remote_cert_sha256_fingerprint_len, buf, RFB_BUF_SIZE);
+
+    printf("SHA-256 Fingerprint: %s\n", buf);
+
+    // User knows expected fingerprint
+    printf("Trust? y/n: ");
+    char answer[RFB_BUF_SIZE];
+    fgets(answer, RFB_BUF_SIZE, stdin);
+    return answer[0] == 'y';
 }
 
 
@@ -519,6 +614,7 @@ int main(int argc,char** argv) {
 	  cl->GotXCutText = got_selection_latin1;
 	  cl->GotXCutTextUTF8 = got_selection_utf8;
 	  cl->GetCredential = get_credential;
+          cl->GetX509CertFingerprintMismatchDecision = get_x509_cert_mismatch_decision;
 	  cl->listenPort = LISTEN_PORT_OFFSET;
 	  cl->listen6Port = LISTEN_PORT_OFFSET;
 	  if(!rfbInitClient(cl,&argc,argv))
