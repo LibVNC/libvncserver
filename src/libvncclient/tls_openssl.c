@@ -36,6 +36,7 @@
 static rfbBool rfbTLSInitialized = FALSE;
 static int rfbTLSExpectedFingerprintIndex = -1;
 static int rfbTLSClientIndex = -1;
+static int rfbTLSCertDecisionIndex = -1;
 
 // Locking callbacks are only initialized if we have mutex support.
 #if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
@@ -158,6 +159,7 @@ InitializeTLS(void)
 
   rfbTLSExpectedFingerprintIndex = SSL_get_ex_new_index(0, "rfbTLSExpectedFingerprintIndex", NULL, NULL, NULL);
   rfbTLSClientIndex = SSL_get_ex_new_index(0, "rfbTLSClientIndex", NULL, NULL, NULL);
+  rfbTLSCertDecisionIndex = SSL_get_ex_new_index(0, "rfbTLSCertDecisionIndex", NULL, NULL, NULL);
 
   rfbClientLog("OpenSSL version %s initialized.\n", SSLeay_version(SSLEAY_VERSION));
   rfbTLSInitialized = TRUE;
@@ -307,13 +309,18 @@ static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
     SSL *ssl = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
     const unsigned char *expected_fingerprint = SSL_get_ex_data(ssl, rfbTLSExpectedFingerprintIndex);
 
+    // Check if we already have a cached user decision for this certificate
+    int cached_decision = (int)(intptr_t)SSL_get_ex_data(ssl, rfbTLSCertDecisionIndex);
+
     int verify;
-    if (expected_fingerprint && memcmp(remote_fingerprint, expected_fingerprint, 32) == 0) {
+    if (cached_decision || (expected_fingerprint && memcmp(remote_fingerprint, expected_fingerprint, 32) == 0)) {
         // accept
         verify = 1;
     } else {
         // ask user
         verify = cert_fingerprint_mismatch_callback(SSL_get_ex_data(ssl, rfbTLSClientIndex), X509_STORE_CTX_get_current_cert(ctx));
+        // Cache the user decision to avoid prompting the user multiple times
+        SSL_set_ex_data(ssl, rfbTLSCertDecisionIndex, (void*)(intptr_t)verify);
     }
 
     if(verify) {
