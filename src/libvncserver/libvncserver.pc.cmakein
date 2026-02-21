@@ -6,8 +6,7 @@ includedir=@CMAKE_INSTALL_PREFIX@/include
 Name: LibVNCServer
 Description: A library for easy implementation of a VNC server.
 Version: @LibVNCServer_VERSION@
-Requires:
-Requires.private:
+Requires: @LIBVNCSERVER_REQUIRES@
+Requires.private: @LIBVNCSERVER_REQUIRES_PRIVATE@
 Libs: -L${libdir} -lvncserver
-Libs.private: @PRIVATE_LIBS@
 Cflags: -I${includedir}
