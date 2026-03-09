@@ -976,6 +976,12 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
       return 1;
     }
 
+  /* Check if we have buffered data available */
+  if (client->buffered > 0) {
+    client->serverMsg = TRUE;
+    return 1;
+  }
+
   client->serverMsg = client->serverMsgMulticast = FALSE;
   
   timeout.tv_sec=(usecs/1000000);
