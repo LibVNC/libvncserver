@@ -10,6 +10,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - windows-latest
+          - windows-11-arm
         cmake_options:
           - "-DWITH_OPENSSL=ON  -DWITH_GNUTLS=OFF -DWITH_GCRYPT=OFF" # build with OpenSSL
           - "-DWITH_OPENSSL=OFF -DWITH_GNUTLS=ON  -DWITH_GCRYPT=ON"  # build with GnuTLS and Libgrypt
