@@ -149,6 +149,11 @@ static rfbBool HandleCoRRE32(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleHextile32(rfbClient* client, int rx, int ry, int rw, int rh);
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+static rfbBool HandleH2648(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleH26416(rfbClient* client, int rx, int ry, int rw, int rh);
+static rfbBool HandleH26432(rfbClient* client, int rx, int ry, int rw, int rh);
+#endif
 static rfbBool HandleUltra8(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleUltra16(rfbClient* client, int rx, int ry, int rw, int rh);
 static rfbBool HandleUltra32(rfbClient* client, int rx, int ry, int rw, int rh);
@@ -1310,6 +1315,14 @@ SetFormatAndEncodings(rfbClient* client)
 #endif
       } else if (strncasecmp(encStr,"hextile",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingHextile);
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+      } else if (strncasecmp(encStr,"h264",encStrLen) == 0) {
+        if (!client->format.trueColour) {
+          rfbClientLog("Ignoring h264 encoding request because pixel format is not true-colour\n");
+        } else if (se->nEncodings < MAX_ENCODINGS) {
+          encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingH264);
+        }
+#endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
       } else if (strncasecmp(encStr,"zlib",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingZlib);
@@ -1369,6 +1382,11 @@ SetFormatAndEncodings(rfbClient* client)
     }
 
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCopyRect);
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+    if (client->format.trueColour && se->nEncodings < MAX_ENCODINGS) {
+      encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingH264);
+    }
+#endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingTight);
@@ -2379,6 +2397,31 @@ HandleRFBServerMessage(rfbClient* client)
 	break;
       }
 
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+      case rfbEncodingH264:
+      {
+        switch (client->format.bitsPerPixel) {
+        case 8:
+          if (!HandleH2648(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h))
+            return FALSE;
+          break;
+        case 16:
+          if (!HandleH26416(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h))
+            return FALSE;
+          break;
+        case 32:
+          if (!HandleH26432(client, rect.r.x, rect.r.y, rect.r.w, rect.r.h))
+            return FALSE;
+          break;
+        default:
+          rfbClientLog("Unsupported bitsPerPixel %d for H.264 encoding\n",
+                       client->format.bitsPerPixel);
+          return FALSE;
+        }
+        break;
+      }
+
+#endif
       case rfbEncodingUltra:
       {
         switch (client->format.bitsPerPixel) {
@@ -2770,6 +2813,9 @@ HandleRFBServerMessage(rfbClient* client)
 #include "tight.c"
 #include "trle.c"
 #include "zrle.c"
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+#include "h264.c"
+#endif
 #undef BPP
 #define BPP 16
 #include "rre.c"
@@ -2780,6 +2826,9 @@ HandleRFBServerMessage(rfbClient* client)
 #include "tight.c"
 #include "trle.c"
 #include "zrle.c"
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+#include "h264.c"
+#endif
 #define REALBPP 15
 #include "trle.c"
 #define REALBPP 15
@@ -2794,6 +2843,9 @@ HandleRFBServerMessage(rfbClient* client)
 #include "tight.c"
 #include "trle.c"
 #include "zrle.c"
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+#include "h264.c"
+#endif
 #define REALBPP 24
 #include "trle.c"
 #define REALBPP 24
