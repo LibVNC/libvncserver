@@ -245,6 +245,7 @@ if(SYSTEMD_FOUND)
   add_definitions(-DLIBVNCSERVER_WITH_SYSTEMD)
   include_directories(${SYSTEMD_INCLUDE_DIRS})
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${SYSTEMD_LIBRARIES})
+  list(APPEND LIBVNCSERVER_REQUIRES_PRIVATE libsystemd)
 endif(SYSTEMD_FOUND)
 
 # common crypto used by both libvncserver and libvncclient
@@ -252,6 +253,8 @@ if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
   message(STATUS "Building crypto with Libgcrypt")
   set(CRYPTO_LIBRARIES ${LIBGCRYPT_LIBRARIES})
   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt.c)
+  list(APPEND LIBVNCCLIENT_REQUIRES_PRIVATE libgcrypt)
+  list(APPEND LIBVNCSERVER_REQUIRES_PRIVATE libgcrypt)
 elseif(OPENSSL_FOUND)
   message(STATUS "Building crypto with OpenSSL")
   set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
@@ -342,6 +345,7 @@ if(WITH_SASL AND LIBSASL2_LIBRARIES AND SASL2_INCLUDE_DIR)
   set(LIBVNCSERVER_HAVE_SASL 1)
   set(ADDITIONAL_LIBS ${ADDITIONAL_LIBS} ${LIBSASL2_LIBRARIES})
   include_directories(${SASL2_INCLUDE_DIR})
+  list(APPEND LIBVNCCLIENT_REQUIRES sasl)
 endif(WITH_SASL AND LIBSASL2_LIBRARIES AND SASL2_INCLUDE_DIR)
 
 # TODO:
@@ -403,6 +407,8 @@ if(GNUTLS_FOUND)
     ${LIBVNCSERVER_DIR}/rfbssl_gnutls.c
     )
   include_directories(${GNUTLS_INCLUDE_DIR})
+  list(APPEND LIBVNCCLIENT_REQUIRES_PRIVATE gnutls)
+  list(APPEND LIBVNCSERVER_REQUIRES_PRIVATE gnutls)
 elseif(OPENSSL_FOUND)
   message(STATUS "Building TLS with OpenSSL")
   set(LIBVNCCLIENT_SOURCES
@@ -414,6 +420,8 @@ elseif(OPENSSL_FOUND)
     ${LIBVNCSERVER_DIR}/rfbssl_openssl.c
   )
   include_directories(${OPENSSL_INCLUDE_DIR})
+  list(APPEND LIBVNCCLIENT_REQUIRES_PRIVATE openssl)
+  list(APPEND LIBVNCSERVER_REQUIRES_PRIVATE openssl)
 else()
   message(STATUS "Building without TLS")
   set(LIBVNCCLIENT_SOURCES
@@ -436,6 +444,8 @@ endif()
 if(ZLIB_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBZ)
   include_directories(${ZLIB_INCLUDE_DIR})
+  list(APPEND LIBVNCCLIENT_REQUIRES zlib)
+  list(APPEND LIBVNCSERVER_REQUIRES zlib)
   set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_SOURCES}
     ${LIBVNCSERVER_DIR}/zlib.c
@@ -448,6 +458,8 @@ endif(ZLIB_FOUND)
 if(LZO_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LZO)
   include_directories(${LZO_INCLUDE_DIR})
+  list(APPEND LIBVNCCLIENT_REQUIRES_PRIVATE lzo2)
+  list(APPEND LIBVNCSERVER_REQUIRES_PRIVATE lzo2)
 else()
   set(LIBVNCSERVER_SOURCES
     ${LIBVNCSERVER_SOURCES}
@@ -462,6 +474,8 @@ endif()
 if(JPEG_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBJPEG)
   include_directories(${JPEG_INCLUDE_DIR})
+  list(APPEND LIBVNCCLIENT_REQUIRES_PRIVATE libjpeg)
+  list(APPEND LIBVNCSERVER_REQUIRES_PRIVATE libjpeg)
   if(PNG_FOUND OR ZLIB_FOUND)
     set(TIGHT_C ${LIBVNCSERVER_DIR}/tight.c ${COMMON_DIR}/turbojpeg.c)
   endif(PNG_FOUND OR ZLIB_FOUND)
@@ -470,6 +484,7 @@ endif(JPEG_FOUND)
 if(PNG_FOUND)
   add_definitions(-DLIBVNCSERVER_HAVE_LIBPNG)
   include_directories(${PNG_INCLUDE_DIR})
+  list(APPEND LIBVNCSERVER_REQUIRES_PRIVATE libpng)
 endif(PNG_FOUND)
 
 set(LIBVNCSERVER_SOURCES
@@ -761,37 +776,16 @@ endif(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
 
 endif(WITH_TESTS)
 
-#
-# this gets the libraries needed by TARGET in "-libx -liby ..." form
-#
-function(get_link_libraries OUT TARGET)
-    set(RESULT "")
-    get_target_property(LIBRARIES ${TARGET} INTERFACE_LINK_LIBRARIES)
-    foreach(LIB ${LIBRARIES})
-	if("${LIB}" MATCHES ".*NOTFOUND.*")
-	    continue()
-	endif()
-	string(REGEX REPLACE "^.*/lib" "" LIB ${LIB}) # remove leading path and "lib" name prefix
-	string(REGEX REPLACE "-l" "" LIB ${LIB}) # remove leading -l
-	string(REGEX REPLACE "\\.so$" "" LIB ${LIB}) # remove trailing .so
-	list(APPEND RESULT "-l${LIB}")
-    endforeach()
-    list(REMOVE_DUPLICATES RESULT)
-    string(CONCAT RESULT ${RESULT}) # back to string
-    if(RESULT)
-	string(REPLACE "-l" " -l" RESULT ${RESULT}) # re-add separators
-    endif(RESULT)
-    set(${OUT} ${RESULT} PARENT_SCOPE)
-endfunction()
-
+string(REPLACE ";" " " LIBVNCCLIENT_REQUIRES "${LIBVNCCLIENT_REQUIRES}")
+string(REPLACE ";" " " LIBVNCCLIENT_REQUIRES_PRIVATE "${LIBVNCCLIENT_REQUIRES_PRIVATE}")
+string(REPLACE ";" " " LIBVNCSERVER_REQUIRES "${LIBVNCSERVER_REQUIRES}")
+string(REPLACE ";" " " LIBVNCSERVER_REQUIRES_PRIVATE "${LIBVNCSERVER_REQUIRES_PRIVATE}")
 set(LIBVNCSERVER_PC_FILES )
 if(WITH_LIBVNCSERVER)
-  get_link_libraries(PRIVATE_LIBS vncserver)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/libvncserver/libvncserver.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc @ONLY)
   list(APPEND LIBVNCSERVER_PC_FILES ${CMAKE_CURRENT_BINARY_DIR}/libvncserver.pc)
 endif(WITH_LIBVNCSERVER)
 if(WITH_LIBVNCCLIENT)
-  get_link_libraries(PRIVATE_LIBS vncclient)
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/libvncclient/libvncclient.pc.cmakein ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc @ONLY)
   list(APPEND LIBVNCSERVER_PC_FILES ${CMAKE_CURRENT_BINARY_DIR}/libvncclient.pc)
 endif(WITH_LIBVNCCLIENT)
