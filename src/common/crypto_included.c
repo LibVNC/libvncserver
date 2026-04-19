@@ -28,13 +28,13 @@
 #include "crypto.h"
 
 
-int hash_md5(void *out, const void *in, const size_t in_len)
+int libvnc_hash_md5(void *out, const void *in, const size_t in_len)
 {
     return 0;
 }
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-int hash_sha1(void *out, const void *in, const size_t in_len)
+int libvnc_hash_sha1(void *out, const void *in, const size_t in_len)
 {
     SHA1Context sha1;
     if(SHA1Reset(&sha1) != shaSuccess)
