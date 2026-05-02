@@ -1273,7 +1273,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
     rfbGetClientIteratorWithClosed(rfbScreenInfoPtr rfbScreen);
 
   if(usec<0)
-    usec=screen->deferUpdateTime*1000;
+    usec=(long)screen->deferUpdateTime*1000;
 
   rfbCheckFds(screen,usec);
   rfbHttpCheckFds(screen);
@@ -1353,7 +1353,7 @@ rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo) {
 void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground)
 {
   if(usec<0)
-    usec=screen->deferUpdateTime*1000;
+    usec=(long)screen->deferUpdateTime*1000;
 
   screen->select_timeout_usec = usec;
 
