@@ -229,6 +229,11 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
       bitsPixel = InitFilterPaletteBPP(client, rw, rh);
       break;
     case rfbTightFilterGradient:
+      if (rw > TIGHT_GRADIENT_MAX_WIDTH) {
+	rfbClientLog("Tight Gradient rectangle width %d exceeds maximum %d.\n",
+		     rw, TIGHT_GRADIENT_MAX_WIDTH);
+	return FALSE;
+      }
       filterFn = FilterGradientBPP;
       bitsPixel = InitFilterGradientBPP(client, rw, rh);
       break;
@@ -430,7 +435,7 @@ FilterGradient24 (rfbClient* client, int srcx, int srcy, int numRows)
   CARDBPP *dst =
     (CARDBPP *)&client->frameBuffer[(srcy * client->width + srcx) * BPP / 8];
   int x, y, c;
-  uint8_t thisRow[2048*3];
+  uint8_t thisRow[TIGHT_GRADIENT_MAX_WIDTH*3];
   uint8_t pix[3];
   int est[3];
 
@@ -473,7 +478,7 @@ FilterGradientBPP (rfbClient* client, int srcx, int srcy, int numRows)
   int x, y, c;
   CARDBPP *src = (CARDBPP *)client->buffer;
   uint16_t *thatRow = (uint16_t *)client->tightPrevRow;
-  uint16_t thisRow[2048*3];
+  uint16_t thisRow[TIGHT_GRADIENT_MAX_WIDTH*3];
   uint16_t pix[3];
   uint16_t max[3];
   int shift[3];
@@ -705,4 +710,3 @@ ReadCompactLen (rfbClient* client)
 /* LIBVNCSERVER_HAVE_LIBZ and LIBVNCSERVER_HAVE_LIBJPEG */
 #endif
 #endif
-
