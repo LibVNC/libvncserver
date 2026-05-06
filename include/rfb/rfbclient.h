@@ -328,10 +328,11 @@ typedef struct _rfbClient {
 	rfbBool zlibStreamActive[4];
 
 	/* Filter stuff. Should be initialized by filter initialization code. */
+#define TIGHT_GRADIENT_MAX_WIDTH 2048
 	rfbBool cutZeros;
 	int rectWidth, rectColors;
 	char tightPalette[256*4];
-	uint8_t tightPrevRow[2048*3*sizeof(uint16_t)];
+	uint8_t tightPrevRow[TIGHT_GRADIENT_MAX_WIDTH*3*sizeof(uint16_t)];
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 	/** JPEG decoder state (obsolete-- do not use). */
