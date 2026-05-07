@@ -89,6 +89,8 @@ static size_t buf_filled=0;
  * httpInitSockets sets up the TCP socket to listen for HTTP connections.
  */
 
+static rfbClientRec cl;
+
 void
 rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
 {
@@ -125,6 +127,9 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
     rfbLog("Listening for HTTP connections on TCP6 port %d\n", rfbScreen->http6Port);
     rfbLog("  URL http://%s:%d\n",rfbScreen->thisHost,rfbScreen->http6Port);
 #endif
+    INIT_MUTEX(cl.outputMutex);
+    INIT_MUTEX(cl.refCountMutex);
+    INIT_MUTEX(cl.sendMutex);
 }
 
 void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
@@ -145,6 +150,19 @@ void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
 	rfbCloseSocket(rfbScreen->httpListen6Sock);
 	rfbScreen->httpListen6Sock=RFB_INVALID_SOCKET;
     }
+    LOCK(cl.outputMutex);
+    UNLOCK(cl.outputMutex);
+    TINI_MUTEX(cl.outputMutex);
+
+    LOCK(cl.sendMutex);
+    UNLOCK(cl.sendMutex);
+    TINI_MUTEX(cl.sendMutex);
+
+    LOCK(cl.refCountMutex);
+    UNLOCK(cl.refCountMutex);
+    TINI_MUTEX(cl.refCountMutex);
+
+    memset(&cl, 0, sizeof(rfbClientRec));
 }
 
 /*
@@ -257,8 +275,6 @@ httpCloseSock(rfbScreenInfoPtr rfbScreen)
     buf_filled = 0;
 }
 
-static rfbClientRec cl;
-
 /*
  * httpProcessInput is called when input is received on the HTTP socket.
  */
@@ -337,10 +353,11 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 
 
     /* Process the request. */
-    if(rfbScreen->httpEnableProxyConnect) {
+if(rfbScreen->httpEnableProxyConnect) {
 	const static char* PROXY_OK_STR = "HTTP/1.0 200 OK\r\nContent-Type: octet-stream\r\nPragma: no-cache\r\n\r\n";
 	if(!strncmp(buf, "CONNECT ", 8)) {
-	    if(atoi(strchr(buf, ':')+1)!=rfbScreen->port) {
+	    char *colon = strchr(buf, ':');
+	    if(colon == NULL || atoi(colon+1)!=rfbScreen->port) {
 		rfbErr("httpd: CONNECT format invalid.\n");
 		rfbWriteExact(&cl,INVALID_REQUEST_STR, strlen(INVALID_REQUEST_STR));
 		httpCloseSock(rfbScreen);
@@ -353,14 +370,17 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
 	    rfbScreen->httpSock = RFB_INVALID_SOCKET;
 	    return;
 	}
-	if (!strncmp(buf, "GET ",4) && !strncmp(strchr(buf,'/'),"/proxied.connection HTTP/1.", 27)) {
-	    /* proxy connection */
-	    rfbLog("httpd: client asked for /proxied.connection\n");
-	    rfbWriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
-	    rfbNewClientConnection(rfbScreen,rfbScreen->httpSock);
-	    rfbScreen->httpSock = RFB_INVALID_SOCKET;
-	    return;
-	}	   
+	if (!strncmp(buf, "GET ",4)) {
+	    char *slash = strchr(buf, '/');
+	    if (slash != NULL && !strncmp(slash,"/proxied.connection HTTP/1.", 27)) {
+		/* proxy connection */
+		rfbLog("httpd: client asked for /proxied.connection\n");
+		rfbWriteExact(&cl,PROXY_OK_STR,strlen(PROXY_OK_STR));
+		rfbNewClientConnection(rfbScreen,rfbScreen->httpSock);
+		rfbScreen->httpSock = RFB_INVALID_SOCKET;
+		return;
+	    }
+	}
     }
 
     if (strncmp(buf, "GET ", 4)) {

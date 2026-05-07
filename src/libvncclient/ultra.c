@@ -138,6 +138,7 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   int toRead=0;
   int inflateResult=0;
   unsigned char *ptr=NULL;
+  unsigned char *ptr_end=NULL;
   lzo_uint uncompressedBytes = ry + (rw * 65535);
   unsigned int numCacheRects = rx;
 
@@ -206,10 +207,17 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   
   /* Put the uncompressed contents of the update on the screen. */
   ptr = (unsigned char *)client->raw_buffer;
+  ptr_end = ptr + uncompressedBytes;
   for (i=0; i<numCacheRects; i++)
   {
     unsigned short sx, sy, sw, sh;
     unsigned int se;
+
+    /* subrect header: sx(2) + sy(2) + sw(2) + sh(2) + se(4) = 12 bytes */
+    if (ptr + 12 > ptr_end) {
+      rfbClientLog("UltraZip: subrect %d header exceeds decompressed data bounds\n", i);
+      return FALSE;
+    }
 
     memcpy((char *)&sx, ptr, 2); ptr += 2;
     memcpy((char *)&sy, ptr, 2); ptr += 2;
@@ -225,8 +233,13 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
     if (se == rfbEncodingRaw)
     {
+        uint64_t rawBytes = (uint64_t)sw * sh * (BPP / 8);
+        if (rawBytes > (size_t)(ptr_end - ptr)) {
+          rfbClientLog("UltraZip: subrect %d raw data exceeds decompressed data bounds\n", i);
+          return FALSE;
+        }
         client->GotBitmap(client, (unsigned char *)ptr, sx, sy, sw, sh);
-        ptr += ((sw * sh) * (BPP / 8));
+        ptr += (size_t)rawBytes;
     }
   }  
 
@@ -234,3 +247,4 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 }
 
 #undef CARDBPP
+

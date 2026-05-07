@@ -3,6 +3,8 @@
 * Make sure you only include relevant changes in your commit(s). In particular, don't re-format
   whole source files as those indentation changes add a lot of unrelated changes to your commit.
 
+* The minimum supported C version is C90 with C++-style comments (GCC, MSVC and Clang support these).
+
 * Make your commits as [atomic as possible](https://www.freshconsulting.com/atomic-commits/).
    * Fundamental question 1: what could we need to revert later?
    * Fundamental question 2: what could we need to cherry-pick?

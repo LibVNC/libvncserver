@@ -103,9 +103,9 @@ listenForIncomingConnections(rfbClient* client)
 
     if (r > 0) {
       if (listenSocket != RFB_INVALID_SOCKET && FD_ISSET(listenSocket, &fds))
-	client->sock = AcceptTcpConnection(client->listenSock); 
+	client->sock = AcceptTcpConnection(listenSocket);
       else if (listen6Socket != RFB_INVALID_SOCKET && FD_ISSET(listen6Socket, &fds))
-	client->sock = AcceptTcpConnection(client->listen6Sock);
+	client->sock = AcceptTcpConnection(listen6Socket);
 
       if (client->sock == RFB_INVALID_SOCKET)
 	return;

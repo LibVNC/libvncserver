@@ -34,6 +34,9 @@
 #endif
 
 static rfbBool rfbTLSInitialized = FALSE;
+static int rfbTLSExpectedFingerprintIndex = -1;
+static int rfbTLSClientIndex = -1;
+static int rfbTLSCertDecisionIndex = -1;
 
 // Locking callbacks are only initialized if we have mutex support.
 #if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
@@ -154,6 +157,10 @@ InitializeTLS(void)
   SSLeay_add_ssl_algorithms();
   RAND_load_file("/dev/urandom", 1024);
 
+  rfbTLSExpectedFingerprintIndex = SSL_get_ex_new_index(0, "rfbTLSExpectedFingerprintIndex", NULL, NULL, NULL);
+  rfbTLSClientIndex = SSL_get_ex_new_index(0, "rfbTLSClientIndex", NULL, NULL, NULL);
+  rfbTLSCertDecisionIndex = SSL_get_ex_new_index(0, "rfbTLSCertDecisionIndex", NULL, NULL, NULL);
+
   rfbClientLog("OpenSSL version %s initialized.\n", SSLeay_version(SSLEAY_VERSION));
   rfbTLSInitialized = TRUE;
   return TRUE;
@@ -182,37 +189,6 @@ static int sock_read_ready(SSL *ssl, uint32_t ms)
 	return r;
 }
 
-static int wait_for_data(SSL *ssl, int ret, int timeout)
-{
-  int err;
-  int retval = 1;
-
-  err = SSL_get_error(ssl, ret);
-	
-  switch(err)
-  {
-    case SSL_ERROR_WANT_READ:
-    case SSL_ERROR_WANT_WRITE:
-      ret = sock_read_ready(ssl, timeout*1000);
-			
-      if (ret == -1) {
-        retval = 2;
-      }
-				
-      break;
-    default:
-      retval = 3;
-      long verify_res = SSL_get_verify_result(ssl);
-      if (verify_res != X509_V_OK)
-        rfbClientLog("Could not verify server certificate: %s.\n",
-                     X509_verify_cert_error_string(verify_res));
-      break;
-   }
-	
-  ERR_clear_error();
-				
-  return retval;
-}
 
 static rfbBool
 load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
@@ -252,12 +228,115 @@ load_crls_from_file(char *file, SSL_CTX *ssl_ctx)
     return FALSE;
 }
 
+/** Convert ASN1_TIME to time_t */
+static time_t asn1time_to_time_t(const ASN1_TIME *t) {
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+
+    // If t is NULL, ASN1_TIME_to_tm() converts the current time, which is not what we want.
+    if (!t || !ASN1_TIME_to_tm(t, &tm)) {
+        return (time_t)-1;
+    }
+
+    return mktime(&tm);  // time_t in localtime; for UTC, use timegm if available
+}
+
+static int cert_fingerprint_mismatch_callback(rfbClient *client, X509 *cert) {
+    if(!cert) {
+        rfbClientErr("No cert given in fingerprint mismatch handling\n");
+        return 0;
+    }
+
+    if (!client || !client->GetX509CertFingerprintMismatchDecision) {
+        rfbClientErr("No client callback given in fingerprint mismatch handling\n");
+        return 0;
+    }
+
+    /* Subject */
+    BIO *bio = BIO_new(BIO_s_mem());
+    if (!bio) {
+        return 0;
+    }
+    X509_NAME_print_ex(bio, X509_get_subject_name(cert), 0, XN_FLAG_RFC2253);
+    char *data;
+    long data_len = BIO_get_mem_data(bio, &data); // owned by OpenSSL
+    if (data_len <= 0) {
+        BIO_free(bio);
+        return 0;
+    }
+    // Allocate a null-terminated copy, bio does not have that
+    char *subject = malloc(data_len + 1);
+    if (subject) {
+        memcpy(subject, data, data_len);
+        subject[data_len] = '\0';
+    }
+    BIO_free(bio);
+
+    /* Validity */
+    time_t not_before = asn1time_to_time_t(X509_get0_notBefore(cert));
+    time_t not_after = asn1time_to_time_t(X509_get0_notAfter(cert));
+
+    /* SHA-256 fingerprint */
+    unsigned char fingerprint[32];
+    if (! X509_digest(cert, EVP_sha256(), fingerprint, NULL)) {
+        free(subject);
+        return 0;
+    }
+
+    /* Call the callback (just reads values) */
+    rfbBool decision = client->GetX509CertFingerprintMismatchDecision(client, subject, not_before, not_after, fingerprint, 32);
+
+    /* Free all allocated memory here */
+    free(subject);
+
+    return decision ? 1 : 0;
+}
+
+static int cert_verify_callback(int preverify_ok, X509_STORE_CTX *ctx) {
+    if (preverify_ok) {
+        rfbClientLog("Server cert trusted\n");
+        return 1; // Accept
+    }
+
+    /*
+      If preverify failed, compare fingerprints
+    */
+    unsigned char remote_fingerprint[32];
+    if (! X509_digest(X509_STORE_CTX_get_current_cert(ctx), EVP_sha256(), remote_fingerprint, NULL)) {
+        return 0;
+    }
+
+    SSL *ssl = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
+    const unsigned char *expected_fingerprint = SSL_get_ex_data(ssl, rfbTLSExpectedFingerprintIndex);
+
+    // Check if we already have a cached user decision for this certificate
+    int cached_decision = (int)(intptr_t)SSL_get_ex_data(ssl, rfbTLSCertDecisionIndex);
+
+    int verify;
+    if (cached_decision || (expected_fingerprint && memcmp(remote_fingerprint, expected_fingerprint, 32) == 0)) {
+        // accept
+        verify = 1;
+    } else {
+        // ask user
+        verify = cert_fingerprint_mismatch_callback(SSL_get_ex_data(ssl, rfbTLSClientIndex), X509_STORE_CTX_get_current_cert(ctx));
+        // Cache the user decision to avoid prompting the user multiple times
+        SSL_set_ex_data(ssl, rfbTLSCertDecisionIndex, (void*)(intptr_t)verify);
+    }
+
+    if(verify) {
+        X509_STORE_CTX_set_error(ctx, X509_V_OK);
+    }
+
+    return verify;
+}
+
+
 static SSL *
 open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredential *cred)
 {
   SSL_CTX *ssl_ctx = NULL;
   SSL *ssl = NULL;
-  int n, finished = 0;
+  int n;
   X509_VERIFY_PARAM *param;
   uint8_t verify_crls;
 
@@ -317,7 +396,7 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
       }
     }
 
-    SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, cert_verify_callback);
 
     if (verify_crls == rfbX509CrlVerifyClient) 
       X509_VERIFY_PARAM_set_flags(param, X509_V_FLAG_CRL_CHECK);
@@ -356,7 +435,12 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
   }
 
   SSL_set_fd (ssl, sockfd);
-  SSL_CTX_set_app_data (ssl_ctx, client);
+  SSL_set_ex_data(ssl, rfbTLSClientIndex, client);
+
+  if (!anonTLS && cred->x509Credential.x509ExpectedFingerprint) {
+      // store expected fingerprint
+      SSL_set_ex_data(ssl, rfbTLSExpectedFingerprintIndex, cred->x509Credential.x509ExpectedFingerprint);
+  }
 
   do
   {
@@ -364,15 +448,36 @@ open_ssl_connection (rfbClient *client, int sockfd, rfbBool anonTLS, rfbCredenti
 		
     if (n != 1) 
     {
-      if (wait_for_data(ssl, n, 1) != 1) 
-      {
-        finished = 1;
-        SSL_shutdown(ssl);
+      int ready;
+      long verify_res;
 
-        goto error_free_ssl;
-      }
+      switch(SSL_get_error(ssl, n))
+          {
+          case SSL_ERROR_WANT_READ:
+          case SSL_ERROR_WANT_WRITE:
+              ready = sock_read_ready(ssl, 1000);
+
+              if (ready == -1) {
+                  ERR_clear_error();
+                  SSL_shutdown(ssl);
+                  goto error_free_ssl;
+              }
+
+              break;
+          default:
+              verify_res = SSL_get_verify_result(ssl);
+              if (verify_res != X509_V_OK)
+                  rfbClientLog("Could not verify server certificate: %s.\n",
+                               X509_verify_cert_error_string(verify_res));
+
+              ERR_clear_error();
+              SSL_shutdown(ssl);
+              goto error_free_ssl;
+              break;
+          }
+      ERR_clear_error();
     }
-  } while( n != 1 && finished != 1 );
+  } while( n != 1 );
 
   X509_VERIFY_PARAM_free(param);
   return ssl;
@@ -536,6 +641,7 @@ FreeX509Credential(rfbCredential *cred)
   free(cred->x509Credential.x509CACrlFile);
   free(cred->x509Credential.x509ClientCertFile);
   free(cred->x509Credential.x509ClientKeyFile);
+  free(cred->x509Credential.x509ExpectedFingerprint);
   free(cred);
 }
 

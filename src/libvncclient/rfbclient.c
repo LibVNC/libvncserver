@@ -1784,6 +1784,14 @@ SendExtDesktopSize(rfbClient* client, uint16_t width, uint16_t height)
     sdm.width = rfbClientSwap16IfLE(width);
     sdm.height = rfbClientSwap16IfLE(height);
     sdm.numberOfScreens = 1;
+
+    /* Copy existing screen information to send with update. */
+    screen.id = client->screen.id;
+    screen.x = client->screen.x;
+    screen.y = client->screen.y;
+    screen.flags = client->screen.flags;
+
+    /* Get updated width and height for the resize. */
     screen.width = rfbClientSwap16IfLE(width);
     screen.height = rfbClientSwap16IfLE(height);
 
@@ -2416,7 +2424,7 @@ HandleRFBServerMessage(rfbClient* client)
           if (!ReadFromRFBServer(client, ((char *)&screen), sz_rfbExtDesktopScreen)) {
             return FALSE;
           }
-          if (screen.id != 0 && screen.width && screen.height) {
+          if (screen.width && screen.height) {
             client->screen = screen;
           } else {
             invalidScreen = TRUE;
