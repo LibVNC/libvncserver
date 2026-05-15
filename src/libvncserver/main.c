@@ -19,6 +19,7 @@
 
 #include <stdarg.h>
 #include <errno.h>
+#include <limits.h>
 
 #ifndef false
 #define false 0
@@ -1263,6 +1264,18 @@ static void gettimeofday(struct timeval* tv,char* dummy)
 }
 #endif
 
+static long
+rfbDeferUpdateTimeToUsec(rfbScreenInfoPtr screen)
+{
+  if(screen->deferUpdateTime <= 0)
+    return 0;
+
+  if(screen->deferUpdateTime > LONG_MAX / 1000L)
+    return LONG_MAX;
+
+  return (long)screen->deferUpdateTime * 1000L;
+}
+
 rfbBool
 rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
 {
@@ -1273,7 +1286,7 @@ rfbProcessEvents(rfbScreenInfoPtr screen,long usec)
     rfbGetClientIteratorWithClosed(rfbScreenInfoPtr rfbScreen);
 
   if(usec<0)
-    usec=screen->deferUpdateTime*1000;
+    usec=rfbDeferUpdateTimeToUsec(screen);
 
   rfbCheckFds(screen,usec);
   rfbHttpCheckFds(screen);
@@ -1353,7 +1366,7 @@ rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo) {
 void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground)
 {
   if(usec<0)
-    usec=screen->deferUpdateTime*1000;
+    usec=rfbDeferUpdateTimeToUsec(screen);
 
   screen->select_timeout_usec = usec;
 
