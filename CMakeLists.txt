@@ -611,6 +611,7 @@ endif(X11_xcb_FOUND AND X11_xcb_xtest_FOUND AND X11_xcb_keysyms_FOUND)
 
 set(LIBVNCCLIENT_EXAMPLES
     backchannel
+    filetransfer
     ppmtest
 )
 

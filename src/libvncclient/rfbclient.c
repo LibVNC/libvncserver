@@ -2688,6 +2688,20 @@ HandleRFBServerMessage(rfbClient* client)
         }
       }
 
+      /*
+       * Legacy UltraVNC/TightVNC file download headers are followed by an
+       * additional 32-bit high-size field. LibVNCServer currently sends it
+       * even though rfbFileTransferMsg only carries the low 32 bits. Consume
+       * it here so the next server message remains aligned.
+       */
+      if (msg.ft.contentType == rfbFileHeader) {
+        uint32_t sizeHigh;
+        if (!ReadFromRFBServer(client, (char *)&sizeHigh, sizeof(sizeHigh))) {
+          free(buffer);
+          return FALSE;
+        }
+      }
+
       if (client->HandleFileTransfer != NULL)
         client->HandleFileTransfer(client, msg.ft.contentType, msg.ft.contentParam,
                                    msg.ft.size, buffer, msg.ft.length);
