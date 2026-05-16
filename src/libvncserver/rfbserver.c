@@ -2453,7 +2453,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 			   cl->host);
 		    /* if cursor was drawn, hide the cursor */
 		    if(!cl->enableCursorShapeUpdates)
-		        rfbRedrawAfterHideCursor(cl,NULL);
+		        rfbRedrawAfterHideCursor(cl, NULL, NULL);
 
 		    cl->enableCursorShapeUpdates = TRUE;
 		    cl->cursorWasChanged = TRUE;
@@ -2464,7 +2464,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		       cl->host);
 		/* if cursor was drawn, hide the cursor */
 		if(!cl->enableCursorShapeUpdates)
-		    rfbRedrawAfterHideCursor(cl,NULL);
+		    rfbRedrawAfterHideCursor(cl, NULL, NULL);
 
 	        cl->enableCursorShapeUpdates = TRUE;
 	        cl->useRichCursorEncoding = TRUE;
@@ -3194,7 +3194,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     sraRect rect;
     int nUpdateRegionRects;
     rfbFramebufferUpdateMsg *fu = (rfbFramebufferUpdateMsg *)cl->updateBuf;
-    sraRegionPtr updateRegion,updateCopyRegion,tmpRegion;
+    sraRegionPtr updateRegion,updateCopyRegion,tmpRegion,requestedRegion;
     int dx, dy;
     rfbBool sendCursorShape = FALSE;
     rfbBool sendCursorPos = FALSE;
@@ -3366,6 +3366,8 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
      * updateCopyRegion to this.
      */
 
+    requestedRegion = sraRgnCreateRgn(cl->requestedRegion);
+
     updateCopyRegion = sraRgnCreateRgn(cl->copyRegion);
     sraRgnAnd(updateCopyRegion,cl->requestedRegion);
     tmpRegion = sraRgnCreateRgn(cl->requestedRegion);
@@ -3403,12 +3405,12 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
    
     if (!cl->enableCursorShapeUpdates) {
       if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) {
-	rfbRedrawAfterHideCursor(cl,updateRegion);
+	rfbRedrawAfterHideCursor(cl, updateRegion, requestedRegion);
 	LOCK(cl->screen->cursorMutex);
 	cl->cursorX = cl->screen->cursorX;
 	cl->cursorY = cl->screen->cursorY;
 	UNLOCK(cl->screen->cursorMutex);
-	rfbRedrawAfterHideCursor(cl,updateRegion);
+	rfbRedrawAfterHideCursor(cl, updateRegion, requestedRegion);
       }
       rfbShowCursor(cl);
     }
@@ -3661,6 +3663,7 @@ updateFailed:
         sraRgnReleaseIterator(i);
     sraRgnDestroy(updateRegion);
     sraRgnDestroy(updateCopyRegion);
+    sraRgnDestroy(requestedRegion);
 
     if(cl->screen->displayFinishedHook)
       cl->screen->displayFinishedHook(cl, result);

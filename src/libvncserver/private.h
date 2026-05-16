@@ -5,7 +5,7 @@
 
 void rfbShowCursor(rfbClientPtr cl);
 void rfbHideCursor(rfbClientPtr cl);
-void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion);
+void rfbRedrawAfterHideCursor(rfbClientPtr cl, sraRegionPtr updateRegion, const sraRegionPtr requestedRegion);
 
 /* from main.c */
 
