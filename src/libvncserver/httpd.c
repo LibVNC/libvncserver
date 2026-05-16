@@ -295,6 +295,7 @@ httpProcessInput(rfbScreenInfoPtr rfbScreen)
     unsigned int maxFnameLen;
     FILE* fd;
     rfbBool performSubstitutions = FALSE;
+    size_t bytesToRead;
     char str[256+32];
 #ifndef WIN32
     char* user=getenv("USER");
@@ -484,8 +485,12 @@ if(rfbScreen->httpEnableProxyConnect) {
     /* end the header */
     rfbWriteExact(&cl, "\r\n", 2);
 
+    /* .vnc substitutions need one byte for NUL termination. Other
+       HTTP files can use the full, aligned buffer. */
+    bytesToRead = performSubstitutions ? BUF_SIZE - 1 : BUF_SIZE;
+
     while (1) {
-	int n = fread(buf, 1, BUF_SIZE-1, fd);
+	int n = fread(buf, 1, bytesToRead, fd);
 	if (n < 0) {
 	    rfbLogPerror("httpProcessInput: read");
 	    fclose(fd);
