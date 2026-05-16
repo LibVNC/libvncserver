@@ -971,6 +971,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->httpListenSock=RFB_INVALID_SOCKET;
    screen->httpListen6Sock=RFB_INVALID_SOCKET;
    screen->httpSock=RFB_INVALID_SOCKET;
+   screen->webSocketsHandshakeMode = rfbWebSocketsHandshakeAuto;
 
    screen->desktopName = "LibVNCServer";
    screen->alwaysShared = FALSE;
