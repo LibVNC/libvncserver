@@ -791,7 +791,15 @@ static rfbCursorPtr rfbDefaultGetCursorPtr(rfbClientPtr cl)
 static rfbBool rfbDefaultPasswordCheck(rfbClientPtr cl,const char* response,int len)
 {
   int i;
-  char *passwd=rfbDecryptPasswdFromFile(cl->screen->authPasswdData);
+  char *passwd;
+
+  if(response == NULL || len != CHALLENGESIZE) {
+    rfbErr("authProcessClientMessage: invalid response length from %s\n",
+	   cl->host);
+    return(FALSE);
+  }
+
+  passwd=rfbDecryptPasswdFromFile(cl->screen->authPasswdData);
 
   if(!passwd) {
     rfbErr("Couldn't read password file: %s\n",cl->screen->authPasswdData);
@@ -822,6 +830,12 @@ rfbBool rfbCheckPasswordByList(rfbClientPtr cl,const char* response,int len)
 {
   char **passwds;
   int i=0;
+
+  if(response == NULL || len != CHALLENGESIZE) {
+    rfbErr("authProcessClientMessage: invalid response length from %s\n",
+	   cl->host);
+    return(FALSE);
+  }
 
   for(passwds=(char**)cl->screen->authPasswdData;*passwds;passwds++,i++) {
     uint8_t auth_tmp[CHALLENGESIZE];
