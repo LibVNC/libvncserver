@@ -629,6 +629,8 @@ typedef struct _rfbClientRec {
     rfbBool enableSupportedEncodings; /**< client supports SupportedEncodings encoding */
     rfbBool enableServerIdentity;     /**< client supports ServerIdentity encoding */
     rfbBool enableKeyboardLedState;   /**< client supports KeyboardState encoding */
+    rfbBool enableExtendedMouseButtons; /**< client supports ExtendedMouseButtons encoding */
+    rfbBool extendedMouseButtonsPending; /**< ExtendedMouseButtons acknowledgement should be sent */
     rfbBool enableLastRectEncoding;   /**< client supports LastRect encoding */
     rfbBool enableCursorShapeUpdates; /**< client supports cursor shape updates */
     rfbBool enableCursorPosUpdates;   /**< client supports cursor position updates */
