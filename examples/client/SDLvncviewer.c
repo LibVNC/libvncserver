@@ -34,6 +34,9 @@ SDL_Window *sdlWindow;
 int x,y;
 
 static int rightAltKeyDown, leftAltKeyDown;
+static rfbBool keypadNumLockInitialized;
+static rfbBool keypadNumLockActive;
+static char skipNextTextInput;
 
 static rfbBool resize(rfbClient* client) {
 	int width=client->width,height=client->height,
@@ -100,9 +103,45 @@ static rfbBool resize(rfbClient* client) {
 	return TRUE;
 }
 
+static char SDL_keypad_text_char(SDL_Keycode sym) {
+	switch (sym) {
+	case SDLK_KP_0: return '0';
+	case SDLK_KP_1: return '1';
+	case SDLK_KP_2: return '2';
+	case SDLK_KP_3: return '3';
+	case SDLK_KP_4: return '4';
+	case SDLK_KP_5: return '5';
+	case SDLK_KP_6: return '6';
+	case SDLK_KP_7: return '7';
+	case SDLK_KP_8: return '8';
+	case SDLK_KP_9: return '9';
+	case SDLK_KP_PERIOD: return '.';
+	default: return '\0';
+	}
+}
+
+static void SDL_init_keypad_numlock_state(void) {
+	if (!keypadNumLockInitialized) {
+		keypadNumLockActive = (SDL_GetModState() & KMOD_NUM) != 0;
+		keypadNumLockInitialized = TRUE;
+	}
+}
+
+static void SDL_update_keypad_numlock_state(SDL_KeyboardEvent* e) {
+	SDL_init_keypad_numlock_state();
+	if (e->type == SDL_KEYDOWN && e->keysym.sym == SDLK_NUMLOCKCLEAR && !e->repeat)
+		keypadNumLockActive = !keypadNumLockActive;
+}
+
+static rfbBool SDL_keypad_numlock_active(void) {
+	SDL_init_keypad_numlock_state();
+	return keypadNumLockActive;
+}
+
 static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	rfbKeySym k = 0;
 	SDL_Keycode sym = e->keysym.sym;
+	rfbBool numlock = SDL_keypad_numlock_active();
 
 	switch (sym) {
 	case SDLK_BACKSPACE: k = XK_BackSpace; break;
@@ -112,17 +151,17 @@ static rfbKeySym SDL_key2rfbKeySym(SDL_KeyboardEvent* e) {
 	case SDLK_PAUSE: k = XK_Pause; break;
 	case SDLK_ESCAPE: k = XK_Escape; break;
 	case SDLK_DELETE: k = XK_Delete; break;
-	case SDLK_KP_0: k = XK_KP_0; break;
-	case SDLK_KP_1: k = XK_KP_1; break;
-	case SDLK_KP_2: k = XK_KP_2; break;
-	case SDLK_KP_3: k = XK_KP_3; break;
-	case SDLK_KP_4: k = XK_KP_4; break;
-	case SDLK_KP_5: k = XK_KP_5; break;
-	case SDLK_KP_6: k = XK_KP_6; break;
-	case SDLK_KP_7: k = XK_KP_7; break;
-	case SDLK_KP_8: k = XK_KP_8; break;
-	case SDLK_KP_9: k = XK_KP_9; break;
-	case SDLK_KP_PERIOD: k = XK_KP_Decimal; break;
+	case SDLK_KP_0: k = numlock ? XK_KP_0 : XK_KP_Insert; break;
+	case SDLK_KP_1: k = numlock ? XK_KP_1 : XK_KP_End; break;
+	case SDLK_KP_2: k = numlock ? XK_KP_2 : XK_KP_Down; break;
+	case SDLK_KP_3: k = numlock ? XK_KP_3 : XK_KP_Page_Down; break;
+	case SDLK_KP_4: k = numlock ? XK_KP_4 : XK_KP_Left; break;
+	case SDLK_KP_5: k = numlock ? XK_KP_5 : XK_KP_Begin; break;
+	case SDLK_KP_6: k = numlock ? XK_KP_6 : XK_KP_Right; break;
+	case SDLK_KP_7: k = numlock ? XK_KP_7 : XK_KP_Home; break;
+	case SDLK_KP_8: k = numlock ? XK_KP_8 : XK_KP_Up; break;
+	case SDLK_KP_9: k = numlock ? XK_KP_9 : XK_KP_Page_Up; break;
+	case SDLK_KP_PERIOD: k = numlock ? XK_KP_Decimal : XK_KP_Delete; break;
 	case SDLK_KP_DIVIDE: k = XK_KP_Divide; break;
 	case SDLK_KP_MULTIPLY: k = XK_KP_Multiply; break;
 	case SDLK_KP_MINUS: k = XK_KP_Subtract; break;
@@ -385,22 +424,41 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 	}
 	case SDL_KEYUP:
 	case SDL_KEYDOWN:
+	{
+		rfbKeySym sym;
+		char keypadTextChar;
+
 		if (viewOnly)
 			break;
-		SendKeyEvent(cl, SDL_key2rfbKeySym(&e->key),
-			e->type == SDL_KEYDOWN ? TRUE : FALSE);
+		SDL_update_keypad_numlock_state(&e->key);
+		sym = SDL_key2rfbKeySym(&e->key);
+		if (sym != 0)
+			SendKeyEvent(cl, sym,
+				e->type == SDL_KEYDOWN ? TRUE : FALSE);
+		keypadTextChar = SDL_keypad_text_char(e->key.keysym.sym);
+		if (e->type == SDL_KEYDOWN && keypadTextChar)
+			skipNextTextInput = keypadTextChar;
+		else if (e->type == SDL_KEYUP && keypadTextChar == skipNextTextInput)
+			skipNextTextInput = '\0';
 		if (e->key.keysym.sym == SDLK_RALT)
 			rightAltKeyDown = e->type == SDL_KEYDOWN;
 		if (e->key.keysym.sym == SDLK_LALT)
 			leftAltKeyDown = e->type == SDL_KEYDOWN;
 		break;
+	}
 	case SDL_TEXTINPUT:
-                if (viewOnly)
+		if (viewOnly)
 			break;
+		if (skipNextTextInput) {
+			char skipped = skipNextTextInput;
+			skipNextTextInput = '\0';
+			if (e->text.text[0] == skipped && e->text.text[1] == '\0')
+				break;
+		}
 		rfbKeySym sym = utf8char2rfbKeySym(e->text.text);
 		SendKeyEvent(cl, sym, TRUE);
 		SendKeyEvent(cl, sym, FALSE);
-                break;
+		break;
 	case SDL_QUIT:
                 if(listenLoop)
 		  {
@@ -597,6 +655,7 @@ int main(int argc,char** argv) {
 	argc = j;
 
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
+	SDL_init_keypad_numlock_state();
 	atexit(SDL_Quit);
 	signal(SIGINT, exit);
 
