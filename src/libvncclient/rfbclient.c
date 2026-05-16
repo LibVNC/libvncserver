@@ -66,6 +66,7 @@
 #include "tls.h"
 
 #define MAX_TEXTCHAT_SIZE 10485760 /* 10MB */
+#define MAX_FILETRANSFER_SIZE 10485760 /* 10MB */
 
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
@@ -1548,6 +1549,33 @@ SendScaleSetting(rfbClient* client,int scaleSetting)
  * (Think HelpDesk type applications)
  */
 
+rfbBool
+FileTransferSend(rfbClient* client, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, const char *data)
+{
+    rfbFileTransferMsg ft;
+
+    if (!SupportsClient2Server(client, rfbFileTransfer))
+        return TRUE;
+
+    if (length > 0 && data == NULL)
+        return FALSE;
+
+    ft.type = rfbFileTransfer;
+    ft.contentType = contentType;
+    ft.contentParam = contentParam;
+    ft.pad = 0;
+    ft.size = rfbClientSwap32IfLE(size);
+    ft.length = rfbClientSwap32IfLE(length);
+
+    if (!WriteToRFBServer(client, (char *)&ft, sz_rfbFileTransferMsg))
+        return FALSE;
+
+    if (length > 0 && !WriteToRFBServer(client, data, length))
+        return FALSE;
+
+    return TRUE;
+}
+
 rfbBool TextChatSend(rfbClient* client, char *text)
 {
     rfbTextChatMsg chat;
@@ -2633,6 +2661,39 @@ HandleRFBServerMessage(rfbClient* client)
     free(buffer);
 
     break;
+  }
+
+  case rfbFileTransfer:
+  {
+      char *buffer = NULL;
+
+      if (!ReadFromRFBServer(client, ((char *)&msg) + 1,
+                             sz_rfbFileTransferMsg - 1))
+        return FALSE;
+
+      msg.ft.size = rfbClientSwap32IfLE(msg.ft.size);
+      msg.ft.length = rfbClientSwap32IfLE(msg.ft.length);
+
+      if (msg.ft.length > MAX_FILETRANSFER_SIZE) {
+        rfbClientErr("Ignoring too big file transfer message payload sent by server: %u B > 10 MB\n",
+                     (unsigned int)msg.ft.length);
+        return FALSE;
+      }
+
+      if (msg.ft.length > 0) {
+        buffer = malloc(msg.ft.length);
+        if (!buffer || !ReadFromRFBServer(client, buffer, msg.ft.length)) {
+          free(buffer);
+          return FALSE;
+        }
+      }
+
+      if (client->HandleFileTransfer != NULL)
+        client->HandleFileTransfer(client, msg.ft.contentType, msg.ft.contentParam,
+                                   msg.ft.size, buffer, msg.ft.length);
+
+      free(buffer);
+      break;
   }
 
   case rfbTextChat:
