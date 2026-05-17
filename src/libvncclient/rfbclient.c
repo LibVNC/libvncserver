@@ -2908,6 +2908,7 @@ PrintPixelFormatForClient(rfbClient *client, rfbPixelFormat *format)
 void
 PrintPixelFormat(rfbPixelFormat *format)
 {
+  /* Legacy API: no rfbClient context is available here. */
   PrintPixelFormatForClient(NULL, format);
 }
 

@@ -530,14 +530,16 @@ typedef void (*rfbClientLogProc)(const char *format, ...);
 /**
  * Optional client-aware logging callback used by rfbClientLogEx() and
  * rfbClientErrEx(). When this callback is NULL, the helpers fall back to the
- * legacy global rfbClientLog/rfbClientErr callbacks.
+ * legacy global rfbClientLog/rfbClientErr callbacks. The client argument may be
+ * NULL for messages without an available rfbClient context, for example when
+ * legacy APIs are called directly.
  */
 typedef void (*rfbClientLogProcWithClient)(struct _rfbClient *client, const char *format, va_list args);
 extern rfbClientLogProc rfbClientLog,rfbClientErr;
 extern rfbClientLogProcWithClient rfbClientLogWithClient,rfbClientErrWithClient;
-/** Log a message with optional rfbClient context. */
+/** Log a message with optional rfbClient context. The client argument may be NULL. */
 extern void rfbClientLogEx(rfbClient *client, const char *format, ...);
-/** Log an error message with optional rfbClient context. */
+/** Log an error message with optional rfbClient context. The client argument may be NULL. */
 extern void rfbClientErrEx(rfbClient *client, const char *format, ...);
 extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
 extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
