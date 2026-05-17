@@ -68,7 +68,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 #ifdef DEBUG_READ_EXACT
 	char* oout=out;
 	unsigned int nn=n;
-	rfbClientLog("ReadFromRFBServer %d bytes\n",n);
+	rfbClientLogEx(client, "ReadFromRFBServer %d bytes\n",n);
 #endif
 
   /* Handle attempts to write to NULL out buffer that might occur
@@ -156,7 +156,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	    if (client->readTimeout > 0 &&
 		++retries > (client->readTimeout * 1000 * 1000 / USECS_WAIT_PER_RETRY))
 	    {
-	      rfbClientLog("Connection timed out\n");
+	      rfbClientLogEx(client, "Connection timed out\n");
 	      return FALSE;
 	    }
 	    /* TODO:
@@ -165,12 +165,12 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	    WaitForMessage(client, USECS_WAIT_PER_RETRY);
 	    i = 0;
 	  } else {
-	    rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
+	    rfbClientErrEx(client, "read (%d: %s)\n",errno,strerror(errno));
 	    return FALSE;
 	  }
 	} else {
 	  if (errorMessageOnReadFailure) {
-	    rfbClientLog("VNC server closed connection\n");
+	    rfbClientLogEx(client, "VNC server closed connection\n");
 	  }
 	  return FALSE;
 	}
@@ -205,7 +205,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	    if (client->readTimeout > 0 &&
 		++retries > (client->readTimeout * 1000 * 1000 / USECS_WAIT_PER_RETRY))
 	    {
-		rfbClientLog("Connection timed out\n");
+		rfbClientLogEx(client, "Connection timed out\n");
 		return FALSE;
 	    }
 	    /* TODO:
@@ -214,12 +214,12 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 	    WaitForMessage(client, USECS_WAIT_PER_RETRY);
 	    i = 0;
 	  } else {
-	    rfbClientErr("read (%s)\n",strerror(errno));
+	    rfbClientErrEx(client, "read (%s)\n",strerror(errno));
 	    return FALSE;
 	  }
 	} else {
 	  if (errorMessageOnReadFailure) {
-	    rfbClientLog("VNC server closed connection\n");
+	    rfbClientLogEx(client, "VNC server closed connection\n");
 	  }
 	  return FALSE;
 	}
@@ -275,7 +275,7 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
                       buf, n,
                       &output, &outputlen);
     if (err != SASL_OK) {
-      rfbClientLog("Failed to encode SASL data %s",
+      rfbClientLogEx(client, "Failed to encode SASL data %s",
                    sasl_errstring(err, NULL, NULL));
       return FALSE;
     }
@@ -298,7 +298,7 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 		errno == EAGAIN) {
           if(client->sock == RFB_INVALID_SOCKET) {
               errno = EBADF;
-              rfbClientErr("socket invalid\n");
+              rfbClientErrEx(client, "socket invalid\n");
               return FALSE;
           }
 
@@ -306,16 +306,16 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 	  FD_SET(client->sock,&fds);
 
 	  if (select(client->sock+1, NULL, &fds, NULL, NULL) <= 0) {
-	    rfbClientErr("select\n");
+	    rfbClientErrEx(client, "select\n");
 	    return FALSE;
 	  }
 	  j = 0;
 	} else {
-	  rfbClientErr("write\n");
+	  rfbClientErrEx(client, "write\n");
 	  return FALSE;
 	}
       } else {
-	rfbClientLog("write failed\n");
+	rfbClientLogEx(client, "write failed\n");
 	return FALSE;
       }
     }
@@ -884,7 +884,7 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 #ifdef WIN32
     errno=WSAGetLastError();
 #endif
-    rfbClientLog("Waiting for message failed: %d (%s)\n",errno,strerror(errno));
+    rfbClientLogEx(client, "Waiting for message failed: %d (%s)\n",errno,strerror(errno));
   }
 
   return num;

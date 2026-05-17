@@ -67,6 +67,8 @@
 
 #define MAX_TEXTCHAT_SIZE 10485760 /* 10MB */
 
+static void PrintPixelFormatForClient(rfbClient *client, rfbPixelFormat *format);
+
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
  */
@@ -1295,7 +1297,7 @@ InitialiseRFBConnection(rfbClient* client)
 	  client->major, client->minor);
 
   rfbClientLogEx(client, "VNC server default format:\n");
-  PrintPixelFormat(&client->si.format);
+  PrintPixelFormatForClient(client, &client->si.format);
 
   return TRUE;
 }
@@ -2878,29 +2880,35 @@ HandleRFBServerMessage(rfbClient* client)
  * PrintPixelFormat.
  */
 
-void
-PrintPixelFormat(rfbPixelFormat *format)
+static void
+PrintPixelFormatForClient(rfbClient *client, rfbPixelFormat *format)
 {
   if (format->bitsPerPixel == 1) {
-    rfbClientLog("  Single bit per pixel.\n");
-    rfbClientLog(
+    rfbClientLogEx(client, "  Single bit per pixel.\n");
+    rfbClientLogEx(client,
 	    "  %s significant bit in each byte is leftmost on the screen.\n",
 	    (format->bigEndian ? "Most" : "Least"));
   } else {
-    rfbClientLog("  %d bits per pixel.\n",format->bitsPerPixel);
+    rfbClientLogEx(client, "  %d bits per pixel.\n",format->bitsPerPixel);
     if (format->bitsPerPixel != 8) {
-      rfbClientLog("  %s significant byte first in each pixel.\n",
+      rfbClientLogEx(client, "  %s significant byte first in each pixel.\n",
 	      (format->bigEndian ? "Most" : "Least"));
     }
     if (format->trueColour) {
-      rfbClientLog("  TRUE colour: max red %d green %d blue %d"
+      rfbClientLogEx(client, "  TRUE colour: max red %d green %d blue %d"
 		   ", shift red %d green %d blue %d\n",
 		   format->redMax, format->greenMax, format->blueMax,
 		   format->redShift, format->greenShift, format->blueShift);
     } else {
-      rfbClientLog("  Colour map (not true colour).\n");
+      rfbClientLogEx(client, "  Colour map (not true colour).\n");
     }
   }
+}
+
+void
+PrintPixelFormat(rfbPixelFormat *format)
+{
+  PrintPixelFormatForClient(NULL, format);
 }
 
 /* avoid name clashes with LibVNCServer */
