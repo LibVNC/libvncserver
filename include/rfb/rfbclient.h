@@ -47,6 +47,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #if LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
@@ -526,7 +527,18 @@ extern int listenForIncomingConnectionsNoFork(rfbClient* viewer, int usec_timeou
 
 extern rfbBool rfbEnableClientLogging;
 typedef void (*rfbClientLogProc)(const char *format, ...);
+/**
+ * Optional client-aware logging callback used by rfbClientLogEx() and
+ * rfbClientErrEx(). When this callback is NULL, the helpers fall back to the
+ * legacy global rfbClientLog/rfbClientErr callbacks.
+ */
+typedef void (*rfbClientLogProcWithClient)(struct _rfbClient *client, const char *format, va_list args);
 extern rfbClientLogProc rfbClientLog,rfbClientErr;
+extern rfbClientLogProcWithClient rfbClientLogWithClient,rfbClientErrWithClient;
+/** Log a message with optional rfbClient context. */
+extern void rfbClientLogEx(rfbClient *client, const char *format, ...);
+/** Log an error message with optional rfbClient context. */
+extern void rfbClientErrEx(rfbClient *client, const char *format, ...);
 extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
 extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
 extern void SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size);
