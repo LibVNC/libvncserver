@@ -137,14 +137,30 @@ webSocketsCheck (rfbClientPtr cl)
             timeout = cl->screen->maxClientWait;
     }
 
+    if (handshakeMode == rfbWebSocketsHandshakeAuto) {
+        ret = rfbPeekExactTimeout(cl, bbuf, 1, timeout);
+        if ((ret < 0) && (errno == ETIMEDOUT)) {
+            rfbLog("Normal socket connection\n");
+            return TRUE;
+        } else if (ret <= 0) {
+            rfbErr("webSocketsHandshake: unknown connection error\n");
+            return FALSE;
+        }
+
+        if (bbuf[0] != 'G' && bbuf[0] != '\x16' && bbuf[0] != '\x80') {
+            rfbLog("Normal socket connection\n");
+            return TRUE;
+        }
+    }
+
     ret = rfbPeekExactTimeout(cl, bbuf, 4, timeout);
     if ((ret < 0) && (errno == ETIMEDOUT)) {
       if (handshakeMode == rfbWebSocketsHandshakeWebSockets) {
         rfbErr("webSocketsHandshake: timed out waiting for WebSockets header\n");
         return FALSE;
       }
-      rfbLog("Normal socket connection\n");
-      return TRUE;
+      rfbErr("webSocketsHandshake: timed out waiting for WebSockets header\n");
+      return FALSE;
     } else if (ret <= 0) {
       rfbErr("webSocketsHandshake: unknown connection error\n");
       return FALSE;
