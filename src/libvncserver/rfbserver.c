@@ -3976,7 +3976,7 @@ rfbSendExtDesktopSize(rfbClientPtr cl,
 rfbBool
 rfbSendUpdateBuf(rfbClientPtr cl)
 {
-    if(cl->sock<0)
+    if(cl->sock<0 || cl->state == RFB_SHUTDOWN)
       return FALSE;
 
     if (rfbWriteExact(cl, cl->updateBuf, cl->ublen) < 0) {
