@@ -90,6 +90,7 @@ static size_t buf_filled=0;
  */
 
 static rfbClientRec cl;
+static rfbBool httpMutexesInit = FALSE;
 
 void
 rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
@@ -130,6 +131,7 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
     INIT_MUTEX(cl.outputMutex);
     INIT_MUTEX(cl.refCountMutex);
     INIT_MUTEX(cl.sendMutex);
+    httpMutexesInit = TRUE;
 }
 
 void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
@@ -150,17 +152,21 @@ void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
 	rfbCloseSocket(rfbScreen->httpListen6Sock);
 	rfbScreen->httpListen6Sock=RFB_INVALID_SOCKET;
     }
-    LOCK(cl.outputMutex);
-    UNLOCK(cl.outputMutex);
-    TINI_MUTEX(cl.outputMutex);
+    if (httpMutexesInit) {
+        LOCK(cl.outputMutex);
+        UNLOCK(cl.outputMutex);
+        TINI_MUTEX(cl.outputMutex);
 
-    LOCK(cl.sendMutex);
-    UNLOCK(cl.sendMutex);
-    TINI_MUTEX(cl.sendMutex);
+        LOCK(cl.sendMutex);
+        UNLOCK(cl.sendMutex);
+        TINI_MUTEX(cl.sendMutex);
 
-    LOCK(cl.refCountMutex);
-    UNLOCK(cl.refCountMutex);
-    TINI_MUTEX(cl.refCountMutex);
+        LOCK(cl.refCountMutex);
+        UNLOCK(cl.refCountMutex);
+        TINI_MUTEX(cl.refCountMutex);
+
+        httpMutexesInit = FALSE;
+    }
 
     memset(&cl, 0, sizeof(rfbClientRec));
 }
