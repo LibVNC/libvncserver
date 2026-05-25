@@ -130,6 +130,10 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
     INIT_MUTEX(cl.outputMutex);
     INIT_MUTEX(cl.refCountMutex);
     INIT_MUTEX(cl.sendMutex);
+    cl.readFromSocket = rfbDefaultReadFromSocket;
+    cl.peekAtSocket = rfbDefaultPeekAtSocket;
+    cl.hasPendingOnSocket = rfbDefaultHasPendingOnSocket;
+    cl.writeToSocket = rfbDefaultWriteToSocket;
 }
 
 void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
