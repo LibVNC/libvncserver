@@ -301,7 +301,7 @@ void ZRLE_ENCODE_TILE(PIXEL_T* data, int w, int h, zrleOutStream* os,
         for (ptr = data; ptr < data+w*h; ptr++)
           zrleOutStreamWRITE_PIXEL(os, *ptr);
 #else
-        zrleOutStreamWriteBytes(os, (zrle_U8 *)data, w*h*(BPP/8));
+        zrleOutStreamWriteBytes(os, (zrle_U8 *)data, w*h*(BPPOUT/8));
 #endif
       }
     }
