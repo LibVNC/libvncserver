@@ -134,7 +134,9 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 
     while (client->buffered < n) {
       int i;
-      if (client->tlsSession)
+      if (client->ReadFromSocket)
+          i = client->ReadFromSocket(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
+      else if (client->tlsSession)
         i = ReadFromTLS(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
       else
 #ifdef LIBVNCSERVER_HAVE_SASL
@@ -186,7 +188,9 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 
     while (n > 0) {
       int i;
-      if (client->tlsSession)
+      if (client->ReadFromSocket)
+          i = client->ReadFromSocket(client, out, n);
+      else if (client->tlsSession)
         i = ReadFromTLS(client, out, n);
       else
 #ifdef LIBVNCSERVER_HAVE_SASL
@@ -262,6 +266,12 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
   if (client->serverPort==-1)
     return TRUE; /* vncrec playing */
 
+  if (client->WriteToSocket) {
+      i = client->WriteToSocket(client, buf, n);
+      if (i <= 0) return FALSE;
+
+      return TRUE;
+  }
   if (client->tlsSession) {
     /* WriteToTLS() will guarantee either everything is written, or error/eof returns */
     i = WriteToTLS(client, buf, n);
