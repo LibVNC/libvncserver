@@ -1709,6 +1709,11 @@ SendExtDesktopSize(rfbClient* client, uint16_t width, uint16_t height)
     return TRUE;
   }
 
+  if (!SupportsClient2Server(client, rfbSetDesktopSize)) {
+    rfbClientLog("Server does not support SetDesktopSize - not sending dimensions %dx%d\n", width, height);
+    return TRUE;
+  }
+
   if (client->screen.width != rfbClientSwap16IfLE(width) || client->screen.height != rfbClientSwap16IfLE(height)) {
     rfbClientLog("Sending dimensions %dx%d\n", width, height);
     sdm.type = rfbSetDesktopSize;
@@ -2154,6 +2159,9 @@ HandleRFBServerMessage(rfbClient* client)
       }
 
       if (rect.encoding == rfbEncodingExtDesktopSize) {
+        /* A server that sends ExtendedDesktopSize must understand SetDesktopSize. */
+        SetClient2Server(client, rfbSetDesktopSize);
+
         /* read encoding data */
         int screens;
         int loop;
