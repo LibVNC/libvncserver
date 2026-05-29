@@ -341,6 +341,16 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
       numRows = (bufferSize - zs->avail_out) / rowSize;
 
+      /* The decompressed stream is server-controlled and may yield more rows
+         than the rectangle's declared height.  filterFn() writes directly into
+         client->frameBuffer, so clamp here before writing to avoid running past
+         the framebuffer (heap out-of-bounds write).  The post-loop
+         "rowsProcessed != rh" check happens too late. */
+      if (numRows > rh - rowsProcessed) {
+	rfbClientLog("Tight: too many scan lines after decompression.\n");
+	return FALSE;
+      }
+
       filterFn(client, rx, ry+rowsProcessed, numRows);
 
       extraBytes = bufferSize - zs->avail_out - numRows * rowSize;
