@@ -102,7 +102,10 @@ rfbEncryptAndStorePasswd(char *passwd, char *fname)
 
     /* Do encryption in-place - this way we overwrite our copy of the plaintext
        password */
-    encrypt_rfbdes(encryptedPasswd, &out_len, fixedkey, encryptedPasswd, sizeof(encryptedPasswd));
+    if (encrypt_rfbdes(encryptedPasswd, &out_len, fixedkey, encryptedPasswd, sizeof(encryptedPasswd)) == 0) {
+	fclose(fp);
+	return 1;
+    }
 
     for (i = 0; i < 8; i++) {
 	putc(encryptedPasswd[i], fp);
@@ -177,10 +180,11 @@ rfbRandomBytes(unsigned char *bytes)
 #endif
 
 /*
- * Encrypt CHALLENGESIZE bytes in memory using a password.
+ * Encrypt CHALLENGESIZE bytes in memory using a password. Returns TRUE
+ * if successful, FALSE if the encryption failed.
  */
 
-void
+rfbBool
 rfbEncryptBytes(unsigned char *bytes, char *passwd)
 {
     unsigned char key[8];
@@ -197,19 +201,24 @@ rfbEncryptBytes(unsigned char *bytes, char *passwd)
 	}
     }
 
-    encrypt_rfbdes(bytes, &out_len, key, bytes, CHALLENGESIZE);
+    return encrypt_rfbdes(bytes, &out_len, key, bytes, CHALLENGESIZE) != 0;
 }
 
-void
+rfbBool
 rfbEncryptBytes2(unsigned char *where, const int length, unsigned char *key) {
   int i, j, out_len;
   for (i = 0; i< 8; i++)
     where[i] ^= key[i];
-  encrypt_rfbdes(where, &out_len, key, where, 8);
+  if (encrypt_rfbdes(where, &out_len, key, where, 8) == 0) {
+    return FALSE;
+  }
   for (i = 8; i < length; i += 8) {
     for (j = 0; j < 8; j++) {
       where[i + j] ^= where[i + j - 8];
     }
-    encrypt_rfbdes(where + i, &out_len, key, where + i, 8);
+    if (encrypt_rfbdes(where + i, &out_len, key, where + i, 8) == 0) {
+      return FALSE;
+    }
   }
+  return TRUE;
 }
