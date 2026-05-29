@@ -3994,6 +3994,12 @@ rfbSendUpdateBuf(rfbClientPtr cl)
  * client, using values from the currently installed colormap.
  */
 
+static void
+rfbSetWireUint16(char *dst, uint16_t value)
+{
+    memcpy(dst, &value, sizeof(value));
+}
+
 rfbBool
 rfbSendSetColourMapEntries(rfbClientPtr cl,
                            int firstColour,
@@ -4001,36 +4007,36 @@ rfbSendSetColourMapEntries(rfbClientPtr cl,
 {
     char buf[sz_rfbSetColourMapEntriesMsg + 256 * 3 * 2];
     char *wbuf = buf;
-    rfbSetColourMapEntriesMsg *scme;
-    uint16_t *rgb;
+    char *rgb;
     rfbColourMap* cm = &cl->screen->colourMap;
     int i, len;
 
     if (nColours > 256) {
 	/* some rare hardware has, e.g., 4096 colors cells: PseudoColor:12 */
     	wbuf = (char *) malloc(sz_rfbSetColourMapEntriesMsg + nColours * 3 * 2);
+	if (wbuf == NULL)
+	    return FALSE;
     }
 
-    scme = (rfbSetColourMapEntriesMsg *)wbuf;
-    rgb = (uint16_t *)(&wbuf[sz_rfbSetColourMapEntriesMsg]);
+    rgb = &wbuf[sz_rfbSetColourMapEntriesMsg];
 
-    scme->type = rfbSetColourMapEntries;
-
-    scme->firstColour = Swap16IfLE(firstColour);
-    scme->nColours = Swap16IfLE(nColours);
+    wbuf[0] = rfbSetColourMapEntries;
+    wbuf[1] = 0;
+    rfbSetWireUint16(&wbuf[2], Swap16IfLE(firstColour));
+    rfbSetWireUint16(&wbuf[4], Swap16IfLE(nColours));
 
     len = sz_rfbSetColourMapEntriesMsg;
 
     for (i = 0; i < nColours; i++) {
       if(i<(int)cm->count) {
 	if(cm->is16) {
-	  rgb[i*3] = Swap16IfLE(cm->data.shorts[i*3]);
-	  rgb[i*3+1] = Swap16IfLE(cm->data.shorts[i*3+1]);
-	  rgb[i*3+2] = Swap16IfLE(cm->data.shorts[i*3+2]);
+	  rfbSetWireUint16(&rgb[i*6], Swap16IfLE(cm->data.shorts[i*3]));
+	  rfbSetWireUint16(&rgb[i*6+2], Swap16IfLE(cm->data.shorts[i*3+1]));
+	  rfbSetWireUint16(&rgb[i*6+4], Swap16IfLE(cm->data.shorts[i*3+2]));
 	} else {
-	  rgb[i*3] = Swap16IfLE((unsigned short)cm->data.bytes[i*3]);
-	  rgb[i*3+1] = Swap16IfLE((unsigned short)cm->data.bytes[i*3+1]);
-	  rgb[i*3+2] = Swap16IfLE((unsigned short)cm->data.bytes[i*3+2]);
+	  rfbSetWireUint16(&rgb[i*6], Swap16IfLE((unsigned short)cm->data.bytes[i*3]));
+	  rfbSetWireUint16(&rgb[i*6+2], Swap16IfLE((unsigned short)cm->data.bytes[i*3+1]));
+	  rfbSetWireUint16(&rgb[i*6+4], Swap16IfLE((unsigned short)cm->data.bytes[i*3+2]));
 	}
       }
     }
