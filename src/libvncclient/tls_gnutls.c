@@ -45,12 +45,12 @@ typedef struct {
 static int cert_fingerprint_mismatch_callback(rfbClient *client, gnutls_x509_crt_t cert)
 {
     if(!cert) {
-        rfbClientErr("No cert given in fingerprint mismatch handling\n");
+        rfbClientErrEx(client, "No cert given in fingerprint mismatch handling\n");
         return 0;
     }
 
     if (!client || !client->GetX509CertFingerprintMismatchDecision) {
-        rfbClientErr("No client callback given in fingerprint mismatch handling\n");
+        rfbClientErrEx(client, "No client callback given in fingerprint mismatch handling\n");
         return 0;
     }
 
@@ -106,7 +106,7 @@ verify_certificate_callback (gnutls_session_t session)
 
   hostname = sptr->serverHost;
   if (!hostname) {
-      rfbClientLog("No server hostname found for client\n");
+      rfbClientLogEx(sptr, "No server hostname found for client\n");
       return GNUTLS_E_CERTIFICATE_ERROR;
   }
 
@@ -116,49 +116,49 @@ verify_certificate_callback (gnutls_session_t session)
   ret = gnutls_certificate_verify_peers2 (session, &status);
   if (ret < 0)
     {
-      rfbClientLog ("Certificate validation call failed\n");
+      rfbClientLogEx(sptr, "Certificate validation call failed\n");
       return GNUTLS_E_CERTIFICATE_ERROR;
     }
 
   if (status & GNUTLS_CERT_INVALID)
-    rfbClientLog("The certificate is not trusted.\n");
+    rfbClientLogEx(sptr, "The certificate is not trusted.\n");
 
   if (status & GNUTLS_CERT_SIGNER_NOT_FOUND)
-    rfbClientLog("The certificate hasn't got a known issuer.\n");
+    rfbClientLogEx(sptr, "The certificate hasn't got a known issuer.\n");
 
   if (status & GNUTLS_CERT_REVOKED)
-    rfbClientLog("The certificate has been revoked.\n");
+    rfbClientLogEx(sptr, "The certificate has been revoked.\n");
 
   if (status & GNUTLS_CERT_EXPIRED)
-    rfbClientLog("The certificate has expired\n");
+    rfbClientLogEx(sptr, "The certificate has expired\n");
 
   if (status & GNUTLS_CERT_NOT_ACTIVATED)
-    rfbClientLog("The certificate is not yet activated\n");
+    rfbClientLogEx(sptr, "The certificate is not yet activated\n");
 
   /* status would be 0 if cert was trusted */
   if (status)
   {
       if (gnutls_certificate_type_get (session) != GNUTLS_CRT_X509) {
-        rfbClientErr("The certificate was not X509\n");
+        rfbClientErrEx(sptr, "The certificate was not X509\n");
         return GNUTLS_E_CERTIFICATE_ERROR;
       }
 
       if (gnutls_x509_crt_init (&cert) < 0)
         {
-          rfbClientErr("Error initialising certificate structure\n");
+          rfbClientErrEx(sptr, "Error initialising certificate structure\n");
           return GNUTLS_E_CERTIFICATE_ERROR;
         }
 
       cert_list = gnutls_certificate_get_peers (session, &cert_list_size);
       if (cert_list == NULL)
         {
-          rfbClientErr("No certificate was found!\n");
+          rfbClientErrEx(sptr, "No certificate was found!\n");
           return GNUTLS_E_CERTIFICATE_ERROR;
         }
 
       if (gnutls_x509_crt_import (cert, &cert_list[0], GNUTLS_X509_FMT_DER) < 0)
         {
-          rfbClientErr("Error parsing certificate\n");
+          rfbClientErrEx(sptr, "Error parsing certificate\n");
           return GNUTLS_E_CERTIFICATE_ERROR;
         }
 
@@ -169,7 +169,7 @@ verify_certificate_callback (gnutls_session_t session)
 
           if (gnutls_x509_crt_get_fingerprint(cert, GNUTLS_DIG_SHA256, remote_fingerprint, &fingerprint_size) == 0) {
               if (memcmp(remote_fingerprint, cred->x509Credential.x509ExpectedFingerprint, 32) == 0) {
-                  rfbClientLog("The certificate's fingerprint matched the expected one - accepting.\n");
+                  rfbClientLogEx(sptr, "The certificate's fingerprint matched the expected one - accepting.\n");
                   gnutls_x509_crt_deinit (cert);
                   return 0;
               }
@@ -178,7 +178,7 @@ verify_certificate_callback (gnutls_session_t session)
 
       /* Fingerprint didn't match or no expected fingerprint - ask user */
       if (cert_fingerprint_mismatch_callback(sptr, cert)) {
-          rfbClientLog("User decided to trust certificate - accepting.\n");
+          rfbClientLogEx(sptr, "User decided to trust certificate - accepting.\n");
           gnutls_x509_crt_deinit (cert);
           return 0;
       }
@@ -189,32 +189,32 @@ verify_certificate_callback (gnutls_session_t session)
 
   /* Certificate is trusted by system CA or via given rfbCredential.x509Credential.x509CACertfile  */
   if (gnutls_certificate_type_get (session) != GNUTLS_CRT_X509) {
-    rfbClientLog("The certificate was not X509\n");
+    rfbClientLogEx(sptr, "The certificate was not X509\n");
     return GNUTLS_E_CERTIFICATE_ERROR;
   }
 
   if (gnutls_x509_crt_init (&cert) < 0)
     {
-      rfbClientLog("Error initialising certificate structure\n");
+      rfbClientLogEx(sptr, "Error initialising certificate structure\n");
       return GNUTLS_E_CERTIFICATE_ERROR;
     }
 
   cert_list = gnutls_certificate_get_peers (session, &cert_list_size);
   if (cert_list == NULL)
     {
-      rfbClientLog("No certificate was found!\n");
+      rfbClientLogEx(sptr, "No certificate was found!\n");
       return GNUTLS_E_CERTIFICATE_ERROR;
     }
 
   if (gnutls_x509_crt_import (cert, &cert_list[0], GNUTLS_X509_FMT_DER) < 0)
     {
-      rfbClientLog("Error parsing certificate\n");
+      rfbClientLogEx(sptr, "Error parsing certificate\n");
       return GNUTLS_E_CERTIFICATE_ERROR;
     }
 
   if (!gnutls_x509_crt_check_hostname (cert, hostname))
     {
-      rfbClientLog("The certificate's owner does not match hostname '%s'\n",
+      rfbClientLogEx(sptr, "The certificate's owner does not match hostname '%s'\n",
               hostname);
       return GNUTLS_E_CERTIFICATE_ERROR;
     }
@@ -355,14 +355,14 @@ InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
 
   if ((ret = gnutls_init((gnutls_session_t*)&client->tlsSession, GNUTLS_CLIENT)) < 0)
   {
-    rfbClientLog("Failed to initialized TLS session: %s.\n", gnutls_strerror(ret));
+    rfbClientLogEx(client, "Failed to initialized TLS session: %s.\n", gnutls_strerror(ret));
     return FALSE;
   }
 
   if ((ret = gnutls_priority_set_direct((gnutls_session_t)client->tlsSession,
     anonTLS ? rfbAnonTLSPriority : rfbTLSPriority, &p)) < 0)
   {
-    rfbClientLog("Warning: Failed to set TLS priority: %s (%s).\n", gnutls_strerror(ret), p);
+    rfbClientLogEx(client, "Warning: Failed to set TLS priority: %s (%s).\n", gnutls_strerror(ret), p);
   }
 
   gnutls_transport_set_ptr((gnutls_session_t)client->tlsSession, (gnutls_transport_ptr_t)client);
@@ -374,7 +374,7 @@ InitializeTLSSession(rfbClient* client, rfbBool anonTLS)
 
   INIT_MUTEX(client->tlsRwMutex);
 
-  rfbClientLog("TLS session initialized.\n");
+  rfbClientLogEx(client, "TLS session initialized.\n");
 
   return TRUE;
 }
@@ -389,10 +389,10 @@ SetTLSAnonCredential(rfbClient* client)
       (ret = gnutls_credentials_set((gnutls_session_t)client->tlsSession, GNUTLS_CRD_ANON, anonCred)) < 0)
   {
     FreeTLS(client);
-    rfbClientLog("Failed to create anonymous credentials: %s", gnutls_strerror(ret));
+    rfbClientLogEx(client, "Failed to create anonymous credentials: %s", gnutls_strerror(ret));
     return FALSE;
   }
-  rfbClientLog("TLS anonymous credential created.\n");
+  rfbClientLogEx(client, "TLS anonymous credential created.\n");
   return TRUE;
 }
 
@@ -405,15 +405,15 @@ HandshakeTLS(rfbClient* client)
   {
     if (!gnutls_error_is_fatal(ret))
     {
-      rfbClientLog("TLS handshake got a temporary error: %s.\n", gnutls_strerror(ret));
+      rfbClientLogEx(client, "TLS handshake got a temporary error: %s.\n", gnutls_strerror(ret));
       continue;
     }
-    rfbClientLog("TLS handshake failed: %s\n", gnutls_strerror(ret));
+    rfbClientLogEx(client, "TLS handshake failed: %s\n", gnutls_strerror(ret));
     FreeTLS(client);
     return FALSE;
   }
 
-  rfbClientLog("TLS handshake done.\n");
+  rfbClientLogEx(client, "TLS handshake done.\n");
   return TRUE;
 }
 
@@ -431,18 +431,18 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
 
     if (count==0)
     {
-        rfbClientLog("List of security types is ZERO. Giving up.\n");
+        rfbClientLogEx(client, "List of security types is ZERO. Giving up.\n");
         return FALSE;
     }
 
-    rfbClientLog("We have %d security types to read\n", count);
+    rfbClientLogEx(client, "We have %d security types to read\n", count);
     authScheme=0;
     /* now, we have a list of available security types to read ( uint8_t[] ) */
     for (loop=0;loop<count;loop++)
     {
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 4)) return FALSE;
         t=rfbClientSwap32IfLE(tAuth[loop]);
-        rfbClientLog("%d) Received security type %d\n", loop, t);
+        rfbClientLogEx(client, "%d) Received security type %d\n", loop, t);
         if (t==rfbNoAuth ||
             t==rfbVncAuth ||
             t==rfbVeNCryptPlain ||
@@ -479,13 +479,13 @@ ReadVeNCryptSecurityType(rfbClient* client, uint32_t *result)
             snprintf(buf2, sizeof(buf2), (loop>0 ? ", %d" : "%d"), (int)tAuth[loop]);
             strncat(buf1, buf2, sizeof(buf1)-strlen(buf1)-1);
         }
-        rfbClientLog("Unknown VeNCrypt authentication scheme from VNC server: %s\n",
+        rfbClientLogEx(client, "Unknown VeNCrypt authentication scheme from VNC server: %s\n",
                buf1);
         return FALSE;
     }
     else
     {
-        rfbClientLog("Selecting security type %d\n", authScheme);
+        rfbClientLogEx(client, "Selecting security type %d\n", authScheme);
         /* send back 4 bytes (in original byte order!) indicating which security type to use */
         if (!WriteToRFBServer(client, (char *)&origAuthScheme, 4)) return FALSE;
     }
@@ -588,11 +588,11 @@ HandleVeNCryptAuth(rfbClient* client)
   {
     return FALSE;
   }
-  rfbClientLog("Got VeNCrypt version %d.%d from server.\n", (int)major, (int)minor);
+  rfbClientLogEx(client, "Got VeNCrypt version %d.%d from server.\n", (int)major, (int)minor);
 
   if (major != 0 && minor != 2)
   {
-    rfbClientLog("Unsupported VeNCrypt version.\n");
+    rfbClientLogEx(client, "Unsupported VeNCrypt version.\n");
     return FALSE;
   }
 
@@ -605,7 +605,7 @@ HandleVeNCryptAuth(rfbClient* client)
 
   if (status != 0)
   {
-    rfbClientLog("Server refused VeNCrypt version %d.%d.\n", (int)major, (int)minor);
+    rfbClientLogEx(client, "Server refused VeNCrypt version %d.%d.\n", (int)major, (int)minor);
     return FALSE;
   }
 
@@ -639,7 +639,7 @@ HandleVeNCryptAuth(rfbClient* client)
   /* Ack is only requred for the encrypted connection */
   if (!ReadFromRFBServer(client, (char *)&status, 1) || status != 1)
   {
-    rfbClientLog("Server refused VeNCrypt authentication %d (%d).\n", authScheme, (int)status);
+    rfbClientLogEx(client, "Server refused VeNCrypt authentication %d (%d).\n", authScheme, (int)status);
     return FALSE;
   }
 
@@ -651,13 +651,13 @@ HandleVeNCryptAuth(rfbClient* client)
   {
     if (!client->GetCredential)
     {
-      rfbClientLog("GetCredential callback is not set.\n");
+      rfbClientLogEx(client, "GetCredential callback is not set.\n");
       return FALSE;
     }
     cred = client->GetCredential(client, rfbCredentialTypeX509);
     if (!cred)
     {
-      rfbClientLog("Reading credential failed\n");
+      rfbClientLogEx(client, "Reading credential failed\n");
       return FALSE;
     }
 
@@ -683,7 +683,7 @@ HandleVeNCryptAuth(rfbClient* client)
     /* We need the client plus the rfbCredential in the verification callback */
     TLSCallbackData *callback_data = malloc(sizeof(TLSCallbackData));
     if (!callback_data) {
-        rfbClientErr("Cannot allocate callback data\n");
+        rfbClientErrEx(client, "Cannot allocate callback data\n");
         FreeTLS(client);
         gnutls_certificate_free_credentials(x509_cred);
         FreeX509Credential(cred);
@@ -697,7 +697,7 @@ HandleVeNCryptAuth(rfbClient* client)
 
     if ((ret = gnutls_credentials_set((gnutls_session_t)client->tlsSession, GNUTLS_CRD_CERTIFICATE, x509_cred)) < 0)
     {
-      rfbClientLog("Cannot set x509 credential: %s.\n", gnutls_strerror(ret));
+      rfbClientLogEx(client, "Cannot set x509 credential: %s.\n", gnutls_strerror(ret));
       FreeTLS(client);
       gnutls_certificate_free_credentials(x509_cred);
       free(callback_data);
@@ -728,7 +728,7 @@ ReadFromTLS(rfbClient* client, char *out, unsigned int n)
     errno = EAGAIN;
   } else
   {
-    rfbClientLog("Error reading from TLS: %s.\n", gnutls_strerror(ret));
+    rfbClientLogEx(client, "Error reading from TLS: %s.\n", gnutls_strerror(ret));
     errno = EINTR;
   }
   return -1;
@@ -750,7 +750,7 @@ WriteToTLS(rfbClient* client, const char *buf, unsigned int n)
     if (ret < 0)
     {
       if (ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED) continue;
-      rfbClientLog("Error writing to TLS: %s.\n", gnutls_strerror(ret));
+      rfbClientLogEx(client, "Error writing to TLS: %s.\n", gnutls_strerror(ret));
       return -1;
     }
     offset += (unsigned int)ret;

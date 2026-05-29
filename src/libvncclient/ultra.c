@@ -46,13 +46,13 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   if (toRead==0) return TRUE;
 
   if (toRead < 0) {
-      rfbClientErr("ultra error: remote sent negative payload size\n");
+      rfbClientErrEx(client, "ultra error: remote sent negative payload size\n");
       return FALSE;
   }
 
   if (uncompressedBytes==0)
   {
-      rfbClientLog("ultra error: rectangle has 0 uncomressed bytes ((%dw * %dh) * (%d / 8))\n", rw, rh, BPP); 
+      rfbClientLogEx(client, "ultra error: rectangle has 0 uncomressed bytes ((%dw * %dh) * (%d / 8))\n", rw, rh, BPP);
       return FALSE;
   }
 
@@ -74,7 +74,7 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     if(client->raw_buffer == NULL)
       return FALSE;
   }
-  
+
   /* allocate enough space to store the incoming compressed packet */
   if ( client->ultra_buffer_size < toRead ) {
     if ( client->ultra_buffer != NULL ) {
@@ -97,19 +97,21 @@ HandleUltraBPP (rfbClient* client, int rx, int ry, int rw, int rh)
               (lzo_byte *)client->ultra_buffer, toRead,
               (lzo_byte *)client->raw_buffer, (lzo_uintp) &uncompressedBytes,
               NULL);
-  
+
   /* Note that uncompressedBytes will be 0 on output overrun */
   if ((rw * rh * (BPP / 8)) != uncompressedBytes)
-      rfbClientLog("Ultra decompressed unexpected amount of data (%d != %d)\n", (rw * rh * (BPP / 8)), uncompressedBytes);
-  
+      rfbClientLogEx(client, "Ultra decompressed unexpected amount of data (%lu != %lu)\n",
+              (unsigned long)(rw * rh * (BPP / 8)),
+              (unsigned long)uncompressedBytes);
+
   /* Put the uncompressed contents of the update on the screen. */
-  if ( inflateResult == LZO_E_OK ) 
+  if ( inflateResult == LZO_E_OK )
   {
     client->GotBitmap(client, (unsigned char *)client->raw_buffer, rx, ry, rw, rh);
   }
   else
   {
-    rfbClientLog("ultra decompress returned error: %d\n",
+    rfbClientLogEx(client, "ultra decompress returned error: %d\n",
             inflateResult);
     return FALSE;
   }
@@ -138,13 +140,13 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   if (toRead==0) return TRUE;
 
   if (toRead < 0) {
-      rfbClientErr("ultrazip error: remote sent negative payload size\n");
+      rfbClientErrEx(client, "ultrazip error: remote sent negative payload size\n");
       return FALSE;
   }
 
   if (uncompressedBytes==0)
   {
-      rfbClientLog("ultrazip error: rectangle has 0 uncomressed bytes (%dy + (%dw * 65535)) (%d rectangles)\n", ry, rw, rx); 
+      rfbClientLogEx(client, "ultrazip error: rectangle has 0 uncomressed bytes (%dy + (%dw * 65535)) (%d rectangles)\n", ry, rw, rx);
       return FALSE;
   }
 
@@ -167,7 +169,7 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	return FALSE;
   }
 
- 
+
   /* allocate enough space to store the incoming compressed packet */
   if ( client->ultra_buffer_size < toRead ) {
     if ( client->ultra_buffer != NULL ) {
@@ -186,13 +188,13 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   inflateResult = lzo1x_decompress_safe(
               (lzo_byte *)client->ultra_buffer, toRead,
               (lzo_byte *)client->raw_buffer, &uncompressedBytes, NULL);
-  if ( inflateResult != LZO_E_OK ) 
+  if ( inflateResult != LZO_E_OK )
   {
-    rfbClientLog("ultra decompress returned error: %d\n",
+    rfbClientLogEx(client, "ultra decompress returned error: %d\n",
             inflateResult);
     return FALSE;
   }
-  
+
   /* Put the uncompressed contents of the update on the screen. */
   ptr = (unsigned char *)client->raw_buffer;
   ptr_end = ptr + uncompressedBytes;
@@ -203,7 +205,7 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
     /* subrect header: sx(2) + sy(2) + sw(2) + sh(2) + se(4) = 12 bytes */
     if (ptr + 12 > ptr_end) {
-      rfbClientLog("UltraZip: subrect %d header exceeds decompressed data bounds\n", i);
+      rfbClientLogEx(client, "UltraZip: subrect %d header exceeds decompressed data bounds\n", i);
       return FALSE;
     }
 
@@ -223,13 +225,13 @@ HandleUltraZipBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     {
         uint64_t rawBytes = (uint64_t)sw * sh * (BPP / 8);
         if (rawBytes > (size_t)(ptr_end - ptr)) {
-          rfbClientLog("UltraZip: subrect %d raw data exceeds decompressed data bounds\n", i);
+          rfbClientLogEx(client, "UltraZip: subrect %d raw data exceeds decompressed data bounds\n", i);
           return FALSE;
         }
         client->GotBitmap(client, (unsigned char *)ptr, sx, sy, sw, sh);
         ptr += (size_t)rawBytes;
     }
-  }  
+  }
 
   return TRUE;
 }
