@@ -577,10 +577,14 @@ rfbCloseClient(rfbClientPtr cl)
 		&& !FD_ISSET(cl->screen->maxFd,&(cl->screen->allFds)))
 	    cl->screen->maxFd--;
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-	/* Has to happen before socket close as the SSL implementation might send a goodbye */
+	/* Has to happen before socket close as the SSL implementation might send a goodbye.
+	   Serialize SSL teardown with rfbWriteExact(), which may run in the output thread. */
+	LOCK(cl->outputMutex);
 	if (cl->sslctx)
 	    rfbssl_destroy(cl);
 	free(cl->wspath);
+	cl->wspath = NULL;
+	UNLOCK(cl->outputMutex);
 #endif
       }
     TSIGNAL(cl->updateCond);

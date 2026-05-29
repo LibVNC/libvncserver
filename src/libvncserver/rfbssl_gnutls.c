@@ -265,8 +265,25 @@ int rfbssl_pending(rfbClientPtr cl)
 
 void rfbssl_destroy(rfbClientPtr cl)
 {
-    struct rfbssl_ctx *ctx = (struct rfbssl_ctx *)cl->sslctx;
-    gnutls_bye(ctx->session, GNUTLS_SHUT_WR);
-    gnutls_deinit(ctx->session);
-    gnutls_certificate_free_credentials(ctx->x509_cred);
+    struct rfbssl_ctx *ctx;
+
+    if (!cl || !cl->sslctx)
+	return;
+
+    ctx = (struct rfbssl_ctx *)cl->sslctx;
+    cl->sslctx = NULL;
+
+    if (ctx->session) {
+	gnutls_bye(ctx->session, GNUTLS_SHUT_WR);
+	gnutls_deinit(ctx->session);
+    }
+    if (ctx->x509_cred)
+	gnutls_certificate_free_credentials(ctx->x509_cred);
+    if (ctx->dh_params)
+	gnutls_dh_params_deinit(ctx->dh_params);
+#ifdef I_LIKE_RSA_PARAMS_THAT_MUCH
+    if (ctx->rsa_params)
+	gnutls_rsa_params_deinit(ctx->rsa_params);
+#endif
+    free(ctx);
 }
