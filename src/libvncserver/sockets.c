@@ -1208,8 +1208,10 @@ rfbConnectToTcpAddr(char *host,
         sock = RFB_INVALID_SOCKET; /* set return value */
     } else {
 	/* one succeeded, re-set to blocking */
-	if (!sock_set_nonblocking(sock, FALSE, rfbErr))
+	if (!sock_set_nonblocking(sock, FALSE, rfbErr)) {
 	    rfbCloseSocket(sock);
+	    sock = RFB_INVALID_SOCKET;
+	}
     }
 
     /* all done with this structure now */

@@ -423,6 +423,10 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
       if(!rfbSetNonBlocking(sock)) {
 	rfbCloseSocket(sock);
+	free(cl->host);
+	if (cl->scaledScreen != NULL)
+	  cl->scaledScreen->scaledScreenRefCount--;
+	free(cl);
 	return NULL;
       }
 
@@ -1482,7 +1486,14 @@ rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer)
         return rfbSendFileTransferMessage(cl, rfbDirPacket, rfbADirectory, 0, 0, NULL);
 
     /* send back the path name (necessary for links) */
-    if (rfbSendFileTransferMessage(cl, rfbDirPacket, rfbADirectory, 0, length, buffer)==FALSE) return FALSE;
+    if (rfbSendFileTransferMessage(cl, rfbDirPacket, rfbADirectory, 0, length, buffer)==FALSE) {
+#ifdef WIN32
+        FindClose(findHandle);
+#else
+        closedir(dirp);
+#endif
+        return FALSE;
+    }
 
 #ifdef WIN32
     while (findHandle != INVALID_HANDLE_VALUE)
