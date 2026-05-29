@@ -820,12 +820,7 @@ SendMonoRect(rfbClientPtr cl,
     dataLen = (w + 7) / 8;
     dataLen *= h;
 
-    if (tightConf[cl->tightCompressLevel].monoZlibLevel == 0 &&
-        cl->tightEncoding != rfbEncodingTightPng)
-        cl->updateBuf[cl->ublen++] =
-            (char)((rfbTightNoZlib | rfbTightExplicitFilter) << 4);
-    else
-        cl->updateBuf[cl->ublen++] = (streamId | rfbTightExplicitFilter) << 4;
+    cl->updateBuf[cl->ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     cl->updateBuf[cl->ublen++] = rfbTightFilterPalette;
     cl->updateBuf[cl->ublen++] = 1;
 
@@ -897,12 +892,7 @@ SendIndexedRect(palettePtr palette,
     }
 
     /* Prepare tight encoding header. */
-    if (tightConf[cl->tightCompressLevel].idxZlibLevel == 0 &&
-        cl->tightEncoding != rfbEncodingTightPng)
-        cl->updateBuf[cl->ublen++] =
-            (char)((rfbTightNoZlib | rfbTightExplicitFilter) << 4);
-    else
-        cl->updateBuf[cl->ublen++] = (streamId | rfbTightExplicitFilter) << 4;
+    cl->updateBuf[cl->ublen++] = (streamId | rfbTightExplicitFilter) << 4;
     cl->updateBuf[cl->ublen++] = rfbTightFilterPalette;
     cl->updateBuf[cl->ublen++] = (char)(palette->numColors - 1);
 
@@ -973,11 +963,7 @@ SendFullColorRect(rfbClientPtr cl,
             return FALSE;
     }
 
-    if (tightConf[cl->tightCompressLevel].rawZlibLevel == 0 &&
-        cl->tightEncoding != rfbEncodingTightPng)
-        cl->updateBuf[cl->ublen++] = (char)(rfbTightNoZlib << 4);
-    else
-        cl->updateBuf[cl->ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
+    cl->updateBuf[cl->ublen++] = 0x00;  /* stream id = 0, no flushing, no filter */
     rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, 1);
 
     if (cl->tightUsePixelFormat24) {
@@ -1007,9 +993,6 @@ CompressData(rfbClientPtr cl,
         rfbStatRecordEncodingSentAdd(cl, cl->tightEncoding, dataLen);
         return TRUE;
     }
-
-    if (zlibLevel == 0)
-        return rfbSendCompressedDataTight(cl, cl->beforeEncBuf, dataLen);
 
     pz = &cl->zsStruct[streamId];
 
