@@ -364,28 +364,39 @@ char* rfbMakeMaskFromAlphaSource(int width,int height,unsigned char* alphaSource
 	return (char *) result;
 }
 
+static void rfbFreeCursorBuffers(rfbCursorPtr cursor)
+{
+   if(!cursor)
+      return;
+
+   if(cursor->cleanupRichSource) {
+      free(cursor->richSource);
+      free(cursor->alphaSource);
+      cursor->richSource = NULL;
+      cursor->alphaSource = NULL;
+      cursor->cleanupRichSource = FALSE;
+   }
+
+   if(cursor->cleanupSource) {
+      free(cursor->source);
+      cursor->source = NULL;
+      cursor->cleanupSource = FALSE;
+   }
+
+   if(cursor->cleanupMask) {
+      free(cursor->mask);
+      cursor->mask = NULL;
+      cursor->cleanupMask = FALSE;
+   }
+}
+
 void rfbFreeCursor(rfbCursorPtr cursor)
 {
    if(cursor) {
-       if(cursor->cleanupRichSource)
-       {
-         free(cursor->richSource);
-         free(cursor->alphaSource);
-       }
-       if(cursor->cleanupSource)
-        free(cursor->source);
-       if(cursor->cleanupMask)
-        free(cursor->mask);
+       rfbFreeCursorBuffers(cursor);
        if(cursor->cleanup)
         free(cursor);
-       else {
-	   cursor->cleanup=cursor->cleanupSource=cursor->cleanupMask
-	       =cursor->cleanupRichSource=FALSE;
-	   cursor->source=cursor->mask=cursor->richSource=NULL;
-	   cursor->alphaSource=NULL;
-       }
    }
-   
 }
 
 /* background and foregroud colour have to be set beforehand */
@@ -774,8 +785,7 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
 	  rfbRedrawAfterHideCursor(cl,NULL);
     rfbReleaseClientIterator(iterator);
 
-    if(rfbScreen->cursor->cleanup)
-	 rfbFreeCursor(rfbScreen->cursor);
+    rfbFreeCursor(rfbScreen->cursor);
   }
 
   rfbScreen->cursor = c;
