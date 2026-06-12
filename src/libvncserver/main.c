@@ -661,6 +661,12 @@ listenerRun(void *data)
 	    /* Reset the pipe */
 	    char buf;
 	    while (read(screen->pipe_notify_listener_thread[0], &buf, sizeof(buf)) == sizeof(buf));
+	    /* A rebind request is serviced here, on the listener thread, so the
+	       close()/socket() swap cannot race the select() above. */
+	    if (screen->rebindListenSockets) {
+		screen->rebindListenSockets = FALSE;
+		rfbRebindListenSockets(screen);
+	    }
 	    /* Go on with loop */
 	    continue;
 	}
@@ -686,7 +692,28 @@ listenerRun(void *data)
 
 #endif
 
-void 
+void
+rfbRequestListenRebind(rfbScreenInfoPtr screen)
+{
+    /* Flag the request; the listener thread picks it up after being woken. */
+    screen->rebindListenSockets = TRUE;
+
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) && !defined(WIN32)
+    if (screen->backgroundLoop && screen->pipe_notify_listener_thread[1] != -1) {
+	const char buf = 'r';
+	if (write(screen->pipe_notify_listener_thread[1], &buf, sizeof(buf)) < 0)
+	    rfbLogPerror("rfbRequestListenRebind: write to notify pipe");
+	return;
+    }
+#endif
+
+    /* No background listener thread: do the swap inline. Safe because the
+       single-threaded event loop is not concurrently in select() here. */
+    screen->rebindListenSockets = FALSE;
+    rfbRebindListenSockets(screen);
+}
+
+void
 rfbStartOnHoldClient(rfbClientPtr cl)
 {
     cl->onHold = FALSE;
