@@ -118,12 +118,49 @@ webSocketsCheck (rfbClientPtr cl)
 {
     char bbuf[4], *scheme;
     int ret;
+    int timeout;
+    rfbWebSocketsHandshakeMode handshakeMode;
 
-    ret = rfbPeekExactTimeout(cl, bbuf, 4,
-                                   WEBSOCKETS_CLIENT_CONNECT_WAIT_MS);
+    handshakeMode = rfbWebSocketsHandshakeAuto;
+    if (cl->screen)
+        handshakeMode = cl->screen->webSocketsHandshakeMode;
+
+    if (handshakeMode == rfbWebSocketsHandshakeRfb) {
+        rfbLog("Normal socket connection\n");
+        return TRUE;
+    }
+
+    timeout = WEBSOCKETS_CLIENT_CONNECT_WAIT_MS;
+    if (handshakeMode == rfbWebSocketsHandshakeWebSockets) {
+        timeout = rfbMaxClientWait;
+        if (cl->screen && cl->screen->maxClientWait)
+            timeout = cl->screen->maxClientWait;
+    }
+
+    if (handshakeMode == rfbWebSocketsHandshakeAuto) {
+        ret = rfbPeekExactTimeout(cl, bbuf, 1, timeout);
+        if ((ret < 0) && (errno == ETIMEDOUT)) {
+            rfbLog("Normal socket connection\n");
+            return TRUE;
+        } else if (ret <= 0) {
+            rfbErr("webSocketsHandshake: unknown connection error\n");
+            return FALSE;
+        }
+
+        if (bbuf[0] != 'G' && bbuf[0] != '\x16' && bbuf[0] != '\x80') {
+            rfbLog("Normal socket connection\n");
+            return TRUE;
+        }
+    }
+
+    ret = rfbPeekExactTimeout(cl, bbuf, 4, timeout);
     if ((ret < 0) && (errno == ETIMEDOUT)) {
-      rfbLog("Normal socket connection\n");
-      return TRUE;
+      if (handshakeMode == rfbWebSocketsHandshakeWebSockets) {
+        rfbErr("webSocketsHandshake: timed out waiting for WebSockets header\n");
+        return FALSE;
+      }
+      rfbErr("webSocketsHandshake: timed out waiting for WebSockets header\n");
+      return FALSE;
     } else if (ret <= 0) {
       rfbErr("webSocketsHandshake: unknown connection error\n");
       return FALSE;
@@ -138,7 +175,7 @@ webSocketsCheck (rfbClientPtr cl)
 	  rfbErr("webSocketsHandshake: rfbssl_init failed\n");
 	  return FALSE;
 	}
-	ret = rfbPeekExactTimeout(cl, bbuf, 4, WEBSOCKETS_CLIENT_CONNECT_WAIT_MS);
+	ret = rfbPeekExactTimeout(cl, bbuf, 4, timeout);
         scheme = "wss";
     } else {
         scheme = "ws";

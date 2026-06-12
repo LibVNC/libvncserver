@@ -46,6 +46,7 @@ rfbUsage(void)
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
     fprintf(stderr, "-sslkeyfile path       set path to private key file for encrypted WebSockets connections\n");
     fprintf(stderr, "-sslcertfile path      set path to certificate file for encrypted WebSockets connections\n");
+    fprintf(stderr, "-websocketmode mode    WebSockets detection mode: auto, rfb, ws\n");
 #endif
     fprintf(stderr, "-httpdir dir-path      enable http server using dir-path home\n");
     fprintf(stderr, "-httpport portnum      use portnum for http connection\n");
@@ -215,6 +216,23 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 		return FALSE;
 	    }
             rfbScreen->sslcertfile = argv[++i];
+        } else if (strcmp(argv[i], "-websocketmode") == 0) {  /* -websocketmode auto|rfb|ws */
+            if (i + 1 >= *argc) {
+		rfbUsage();
+		return FALSE;
+	    }
+            i++;
+            if (strcmp(argv[i], "auto") == 0) {
+                rfbScreen->webSocketsHandshakeMode = rfbWebSocketsHandshakeAuto;
+            } else if (strcmp(argv[i], "rfb") == 0) {
+                rfbScreen->webSocketsHandshakeMode = rfbWebSocketsHandshakeRfb;
+            } else if (strcmp(argv[i], "ws") == 0 || strcmp(argv[i], "websocket") == 0) {
+                rfbScreen->webSocketsHandshakeMode = rfbWebSocketsHandshakeWebSockets;
+            } else {
+                rfbErr("invalid -websocketmode value: %s\n", argv[i]);
+                rfbUsage();
+                return FALSE;
+            }
 #endif
         } else {
 	    rfbProtocolExtension* extension;
