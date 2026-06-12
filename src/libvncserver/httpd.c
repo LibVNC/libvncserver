@@ -229,15 +229,20 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
         || (rfbScreen->httpListen6Sock != RFB_INVALID_SOCKET && FD_ISSET(rfbScreen->httpListen6Sock, &fds))) {
 	if (rfbScreen->httpSock != RFB_INVALID_SOCKET) rfbCloseSocket(rfbScreen->httpSock);
 
+	/*
+	 * Mirror the RFB listener in listenerRun(): on a failed accept() just bail and
+	 * keep the listening socket. While the bound interface's address is gone the
+	 * accept() fails (e.g. EINVAL), but the socket is not dead -- it resumes once
+	 * the address returns. Logging every failure here would flood the log for the
+	 * whole down period, so stay silent like the RFB path does.
+	 */
 	if(FD_ISSET(rfbScreen->httpListenSock, &fds)) {
 	    if ((rfbScreen->httpSock = accept(rfbScreen->httpListenSock, (struct sockaddr *)&addr, &addrlen)) == RFB_INVALID_SOCKET) {
-	      rfbLogPerror("httpCheckFds: accept");
 	      return;
 	    }
 	}
 	else if(FD_ISSET(rfbScreen->httpListen6Sock, &fds)) {
 	    if ((rfbScreen->httpSock = accept(rfbScreen->httpListen6Sock, (struct sockaddr *)&addr, &addrlen)) == RFB_INVALID_SOCKET) {
-	      rfbLogPerror("httpCheckFds: accept");
 	      return;
 	    }
 	}
