@@ -232,7 +232,7 @@ static void CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, 
 static void initAppData(AppData* data) {
 	data->shareDesktop=TRUE;
 	data->viewOnly=FALSE;
-	data->encodingsString="tight zrle ultra copyrect hextile zlib corre rre raw";
+	data->encodingsString="h264 tight zrle ultra copyrect hextile zlib corre rre raw";
 	data->useBGR233=FALSE;
 	data->nColours=0;
 	data->forceOwnCmap=FALSE;
@@ -567,6 +567,9 @@ void rfbClientCleanup(rfbClient* client) {
 
   free(client->ultra_buffer);
   free(client->raw_buffer);
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+  rfbClientH264ReleaseDecoder(client);
+#endif
 
   FreeTLS(client);
 
