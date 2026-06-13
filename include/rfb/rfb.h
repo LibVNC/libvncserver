@@ -390,6 +390,11 @@ typedef struct _rfbScreenInfo
     /* Timeout value for select() calls, mainly used for multithreaded servers. */
     int select_timeout_usec;
 
+    /** Set by rfbRequestListenRebind() to ask the listener thread to re-create
+     * its listening sockets from the current listenInterface/listen6Interface/
+     * port/ipv6port values on its next loop iteration. Cleared by the thread. */
+    rfbBool rebindListenSockets;
+
     /*
       multicast stuff 
     */
@@ -852,6 +857,15 @@ extern int rfbMaxClientWait;
 
 extern void rfbInitSockets(rfbScreenInfoPtr rfbScreen);
 extern void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen);
+/** Close and re-create the TCP/TCP6 listening sockets from the screen's current
+ * listenInterface/listen6Interface/port/ipv6port. Must run on the same thread
+ * that select()s on those sockets; off-thread callers use rfbRequestListenRebind().
+ * Returns TRUE if at least one family is now listening. */
+extern rfbBool rfbRebindListenSockets(rfbScreenInfoPtr rfbScreen);
+/** Thread-safe request to rebind the listening sockets: the actual swap is done
+ * by the background listener thread on its next iteration. Caller must have set
+ * the desired listenInterface/listen6Interface/port/ipv6port beforehand. */
+extern void rfbRequestListenRebind(rfbScreenInfoPtr rfbScreen);
 extern void rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen);
 extern void rfbCloseClient(rfbClientPtr cl);
 extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);

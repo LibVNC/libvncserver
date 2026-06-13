@@ -660,6 +660,12 @@ rfbClientConnectionGone(rfbClientPtr cl)
     if(cl->sock != RFB_INVALID_SOCKET)
 	rfbCloseSocket(cl->sock);
 
+    /* Clean up file descriptor of an interrupted file transfer */
+    if (cl->fileTransfer.fd != -1) {
+        close(cl->fileTransfer.fd);
+        cl->fileTransfer.fd = -1;
+    }
+
     if (cl->scaledScreen!=NULL)
         cl->scaledScreen->scaledScreenRefCount--;
 
@@ -4921,7 +4927,7 @@ rfbSendExtDesktopSize(rfbClientPtr cl,
 rfbBool
 rfbSendUpdateBuf(rfbClientPtr cl)
 {
-    if(cl->sock<0)
+    if(cl->sock<0 || cl->state == RFB_SHUTDOWN)
       return FALSE;
 
     if (rfbWriteExact(cl, cl->updateBuf, cl->ublen) < 0) {

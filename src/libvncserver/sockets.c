@@ -461,6 +461,83 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
 }
 
 /*
+ * rfbRebindListenSockets closes the current TCP/TCP6 listening sockets and
+ * re-creates them from the screen's current listenInterface/listen6Interface
+ * and port/ipv6port. This is used to follow an interface whose IP address
+ * changed (e.g. after the bound network interface went down and back up).
+ *
+ * It must be called on the thread that select()s on the listening sockets so
+ * that the close()/socket() swap cannot race a concurrent select(): in the
+ * threaded (background loop) case that is the listener thread, which invokes
+ * this from listenerRun() in response to rfbRequestListenRebind(). Already-
+ * connected clients keep their own sockets and are unaffected. The HTTP
+ * listeners are bound to the same interface address, so they are re-created too.
+ */
+rfbBool
+rfbRebindListenSockets(rfbScreenInfoPtr rfbScreen)
+{
+    in_addr_t iface = rfbScreen->listenInterface;
+
+    /* This deliberately only handles the plain TCP/TCP6 listeners; inetd and
+       autoPort setups have no stable address to rebind to. */
+    if (rfbScreen->inetdSock != RFB_INVALID_SOCKET || rfbScreen->autoPort)
+        return FALSE;
+
+    /* tear down the existing listeners; rfbCloseSocket() also resets the fd to
+       RFB_INVALID_SOCKET, the outer if only skips the FD_CLR when there is none */
+    if (rfbScreen->listenSock != RFB_INVALID_SOCKET) {
+        FD_CLR(rfbScreen->listenSock, &rfbScreen->allFds);
+        rfbCloseSocket(rfbScreen->listenSock);
+    }
+#ifdef LIBVNCSERVER_IPv6
+    if (rfbScreen->listen6Sock != RFB_INVALID_SOCKET) {
+        FD_CLR(rfbScreen->listen6Sock, &rfbScreen->allFds);
+        rfbCloseSocket(rfbScreen->listen6Sock);
+    }
+#endif
+
+    /* re-create from the current interface addresses */
+    if (rfbScreen->port > 0) {
+        if ((rfbScreen->listenSock = rfbListenOnTCPPort(rfbScreen->port, iface)) == RFB_INVALID_SOCKET) {
+            rfbLogPerror("rfbRebindListenSockets: ListenOnTCPPort");
+        } else {
+            rfbLog("rfbRebindListenSockets: listening for VNC connections on TCP port %d\n", rfbScreen->port);
+            FD_SET(rfbScreen->listenSock, &rfbScreen->allFds);
+            rfbScreen->maxFd = rfbMax((int)rfbScreen->listenSock, rfbScreen->maxFd);
+        }
+    }
+
+#ifdef LIBVNCSERVER_IPv6
+    if (rfbScreen->ipv6port > 0) {
+        if ((rfbScreen->listen6Sock = rfbListenOnTCP6Port(rfbScreen->ipv6port, rfbScreen->listen6Interface)) == RFB_INVALID_SOCKET) {
+            /* rfbListenOnTCP6Port has its own detailed error printout */
+        } else {
+            rfbLog("rfbRebindListenSockets: listening for VNC connections on TCP6 port %d\n", rfbScreen->ipv6port);
+            FD_SET(rfbScreen->listen6Sock, &rfbScreen->allFds);
+            rfbScreen->maxFd = rfbMax((int)rfbScreen->listen6Sock, rfbScreen->maxFd);
+        }
+    }
+#endif
+
+    /* The HTTP listeners are bound to the same interface address and go stale the
+       same way, so re-create them too. rfbHttpCheckFds() runs on this same listener
+       thread, so closing/reopening here cannot race it. Only relevant with an httpDir
+       configured; reset httpInitDone so rfbHttpInitSockets() actually runs again. This
+       is best-effort and does not affect the RFB-based return value below. */
+    if (rfbScreen->httpDir) {
+        rfbHttpShutdownSockets(rfbScreen);
+        rfbScreen->httpInitDone = FALSE;
+        rfbHttpInitSockets(rfbScreen);
+    }
+
+    return (rfbScreen->listenSock != RFB_INVALID_SOCKET
+#ifdef LIBVNCSERVER_IPv6
+            || rfbScreen->listen6Sock != RFB_INVALID_SOCKET
+#endif
+           ) ? TRUE : FALSE;
+}
+
+/*
  * rfbCheckFds is called from ProcessInputEvents to check for input on the RFB
  * socket(s).  If there is input to process, the appropriate function in the
  * RFB server code will be called (rfbNewClientConnection,
