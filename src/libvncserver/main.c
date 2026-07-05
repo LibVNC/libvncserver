@@ -651,6 +651,13 @@ listenerRun(void *data)
         tv.tv_sec = 0;
 	tv.tv_usec = screen->select_timeout_usec;
         if (select(screen->maxFd+1, &listen_fds, NULL, NULL, &tv) == -1) {
+            if (errno == EINTR)
+                /* A signal interrupted select(); this is benign. select() is
+                   not restarted by the kernel on interruption (even with
+                   SA_RESTART, see signal(7)), so retry rather than killing the
+                   listener thread and leaving the listening sockets open but
+                   unaccepted. */
+                continue;
             rfbLogPerror("listenerRun: error in select");
             return THREAD_ROUTINE_RETURN_VALUE;
         }
