@@ -651,6 +651,8 @@ listenerRun(void *data)
         tv.tv_sec = 0;
 	tv.tv_usec = screen->select_timeout_usec;
         if (select(screen->maxFd+1, &listen_fds, NULL, NULL, &tv) == -1) {
+            if (errno == EINTR || errno == EAGAIN)
+                continue; /* interrupted by a signal: benign, retry */
             rfbLogPerror("listenerRun: error in select");
             return THREAD_ROUTINE_RETURN_VALUE;
         }
