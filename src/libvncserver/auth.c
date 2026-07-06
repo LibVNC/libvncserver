@@ -238,7 +238,7 @@ static rfbSecurityHandler VncSecurityHandlerNone = {
 static int32_t
 determinePrimarySecurityType(rfbClientPtr cl)
 {
-    if (!cl->screen->authPasswdData || cl->reverseConnection) {
+    if (!cl->screen->authPasswdData) {
         /* chk if this condition is valid or not. */
         return rfbSecTypeNone;
     } else if (cl->screen->authPasswdData) {
