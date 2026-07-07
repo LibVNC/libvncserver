@@ -1281,7 +1281,14 @@ SetFormatAndEncodings(rfbClient* client)
   se->pad = 0;
   se->nEncodings = 0;
 
-  if (client->appData.encodingsString) {
+  if (client->useFrameBufferViewport) {
+    rfbClientLog("Framebuffer viewport active: requesting viewport-safe encodings only\n");
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingHextile);
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCoRRE);
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRRE);
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRaw);
+  }
+  else if (client->appData.encodingsString) {
     const char *encStr = client->appData.encodingsString;
     int encStrLen;
     do {
@@ -2020,6 +2027,57 @@ rfbClientProcessExtServerCutText(rfbClient* client, char *data, int len)
   return TRUE;
 }
 #endif
+
+rfbBool rfbClientSetFrameBufferViewport(rfbClient *client, int x, int y, int w, int h)
+{
+    rfbRectangle rect;
+
+    if (!client || x < 0 || y < 0 || w <= 0 || h <= 0)
+        return FALSE;
+
+    if (client->frameBuffer) {
+        rfbClientErr("Cannot change framebuffer viewport after framebuffer allocation\n");
+        return FALSE;
+    }
+
+    if ((client->width > 0 && (uint64_t)x + (uint64_t)w > (uint64_t)client->width) ||
+        (client->height > 0 && (uint64_t)y + (uint64_t)h > (uint64_t)client->height)) {
+        rfbClientErr("Framebuffer viewport %dx%d at (%d, %d) exceeds remote framebuffer %dx%d\n",
+                     w, h, x, y, client->width, client->height);
+        return FALSE;
+    }
+
+    client->useFrameBufferViewport = TRUE;
+    client->frameBufferViewportX = x;
+    client->frameBufferViewportY = y;
+    client->frameBufferViewportW = w;
+    client->frameBufferViewportH = h;
+
+    rect.x = x;
+    rect.y = y;
+    rect.w = w;
+    rect.h = h;
+    rfbClientSetUpdateRect(client, &rect);
+    return TRUE;
+}
+
+void rfbClientClearFrameBufferViewport(rfbClient *client)
+{
+    if (!client)
+        return;
+
+    if (client->frameBuffer) {
+        rfbClientErr("Cannot clear framebuffer viewport after framebuffer allocation\n");
+        return;
+    }
+
+    client->useFrameBufferViewport = FALSE;
+    client->frameBufferViewportX = 0;
+    client->frameBufferViewportY = 0;
+    client->frameBufferViewportW = 0;
+    client->frameBufferViewportH = 0;
+    rfbClientSetUpdateRect(client, NULL);
+}
 
 void rfbClientSetUpdateRect(rfbClient *client, rfbRectangle *rect) {
     if (rect) {

@@ -83,19 +83,83 @@ static char* ReadPassword(rfbClient* client) {
 #endif
 	return p;
 }
+static int FrameBufferStridePixels(rfbClient* client)
+{
+  if (client->useFrameBufferViewport)
+    return client->frameBufferViewportW;
+  return client->width;
+}
+
+static rfbBool ClipToFrameBuffer(rfbClient* client, int x, int y, int w, int h,
+                                 int* localX, int* localY,
+                                 int* srcX, int* srcY,
+                                 int* clippedW, int* clippedH)
+{
+  int fbX = 0;
+  int fbY = 0;
+  int fbW = client->width;
+  int fbH = client->height;
+  int x0, y0, x1, y1;
+
+  if (w <= 0 || h <= 0)
+    return FALSE;
+
+  if (client->useFrameBufferViewport) {
+    fbX = client->frameBufferViewportX;
+    fbY = client->frameBufferViewportY;
+    fbW = client->frameBufferViewportW;
+    fbH = client->frameBufferViewportH;
+  }
+
+  x0 = x > fbX ? x : fbX;
+  y0 = y > fbY ? y : fbY;
+  x1 = (x + w) < (fbX + fbW) ? (x + w) : (fbX + fbW);
+  y1 = (y + h) < (fbY + fbH) ? (y + h) : (fbY + fbH);
+
+  if (x0 >= x1 || y0 >= y1)
+    return FALSE;
+
+  *localX = x0 - fbX;
+  *localY = y0 - fbY;
+  *srcX = x0 - x;
+  *srcY = y0 - y;
+  *clippedW = x1 - x0;
+  *clippedH = y1 - y0;
+  return TRUE;
+}
+
+static rfbBool RectFullyInsideFrameBuffer(rfbClient* client, int x, int y, int w, int h,
+                                          int* localX, int* localY)
+{
+  int srcX, srcY, clippedW, clippedH;
+
+  if (!ClipToFrameBuffer(client, x, y, w, h,
+                         localX, localY, &srcX, &srcY, &clippedW, &clippedH))
+    return FALSE;
+
+  return srcX == 0 && srcY == 0 && clippedW == w && clippedH == h;
+}
+
 static rfbBool MallocFrameBuffer(rfbClient* client) {
   uint64_t allocSize;
+  int width = client->width;
+  int height = client->height;
 
   if(client->frameBuffer) {
     free(client->frameBuffer);
     client->frameBuffer = NULL;
   }
 
+  if (client->useFrameBufferViewport) {
+    width = client->frameBufferViewportW;
+    height = client->frameBufferViewportH;
+  }
+
   /* SECURITY: promote 'width' into uint64_t so that the multiplication does not overflow
      'width' and 'height' are 16-bit integers per RFB protocol design
      SIZE_MAX is the maximum value that can fit into size_t
   */
-  allocSize = (uint64_t)client->width * client->height * client->format.bitsPerPixel/8;
+  allocSize = (uint64_t)width * height * client->format.bitsPerPixel/8;
 
   if (allocSize >= SIZE_MAX) {
     rfbClientErr("CRITICAL: cannot allocate frameBuffer, requested size is too large\n");
@@ -112,25 +176,25 @@ static rfbBool MallocFrameBuffer(rfbClient* client) {
 
 /* messages */
 
-static rfbBool CheckRect(rfbClient* client, int x, int y, int w, int h) {
-  return x + w <= client->width && y + h <= client->height;
-}
-
 static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_t colour) {
   int i,j;
+  int localX, localY, srcX, srcY, clippedW, clippedH;
+  int stride;
 
   if (client->frameBuffer == NULL) {
       return;
   }
 
-  if (!CheckRect(client, x, y, w, h)) {
-    rfbClientLog("Rect out of bounds: %dx%d at (%d, %d)\n", x, y, w, h);
+  if (!ClipToFrameBuffer(client, x, y, w, h,
+                         &localX, &localY, &srcX, &srcY, &clippedW, &clippedH)) {
     return;
   }
 
+  stride = FrameBufferStridePixels(client);
+
 #define FILL_RECT(BPP) \
-    for(j=y*client->width;j<(y+h)*client->width;j+=client->width) \
-      for(i=x;i<x+w;i++) \
+    for(j=localY*stride;j<(localY+clippedH)*stride;j+=stride) \
+      for(i=localX;i<localX+clippedW;i++) \
 	((uint##BPP##_t*)client->frameBuffer)[j+i]=colour;
 
   switch(client->format.bitsPerPixel) {
@@ -144,22 +208,31 @@ static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_
 
 static void CopyRectangle(rfbClient* client, const uint8_t* buffer, int x, int y, int w, int h) {
   int j;
+  int localX, localY, srcX, srcY, clippedW, clippedH;
+  int stride;
 
   if (client->frameBuffer == NULL) {
       return;
   }
 
-  if (!CheckRect(client, x, y, w, h)) {
-    rfbClientLog("Rect out of bounds: %dx%d at (%d, %d)\n", x, y, w, h);
+  if (!ClipToFrameBuffer(client, x, y, w, h,
+                         &localX, &localY, &srcX, &srcY, &clippedW, &clippedH)) {
     return;
   }
 
+  stride = FrameBufferStridePixels(client);
+
 #define COPY_RECT(BPP) \
   { \
-    int rs = w * BPP / 8, rs2 = client->width * BPP / 8; \
-    for (j = ((x * (BPP / 8)) + (y * rs2)); j < (y + h) * rs2; j += rs2) { \
-      memcpy(client->frameBuffer + j, buffer, rs); \
-      buffer += rs; \
+    int srcStride = w * BPP / 8; \
+    int dstStride = stride * BPP / 8; \
+    int rowBytes = clippedW * BPP / 8; \
+    const uint8_t* src = buffer + (srcY * srcStride) + (srcX * BPP / 8); \
+    uint8_t* dst = client->frameBuffer + (localY * dstStride) + (localX * BPP / 8); \
+    for (j = 0; j < clippedH; j++) { \
+      memcpy(dst, src, rowBytes); \
+      src += srcStride; \
+      dst += dstStride; \
     } \
   }
 
@@ -175,44 +248,59 @@ static void CopyRectangle(rfbClient* client, const uint8_t* buffer, int x, int y
 /* TODO: test */
 static void CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, int w, int h, int dest_x, int dest_y) {
   int i,j;
+  int localSrcX, localSrcY, localDestX, localDestY;
+  int destClipLocalX, destClipLocalY, destClipSrcX, destClipSrcY, clippedW, clippedH;
+  int clippedSrcX, clippedSrcY;
+  int stride;
 
   if (client->frameBuffer == NULL) {
       return;
   }
 
-  if (!CheckRect(client, src_x, src_y, w, h)) {
-    rfbClientLog("Source rect out of bounds: %dx%d at (%d, %d)\n", src_x, src_y, w, h);
+  if (!ClipToFrameBuffer(client, dest_x, dest_y, w, h,
+                         &destClipLocalX, &destClipLocalY,
+                         &destClipSrcX, &destClipSrcY,
+                         &clippedW, &clippedH)) {
     return;
   }
 
-  if (!CheckRect(client, dest_x, dest_y, w, h)) {
-    rfbClientLog("Dest rect out of bounds: %dx%d at (%d, %d)\n", dest_x, dest_y, w, h);
+  clippedSrcX = src_x + destClipSrcX;
+  clippedSrcY = src_y + destClipSrcY;
+
+  if (!RectFullyInsideFrameBuffer(client, clippedSrcX, clippedSrcY, clippedW, clippedH,
+                                  &localSrcX, &localSrcY) ||
+      !RectFullyInsideFrameBuffer(client, dest_x + destClipSrcX, dest_y + destClipSrcY,
+                                  clippedW, clippedH, &localDestX, &localDestY)) {
+    rfbClientLog("CopyRect outside local framebuffer viewport: src=%dx%d at (%d, %d), dest=%dx%d at (%d, %d)\n",
+                 w, h, src_x, src_y, w, h, dest_x, dest_y);
     return;
   }
+
+  stride = FrameBufferStridePixels(client);
 
 #define COPY_RECT_FROM_RECT(BPP) \
   { \
-    uint##BPP##_t* _buffer=((uint##BPP##_t*)client->frameBuffer)+(src_y-dest_y)*client->width+src_x-dest_x; \
-    if (dest_y < src_y) { \
-      for(j = dest_y*client->width; j < (dest_y+h)*client->width; j += client->width) { \
-        if (dest_x < src_x) { \
-          for(i = dest_x; i < dest_x+w; i++) { \
+    uint##BPP##_t* _buffer=((uint##BPP##_t*)client->frameBuffer)+(localSrcY-localDestY)*stride+localSrcX-localDestX; \
+    if (localDestY < localSrcY) { \
+      for(j = localDestY*stride; j < (localDestY+clippedH)*stride; j += stride) { \
+        if (localDestX < localSrcX) { \
+          for(i = localDestX; i < localDestX+clippedW; i++) { \
             ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
           } \
         } else { \
-          for(i = dest_x+w-1; i >= dest_x; i--) { \
+          for(i = localDestX+clippedW-1; i >= localDestX; i--) { \
             ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
           } \
         } \
       } \
     } else { \
-      for(j = (dest_y+h-1)*client->width; j >= dest_y*client->width; j-=client->width) { \
-        if (dest_x < src_x) { \
-          for(i = dest_x; i < dest_x+w; i++) { \
+      for(j = (localDestY+clippedH-1)*stride; j >= localDestY*stride; j-=stride) { \
+        if (localDestX < localSrcX) { \
+          for(i = localDestX; i < localDestX+clippedW; i++) { \
             ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
           } \
         } else { \
-          for(i = dest_x+w-1; i >= dest_x; i--) { \
+          for(i = localDestX+clippedW-1; i >= localDestX; i--) { \
             ((uint##BPP##_t*)client->frameBuffer)[j+i]=_buffer[j+i]; \
           } \
         } \
@@ -319,6 +407,11 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 
   /* default: use complete frame buffer */ 
   client->updateRect.x = -1;
+  client->useFrameBufferViewport = FALSE;
+  client->frameBufferViewportX = 0;
+  client->frameBufferViewportY = 0;
+  client->frameBufferViewportW = 0;
+  client->frameBufferViewportH = 0;
  
   client->frameBuffer = NULL;
   client->outputWindow = 0;
@@ -437,6 +530,18 @@ rfbBool rfbClientInitialise(rfbClient* client) {
 
   client->width=client->si.framebufferWidth;
   client->height=client->si.framebufferHeight;
+
+  if (client->useFrameBufferViewport) {
+    if (client->frameBufferViewportX + client->frameBufferViewportW > client->width ||
+        client->frameBufferViewportY + client->frameBufferViewportH > client->height) {
+      rfbClientErr("Framebuffer viewport %dx%d at (%d, %d) exceeds remote framebuffer %dx%d\n",
+                   client->frameBufferViewportW, client->frameBufferViewportH,
+                   client->frameBufferViewportX, client->frameBufferViewportY,
+                   client->width, client->height);
+      return FALSE;
+    }
+  }
+
   if (!client->MallocFrameBuffer(client))
     return FALSE;
 
