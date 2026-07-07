@@ -30,6 +30,8 @@
 #define REALBPP BPP
 #endif
 
+#define REALBytesPP ((REALBPP + 7) / 8)
+
 #if !defined(UNCOMP) || UNCOMP == 0
 #define HandleTRLE CONCAT2E(HandleTRLE, REALBPP)
 #elif UNCOMP > 0
@@ -38,7 +40,6 @@
 #define HandleTRLE CONCAT3E(HandleTRLE, REALBPP, Up)
 #endif
 #define CARDBPP CONCAT3E(uint, BPP, _t)
-#define CARDREALBPP CONCAT3E(uint, REALBPP, _t)
 
 #if REALBPP != BPP && defined(UNCOMP) && UNCOMP != 0
 #if UNCOMP > 0
@@ -53,7 +54,7 @@
 static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
   int x, y, w, h;
   uint8_t type, last_type = 0;
-  int min_buffer_size = 16 * 16 * (REALBPP / 8) * 2;
+  int min_buffer_size = 16 * 16 * REALBytesPP * 2;
   uint8_t *buffer;
   CARDBPP palette[128];
   int bpp = 0, mask = 0, divider = 0;
@@ -93,14 +94,14 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
 
       switch (type) {
       case 0: {
-        if (!ReadFromRFBServer(client, (char *)buffer, w * h * REALBPP / 8))
+        if (!ReadFromRFBServer(client, (char *)buffer, w * h * REALBytesPP))
           return FALSE;
 #if REALBPP != BPP
         int i, j;
 
         for (j = y * client->width; j < (y + h) * client->width;
              j += client->width)
-          for (i = x; i < x + w; i++, buffer += REALBPP / 8)
+          for (i = x; i < x + w; i++, buffer += REALBytesPP)
             ((CARDBPP *)client->frameBuffer)[j + i] = UncompressCPixel(buffer);
 #else
         client->GotBitmap(client, buffer, x, y, w, h);
@@ -109,7 +110,7 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
         break;
       }
       case 1: {
-        if (!ReadFromRFBServer(client, (char *)buffer, REALBPP / 8))
+        if (!ReadFromRFBServer(client, (char *)buffer, REALBytesPP))
           return FALSE;
 
         color = UncompressCPixel(buffer);
@@ -171,11 +172,11 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
         while (j < h) {
 	  int color, length, buffer_pos = 0;
           /* read color */
-          if (!ReadFromRFBServer(client, (char*)buffer, REALBPP / 8 + 1))
+          if (!ReadFromRFBServer(client, (char*)buffer, REALBytesPP + 1))
             return FALSE;
           color = UncompressCPixel(buffer);
-          buffer += REALBPP / 8;
-	  buffer_pos += REALBPP / 8;
+          buffer += REALBytesPP;
+	  buffer_pos += REALBytesPP;
           /* read run length */
           length = 1;
           while (*buffer == 0xff && buffer_pos < client->raw_buffer_size-1) {
@@ -260,11 +261,11 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
           bpp = (type > 4 ? 4 : (type > 2 ? 2 : 1)),
           mask = (1 << bpp) - 1, divider = (8 / bpp);
 
-          if (!ReadFromRFBServer(client, (char *)buffer, type * REALBPP / 8))
+          if (!ReadFromRFBServer(client, (char *)buffer, type * REALBytesPP))
             return FALSE;
 
           /* read palette */
-          for (i = 0; i < type; i++, buffer += REALBPP / 8)
+          for (i = 0; i < type; i++, buffer += REALBytesPP)
             palette[i] = UncompressCPixel(buffer);
 
           last_type = type;
@@ -272,11 +273,11 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
         } else if (type >= 130) {
           int i;
 
-          if (!ReadFromRFBServer(client, (char *)buffer, (type - 128) * REALBPP / 8))
+          if (!ReadFromRFBServer(client, (char *)buffer, (type - 128) * REALBytesPP))
             return FALSE;
 
           /* read palette */
-          for (i = 0; i < type - 128; i++, buffer += REALBPP / 8)
+          for (i = 0; i < type - 128; i++, buffer += REALBytesPP)
             palette[i] = UncompressCPixel(buffer);
 
           last_type = type;
@@ -292,7 +293,6 @@ static rfbBool HandleTRLE(rfbClient *client, int rx, int ry, int rw, int rh) {
 }
 
 #undef CARDBPP
-#undef CARDREALBPP
 #undef HandleTRLE
 #undef UncompressCPixel
 #undef REALBPP
