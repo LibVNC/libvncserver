@@ -97,6 +97,13 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
     if (rfbScreen->httpInitDone)
 	return;
 
+    INIT_MUTEX(cl.outputMutex);
+    INIT_MUTEX(cl.refCountMutex);
+    INIT_MUTEX(cl.sendMutex);
+    cl.readFromSocket = rfbDefaultReadFromSocket;
+    cl.peekAtSocket = rfbDefaultPeekAtSocket;
+    cl.hasPendingOnSocket = rfbDefaultHasPendingOnSocket;
+    cl.writeToSocket = rfbDefaultWriteToSocket;
     rfbScreen->httpInitDone = TRUE;
 
     /* Always initialize mutexes regardless of httpDir being set */
@@ -139,6 +146,11 @@ rfbHttpInitSockets(rfbScreenInfoPtr rfbScreen)
 }
 
 void rfbHttpShutdownSockets(rfbScreenInfoPtr rfbScreen) {
+    if (!rfbScreen->httpInitDone)
+       return;
+
+    rfbScreen->httpInitDone = FALSE;
+
     if(rfbScreen->httpSock>-1) {
 	FD_CLR(rfbScreen->httpSock,&rfbScreen->allFds);
 	rfbCloseSocket(rfbScreen->httpSock);
