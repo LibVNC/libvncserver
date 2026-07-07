@@ -702,6 +702,11 @@ if(WITH_LIBVNCSERVER)
     cargstest
     copyrecttest
   )
+  if(UNIX)
+    list(APPEND SIMPLETESTS
+      unixsocktest
+    )
+  endif(UNIX)
 endif(WITH_LIBVNCSERVER)
 
 
@@ -758,6 +763,9 @@ endif(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
 
 if(WITH_LIBVNCSERVER)
   add_test(NAME cargs COMMAND test_cargstest)
+  if(UNIX)
+    add_test(NAME unixsock COMMAND test_unixsocktest)
+  endif(UNIX)
 endif(WITH_LIBVNCSERVER)
 if(UNIX)
   if(WITH_LIBVNCSERVER)

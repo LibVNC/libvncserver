@@ -362,13 +362,14 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     rfbProtocolVersionMsg pv;
     rfbClientIteratorPtr iterator;
     rfbClientPtr cl,cl_;
-#ifdef LIBVNCSERVER_IPv6
+#if defined(LIBVNCSERVER_IPv6) || !defined(WIN32)
     struct sockaddr_storage addr;
 #else
     struct sockaddr_in addr;
 #endif
     socklen_t addrlen = sizeof(addr);
     rfbProtocolExtension* extension;
+    rfbBool isTcp = FALSE;
 
     cl = (rfbClientPtr)calloc(sizeof(rfbClientRec),1);
 
@@ -397,20 +398,56 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 #ifdef LIBVNCSERVER_IPv6
 		char host[1024];
 #endif
+#ifndef WIN32
+		struct sockaddr *sockAddr;
+		sockAddr = (struct sockaddr *)&addr;
+#endif
       int one=1;
       size_t otherClientsCount = 0;
 
-      getpeername(sock, (struct sockaddr *)&addr, &addrlen);
-#ifdef LIBVNCSERVER_IPv6
-      if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
-	rfbLogPerror("rfbNewClient: error in getnameinfo");
-	cl->host = strdup("");
-      }
-      else
-	cl->host = strdup(host);
-#else
-      cl->host = strdup(inet_ntoa(addr.sin_addr));
+      if (getpeername(sock, (struct sockaddr *)&addr, &addrlen) < 0) {
+	rfbLogPerror("rfbNewClient: error in getpeername");
+	cl->host = strdup("NON_SOCKET");
+      } else {
+#ifndef WIN32
+	if (sockAddr->sa_family == AF_UNIX) {
+	  struct sockaddr_un uaddr;
+	  addrlen = sizeof(uaddr);
+	  memset(&uaddr, 0, sizeof(uaddr));
+	  if (getsockname(sock, (struct sockaddr *)&uaddr, &addrlen) < 0) {
+	    rfbLogPerror("rfbNewClient: error in getsockname");
+	    cl->host = strdup("NAMEFAIL_AF_UNIX");
+	  } else if (uaddr.sun_path[0] == '\0') {
+	    cl->host = strdup("UNNAMED_AF_UNIX");
+	  } else {
+	    cl->host = strdup(uaddr.sun_path);
+	  }
+	} else
 #endif
+#ifdef LIBVNCSERVER_IPv6
+	{
+	  if (addr.ss_family == AF_INET || addr.ss_family == AF_INET6)
+	    isTcp = TRUE;
+	  if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
+	    rfbLogPerror("rfbNewClient: error in getnameinfo");
+	    cl->host = strdup("UNKNOWN_HOST");
+	  }
+	  else
+	    cl->host = strdup(host);
+	}
+#else
+	{
+	  struct sockaddr_in *inetAddr;
+	  inetAddr = (struct sockaddr_in *)&addr;
+	  if (inetAddr->sin_family == AF_INET) {
+	    isTcp = TRUE;
+	    cl->host = strdup(inet_ntoa(inetAddr->sin_addr));
+	  } else {
+	    cl->host = strdup("UNKNOWN_HOST");
+	  }
+	}
+#endif
+      }
 
       cl->destPort = -1;
 
@@ -426,9 +463,9 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 	return NULL;
       }
 
-      if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+      if (isTcp && setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		     (char *)&one, sizeof(one)) < 0) {
-	rfbLogPerror("setsockopt failed: can't set TCP_NODELAY flag, non TCP socket?");
+	rfbLogPerror("setsockopt failed: can't set TCP_NODELAY flag");
       }
 
       FD_SET(sock,&(rfbScreen->allFds));
