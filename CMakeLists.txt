@@ -754,6 +754,13 @@ if(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
   set_target_properties(test_wstest PROPERTIES OUTPUT_NAME wstest)
   set_target_properties(test_wstest PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
   target_link_libraries(test_wstest vncserver ${ADDITIONAL_TEST_LIBS})
+
+  add_executable(test_wscheckmode_test
+    ${TESTS_DIR}/wscheckmode_test.c
+    )
+  set_target_properties(test_wscheckmode_test PROPERTIES OUTPUT_NAME wscheckmode_test)
+  set_target_properties(test_wscheckmode_test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/test)
+  target_link_libraries(test_wscheckmode_test vncserver ${ADDITIONAL_TEST_LIBS})
 endif(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
 
 if(WITH_LIBVNCSERVER)
@@ -772,6 +779,7 @@ if(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
 endif(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
 if(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
     add_test(NAME wstest COMMAND test_wstest)
+    add_test(NAME wscheckmode COMMAND test_wscheckmode_test)
 endif(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
 
 endif(WITH_TESTS)
