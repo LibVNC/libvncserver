@@ -249,7 +249,11 @@ if(SYSTEMD_FOUND)
 endif(SYSTEMD_FOUND)
 
 # common crypto used by both libvncserver and libvncclient
-if(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
+if(APPLE AND OPENSSL_FOUND)
+  message(STATUS "Building crypto with OpenSSL")
+  set(CRYPTO_LIBRARIES ${OPENSSL_LIBRARIES})
+  set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_openssl.c)
+elseif(WITH_GCRYPT AND LIBGCRYPT_LIBRARIES)
   message(STATUS "Building crypto with Libgcrypt")
   set(CRYPTO_LIBRARIES ${LIBGCRYPT_LIBRARIES})
   set(CRYPTO_SOURCES ${COMMON_DIR}/crypto_libgcrypt.c)
@@ -382,6 +386,7 @@ set(LIBVNCSERVER_SOURCES
 set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_DIR}/cursor.c
     ${LIBVNCCLIENT_DIR}/listen.c
+    ${LIBVNCCLIENT_DIR}/ardauth.c
     ${LIBVNCCLIENT_DIR}/rfbclient.c
     ${LIBVNCCLIENT_DIR}/sockets.c
     ${LIBVNCCLIENT_DIR}/vncviewer.c
@@ -531,6 +536,9 @@ if(WITH_LIBVNCCLIENT)
                         ${GNUTLS_LIBRARIES}
                         ${OPENSSL_LIBRARIES}
   )
+  if(APPLE)
+    target_link_libraries(vncclient "-framework CoreFoundation" "-framework GSS" "-framework Kerberos")
+  endif()
   set(LIBVNCSERVER_LIBRARIES vncclient)
 endif(WITH_LIBVNCCLIENT)
 if(WITH_LIBVNCSERVER)
@@ -611,6 +619,7 @@ endif(X11_xcb_FOUND AND X11_xcb_xtest_FOUND AND X11_xcb_keysyms_FOUND)
 
 set(LIBVNCCLIENT_EXAMPLES
     backchannel
+    ardauthprobe
     ppmtest
 )
 
@@ -659,7 +668,11 @@ if(WITH_EXAMPLES)
 
   if(WITH_LIBVNCCLIENT)
     foreach(e ${LIBVNCCLIENT_EXAMPLES})
-      add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
+      if(EXISTS ${TESTS_DIR}/${e}.c)
+        add_executable(client_examples_${e} ${TESTS_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
+      else()
+        add_executable(client_examples_${e} ${LIBVNCCLIEXAMPLE_DIR}/${e}.c ${LIBVNCCLIEXAMPLE_DIR}/${${e}_EXTRA_SOURCES} )
+      endif()
       set_target_properties(client_examples_${e} PROPERTIES OUTPUT_NAME ${e})
       set_target_properties(client_examples_${e} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/examples/client)
       target_link_libraries(client_examples_${e} vncclient ${CMAKE_THREAD_LIBS_INIT} ${SDL2_LIBRARY} ${GTK2_LIBRARIES} ${FFMPEG_LIBRARIES} ${LIBSSHTUNNEL_LIBRARY})

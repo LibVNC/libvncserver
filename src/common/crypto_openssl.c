@@ -28,6 +28,8 @@
 #include <openssl/dh.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
 #if (OPENSSL_VERSION_NUMBER >= 0x30000000L)
 #include <openssl/provider.h>
 #endif
@@ -65,6 +67,28 @@ int hash_sha1(void *out, const void *in, const size_t in_len)
     return 1;
 }
 #endif /* LIBVNCSERVER_WITH_WEBSOCKETS */
+
+int hash_sha512(void *out, const void *in, const size_t in_len)
+{
+    EVP_MD_CTX *ctx = NULL;
+    int result = 0;
+    unsigned int digest_len = 0;
+
+    if (!(ctx = EVP_MD_CTX_new()))
+	goto out;
+    if (!EVP_DigestInit_ex(ctx, EVP_sha512(), NULL))
+	goto out;
+    if (!EVP_DigestUpdate(ctx, in, in_len))
+	goto out;
+    if (!EVP_DigestFinal_ex(ctx, out, &digest_len))
+	goto out;
+
+    result = digest_len == SHA512_HASH_SIZE;
+
+ out:
+    EVP_MD_CTX_free(ctx);
+    return result;
+}
 
 void random_bytes(void *out, size_t len)
 {
@@ -176,6 +200,57 @@ int encrypt_aes128ecb(void *out, int *out_len, const unsigned char key[16], cons
 
  out:
     EVP_CIPHER_CTX_free(aes);
+    return result;
+}
+
+int pbkdf2_hmac_sha512(const uint8_t *password, size_t password_len,
+		       const uint8_t *salt, size_t salt_len, uint32_t rounds,
+		       uint8_t *out, size_t out_len)
+{
+    if (!password || !salt || !out || out_len == 0)
+	return 0;
+    return PKCS5_PBKDF2_HMAC((const char *)password, (int)password_len, salt,
+			     (int)salt_len, rounds ? (int)rounds : 1,
+			     EVP_sha512(), (int)out_len, out) == 1;
+}
+
+int encrypt_rsa_pkcs1_spki_der(uint8_t *out, size_t *out_len,
+			       const uint8_t *der, size_t der_len,
+			       const void *in, size_t in_len)
+{
+    int result = 0;
+    EVP_PKEY *pkey = NULL;
+    EVP_PKEY_CTX *ctx = NULL;
+    const unsigned char *derp = der;
+    size_t required_len = 0;
+
+    if (!out || !out_len || !der || !in)
+	goto out;
+
+    pkey = d2i_PUBKEY(NULL, &derp, (long)der_len);
+    if (!pkey || EVP_PKEY_base_id(pkey) != EVP_PKEY_RSA)
+	goto out;
+
+    ctx = EVP_PKEY_CTX_new(pkey, NULL);
+    if (!ctx)
+	goto out;
+    if (EVP_PKEY_encrypt_init(ctx) <= 0)
+	goto out;
+    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0)
+	goto out;
+    if (EVP_PKEY_encrypt(ctx, NULL, &required_len, in, in_len) <= 0)
+	goto out;
+    if (required_len > *out_len)
+	goto out;
+    if (EVP_PKEY_encrypt(ctx, out, &required_len, in, in_len) <= 0)
+	goto out;
+
+    *out_len = required_len;
+    result = 1;
+
+ out:
+    EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY_free(pkey);
     return result;
 }
 

@@ -101,6 +101,31 @@ int hash_sha1(void *out, const void *in, const size_t in_len)
 }
 #endif /* LIBVNCSERVER_WITH_WEBSOCKETS */
 
+int hash_sha512(void *out, const void *in, const size_t in_len)
+{
+    int result = 0;
+    gcry_error_t error;
+    gcry_md_hd_t sha512 = NULL;
+    void *digest;
+
+    error = gcry_md_open(&sha512, GCRY_MD_SHA512, 0);
+    if (gcry_err_code(error) != GPG_ERR_NO_ERROR)
+	goto out;
+
+    gcry_md_write(sha512, in, in_len);
+
+    if(!(digest = gcry_md_read(sha512, GCRY_MD_SHA512)))
+       goto out;
+
+    memcpy(out, digest, gcry_md_get_algo_dlen(GCRY_MD_SHA512));
+
+    result = 1;
+
+ out:
+    gcry_md_close(sha512);
+    return result;
+}
+
 void random_bytes(void *out, size_t len)
 {
     gcry_randomize(out, len, GCRY_STRONG_RANDOM);
@@ -195,6 +220,33 @@ int encrypt_aes128ecb(void *out, int *out_len, const unsigned char key[16], cons
  out:
     gcry_cipher_close(aes);
     return result;
+}
+
+int pbkdf2_hmac_sha512(const uint8_t *password, size_t password_len,
+		       const uint8_t *salt, size_t salt_len, uint32_t rounds,
+		       uint8_t *out, size_t out_len)
+{
+    gcry_error_t error;
+
+    if (!password || !salt || !out || out_len == 0)
+	return 0;
+
+    error = gcry_kdf_derive(password, password_len, GCRY_KDF_PBKDF2, GCRY_MD_SHA512,
+			    salt, salt_len, rounds ? rounds : 1, out_len, out);
+    return gcry_err_code(error) == GPG_ERR_NO_ERROR;
+}
+
+int encrypt_rsa_pkcs1_spki_der(uint8_t *out, size_t *out_len,
+			       const uint8_t *der, size_t der_len,
+			       const void *in, size_t in_len)
+{
+    (void)out;
+    (void)out_len;
+    (void)der;
+    (void)der_len;
+    (void)in;
+    (void)in_len;
+    return 0;
 }
 
 int dh_generate_keypair(uint8_t *priv_out, uint8_t *pub_out, const uint8_t *gen, const size_t gen_len, const uint8_t *prime, const size_t keylen)
