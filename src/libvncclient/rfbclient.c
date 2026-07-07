@@ -67,6 +67,8 @@
 
 #define MAX_TEXTCHAT_SIZE 10485760 /* 10MB */
 
+static void PrintPixelFormatForClient(rfbClient *client, rfbPixelFormat *format);
+
 /*
  * rfbClientLog prints a time-stamped message to the log file (stderr).
  */
@@ -97,6 +99,67 @@ rfbDefaultClientLog(const char *format, ...)
 
 rfbClientLogProc rfbClientLog=rfbDefaultClientLog;
 rfbClientLogProc rfbClientErr=rfbDefaultClientLog;
+rfbClientLogProcWithClient rfbClientLogWithClient=NULL;
+rfbClientLogProcWithClient rfbClientErrWithClient=NULL;
+
+static void
+rfbClientLogFallback(rfbClientLogProc legacyLog, const char *format, va_list args)
+{
+    va_list argsCopy;
+    char *message;
+    int messageLen;
+
+    if(!legacyLog)
+      return;
+
+    va_copy(argsCopy, args);
+    messageLen = vsnprintf(NULL, 0, format, argsCopy);
+    va_end(argsCopy);
+
+    if(messageLen < 0) {
+      legacyLog("%s", format);
+      return;
+    }
+
+    message = malloc((size_t)messageLen + 1);
+    if(!message) {
+      legacyLog("%s", format);
+      return;
+    }
+
+    va_copy(argsCopy, args);
+    vsnprintf(message, (size_t)messageLen + 1, format, argsCopy);
+    va_end(argsCopy);
+
+    legacyLog("%s", message);
+    free(message);
+}
+
+void
+rfbClientLogEx(rfbClient *client, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    if(rfbClientLogWithClient)
+      rfbClientLogWithClient(client, format, args);
+    else
+      rfbClientLogFallback(rfbClientLog, format, args);
+    va_end(args);
+}
+
+void
+rfbClientErrEx(rfbClient *client, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    if(rfbClientErrWithClient)
+      rfbClientErrWithClient(client, format, args);
+    else
+      rfbClientLogFallback(rfbClientErr, format, args);
+    va_end(args);
+}
 
 /* extensions */
 
@@ -299,7 +362,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     char buffer[10];
     rfbVNCRec* rec = (rfbVNCRec*)malloc(sizeof(rfbVNCRec));
     if(!rec) {
-        rfbClientLog("Could not allocate rfbVNCRec memory\n");
+        rfbClientLogEx(client, "Could not allocate rfbVNCRec memory\n");
         return FALSE;
     }
     client->vncRec = rec;
@@ -310,13 +373,13 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     rec->doNotSleep = FALSE;
     
     if (!rec->file) {
-      rfbClientLog("Could not open %s.\n",client->serverHost);
+      rfbClientLogEx(client, "Could not open %s.\n",client->serverHost);
       return FALSE;
     }
     setbuf(rec->file,NULL);
 
     if (fread(buffer,1,strlen(magic),rec->file) != strlen(magic) || strncmp(buffer,magic,strlen(magic))) {
-      rfbClientLog("File %s was not recorded by vncrec.\n",client->serverHost);
+      rfbClientLogEx(client, "File %s was not recorded by vncrec.\n",client->serverHost);
       fclose(rec->file);
       return FALSE;
     }
@@ -338,7 +401,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
 
     /* serverHost is a hostname */
     if (!StringToIPAddr(hostname, &host)) {
-      rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
+      rfbClientLogEx(client, "Couldn't convert '%s' to host address\n", hostname);
       return FALSE;
     }
     client->sock = ConnectClientToTcpAddrWithTimeout(host, port, client->connectTimeout);
@@ -346,7 +409,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
   }
 
   if (client->sock == RFB_INVALID_SOCKET) {
-    rfbClientLog("Unable to connect to VNC server\n");
+    rfbClientLogEx(client, "Unable to connect to VNC server\n");
     return FALSE;
   }
 
@@ -371,7 +434,7 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 #else
   unsigned int host;
   if (!StringToIPAddr(repeaterHost, &host)) {
-    rfbClientLog("Couldn't convert '%s' to host address\n", repeaterHost);
+    rfbClientLogEx(client, "Couldn't convert '%s' to host address\n", repeaterHost);
     return FALSE;
   }
 
@@ -379,7 +442,7 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 #endif
 
   if (client->sock == RFB_INVALID_SOCKET) {
-    rfbClientLog("Unable to connect to VNC repeater\n");
+    rfbClientLogEx(client, "Unable to connect to VNC repeater\n");
     return FALSE;
   }
 
@@ -389,11 +452,11 @@ rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int rep
 
   /* UltraVNC repeater always report version 000.000 to identify itself */
   if (sscanf(pv,rfbProtocolVersionFormat,&major,&minor) != 2 || major != 0 || minor != 0) {
-    rfbClientLog("Not a valid VNC repeater (%s)\n",pv);
+    rfbClientLogEx(client, "Not a valid VNC repeater (%s)\n",pv);
     return FALSE;
   }
 
-  rfbClientLog("Connected to VNC repeater, using protocol version %d.%d\n", major, minor);
+  rfbClientLogEx(client, "Connected to VNC repeater, using protocol version %d.%d\n", major, minor);
 
   memset(tmphost, 0, sizeof(tmphost));
   if(snprintf(tmphost, sizeof(tmphost), "%s:%d", destHost, destPort) >= (int)sizeof(tmphost))
@@ -416,13 +479,13 @@ ReadReason(rfbClient* client)
     if (!ReadFromRFBServer(client, (char *)&reasonLen, 4)) return;
     reasonLen = rfbClientSwap32IfLE(reasonLen);
     if(reasonLen > 1<<20) {
-      rfbClientLog("VNC connection failed, but sent reason length of %u exceeds limit of 1MB",(unsigned int)reasonLen);
+      rfbClientLogEx(client, "VNC connection failed, but sent reason length of %u exceeds limit of 1MB",(unsigned int)reasonLen);
       return;
     }
     reason = malloc(reasonLen+1);
     if (!reason || !ReadFromRFBServer(client, reason, reasonLen)) { free(reason); return; }
     reason[reasonLen]=0;
-    rfbClientLog("VNC connection failed: %s\n",reason);
+    rfbClientLogEx(client, "VNC connection failed: %s\n",reason);
     free(reason);
 }
 
@@ -437,7 +500,7 @@ rfbHandleAuthResult(rfbClient* client)
 
     switch (authResult) {
     case rfbVncAuthOK:
-      rfbClientLog("VNC authentication succeeded\n");
+      rfbClientLogEx(client, "VNC authentication succeeded\n");
       return TRUE;
       break;
     case rfbVncAuthFailed:
@@ -447,14 +510,14 @@ rfbHandleAuthResult(rfbClient* client)
         ReadReason(client);
         return FALSE;
       }
-      rfbClientLog("VNC authentication failed\n");
+      rfbClientLogEx(client, "VNC authentication failed\n");
       return FALSE;
     case rfbVncAuthTooMany:
-      rfbClientLog("VNC authentication failed - too many tries\n");
+      rfbClientLogEx(client, "VNC authentication failed - too many tries\n");
       return FALSE;
     }
 
-    rfbClientLog("Unknown VNC authentication result: %d\n",
+    rfbClientLogEx(client, "Unknown VNC authentication result: %d\n",
                  (int)authResult);
     return FALSE;
 }
@@ -476,26 +539,26 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
 
     if (count==0)
     {
-        rfbClientLog("List of security types is ZERO, expecting an error to follow\n");
+        rfbClientLogEx(client, "List of security types is ZERO, expecting an error to follow\n");
         ReadReason(client);
         return FALSE;
     }
 
-    rfbClientLog("We have %d security types to read\n", count);
+    rfbClientLogEx(client, "We have %d security types to read\n", count);
     authScheme=0;
     /* now, we have a list of available security types to read ( uint8_t[] ) */
     for (loop=0;loop<count;loop++)
     {
         if (!ReadFromRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
-        rfbClientLog("%d) Received security type %d\n", loop, tAuth[loop]);
+        rfbClientLogEx(client, "%d) Received security type %d\n", loop, tAuth[loop]);
 
 		switch (tAuth[loop]) {
 		case rfbUltra:
-			rfbClientLog("UltraVNC server detected, enabling UltraVNC specific messages\n");
+			rfbClientLogEx(client, "UltraVNC server detected, enabling UltraVNC specific messages\n");
 			DefaultSupportedMessagesUltraVNC(client);
 			break;
 		case rfbTight:
-			rfbClientLog("TightVNC server detected, enabling TightVNC specific messages\n");
+			rfbClientLogEx(client, "TightVNC server detected, enabling TightVNC specific messages\n");
 			DefaultSupportedMessagesTightVNC(client);
 			break;
 		}
@@ -541,7 +604,7 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
             }
             if (flag)
             {
-                rfbClientLog("Selecting security type %d (%d/%d in the list)\n", authScheme, loop, count);
+                rfbClientLogEx(client, "Selecting security type %d (%d/%d in the list)\n", authScheme, loop, count);
                 /* send back a single byte indicating which security type to use */
                 if (!WriteToRFBServer(client, (char *)&tAuth[loop], 1)) return FALSE;
             }
@@ -556,7 +619,7 @@ ReadSupportedSecurityType(rfbClient* client, uint32_t *result, rfbBool subAuth)
             snprintf(buf2, sizeof(buf2), (loop>0 ? ", %d" : "%d"), (int)tAuth[loop]);
             strncat(buf1, buf2, sizeof(buf1)-strlen(buf1)-1);
         }
-        rfbClientLog("Unknown authentication scheme from VNC server: %s\n",
+        rfbClientLogEx(client, "Unknown authentication scheme from VNC server: %s\n",
                buf1);
         return FALSE;
     }
@@ -578,7 +641,7 @@ HandleVncAuth(rfbClient *client)
         passwd = client->GetPassword(client);
 
       if ((!passwd) || (strlen(passwd) == 0)) {
-        rfbClientLog("Reading password failed\n");
+        rfbClientLogEx(client, "Reading password failed\n");
         return FALSE;
       }
       if (strlen(passwd) > 8) {
@@ -619,13 +682,13 @@ HandlePlainAuth(rfbClient *client)
 
   if (!client->GetCredential)
   {
-    rfbClientLog("GetCredential callback is not set.\n");
+    rfbClientLogEx(client, "GetCredential callback is not set.\n");
     return FALSE;
   }
   cred = client->GetCredential(client, rfbCredentialTypeUser);
   if (!cred)
   {
-    rfbClientLog("Reading credential failed\n");
+    rfbClientLogEx(client, "Reading credential failed\n");
     return FALSE;
   }
 
@@ -704,26 +767,26 @@ HandleUltraMSLogonIIAuth(rfbClient *client)
   if (!ReadFromRFBServer(client, (char *)resp, sizeof(resp))) return FALSE;
 
   if(!dh_generate_keypair(priv, pub, gen, sizeof(gen), mod, sizeof(priv))) {
-      rfbClientErr("HandleUltraMSLogonIIAuth: generating keypair failed\n");
+      rfbClientErrEx(client, "HandleUltraMSLogonIIAuth: generating keypair failed\n");
       return FALSE;
   }
 
   if(!dh_compute_shared_key(key, priv, resp, mod, sizeof(key))) {
-      rfbClientErr("HandleUltraMSLogonIIAuth: creating shared key failed\n");
+      rfbClientErrEx(client, "HandleUltraMSLogonIIAuth: creating shared key failed\n");
       return FALSE;
   }
 
   if (!client->GetCredential)
   {
-    rfbClientLog("GetCredential callback is not set.\n");
+    rfbClientLogEx(client, "GetCredential callback is not set.\n");
     return FALSE;
   }
-  rfbClientLog("WARNING! MSLogon security type has very low password encryption! "\
+  rfbClientLogEx(client, "WARNING! MSLogon security type has very low password encryption! "\
     "Use it only with SSH tunnel or trusted network.\n");
   cred = client->GetCredential(client, rfbCredentialTypeUser);
   if (!cred)
   {
-    rfbClientLog("Reading credential failed\n");
+    rfbClientLogEx(client, "Reading credential failed\n");
     return FALSE;
   }
 
@@ -762,15 +825,15 @@ HandleMSLogonAuth(rfbClient *client)
 
   if (!client->GetCredential)
   {
-    rfbClientLog("GetCredential callback is not set.\n");
+    rfbClientLogEx(client, "GetCredential callback is not set.\n");
     return FALSE;
   }
-  rfbClientLog("WARNING! MSLogon security type has very low password encryption! "\
+  rfbClientLogEx(client, "WARNING! MSLogon security type has very low password encryption! "\
     "Use it only with SSH tunnel or trusted network.\n");
   cred = client->GetCredential(client, rfbCredentialTypeUser);
   if (!cred)
   {
-    rfbClientLog("Reading credential failed\n");
+    rfbClientLogEx(client, "Reading credential failed\n");
     return FALSE;
   }
 
@@ -818,11 +881,11 @@ HandleARDAuth(rfbClient *client)
   /* Step 1: Read the authentication material from the socket.
      A two-byte generator value, a two-byte key length value. */
   if (!ReadFromRFBServer(client, (char *)gen, 2)) {
-      rfbClientErr("HandleARDAuth: reading generator value failed\n");
+      rfbClientErrEx(client, "HandleARDAuth: reading generator value failed\n");
       goto out;
   }
   if (!ReadFromRFBServer(client, (char *)len, 2)) {
-      rfbClientErr("HandleARDAuth: reading key length failed\n");
+      rfbClientErrEx(client, "HandleARDAuth: reading key length failed\n");
       goto out;
   }
   keylen = 256*len[0]+len[1]; /* convert from char[] to int */
@@ -839,17 +902,17 @@ HandleARDAuth(rfbClient *client)
   /* Step 1: Read the authentication material from the socket.
      The prime modulus (keylen bytes) and the peer's generated public key (keylen bytes). */
   if (!ReadFromRFBServer(client, (char *)mod, keylen)) {
-      rfbClientErr("HandleARDAuth: reading prime modulus failed\n");
+      rfbClientErrEx(client, "HandleARDAuth: reading prime modulus failed\n");
       goto out;
   }
   if (!ReadFromRFBServer(client, (char *)resp, keylen)) {
-      rfbClientErr("HandleARDAuth: reading peer's generated public key failed\n");
+      rfbClientErrEx(client, "HandleARDAuth: reading peer's generated public key failed\n");
       goto out;
   }
 
   /* Step 2: Generate own Diffie-Hellman public-private key pair. */
   if(!dh_generate_keypair(priv, pub, gen, 2, mod, keylen)) {
-      rfbClientErr("HandleARDAuth: generating keypair failed\n");
+      rfbClientErrEx(client, "HandleARDAuth: generating keypair failed\n");
       goto out;
   }
 
@@ -857,7 +920,7 @@ HandleARDAuth(rfbClient *client)
      prime (mod), and the peer's public key. The output will be a shared
      secret known to both us and the peer. */
   if(!dh_compute_shared_key(key, priv, resp, mod, keylen)) {
-      rfbClientErr("HandleARDAuth: creating shared key failed\n");
+      rfbClientErrEx(client, "HandleARDAuth: creating shared key failed\n");
       goto out;
   }
 
@@ -865,7 +928,7 @@ HandleARDAuth(rfbClient *client)
      This 128-bit (16-byte) value will be used as the AES key. */
   shared = malloc(MD5_HASH_SIZE);
   if(!hash_md5(shared, key, keylen)) {
-      rfbClientErr("HandleARDAuth: hashing shared key failed\n");
+      rfbClientErrEx(client, "HandleARDAuth: hashing shared key failed\n");
       goto out;
   }
 
@@ -874,12 +937,12 @@ HandleARDAuth(rfbClient *client)
      Null-terminate each. Fill the unused bytes with random characters
      so that the encryption output is less predictable. */
   if(!client->GetCredential) {
-      rfbClientErr("HandleARDAuth: GetCredential callback is not set\n");
+      rfbClientErrEx(client, "HandleARDAuth: GetCredential callback is not set\n");
       goto out;
   }
   cred = client->GetCredential(client, rfbCredentialTypeUser);
   if(!cred) {
-      rfbClientErr("HandleARDAuth: reading credential failed\n");
+      rfbClientErrEx(client, "HandleARDAuth: reading credential failed\n");
       goto out;
   }
   passwordLen = strlen(cred->userCredential.password)+1;
@@ -896,7 +959,7 @@ HandleARDAuth(rfbClient *client)
      from step 4, using the AES 128-bit symmetric cipher in electronic
      codebook (ECB) mode. Use no further padding for this block cipher. */
   if(!encrypt_aes128ecb(ciphertext, &ciphertext_len, shared, userpass, sizeof(userpass))) {
-      rfbClientErr("HandleARDAuth: encrypting credentials failed\n");
+      rfbClientErrEx(client, "HandleARDAuth: encrypting credentials failed\n");
       goto out;
   }
 
@@ -982,7 +1045,7 @@ InitialiseRFBConnection(rfbClient* client)
   pv[sz_rfbProtocolVersionMsg] = 0;
 
   if (sscanf(pv,rfbProtocolVersionFormat,&major,&minor) != 2) {
-    rfbClientLog("Not a valid VNC server (%s)\n",pv);
+    rfbClientLogEx(client, "Not a valid VNC server (%s)\n",pv);
     return FALSE;
   }
 
@@ -998,7 +1061,7 @@ InitialiseRFBConnection(rfbClient* client)
   /* Legacy version of UltraVNC uses minor codes 4 and 6 for the server */
   /* left in for backwards compatibility */
   if (major==3 && (minor==4 || minor==6)) {
-      rfbClientLog("UltraVNC server detected, enabling UltraVNC specific messages\n",pv);
+      rfbClientLogEx(client, "UltraVNC server detected, enabling UltraVNC specific messages\n",pv);
       DefaultSupportedMessagesUltraVNC(client);
   }
 
@@ -1007,14 +1070,14 @@ InitialiseRFBConnection(rfbClient* client)
   if (major==3 && (minor==14 || minor==16)) {
      minor = minor - 10;
      client->minor = minor;
-     rfbClientLog("UltraVNC Single Click server detected, enabling UltraVNC specific messages\n",pv);
+     rfbClientLogEx(client, "UltraVNC Single Click server detected, enabling UltraVNC specific messages\n",pv);
      DefaultSupportedMessagesUltraVNC(client);
   }
 
   /* Legacy version of TightVNC uses minor codes 5 for the server */
   /* left in for backwards compatibility */
   if (major==3 && minor==5) {
-      rfbClientLog("TightVNC server detected, enabling TightVNC specific messages\n",pv);
+      rfbClientLogEx(client, "TightVNC server detected, enabling TightVNC specific messages\n",pv);
       DefaultSupportedMessagesTightVNC(client);
   }
 
@@ -1025,7 +1088,7 @@ InitialiseRFBConnection(rfbClient* client)
     client->minor=8;
   }
 
-  rfbClientLog("VNC server supports protocol version %d.%d (viewer %d.%d)\n",
+  rfbClientLogEx(client, "VNC server supports protocol version %d.%d (viewer %d.%d)\n",
 	  major, minor, rfbProtocolMajorVersion, rfbProtocolMinorVersion);
 
   sprintf(pv,rfbProtocolVersionFormat,client->major,client->minor);
@@ -1044,7 +1107,7 @@ InitialiseRFBConnection(rfbClient* client)
     authScheme = rfbClientSwap32IfLE(authScheme);
   }
   
-  rfbClientLog("Selected Security Scheme %d\n", authScheme);
+  rfbClientLogEx(client, "Selected Security Scheme %d\n", authScheme);
   client->authScheme = authScheme;
   
   switch (authScheme) {
@@ -1054,7 +1117,7 @@ InitialiseRFBConnection(rfbClient* client)
     return FALSE;
 
   case rfbNoAuth:
-    rfbClientLog("No authentication needed\n");
+    rfbClientLogEx(client, "No authentication needed\n");
 
     /* 3.8 and upwards sends a Security Result for rfbNoAuth */
     if ((client->major==3 && client->minor > 7) || client->major>3)
@@ -1099,7 +1162,7 @@ InitialiseRFBConnection(rfbClient* client)
         return FALSE;
 
       case rfbNoAuth:
-        rfbClientLog("No sub authentication needed\n");
+        rfbClientLogEx(client, "No sub authentication needed\n");
         /* 3.8 and upwards sends a Security Result for rfbNoAuth */
         if ((client->major==3 && client->minor > 7) || client->major>3)
             if (!rfbHandleAuthResult(client)) return FALSE;
@@ -1116,7 +1179,7 @@ InitialiseRFBConnection(rfbClient* client)
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
       default:
-        rfbClientLog("Unknown sub authentication scheme from VNC server: %d\n",
+        rfbClientLogEx(client, "Unknown sub authentication scheme from VNC server: %d\n",
             (int)subAuthScheme);
         return FALSE;
     }
@@ -1146,7 +1209,7 @@ InitialiseRFBConnection(rfbClient* client)
       case rfbNoAuth:
       case rfbVeNCryptTLSNone:
       case rfbVeNCryptX509None:
-        rfbClientLog("No sub authentication needed\n");
+        rfbClientLogEx(client, "No sub authentication needed\n");
         if (!rfbHandleAuthResult(client)) return FALSE;
         break;
 
@@ -1170,7 +1233,7 @@ InitialiseRFBConnection(rfbClient* client)
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
       default:
-        rfbClientLog("Unknown sub authentication scheme from VNC server: %d\n",
+        rfbClientLogEx(client, "Unknown sub authentication scheme from VNC server: %d\n",
             client->subAuthScheme);
         return FALSE;
     }
@@ -1194,7 +1257,7 @@ InitialiseRFBConnection(rfbClient* client)
       }
       if (authHandled) break;
     }
-    rfbClientLog("Unknown authentication scheme from VNC server: %d\n",
+    rfbClientLogEx(client, "Unknown authentication scheme from VNC server: %d\n",
 	    (int)authScheme);
     return FALSE;
   }
@@ -1213,13 +1276,13 @@ InitialiseRFBConnection(rfbClient* client)
   client->si.nameLength = rfbClientSwap32IfLE(client->si.nameLength);
 
   if (client->si.nameLength > 1<<20) {
-      rfbClientErr("Too big desktop name length sent by server: %u B > 1 MB\n", (unsigned int)client->si.nameLength);
+      rfbClientErrEx(client, "Too big desktop name length sent by server: %u B > 1 MB\n", (unsigned int)client->si.nameLength);
       return FALSE;
   }
 
   client->desktopName = malloc(client->si.nameLength + 1);
   if (!client->desktopName) {
-    rfbClientLog("Error allocating memory for desktop name, %lu bytes\n",
+    rfbClientLogEx(client, "Error allocating memory for desktop name, %lu bytes\n",
             (unsigned long)client->si.nameLength);
     return FALSE;
   }
@@ -1228,13 +1291,13 @@ InitialiseRFBConnection(rfbClient* client)
 
   client->desktopName[client->si.nameLength] = 0;
 
-  rfbClientLog("Desktop name \"%s\"\n",client->desktopName);
+  rfbClientLogEx(client, "Desktop name \"%s\"\n",client->desktopName);
 
-  rfbClientLog("Connected to VNC server, using protocol version %d.%d\n",
+  rfbClientLogEx(client, "Connected to VNC server, using protocol version %d.%d\n",
 	  client->major, client->minor);
 
-  rfbClientLog("VNC server default format:\n");
-  PrintPixelFormat(&client->si.format);
+  rfbClientLogEx(client, "VNC server default format:\n");
+  PrintPixelFormatForClient(client, &client->si.format);
 
   return TRUE;
 }
@@ -1336,7 +1399,7 @@ SetFormatAndEncodings(rfbClient* client)
       } else if (strncasecmp(encStr,"rre",encStrLen) == 0) {
 	encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRRE);
       } else {
-	rfbClientLog("Unknown encoding '%.*s'\n",encStrLen,encStr);
+	rfbClientLogEx(client, "Unknown encoding '%.*s'\n",encStrLen,encStr);
       }
 
       encStr = nextEncStr;
@@ -1359,11 +1422,11 @@ SetFormatAndEncodings(rfbClient* client)
       /* TODO:
       if (!tunnelSpecified) {
       */
-      rfbClientLog("Same machine: preferring raw encoding\n");
+      rfbClientLogEx(client, "Same machine: preferring raw encoding\n");
       encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingRaw);
       /*
       } else {
-	rfbClientLog("Tunneling active: preferring tight encoding\n");
+	rfbClientLogEx(client, "Tunneling active: preferring tight encoding\n");
       }
       */
     }
@@ -1497,7 +1560,7 @@ SendFramebufferUpdateRequest(rfbClient* client, int x, int y, int w, int h, rfbB
   if (!SupportsClient2Server(client, rfbFramebufferUpdateRequest)) return TRUE;
 
   if (client->requestedResize) {
-    rfbClientLog("Skipping Update - resize in progress\n");
+    rfbClientLogEx(client, "Skipping Update - resize in progress\n");
     return TRUE;
   }
 
@@ -1705,12 +1768,12 @@ SendExtDesktopSize(rfbClient* client, uint16_t width, uint16_t height)
   rfbExtDesktopScreen screen;
 
   if (client->screen.width == 0 && client->screen.height == 0 ) {
-    rfbClientLog("Screen not yet received from server - not sending dimensions %dx%d\n", width, height);
+    rfbClientLogEx(client, "Screen not yet received from server - not sending dimensions %dx%d\n", width, height);
     return TRUE;
   }
 
   if (client->screen.width != rfbClientSwap16IfLE(width) || client->screen.height != rfbClientSwap16IfLE(height)) {
-    rfbClientLog("Sending dimensions %dx%d\n", width, height);
+    rfbClientLogEx(client, "Sending dimensions %dx%d\n", width, height);
     sdm.type = rfbSetDesktopSize;
     sdm.width = rfbClientSwap16IfLE(width);
     sdm.height = rfbClientSwap16IfLE(height);
@@ -1865,7 +1928,7 @@ sendExtClientCutTextProvide(rfbClient *client, char* data, int len)
 
   unsigned char *buf = malloc(sz_to_compressed);
   if (!buf) {
-    rfbClientLog("sendExtClientCutTextProvide. alloc buf failed\n");
+    rfbClientLogEx(client, "sendExtClientCutTextProvide. alloc buf failed\n");
     return FALSE;
   }
   memcpy(buf, &be_size, sizeof(be_size));
@@ -1874,13 +1937,13 @@ sendExtClientCutTextProvide(rfbClient *client, char* data, int len)
 
   unsigned char *cbuf = malloc(sizeof(be_flags) + csz); /*flag, compressed*/
   if (!cbuf) {
-    rfbClientLog("sendExtClientCutTextProvide. alloc cbuf failed\n");
+    rfbClientLogEx(client, "sendExtClientCutTextProvide. alloc cbuf failed\n");
     free(buf);
     return FALSE;
   }
   memcpy(cbuf, &be_flags, sizeof(be_flags));
   if (CompressClipData(cbuf + sizeof(be_flags), &csz, buf, sz_to_compressed) != Z_OK) {
-    rfbClientLog("sendExtClientCutTextProvide: compress cbuf failed\n");
+    rfbClientLogEx(client, "sendExtClientCutTextProvide: compress cbuf failed\n");
     free(buf);
     free(cbuf);
     return FALSE;
@@ -1936,7 +1999,7 @@ rfbClientProcessExtServerCutText(rfbClient* client, char *data, int len)
 {
   uint32_t flags;
   if (len < sizeof(flags)) {
-    rfbClientLog("rfbClientProcessExtServerCutText. len < 4\n");
+    rfbClientLogEx(client, "rfbClientProcessExtServerCutText. len < 4\n");
     return FALSE;
   }
   memcpy(&flags, data, sizeof(flags));
@@ -1949,15 +2012,15 @@ rfbClientProcessExtServerCutText(rfbClient* client, char *data, int len)
    * modify here if need more types(rtf,html,dib,files)
    */
   if (!(flags & rfbExtendedClipboard_Text)) {
-    rfbClientLog("rfbClientProcessExtServerCutText. not text type. ignore\n");
+    rfbClientLogEx(client, "rfbClientProcessExtServerCutText. not text type. ignore\n");
     return TRUE;
   }
   if (!(flags & rfbExtendedClipboard_Provide)) {
-    rfbClientLog("rfbClientProcessExtServerCutText. not provide type. ignore\n");
+    rfbClientLogEx(client, "rfbClientProcessExtServerCutText. not provide type. ignore\n");
     return TRUE;
   }
   if (flags & rfbExtendedClipboard_Caps) {
-    rfbClientLog("rfbClientProcessExtServerCutText. default cap.\n");
+    rfbClientLogEx(client, "rfbClientProcessExtServerCutText. default cap.\n");
     client->extendedClipboardServerCapabilities |= rfbExtendedClipboard_Text; /* for now, only text */
     return TRUE;
   }
@@ -1969,7 +2032,7 @@ rfbClientProcessExtServerCutText(rfbClient* client, char *data, int len)
   stream.avail_in = 0;
   stream.next_in = NULL;
   if (inflateInit(&stream) != Z_OK) {
-    rfbClientLog("rfbClientProcessExtServerCutText. inflateInit failed\n");
+    rfbClientLogEx(client, "rfbClientProcessExtServerCutText. inflateInit failed\n");
     return FALSE;
   }
   stream.avail_in = len;
@@ -1979,20 +2042,20 @@ rfbClientProcessExtServerCutText(rfbClient* client, char *data, int len)
   stream.avail_out = sizeof(size);
   stream.next_out = (unsigned char *)&size;
   if (inflate(&stream, Z_SYNC_FLUSH) != Z_OK) {
-    rfbClientLog("rfbClientProcessExtServerCutText. inflate size failed\n");
+    rfbClientLogEx(client, "rfbClientProcessExtServerCutText. inflate size failed\n");
     inflateEnd(&stream);
     return FALSE;
   }
   size = rfbClientSwap32IfLE(size);
   if (size > (1 << 20)) {
-    rfbClientLog("rfbClientProcessExtServerCutText. size too large\n");
+    rfbClientLogEx(client, "rfbClientProcessExtServerCutText. size too large\n");
     inflateEnd(&stream);
     return FALSE;
   }
 
   unsigned char *buf = malloc(size);
   if (!buf) {
-    rfbClientLog("rfbClientProcessExtServerCutText. alloc buf failed\n");
+    rfbClientLogEx(client, "rfbClientProcessExtServerCutText. alloc buf failed\n");
     inflateEnd(&stream);
     return FALSE;
   }
@@ -2001,13 +2064,13 @@ rfbClientProcessExtServerCutText(rfbClient* client, char *data, int len)
   uLong out_before = stream.total_out;
   int err = inflate(&stream, Z_SYNC_FLUSH);
   if (err != Z_OK && err != Z_STREAM_END) {
-    rfbClientLog("rfbClientProcessExtServerCutText. inflate buf failed\n");
+    rfbClientLogEx(client, "rfbClientProcessExtServerCutText. inflate buf failed\n");
     free(buf);
     inflateEnd(&stream);
     return FALSE;
   }
   if ((stream.total_out - out_before) != size) {
-    rfbClientLog("rfbClientProcessExtServerCutText. inflate size error\n");
+    rfbClientLogEx(client, "rfbClientProcessExtServerCutText. inflate size error\n");
     free(buf);
     inflateEnd(&stream);
     return FALSE;
@@ -2149,7 +2212,7 @@ HandleRFBServerMessage(rfbClient* client)
 	if(!ResizeClientBuffer(client, rect.r.w, rect.r.h))
 	  return FALSE;
 	SendFramebufferUpdateRequest(client, 0, 0, rect.r.w, rect.r.h, FALSE);
-	rfbClientLog("Got new framebuffer size: %dx%d\n", rect.r.w, rect.r.h);
+	rfbClientLogEx(client, "Got new framebuffer size: %dx%d\n", rect.r.w, rect.r.h);
 	continue;
       }
 
@@ -2181,7 +2244,7 @@ HandleRFBServerMessage(rfbClient* client)
           if(!ResizeClientBuffer(client, rect.r.w, rect.r.h)) {
             return FALSE;
           }
-          rfbClientLog("Updated desktop size: %dx%d\n", rect.r.w, rect.r.h);
+          rfbClientLogEx(client, "Updated desktop size: %dx%d\n", rect.r.w, rect.r.h);
         }
         client->requestedResize = FALSE;
 
@@ -2197,17 +2260,17 @@ HandleRFBServerMessage(rfbClient* client)
           /* msgs is two sets of bit flags of supported messages client2server[] and server2client[] */
           /* currently ignored by this library */
 
-          rfbClientLog("client2server supported messages (bit flags)\n");
+          rfbClientLogEx(client, "client2server supported messages (bit flags)\n");
           for (loop=0;loop<32;loop+=8)
-            rfbClientLog("%02X: %04x %04x %04x %04x - %04x %04x %04x %04x\n", loop,
+            rfbClientLogEx(client, "%02X: %04x %04x %04x %04x - %04x %04x %04x %04x\n", loop,
                 client->supportedMessages.client2server[loop],   client->supportedMessages.client2server[loop+1],
                 client->supportedMessages.client2server[loop+2], client->supportedMessages.client2server[loop+3],
                 client->supportedMessages.client2server[loop+4], client->supportedMessages.client2server[loop+5],
                 client->supportedMessages.client2server[loop+6], client->supportedMessages.client2server[loop+7]);
 
-          rfbClientLog("server2client supported messages (bit flags)\n");
+          rfbClientLogEx(client, "server2client supported messages (bit flags)\n");
           for (loop=0;loop<32;loop+=8)
-            rfbClientLog("%02X: %04x %04x %04x %04x - %04x %04x %04x %04x\n", loop,
+            rfbClientLogEx(client, "%02X: %04x %04x %04x %04x - %04x %04x %04x %04x\n", loop,
                 client->supportedMessages.server2client[loop],   client->supportedMessages.server2client[loop+1],
                 client->supportedMessages.server2client[loop+2], client->supportedMessages.server2client[loop+3],
                 client->supportedMessages.server2client[loop+4], client->supportedMessages.server2client[loop+5],
@@ -2241,7 +2304,7 @@ HandleRFBServerMessage(rfbClient* client)
               return FALSE;
           }
           buffer[rect.r.w]=0; /* null terminate, just in case */
-          rfbClientLog("Connected to Server \"%s\"\n", buffer);
+          rfbClientLogEx(client, "Connected to Server \"%s\"\n", buffer);
           free(buffer);
           continue;
       }
@@ -2252,7 +2315,7 @@ HandleRFBServerMessage(rfbClient* client)
         if ((rect.r.x + rect.r.w > client->width) ||
 	    (rect.r.y + rect.r.h > client->height))
 	    {
-	      rfbClientLog("Rect too large: %dx%d at (%d, %d)\n",
+	      rfbClientLogEx(client, "Rect too large: %dx%d at (%d, %d)\n",
 	  	  rect.r.w, rect.r.h, rect.r.x, rect.r.y);
 	      return FALSE;
             }
@@ -2262,7 +2325,7 @@ HandleRFBServerMessage(rfbClient* client)
         if ((rect.encoding != rfbEncodingTight) && 
             (rect.r.h * rect.r.w == 0))
         {
-	  rfbClientLog("Zero size rect - ignoring (encoding=%d (0x%08x) %dx, %dy, %dw, %dh)\n", rect.encoding, rect.encoding, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
+	  rfbClientLogEx(client, "Zero size rect - ignoring (encoding=%d (0x%08x) %dx, %dy, %dw, %dh)\n", rect.encoding, rect.encoding, rect.r.x, rect.r.y, rect.r.w, rect.r.h);
 	  continue;
         }
         */
@@ -2556,7 +2619,7 @@ HandleRFBServerMessage(rfbClient* client)
 	       handled = TRUE;
 
 	   if(!handled) {
-	     rfbClientLog("Unknown rect encoding %d\n",
+	     rfbClientLogEx(client, "Unknown rect encoding %d\n",
 		 (int)rect.encoding);
 	     return FALSE;
 	   }
@@ -2604,7 +2667,7 @@ HandleRFBServerMessage(rfbClient* client)
 #endif
 
     if (msg.sct.length > 1<<20) {
-	    rfbClientErr("Ignoring too big cut text length sent by server: %u B > 1 MB\n", (unsigned int)msg.sct.length);
+	    rfbClientErrEx(client, "Ignoring too big cut text length sent by server: %u B > 1 MB\n", (unsigned int)msg.sct.length);
 	    return FALSE;
     }  
 
@@ -2644,17 +2707,17 @@ HandleRFBServerMessage(rfbClient* client)
       msg.tc.length = rfbClientSwap32IfLE(msg.sct.length);
       switch(msg.tc.length) {
       case rfbTextChatOpen:
-          rfbClientLog("Received TextChat Open\n");
+          rfbClientLogEx(client, "Received TextChat Open\n");
           if (client->HandleTextChat!=NULL)
               client->HandleTextChat(client, (int)rfbTextChatOpen, NULL);
           break;
       case rfbTextChatClose:
-          rfbClientLog("Received TextChat Close\n");
+          rfbClientLogEx(client, "Received TextChat Close\n");
          if (client->HandleTextChat!=NULL)
               client->HandleTextChat(client, (int)rfbTextChatClose, NULL);
           break;
       case rfbTextChatFinished:
-          rfbClientLog("Received TextChat Finished\n");
+          rfbClientLogEx(client, "Received TextChat Finished\n");
          if (client->HandleTextChat!=NULL)
               client->HandleTextChat(client, (int)rfbTextChatFinished, NULL);
           break;
@@ -2669,7 +2732,7 @@ HandleRFBServerMessage(rfbClient* client)
           }
           /* Null Terminate <just in case> */
           buffer[msg.tc.length]=0;
-          rfbClientLog("Received TextChat \"%s\"\n", buffer);
+          rfbClientLogEx(client, "Received TextChat \"%s\"\n", buffer);
           if (client->HandleTextChat!=NULL)
               client->HandleTextChat(client, (int)msg.tc.length, buffer);
           free(buffer);
@@ -2705,7 +2768,7 @@ HandleRFBServerMessage(rfbClient* client)
       return FALSE;
 
     SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
-    rfbClientLog("Got new framebuffer size: %dx%d\n", client->width, client->height);
+    rfbClientLogEx(client, "Got new framebuffer size: %dx%d\n", client->width, client->height);
     break;
   }
 
@@ -2717,7 +2780,7 @@ HandleRFBServerMessage(rfbClient* client)
     if (!ResizeClientBuffer(client, rfbClientSwap16IfLE(msg.prsfb.buffer_w), rfbClientSwap16IfLE(msg.prsfb.buffer_h)))
       return FALSE;
     SendFramebufferUpdateRequest(client, 0, 0, client->width, client->height, FALSE);
-    rfbClientLog("Got new framebuffer size: %dx%d\n", client->width, client->height);
+    rfbClientLogEx(client, "Got new framebuffer size: %dx%d\n", client->width, client->height);
     break;
   }
 
@@ -2732,7 +2795,7 @@ HandleRFBServerMessage(rfbClient* client)
 
       if(!handled) {
 	char buffer[256];
-	rfbClientLog("Unknown message type %d from VNC server\n",msg.type);
+	rfbClientLogEx(client, "Unknown message type %d from VNC server\n",msg.type);
 	ReadFromRFBServer(client, buffer, 256);
 	return FALSE;
       }
@@ -2817,29 +2880,36 @@ HandleRFBServerMessage(rfbClient* client)
  * PrintPixelFormat.
  */
 
-void
-PrintPixelFormat(rfbPixelFormat *format)
+static void
+PrintPixelFormatForClient(rfbClient *client, rfbPixelFormat *format)
 {
   if (format->bitsPerPixel == 1) {
-    rfbClientLog("  Single bit per pixel.\n");
-    rfbClientLog(
+    rfbClientLogEx(client, "  Single bit per pixel.\n");
+    rfbClientLogEx(client,
 	    "  %s significant bit in each byte is leftmost on the screen.\n",
 	    (format->bigEndian ? "Most" : "Least"));
   } else {
-    rfbClientLog("  %d bits per pixel.\n",format->bitsPerPixel);
+    rfbClientLogEx(client, "  %d bits per pixel.\n",format->bitsPerPixel);
     if (format->bitsPerPixel != 8) {
-      rfbClientLog("  %s significant byte first in each pixel.\n",
+      rfbClientLogEx(client, "  %s significant byte first in each pixel.\n",
 	      (format->bigEndian ? "Most" : "Least"));
     }
     if (format->trueColour) {
-      rfbClientLog("  TRUE colour: max red %d green %d blue %d"
+      rfbClientLogEx(client, "  TRUE colour: max red %d green %d blue %d"
 		   ", shift red %d green %d blue %d\n",
 		   format->redMax, format->greenMax, format->blueMax,
 		   format->redShift, format->greenShift, format->blueShift);
     } else {
-      rfbClientLog("  Colour map (not true colour).\n");
+      rfbClientLogEx(client, "  Colour map (not true colour).\n");
     }
   }
+}
+
+void
+PrintPixelFormat(rfbPixelFormat *format)
+{
+  /* Legacy API: no rfbClient context is available here. */
+  PrintPixelFormatForClient(NULL, format);
 }
 
 /* avoid name clashes with LibVNCServer */

@@ -147,7 +147,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     return FALSE;
 
   if (rx + rw > client->width || ry + rh > client->height) {
-    rfbClientLog("Rect out of bounds: %dx%d at (%d, %d)\n", rx, ry, rw, rh);
+    rfbClientLogEx(client, "Rect out of bounds: %dx%d at (%d, %d)\n", rx, ry, rw, rh);
     return FALSE;
   }
 
@@ -159,7 +159,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     if ((comp_ctl & 1) && client->zlibStreamActive[stream_id]) {
       if (inflateEnd (&client->zlibStream[stream_id]) != Z_OK &&
 	  client->zlibStream[stream_id].msg != NULL)
-	rfbClientLog("inflateEnd: %s\n", client->zlibStream[stream_id].msg);
+	rfbClientLogEx(client, "inflateEnd: %s\n", client->zlibStream[stream_id].msg);
       client->zlibStreamActive[stream_id] = FALSE;
     }
     comp_ctl >>= 1;
@@ -194,7 +194,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
 #if BPP == 8
   if (comp_ctl == rfbTightJpeg) {
-    rfbClientLog("Tight encoding: JPEG is not supported in 8 bpp mode.\n");
+    rfbClientLogEx(client, "Tight encoding: JPEG is not supported in 8 bpp mode.\n");
     return FALSE;
   }
 #else
@@ -205,7 +205,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 
   /* Quit on unsupported subencoding value. */
   if (comp_ctl > rfbTightMaxSubencoding) {
-    rfbClientLog("Tight encoding: bad subencoding value received.\n");
+    rfbClientLogEx(client, "Tight encoding: bad subencoding value received.\n");
     return FALSE;
   }
 
@@ -230,7 +230,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
       break;
     case rfbTightFilterGradient:
       if (rw > TIGHT_GRADIENT_MAX_WIDTH) {
-	rfbClientLog("Tight Gradient rectangle width %d exceeds maximum %d.\n",
+	rfbClientLogEx(client, "Tight Gradient rectangle width %d exceeds maximum %d.\n",
 		     rw, TIGHT_GRADIENT_MAX_WIDTH);
 	return FALSE;
       }
@@ -238,7 +238,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
       bitsPixel = InitFilterGradientBPP(client, rw, rh);
       break;
     default:
-      rfbClientLog("Tight encoding: unknown filter code received.\n");
+      rfbClientLogEx(client, "Tight encoding: unknown filter code received.\n");
       return FALSE;
     }
   } else {
@@ -246,7 +246,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     bitsPixel = InitFilterCopyBPP(client, rw, rh);
   }
   if (bitsPixel == 0) {
-    rfbClientLog("Tight encoding: error receiving palette.\n");
+    rfbClientLogEx(client, "Tight encoding: error receiving palette.\n");
     return FALSE;
   }
 
@@ -264,12 +264,12 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   /* Read the length (1..3 bytes) of compressed data following. */
   compressedLen = (int)ReadCompactLen(client);
   if (compressedLen <= 0) {
-    rfbClientLog("Incorrect data received from the server.\n");
+    rfbClientLogEx(client, "Incorrect data received from the server.\n");
     return FALSE;
   }
   if (readUncompressed) {
     if (compressedLen > RFB_BUFFER_SIZE) {
-	rfbClientErr("Received uncompressed byte count exceeds our buffer size.\n");
+	rfbClientErrEx(client, "Received uncompressed byte count exceeds our buffer size.\n");
 	return FALSE;
     }
 
@@ -291,7 +291,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
     err = inflateInit(zs);
     if (err != Z_OK) {
       if (zs->msg != NULL)
-	rfbClientLog("InflateInit error: %s.\n", zs->msg);
+	rfbClientLogEx(client, "InflateInit error: %s.\n", zs->msg);
       return FALSE;
     }
     client->zlibStreamActive[stream_id] = TRUE;
@@ -302,7 +302,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   bufferSize = RFB_BUFFER_SIZE * bitsPixel / (bitsPixel + BPP) & 0xFFFFFFFC;
   if (rowSize > bufferSize) {
     /* Should be impossible when RFB_BUFFER_SIZE >= 16384 */
-    rfbClientLog("Internal error: incorrect buffer size.\n");
+    rfbClientLogEx(client, "Internal error: incorrect buffer size.\n");
     return FALSE;
   }
 
@@ -332,9 +332,9 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
 	break;
       if (err != Z_OK && err != Z_STREAM_END) {
 	if (zs->msg != NULL) {
-	  rfbClientLog("Inflate error: %s.\n", zs->msg);
+	  rfbClientLogEx(client, "Inflate error: %s.\n", zs->msg);
 	} else {
-	  rfbClientLog("Inflate error: %d.\n", err);
+	  rfbClientLogEx(client, "Inflate error: %d.\n", err);
 	}
 	return FALSE;
       }
@@ -363,7 +363,7 @@ HandleTightBPP (rfbClient* client, int rx, int ry, int rw, int rh)
   }
 
   if (rowsProcessed != rh) {
-    rfbClientLog("Incorrect number of scan lines after decompression.\n");
+    rfbClientLogEx(client, "Incorrect number of scan lines after decompression.\n");
     return FALSE;
   }
 
@@ -618,13 +618,13 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
 
   compressedLen = (int)ReadCompactLen(client);
   if (compressedLen <= 0) {
-    rfbClientLog("Incorrect data received from the server.\n");
+    rfbClientLogEx(client, "Incorrect data received from the server.\n");
     return FALSE;
   }
 
   compressedData = malloc(compressedLen);
   if (compressedData == NULL) {
-    rfbClientLog("Memory allocation error.\n");
+    rfbClientLogEx(client, "Memory allocation error.\n");
     return FALSE;
   }
 
@@ -638,7 +638,7 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
   
   if (!client->tjhnd) {
     if ((client->tjhnd = tjInitDecompress()) == NULL) {
-      rfbClientLog("TurboJPEG error: %s\n", tjGetErrorStr());
+      rfbClientLogEx(client, "TurboJPEG error: %s\n", tjGetErrorStr());
       free(compressedData);
       return FALSE;
     }
@@ -661,7 +661,7 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
 
   if (tjDecompress(client->tjhnd, compressedData, (unsigned long)compressedLen,
                    dst, w, pitch, h, pixelSize, flags)==-1) {
-    rfbClientLog("TurboJPEG error: %s\n", tjGetErrorStr());
+    rfbClientLogEx(client, "TurboJPEG error: %s\n", tjGetErrorStr());
     free(compressedData);
     return FALSE;
   }
