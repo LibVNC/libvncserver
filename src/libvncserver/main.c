@@ -467,7 +467,8 @@ clientOutput(void *data)
 		}
 		if (cl->state != RFB_NORMAL || cl->onHold) {
 			/* just sleep until things get normal */
-		        THREAD_SLEEP_MS(cl->screen->deferUpdateTime);
+		        THREAD_SLEEP_MS(cl->screen->deferUpdateTime > 0
+		                        ? cl->screen->deferUpdateTime : 1);
 			continue;
 		}
 
@@ -492,8 +493,10 @@ clientOutput(void *data)
         }
         
         /* OK, now, to save bandwidth, wait a little while for more
-           updates to come along. */
-	THREAD_SLEEP_MS(cl->screen->deferUpdateTime);
+           updates to come along. A deferUpdateTime of 0 means "no deferral",
+           not a zero-length sleep syscall per update. */
+	if (cl->screen->deferUpdateTime > 0)
+	    THREAD_SLEEP_MS(cl->screen->deferUpdateTime);
 
         /* Now, get the region we're going to update, and remove
            it from cl->modifiedRegion _before_ we send the update.
@@ -1386,8 +1389,13 @@ rfbBool rfbIsActive(rfbScreenInfoPtr screenInfo) {
 
 void rfbRunEventLoop(rfbScreenInfoPtr screen, long usec, rfbBool runInBackground)
 {
-  if(usec<0)
+  if(usec<0) {
     usec=screen->deferUpdateTime*1000;
+    /* A deferUpdateTime of 0 must not turn the default select() timeout into
+       a zero-timeout busy poll; sockets still wake the loop immediately. */
+    if(usec<=0)
+      usec=100*1000;
+  }
 
   screen->select_timeout_usec = usec;
 
