@@ -425,6 +425,26 @@ void rfbMarkRegionAsModified(rfbScreenInfoPtr screen,sraRegionPtr modRegion)
    rfbReleaseClientIterator(iterator);
 }
 
+void rfbNotifyH264FrameAvailable(rfbScreenInfoPtr screen)
+{
+   rfbClientIteratorPtr iterator;
+   rfbClientPtr cl;
+   sraRegionPtr region = sraRgnCreateRect(0,0,screen->width,screen->height);
+
+   iterator=rfbGetClientIterator(screen);
+   while((cl=rfbClientIteratorNext(iterator))) {
+     if(cl->preferredEncoding != rfbEncodingOpenH264)
+       continue;
+     LOCK(cl->updateMutex);
+     sraRgnOr(cl->modifiedRegion,region);
+     TSIGNAL(cl->updateCond);
+     UNLOCK(cl->updateMutex);
+   }
+
+   rfbReleaseClientIterator(iterator);
+   sraRgnDestroy(region);
+}
+
 void rfbScaledScreenUpdate(rfbScreenInfoPtr screen, int x1, int y1, int x2, int y2);
 void rfbMarkRectAsModified(rfbScreenInfoPtr screen,int x1,int y1,int x2,int y2)
 {

@@ -113,6 +113,24 @@ typedef rfbBool (*rfbPasswordCheckProcPtr)(struct _rfbClientRec* cl,const char* 
 typedef enum rfbNewClientAction (*rfbNewClientHookPtr)(struct _rfbClientRec* cl);
 typedef void (*rfbDisplayHookPtr)(struct _rfbClientRec* cl);
 typedef void (*rfbDisplayFinishedHookPtr)(struct _rfbClientRec* cl, int result);
+/**
+ * Return the next H.264 access unit to send to a client that selected the
+ * Open H.264 encoding, or FALSE if no new access unit is available for this
+ * client right now.
+ *
+ * The hook must not block: it is called from the client's update path.
+ * Whenever a new access unit becomes available, call
+ * rfbNotifyH264FrameAvailable() to trigger another framebuffer update.
+ *
+ * On success, store a malloc()ed buffer in @p frame; LibVNCServer takes
+ * ownership and frees it after sending. The hook is called independently for
+ * every client, so keep a per-client stream position in cl->clientData. Each
+ * client's stream must be self-contained, i.e. start with SPS/PPS parameter
+ * sets followed by an IDR frame.
+ */
+typedef rfbBool (*rfbGetH264FrameHookPtr)(struct _rfbClientRec* cl,
+                                          char** frame,
+                                          size_t* frameSize);
 /** support the capability to view the caps/num/scroll states of the X server */
 typedef int  (*rfbGetKeyboardLedStateHookPtr)(struct _rfbScreenInfo* screen);
 typedef rfbBool (*rfbXvpHookPtr)(struct _rfbClientRec* cl, uint8_t, uint8_t);
@@ -386,6 +404,9 @@ typedef struct _rfbScreenInfo
      * its listening sockets from the current listenInterface/listen6Interface/
      * port/ipv6port values on its next loop iteration. Cleared by the thread. */
     rfbBool rebindListenSockets;
+    /** Optional source of pre-encoded H.264 access units. Setting this hook
+     * enables the Open H.264 encoding. See rfbGetH264FrameHookPtr. */
+    rfbGetH264FrameHookPtr getH264FrameHook;
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -740,6 +761,11 @@ typedef struct _rfbClientRec {
     ClientPeekAtSocket peekAtSocket;             /* Peek at data from socket */
     ClientHasPendingOnSocket hasPendingOnSocket; /* Has pending data on socket */
     ClientWriteToSocket writeToSocket;           /* Write data to socket */
+
+    /** TRUE if the client advertised the Open H.264 encoding and the screen
+     * has a getH264FrameHook. Applications can use this to recognize
+     * H.264-capable clients that selected another encoding. */
+    rfbBool supportsH264Encoding;
 } rfbClientRec, *rfbClientPtr;
 
 /**
@@ -862,6 +888,7 @@ extern void rfbClientConnFailed(rfbClientPtr cl, const char *reason);
 extern void rfbNewUDPConnection(rfbScreenInfoPtr rfbScreen,rfbSocket sock);
 extern void rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen);
 extern rfbBool rfbSendFramebufferUpdate(rfbClientPtr cl, sraRegionPtr updateRegion);
+extern rfbBool rfbSendRectEncodingOpenH264(rfbClientPtr cl, const char *frame, size_t frameSize);
 extern rfbBool rfbSendRectEncodingRaw(rfbClientPtr cl, int x,int y,int w,int h);
 extern rfbBool rfbSendUpdateBuf(rfbClientPtr cl);
 extern void rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len);
@@ -1090,6 +1117,12 @@ void rfbDoCopyRegion(rfbScreenInfoPtr rfbScreen,sraRegionPtr copyRegion,int dx,i
 
 void rfbMarkRectAsModified(rfbScreenInfoPtr rfbScreen,int x1,int y1,int x2,int y2);
 void rfbMarkRegionAsModified(rfbScreenInfoPtr rfbScreen,sraRegionPtr modRegion);
+/** Wake all clients streaming via the Open H.264 encoding because a new
+ * access unit can be fetched through getH264FrameHook. Clients using other
+ * encodings are not disturbed. With the threaded event loop this may be
+ * called from any thread; an application driving rfbProcessEvents() itself
+ * should call it from that same thread. */
+void rfbNotifyH264FrameAvailable(rfbScreenInfoPtr rfbScreen);
 void rfbDoNothingWithClient(rfbClientPtr cl);
 enum rfbNewClientAction defaultNewClientHook(rfbClientPtr cl);
 void rfbRegisterProtocolExtension(rfbProtocolExtension* extension);
