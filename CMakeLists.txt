@@ -704,6 +704,12 @@ if(WITH_LIBVNCSERVER)
     cargstest
     copyrecttest
   )
+  if(UNIX)
+    # uses BSD sockets directly to stand in for a repeater
+    list(APPEND SIMPLETESTS
+      repeatertest
+    )
+  endif(UNIX)
 endif(WITH_LIBVNCSERVER)
 
 
@@ -764,6 +770,9 @@ endif(WITH_LIBVNCSERVER)
 if(UNIX)
   if(WITH_LIBVNCSERVER)
     add_test(NAME includetest_server COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} ${CMAKE_MAKE_PROGRAM} "rfb/rfb.h")
+    add_test(NAME repeater COMMAND test_repeatertest)
+    # a broken connect completion wait fails after rfbMaxClientWait, don't hang forever
+    set_tests_properties(repeater PROPERTIES TIMEOUT 60)
   endif(WITH_LIBVNCSERVER)
   if(WITH_LIBVNCCLIENT)
     add_test(NAME includetest_client COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} ${CMAKE_MAKE_PROGRAM} "rfb/rfbclient.h")
