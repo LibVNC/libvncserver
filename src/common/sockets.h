@@ -70,6 +70,18 @@
 #include "rfb/rfbproto.h"
 
 /*
+  select() cannot handle file descriptors >= FD_SETSIZE (1024 on most systems),
+  where FD_SET() is undefined behaviour. Use poll() instead where both the
+  function and its header are available; the code falls back to select()
+  otherwise. RFB_USE_POLL is internal to LibVNCServer, do not use it in
+  installed headers.
+ */
+#if defined(LIBVNCSERVER_HAVE_POLL) && defined(LIBVNCSERVER_HAVE_POLL_H)
+#include <poll.h>
+#define RFB_USE_POLL 1
+#endif
+
+/*
    Set (non)blocking mode for a socket.
    Returns TRUE on succcess, FALSE on failure.
  */
