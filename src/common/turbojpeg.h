@@ -30,7 +30,9 @@
 #ifndef __TURBOJPEG_H__
 #define __TURBOJPEG_H__
 
-#if defined(_WIN32) && defined(DLLDEFINE)
+#if defined(__GNUC__)
+#define DLLEXPORT __attribute__((visibility("hidden")))
+#elif defined(_WIN32) && defined(DLLDEFINE)
 #define DLLEXPORT __declspec(dllexport)
 #else
 #define DLLEXPORT
