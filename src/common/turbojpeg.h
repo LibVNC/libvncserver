@@ -304,7 +304,7 @@ extern "C" {
  * @return a handle to the newly-created instance, or NULL if an error
  * occurred (see #tjGetErrorStr().)
  */
-DLLEXPORT tjhandle DLLCALL tjInitCompress(void);
+DLLEXPORT tjhandle DLLCALL rdr_tjInitCompress(void);
 
 
 /**
@@ -354,7 +354,7 @@ DLLEXPORT tjhandle DLLCALL tjInitCompress(void);
  *
  * @return 0 if successful, or -1 if an error occurred (see #tjGetErrorStr().)
 */
-DLLEXPORT int DLLCALL tjCompress2(tjhandle handle, unsigned char *srcBuf,
+DLLEXPORT int DLLCALL rdr_tjCompress2(tjhandle handle, unsigned char *srcBuf,
   int width, int pitch, int height, int pixelFormat, unsigned char **jpegBuf,
   unsigned long *jpegSize, int jpegSubsamp, int jpegQual, int flags);
 
@@ -379,7 +379,7 @@ DLLEXPORT int DLLCALL tjCompress2(tjhandle handle, unsigned char *srcBuf,
  * @return the maximum size of the buffer (in bytes) required to hold the
  * image, or -1 if the arguments are out of bounds.
  */
-DLLEXPORT unsigned long DLLCALL tjBufSize(int width, int height,
+DLLEXPORT unsigned long DLLCALL rdr_tjBufSize(int width, int height,
   int jpegSubsamp);
 
 
@@ -389,7 +389,7 @@ DLLEXPORT unsigned long DLLCALL tjBufSize(int width, int height,
  * @return a handle to the newly-created instance, or NULL if an error
  * occurred (see #tjGetErrorStr().)
 */
-DLLEXPORT tjhandle DLLCALL tjInitDecompress(void);
+DLLEXPORT tjhandle DLLCALL rdr_tjInitDecompress(void);
 
 
 /**
@@ -408,7 +408,7 @@ DLLEXPORT tjhandle DLLCALL tjInitDecompress(void);
  *
  * @return 0 if successful, or -1 if an error occurred (see #tjGetErrorStr().)
 */
-DLLEXPORT int DLLCALL tjDecompressHeader2(tjhandle handle,
+DLLEXPORT int DLLCALL rdr_tjDecompressHeader2(tjhandle handle,
   unsigned char *jpegBuf, unsigned long jpegSize, int *width, int *height,
   int *jpegSubsamp);
 
@@ -423,7 +423,7 @@ DLLEXPORT int DLLCALL tjDecompressHeader2(tjhandle handle,
  * @return a pointer to a list of fractional scaling factors, or NULL if an
  * error is encountered (see #tjGetErrorStr().)
 */
-DLLEXPORT tjscalingfactor* DLLCALL tjGetScalingFactors(int *numscalingfactors);
+DLLEXPORT tjscalingfactor* DLLCALL rdr_tjGetScalingFactors(int *numscalingfactors);
 
 
 /**
@@ -468,7 +468,7 @@ DLLEXPORT tjscalingfactor* DLLCALL tjGetScalingFactors(int *numscalingfactors);
  *
  * @return 0 if successful, or -1 if an error occurred (see #tjGetErrorStr().)
  */
-DLLEXPORT int DLLCALL tjDecompress2(tjhandle handle,
+DLLEXPORT int DLLCALL rdr_tjDecompress2(tjhandle handle,
   unsigned char *jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
   int width, int pitch, int height, int pixelFormat, int flags);
 
@@ -481,7 +481,7 @@ DLLEXPORT int DLLCALL tjDecompress2(tjhandle handle,
  *
  * @return 0 if successful, or -1 if an error occurred (see #tjGetErrorStr().)
  */
-DLLEXPORT int DLLCALL tjDestroy(tjhandle handle);
+DLLEXPORT int DLLCALL rdr_tjDestroy(tjhandle handle);
 
 
 /**
@@ -489,7 +489,7 @@ DLLEXPORT int DLLCALL tjDestroy(tjhandle handle);
  *
  * @return a descriptive error message explaining why the last command failed.
  */
-DLLEXPORT char* DLLCALL tjGetErrorStr(void);
+DLLEXPORT char* DLLCALL rdr_tjGetErrorStr(void);
 
 
 /* Backward compatibility functions and macros (nothing to see here) */
@@ -509,16 +509,16 @@ DLLEXPORT char* DLLCALL tjGetErrorStr(void);
 #define TJ_FORCESSE3 TJFLAG_FORCESSE3
 #define TJ_FASTUPSAMPLE TJFLAG_FASTUPSAMPLE
 
-DLLEXPORT unsigned long DLLCALL TJBUFSIZE(int width, int height);
+DLLEXPORT unsigned long DLLCALL rdr_TJBUFSIZE(int width, int height);
 
-DLLEXPORT int DLLCALL tjCompress(tjhandle handle, unsigned char *srcBuf,
+DLLEXPORT int DLLCALL rdr_tjCompress(tjhandle handle, unsigned char *srcBuf,
   int width, int pitch, int height, int pixelSize, unsigned char *dstBuf,
   unsigned long *compressedSize, int jpegSubsamp, int jpegQual, int flags);
 
-DLLEXPORT int DLLCALL tjDecompressHeader(tjhandle handle,
+DLLEXPORT int DLLCALL rdr_tjDecompressHeader(tjhandle handle,
   unsigned char *jpegBuf, unsigned long jpegSize, int *width, int *height);
 
-DLLEXPORT int DLLCALL tjDecompress(tjhandle handle,
+DLLEXPORT int DLLCALL rdr_tjDecompress(tjhandle handle,
   unsigned char *jpegBuf, unsigned long jpegSize, unsigned char *dstBuf,
   int width, int pitch, int height, int pixelSize, int flags);
 
