@@ -32,6 +32,8 @@
 
 #if defined(_WIN32) && defined(DLLDEFINE)
 #define DLLEXPORT __declspec(dllexport)
+#elif defined(__GNUC__) && __GNUC__ >= 4
+#define DLLEXPORT __attribute__ ((visibility ("hidden")))
 #else
 #define DLLEXPORT
 #endif

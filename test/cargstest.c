@@ -1,5 +1,23 @@
 #include <rfb/rfb.h>
 
+
+#if defined(__ELF__) && (defined(__GNUC__) || defined(__clang__))
+#include <dlfcn.h>
+static int check_symbol_not_exported(void) {
+    void *handle = dlopen(NULL, RTLD_NOW);
+    if (!handle) return 0;
+    if (dlsym(handle, "tjCompress2") != NULL || dlsym(handle, "tjInitCompress") != NULL) {
+        fprintf(stderr, "Error: turbojpeg symbols exported in main executable dynamic symbol table!\n");
+        dlclose(handle);
+        return 1;
+    }
+    dlclose(handle);
+    return 0;
+}
+#else
+static int check_symbol_not_exported(void) { return 0; }
+#endif
+
 int main(int argc,char** argv)
 {
 	int fake_argc=6;
@@ -27,6 +45,7 @@ int main(int argc,char** argv)
 		fprintf(stderr,"fake_argv[1] is %s (should be -nothing)\n",fake_argv[1]);
 		ret=1;
 	}
+	if (check_symbol_not_exported()) ret = 1;
 	return ret;
 }
 
