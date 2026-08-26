@@ -508,6 +508,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->cursorY = rfbScreen->cursorY;
       cl->useNewFBSize = FALSE;
       cl->useExtDesktopSize = FALSE;
+      cl->extDesktopSizeSent = FALSE;
       cl->requestedDesktopSizeChange = 0;
       cl->lastDesktopSizeChangeError = 0;
 
@@ -2392,6 +2393,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->useCopyRect              = FALSE;
         cl->useNewFBSize             = FALSE;
         cl->useExtDesktopSize        = FALSE;
+        cl->extDesktopSizeSent       = FALSE;
         cl->cursorWasChanged         = FALSE;
         cl->useRichCursorEncoding    = FALSE;
         cl->enableCursorPosUpdates   = FALSE;
@@ -2498,6 +2500,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                            "%s\n", cl->host);
                     cl->useExtDesktopSize = TRUE;
                     cl->useNewFBSize = TRUE;
+                    cl->extDesktopSizeSent = FALSE;
                 }
                 break;
             case rfbEncodingKeyboardLedState:
@@ -2719,7 +2722,12 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
        if (!msg.fur.incremental) {
 	    sraRgnOr(cl->modifiedRegion,tmpRegion);
 	    sraRgnSubtract(cl->copyRegion,tmpRegion);
-            if (cl->useExtDesktopSize)
+            /* Re-assert the desktop size on a full-screen request, but only until
+               it has been sent once: otherwise a viewer that keeps requesting full
+               updates after each ExtDesktopSize (e.g. UltraVNC in its "new ultra
+               server" mode) loops forever receiving only size rectangles and never
+               any pixels. Real resizes still re-send it via rfbNewFramebuffer(). */
+            if (cl->useExtDesktopSize && !cl->extDesktopSizeSent)
                 cl->newFBSizePending = TRUE;
        }
        TSIGNAL(cl->updateCond);
@@ -3227,6 +3235,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
             cl->screen->displayFinishedHook(cl, FALSE);
           return FALSE;
         }
+        cl->extDesktopSizeSent = TRUE;
       }
       else if (!rfbSendNewFBSize(cl, cl->scaledScreen->width, cl->scaledScreen->height)) {
 	if(cl->screen->displayFinishedHook)
