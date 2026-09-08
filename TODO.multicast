@@ -33,8 +33,9 @@ SERVER:
 - really fill partial update packets when using other than raw encoding
 
 - When operating with maxSendRateFixed, actual send rate is much lower.
-  The problem shows up at higher transmission rates like 10MB/s. Really
-  no idea what's causing this.
+  The problem shows up at higher transmission rates like 10MB/s. Very
+  probably due to the receiver not draining the receive buffer fast enough
+  (it all single-threaded as of now).
 
 CLIENT:
 
