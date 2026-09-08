@@ -3050,8 +3050,12 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 #endif
 	      /* decrease send rate */
 	      cl->screen->multicastMaxSendRate *= 1.0/MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
-	      /* decrease the increment itself */
-	      cl->screen->multicastMaxSendRateIncrement *= 1.0/MULTICAST_MAXSENDRATE_CHANGE_FACTOR;
+	      /* reset the increment all the way back to its start value: significant
+		 loss means the geometrically-grown increment overshot, so the ramp must
+		 restart gentle and re-earn its acceleration through
+		 MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER loss-free increases (see below),
+		 rather than resuming at the large pre-loss stride */
+	      cl->screen->multicastMaxSendRateIncrement = MULTICAST_MAXSENDRATE_INCREMENT_START;
 	      /* reset increment increase counter: we increase the increment after MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER increments
 		 WITHOUT a send rate decrease in between */
 	      cl->screen->multicastMaxSendRateIncrementCount = 0;
