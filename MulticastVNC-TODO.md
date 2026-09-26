@@ -42,8 +42,6 @@ CLIENT:
 - join multicast group on every interface (INADDR_ANY only joins on default
   interface which may not be the right one...)
 
-- missing packets only NACKed once
-
 - verify sender address+port in  ReadFromRFBServerMulticast()?
   -> would need bind() to address we got from getaddrinfo() 
      (plus a SO_REUSEADDR setsockopt() if same port as client &

@@ -1583,6 +1583,174 @@ SendMulticastFramebufferUpdateNACK(rfbClient* client, uint32_t idPartialUpd, uin
 }
 
 
+/*
+ * Bounded re-NACK of missing multicast partial updates.
+ *
+ * The client tracks each still-missing partial id in an outstanding set and
+ * re-NACKs it on an RTT-scaled timer with exponential backoff, giving up after
+ * MULTICAST_NACK_MAX_RETRIES attempts (then the loss is unrecoverable and the
+ * unicast fallback via multicastTimeout is the backstop). This is what fixes
+ * persistent artifacts on lossy links, where a repair may itself be dropped:
+ * without a retry the gap would never be re-requested. Retry bound and timing
+ * follow NACK-oriented reliable multicast practice (NORM RFC 5740, SRM, PGM
+ * RFC 3208): RTT-scaled timer, exponential backoff, small bounded retry count.
+ */
+#define MULTICAST_NACK_MAX_RETRIES 4     /* initial NACK + up to 3 re-NACKs */
+#define MULTICAST_NACK_MISSING_MAX 4096  /* cap on tracked outstanding partials */
+#define MULTICAST_NACK_RTO_INIT_MS 1000  /* initial base retry timeout before any RTT sample (RFC 6298 initial RTO) */
+#define MULTICAST_NACK_RTO_MAX_MS  2000  /* ceiling on the base retry timeout, bounds worst-case give-up latency */
+
+/* The outstanding-missing set is a plain grow-on-demand array (count/capacity on
+ * the client, capacity doubles up to MULTICAST_NACK_MISSING_MAX). Not a ring
+ * buffer like the server's sent-partial backlog: entries here leave when their
+ * repair *arrives*, i.e. from the middle and in arbitrary order, so a ring's
+ * FIFO/overwrite-oldest semantics don't fit (they'd evict the wrong, longest-
+ * outstanding entry on overflow). Removal is a swap-remove: instead of shifting
+ * every later element down to close the hole (O(n) memmove), the last live entry
+ * is copied into the freed slot and the count is decremented -- O(1), but it
+ * reorders the array. That's fine, since each entry retries on its own timer,
+ * not by position. The set is small and self-draining (near-empty on a healthy link),
+ * and every real pass (the retry sweep) touches all entries, so a flat array is
+ * the natural fit; the cap bounds worst-case memory. */
+typedef struct {
+  uint32_t idPartial;
+  struct timeval lastNacked;
+  int nackCount;                         /* attempts so far (initial NACK == 1) */
+} multicastMissingEntry;
+
+/* record a newly-detected missing partial id (callers pass gap ids, which are
+   always new, so no dedup scan is needed) */
+static void multicastMissingAdd(rfbClient* client, uint32_t idPartial)
+{
+  multicastMissingEntry *arr;
+
+  if(client->multicastMissingCount == client->multicastMissingCapacity) {
+    size_t newcap = client->multicastMissingCapacity ? client->multicastMissingCapacity*2 : 256;
+    if(newcap > MULTICAST_NACK_MISSING_MAX) newcap = MULTICAST_NACK_MISSING_MAX;
+    if(client->multicastMissingCount >= newcap) {
+#if defined(MULTICAST_DEBUG) || defined(MULTICAST_REPAIR_DEBUG)
+      rfbClientLog("MulticastVNC REPAIR: outstanding-missing set full (%d), dropping partial %u (unrecoverable)\n",
+		   MULTICAST_NACK_MISSING_MAX, idPartial);
+#endif
+      return; /* at cap: drop tracking, treat as unrecoverable */
+    }
+    arr = (multicastMissingEntry*)realloc(client->multicastMissing, newcap*sizeof(multicastMissingEntry));
+    if(!arr) return;
+    client->multicastMissing = arr;
+    client->multicastMissingCapacity = newcap;
+  }
+
+  arr = (multicastMissingEntry*)client->multicastMissing;
+  arr[client->multicastMissingCount].idPartial = idPartial;
+  gettimeofday(&arr[client->multicastMissingCount].lastNacked, NULL);
+  arr[client->multicastMissingCount].nackCount = 1; /* the initial NACK is attempt 1 */
+  ++client->multicastMissingCount;
+}
+
+/* a partial (normal or repair) arrived: stop tracking it if outstanding */
+static void multicastMissingRemove(rfbClient* client, uint32_t idPartial)
+{
+  multicastMissingEntry *arr = (multicastMissingEntry*)client->multicastMissing;
+  size_t i;
+  for(i=0; i<client->multicastMissingCount; ++i)
+    if(arr[i].idPartial == idPartial) {
+      /* Karn's algorithm: only entries repaired on their FIRST NACK give an
+	 unambiguous NACK->repair RTT sample (after a re-NACK we can't tell which
+	 NACK the repair answers). Feed those into a smoothed estimate (EWMA, gain
+	 1/8) so the retry timer self-scales to the link instead of a hardcoded
+	 value; the retry timeout is then derived as a fixed multiple of it. */
+      if(arr[i].nackCount == 1) {
+	struct timeval now;
+	int sample;
+	gettimeofday(&now, NULL);
+	sample = (now.tv_sec - arr[i].lastNacked.tv_sec)*1000
+	       + (now.tv_usec - arr[i].lastNacked.tv_usec)/1000;
+	if(sample < 0) sample = 0;
+	if(client->multicastRepairSrtt == 0)                                    /* first sample seeds the estimate */
+	  client->multicastRepairSrtt = sample;
+	else
+	  client->multicastRepairSrtt = (7*client->multicastRepairSrtt + sample)/8; /* gain 1/8 */
+      }
+#if defined(MULTICAST_DEBUG) || defined(MULTICAST_REPAIR_DEBUG)
+      rfbClientLog("MulticastVNC REPAIR: repair for partial %u arrived after %d NACK(s), %lu still outstanding (srtt %ums)\n",
+		   idPartial, arr[i].nackCount, (unsigned long)(client->multicastMissingCount-1),
+		   client->multicastRepairSrtt);
+#endif
+      arr[i] = arr[client->multicastMissingCount-1]; /* swap-remove */
+      --client->multicastMissingCount;
+      return;
+    }
+}
+
+/* periodic pass: re-NACK outstanding partials whose backoff timer has expired,
+   dropping those that have exhausted their retries */
+void HandleMulticastNACKRetries(rfbClient* client)
+{
+  multicastMissingEntry *arr = (multicastMissingEntry*)client->multicastMissing;
+  struct timeval now;
+  size_t i = 0;
+  /* Base retry timeout = twice the smoothed NACK->repair RTT, so it tracks the
+     actual link instead of a hardcoded value; the 2x gives headroom for jitter
+     (WiFi, DTIM) without the extra state of a mean-deviation term. Until the
+     first sample lands, fall back to a conservative 1s initial RTO (RFC 6298):
+     the seed MUST exceed real repair latency, otherwise we give up before any
+     repair can arrive and thus never obtain a sample to adapt from -- a seed
+     tighter than the RTT is a bootstrap deadlock. Capped to bound worst-case
+     give-up, then floored at one update interval (never re-NACK faster than the
+     server can emit a repair). The floor is applied last on purpose: it is a
+     correctness bound (retrying before the server's next send cycle only yields
+     spurious NACKs and, since the repair then always answers a re-NACK, starves
+     Karn's srtt sampling), so it must win even when the update interval exceeds
+     the cap. */
+  size_t base = client->multicastRepairSrtt
+    ? 2*client->multicastRepairSrtt
+    : MULTICAST_NACK_RTO_INIT_MS;
+  if(base > MULTICAST_NACK_RTO_MAX_MS)
+    base = MULTICAST_NACK_RTO_MAX_MS;
+  if(client->multicastUpdInterval && base < client->multicastUpdInterval)
+    base = client->multicastUpdInterval;
+
+  gettimeofday(&now, NULL);
+
+  while(i < client->multicastMissingCount) {
+    multicastMissingEntry *e = &arr[i];
+    long secs = now.tv_sec - e->lastNacked.tv_sec;
+    size_t elapsed, timeout;
+
+    if(secs < 0) { /* clock went backwards, reset timer */
+      e->lastNacked = now;
+      ++i;
+      continue;
+    }
+
+    elapsed = secs*1000 + (now.tv_usec - e->lastNacked.tv_usec)/1000;
+    timeout = base << (e->nackCount - 1); /* exponential backoff */
+
+    if(elapsed >= timeout) {
+      if(e->nackCount >= MULTICAST_NACK_MAX_RETRIES) {
+        /* give up: unrecoverable (unicast fallback remains the backstop) */
+#if defined(MULTICAST_DEBUG) || defined(MULTICAST_REPAIR_DEBUG)
+        rfbClientLog("MulticastVNC REPAIR: giving up on partial %u after %d attempts (unrecoverable)\n",
+		     e->idPartial, e->nackCount);
+#endif
+        arr[i] = arr[client->multicastMissingCount-1];
+        --client->multicastMissingCount;
+        continue; /* process the swapped-in entry without advancing */
+      }
+      SendMulticastFramebufferUpdateNACK(client, e->idPartial, 1);
+      client->multicastPktsNACKed++;
+      e->lastNacked = now;
+      ++e->nackCount;
+#if defined(MULTICAST_DEBUG) || defined(MULTICAST_REPAIR_DEBUG)
+      rfbClientLog("MulticastVNC REPAIR: re-NACK partial %u (attempt %d, waited %lums)\n",
+		   e->idPartial, e->nackCount, (unsigned long)elapsed);
+#endif
+    }
+    ++i;
+  }
+}
+
+
 
 /*
  * SendScaleSetting.
@@ -2161,11 +2329,15 @@ HandleRFBServerMessage(rfbClient* client)
 	      msg.mfu.idPartialUpd = rfbClientSwap32IfLE(msg.mfu.idPartialUpd);
 	      msg.mfu.nRects = rfbClientSwap16IfLE(msg.mfu.nRects);	      
 	      
+	      /* this partial arrived (in-order, or a repair of an earlier hole),
+		 so it is no longer outstanding */
+	      multicastMissingRemove(client, msg.mfu.idPartialUpd);
+
 	      /* calculate lost partial updates from sequence numbers */
 	      client->multicastPktsRcvd++;
 	      if(client->multicastLastWholeUpd >= 0) /* only check on the second and later runs */
 		{
-		  /* it can happen that we get a mis-ordered partial update 
+		  /* it can happen that we get a mis-ordered partial update
 		     with a sequence number near to overflow, consider a succession of
 		     (1021, 0, 1022, 1) in a [0...1023] example seq.no. range */
 		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 0x0FFF0000)
@@ -2173,13 +2345,29 @@ HandleRFBServerMessage(rfbClient* client)
 
 		  /* partial update missing */
 		  if(msg.mfu.idPartialUpd - client->multicastLastPartialUpd > 1) {
+		    uint32_t m;
 		    client->multicastPktsLost += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
 		    client->multicastPktsNACKed += msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1);
 
-		    /* tell server about missing partial updates */
-		    SendMulticastFramebufferUpdateNACK(client, 
+		    /* tell server about missing partial updates ... */
+		    SendMulticastFramebufferUpdateNACK(client,
 						       client->multicastLastPartialUpd+1,
 						       msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1));
+
+		    /* ... and track each one so it can be re-NACKed if the repair
+		       is itself lost (bounded by the outstanding-set cap) */
+		    for(m = client->multicastLastPartialUpd+1;
+			m < (uint32_t)msg.mfu.idPartialUpd
+			  && client->multicastMissingCount < MULTICAST_NACK_MISSING_MAX;
+			++m)
+		      multicastMissingAdd(client, m);
+#if defined(MULTICAST_DEBUG) || defined(MULTICAST_REPAIR_DEBUG)
+		    rfbClientLog("MulticastVNC REPAIR: gap of %u partial(s) [%u..%u] NACKed and tracked, %lu now outstanding\n",
+				 (uint32_t)(msg.mfu.idPartialUpd-(client->multicastLastPartialUpd+1)),
+				 (uint32_t)(client->multicastLastPartialUpd+1),
+				 (uint32_t)(msg.mfu.idPartialUpd-1),
+				 (unsigned long)client->multicastMissingCount);
+#endif
 		  }
 
 		  /* if a partial update arrives out of order (with a lower sequence number than the 
