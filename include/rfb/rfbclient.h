@@ -535,6 +535,11 @@ typedef struct _rfbClient {
         size_t  multicastPktsNACKed;   /* counts NACKed multicast packets */
         size_t  multicastPktsLost;     /* counts lost multicast packets */
         rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
+        void   *multicastMissing;      /* outstanding missing partial updates awaiting (re-)NACK */
+        size_t  multicastMissingCount; /* live gauge: partials currently missing and still being re-NACKed;
+                                          a viewer may read this directly, e.g. as repair-backlog depth */
+        size_t  multicastMissingCapacity;
+        unsigned multicastRepairSrtt;   /* smoothed NACK->repair round-trip time in ms (0 = no sample yet); the re-NACK retry timeout is derived from it */
 } rfbClient;
 
 /* cursor.c */
@@ -604,6 +609,7 @@ extern rfbBool SendFramebufferUpdateRequest(rfbClient* client,
 					 rfbBool incremental);
 extern rfbBool SendMulticastFramebufferUpdateRequest(rfbClient* client, rfbBool incremental);
 extern rfbBool SendMulticastFramebufferUpdateNACK(rfbClient* client, uint32_t idPartialUpd, uint16_t nPartialUpds);
+extern void HandleMulticastNACKRetries(rfbClient* client);
 extern rfbBool SendScaleSetting(rfbClient* client,int scaleSetting);
 /**
  * Sends a pointer event to the server. A pointer event includes a cursor

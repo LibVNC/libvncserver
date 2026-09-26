@@ -404,6 +404,10 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->multicastRcvBufSize = 5242880;
   client->multicastLastWholeUpd = -1;
   client->multicastLastPartialUpd = -1;
+  client->multicastMissing = NULL;
+  client->multicastMissingCount = 0;
+  client->multicastMissingCapacity = 0;
+  client->multicastRepairSrtt = 0;
 
   client->clientAuthSchemes = NULL;
 
@@ -600,6 +604,7 @@ void rfbClientCleanup(rfbClient* client) {
   if (client->multicastSock != RFB_INVALID_SOCKET)
     close(client->multicastSock);
   ghpringbuf_destroy(client->multicastPacketBuf);
+  free(client->multicastMissing);
 
   free(client->desktopName);
   free(client->serverHost);
@@ -640,6 +645,8 @@ rfbBool rfbProcessServerMessage(rfbClient* client, int usec_timeout)
 	client->multicastRequestTimestamp = now;
 	SendMulticastFramebufferUpdateRequest(client, TRUE);
       }
+      /* re-NACK any still-missing partials whose backoff timer has expired */
+      HandleMulticastNACKRetries(client);
   }
   
   r = WaitForMessage(client, usec_timeout); 
