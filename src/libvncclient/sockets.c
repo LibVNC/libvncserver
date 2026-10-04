@@ -1102,7 +1102,12 @@ rfbSocket CreateMulticastSocket(struct sockaddr_storage multicastSockAddr, int s
 	       dfltrcvbuf, so_recvbuf, optval);
 
 
-  if(bind(sock, (struct sockaddr*)&localAddr, sizeof(localAddr)) < 0)
+  /* bind() needs the address length of the actual family, not the full
+     sockaddr_storage: lenient stacks accept the oversize, but strict ones
+     (BSD/macOS) reject it with EINVAL ("Invalid argument") */
+  if(bind(sock, (struct sockaddr*)&localAddr,
+	  localAddr.ss_family == AF_INET ? sizeof(struct sockaddr_in)
+	                                 : sizeof(struct sockaddr_in6)) < 0)
     {
 #ifdef WIN32
       errno=WSAGetLastError();
