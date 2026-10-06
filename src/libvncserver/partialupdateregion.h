@@ -34,7 +34,6 @@ typedef struct _partialUpdRegion {
   uint16_t idWhole;
   uint32_t idPartial;
   sraRegionPtr region;
-  rfbBool pending;             /* fresh, not-yet-repaired loss awaiting rate accounting */
   rfbBool repairPending;       /* a repair (re)transmission is due for this partial */
   rfbBool nackedEver;          /* NACKed at least once (lets the server ignore re-NACKs for rate) */
   uint32_t sendrate;

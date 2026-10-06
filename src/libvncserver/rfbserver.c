@@ -3017,19 +3017,17 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	      continue;
 	    ((partialUpdRegion*)ghpringbuf_at(buf, i))->nackedEver = TRUE;
 
-	    /* register this fresh, not-yet-repaired loss for rate accounting */
-	    ((partialUpdRegion*)ghpringbuf_at(buf, i))->pending = TRUE;
-
-
 	    /* this NACK CANNOT be part of a 'tightly packed' burst of sufficient size,
 	       so take a look back to see if it's maybe part of a 'sparse' burst that
-	       occured within a 'lookback'-sized window */
+	       occured within a 'lookback'-sized window. A neighbour counts if it was
+	       NACKed at all (nackedEver) and still sits in the buffer, so the window
+	       spans a fixed number of buffer positions regardless of the send rate. */
 	    if(msg.mfun.nPartialUpds < MULTICAST_MAXSENDRATE_NACKS_REQUIRED) {
 	      uint32_t lookback = 2 * MULTICAST_MAXSENDRATE_NACKS_REQUIRED;
 	      while(lookback) {
 		  partialUpdRegion* p = ((partialUpdRegion*)ghpringbuf_at(buf, i - lookback));
 		if(p
-		   && p->pending
+		   && p->nackedEver
 		   && !p->sendrate_decreased
 		   && cl->screen->multicastMaxSendRate >= p->sendrate)
 		  ++significantNACKsInPast;
@@ -4457,9 +4455,6 @@ rfbSendMulticastRepairUpdate(rfbClientPtr cl)
 #endif
 	LOCK(cl->screen->multicastSharedMutex);
 	pur->repairPending = FALSE;
-	/* the fresh-loss rate-accounting window for this partial closes once its
-	   repair has been sent (a later re-NACK is repair-only, see above) */
-	pur->pending = FALSE;
 	UNLOCK(cl->screen->multicastSharedMutex);
       }
     }
@@ -4490,7 +4485,6 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
     tmp.idWhole = idWholeUpd;
     tmp.idPartial = idPartialUpd;
     tmp.region = sraRgnCreate();
-    tmp.pending = FALSE;
     tmp.repairPending = FALSE;
     tmp.nackedEver = FALSE;
     tmp.sendrate = cl->screen->multicastMaxSendRate;
