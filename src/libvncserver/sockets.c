@@ -97,6 +97,7 @@ int deny_severity=LOG_WARNING;
 #endif
 
 #include "sockets.h"
+#include "private.h"
 
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */
@@ -334,6 +335,31 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
 	rfbLogPerror("Could not terminate Windows Sockets\n");
     }
 #endif
+}
+
+/*
+ * Return whether the given socket is still in TCP LISTEN state.
+ *
+ * When an interface goes down, an OS can drop a listener bound to its address
+ * out of LISTEN state while keeping the fd valid: select() on such a dead
+ * socket reports readable forever while accept() always fails, so callers
+ * must not poll it. A closed fd also reports FALSE.
+ */
+rfbBool
+rfbListenSocketIsListening(rfbSocket sock)
+{
+    int val = 0;
+    int optlen = sizeof(val);
+
+    if (sock == RFB_INVALID_SOCKET)
+        return FALSE;
+#ifdef WIN32
+    if (getsockopt(sock, SOL_SOCKET, SO_ACCEPTCONN, (char *)&val, &optlen) != 0)
+#else
+    if (getsockopt(sock, SOL_SOCKET, SO_ACCEPTCONN, &val, (socklen_t *)&optlen) != 0)
+#endif
+        return FALSE;
+    return val != 0;
 }
 
 /*
