@@ -664,6 +664,10 @@ rfbClientConnectionGone(rfbClientPtr cl)
 
     rfbFreeUltraData(cl);
 
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+    rfbClientH264ReleaseEncoder(cl);
+#endif
+
     /* free buffers holding pixel data before and after encoding */
     free(cl->beforeEncBuf);
     free(cl->afterEncBuf);
@@ -2429,6 +2433,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
             case rfbEncodingRRE:
             case rfbEncodingCoRRE:
             case rfbEncodingHextile:
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+            case rfbEncodingH264:
+#endif
             case rfbEncodingUltra:
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	    case rfbEncodingZlib:
@@ -2719,6 +2726,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
        if (!msg.fur.incremental) {
 	    sraRgnOr(cl->modifiedRegion,tmpRegion);
 	    sraRgnSubtract(cl->copyRegion,tmpRegion);
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+            cl->h264ForceKeyframe = TRUE;
+#endif
             if (cl->useExtDesktopSize)
                 cl->newFBSizePending = TRUE;
        }
@@ -3400,6 +3410,14 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
      cl->copyDY = 0;
    
      UNLOCK(cl->updateMutex);
+
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+    if (cl->preferredEncoding == rfbEncodingH264) {
+        sraRgnDestroy(updateRegion);
+        updateRegion = sraRgnCreateRect(0, 0, cl->scaledScreen->width, cl->scaledScreen->height);
+        sraRgnMakeEmpty(updateCopyRegion);
+    }
+#endif
    
     if (!cl->enableCursorShapeUpdates) {
       if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) {
@@ -3614,6 +3632,12 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
             if (!rfbSendRectEncodingUltra(cl, x, y, w, h))
                 goto updateFailed;
             break;
+#ifdef LIBVNCSERVER_HAVE_LIBAVCODEC
+        case rfbEncodingH264:
+            if (!rfbSendRectEncodingH264(cl, x, y, w, h))
+                goto updateFailed;
+            break;
+#endif
 #ifdef LIBVNCSERVER_HAVE_LIBZ
 	case rfbEncodingZlib:
 	    if (!rfbSendRectEncodingZlib(cl, x, y, w, h))
@@ -3643,6 +3667,8 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         sraRgnReleaseIterator(i);
         i = NULL;
     }
+
+rectanglesDone:
 
     if ( nUpdateRegionRects == 0xFFFF &&
 	 !rfbSendLastRectMarker(cl) )
@@ -4247,5 +4273,3 @@ rfbProcessUDPInput(rfbScreenInfoPtr rfbScreen)
 	rfbDisconnectUDPSock(rfbScreen);
     }
 }
-
-
