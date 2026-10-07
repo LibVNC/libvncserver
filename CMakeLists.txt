@@ -389,6 +389,10 @@ set(LIBVNCCLIENT_SOURCES
     ${CRYPTO_SOURCES}
 )
 
+if(UNIX)
+  set_source_files_properties(${COMMON_DIR}/turbojpeg.c PROPERTIES COMPILE_OPTIONS "-fvisibility=hidden")
+endif()
+
 if(JPEG_FOUND)
   set(LIBVNCCLIENT_SOURCES
     ${LIBVNCCLIENT_SOURCES}
