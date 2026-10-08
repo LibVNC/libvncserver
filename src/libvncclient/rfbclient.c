@@ -864,7 +864,7 @@ HandleARDAuth(rfbClient *client)
   /* Step 4: Perform an MD5 hash of the shared secret.
      This 128-bit (16-byte) value will be used as the AES key. */
   shared = malloc(MD5_HASH_SIZE);
-  if(!hash_md5(shared, key, keylen)) {
+  if(!libvnc_hash_md5(shared, key, keylen)) {
       rfbClientErr("HandleARDAuth: hashing shared key failed\n");
       goto out;
   }
