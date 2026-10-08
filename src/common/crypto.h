@@ -5,6 +5,7 @@
 #include "rfb/rfbconfig.h"
 
 #define SHA1_HASH_SIZE 20
+#define SHA512_HASH_SIZE 64
 #define MD5_HASH_SIZE 16
 
 /* Generates an MD5 hash of 'in' and writes it to 'out', which must be 16 bytes in size. */
@@ -14,6 +15,9 @@ int hash_md5(void *out, const void *in, const size_t in_len);
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 int hash_sha1(void *out, const void *in, const size_t in_len);
 #endif
+
+/* Generates an SHA512 hash of 'in' and writes it to 'out', which must be 64 bytes in size. */
+int hash_sha512(void *out, const void *in, const size_t in_len);
 
 /* Fill 'out' with 'len' random bytes. */
 void random_bytes(void *out, size_t len);
@@ -32,6 +36,15 @@ int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
 
 /* Encrypts 'in' with the the 16-byte key in 'key' using AES-128-ECB and writes the result to 'out'. */
 int encrypt_aes128ecb(void *out, int *out_len, const unsigned char key[16], const void *in, const size_t in_len);
+
+/* Derives key material with PBKDF2-HMAC-SHA512. */
+int pbkdf2_hmac_sha512(const uint8_t *password, size_t password_len, const uint8_t *salt, size_t salt_len, uint32_t rounds, uint8_t *out, size_t out_len);
+
+/*
+  Imports an RSA public key from SubjectPublicKeyInfo DER and encrypts 'in'
+  with PKCS#1 v1.5 padding, writing the ciphertext to 'out'.
+ */
+int encrypt_rsa_pkcs1_spki_der(uint8_t *out, size_t *out_len, const uint8_t *der, size_t der_len, const void *in, size_t in_len);
 
 /*
    Generates a Diffie-Hellman public-private keypair using the generator value 'gen' and prime modulo

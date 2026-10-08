@@ -48,6 +48,14 @@ int hash_sha1(void *out, const void *in, const size_t in_len)
 }
 #endif /* LIBVNCSERVER_WITH_WEBSOCKETS */
 
+int hash_sha512(void *out, const void *in, const size_t in_len)
+{
+    (void)out;
+    (void)in;
+    (void)in_len;
+    return 0;
+}
+
 void random_bytes(void *out, size_t len)
 {
 
@@ -81,6 +89,29 @@ int decrypt_rfbdes(void *out, int *out_len, const unsigned char key[8], const vo
 
 int encrypt_aes128ecb(void *out, int *out_len, const unsigned char key[16], const void *in, const size_t in_len)
 {
+    return 0;
+}
+
+int pbkdf2_hmac_sha512(const uint8_t *password, size_t password_len, const uint8_t *salt, size_t salt_len, uint32_t rounds, uint8_t *out, size_t out_len)
+{
+    (void)password;
+    (void)password_len;
+    (void)salt;
+    (void)salt_len;
+    (void)rounds;
+    (void)out;
+    (void)out_len;
+    return 0;
+}
+
+int encrypt_rsa_pkcs1_spki_der(uint8_t *out, size_t *out_len, const uint8_t *der, size_t der_len, const void *in, size_t in_len)
+{
+    (void)out;
+    (void)out_len;
+    (void)der;
+    (void)der_len;
+    (void)in;
+    (void)in_len;
     return 0;
 }
 
