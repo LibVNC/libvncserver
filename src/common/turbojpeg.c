@@ -429,13 +429,13 @@ static void fromRGB(unsigned char *src, unsigned char *dst, int width,
 
 /* General API functions */
 
-DLLEXPORT char* DLLCALL tjGetErrorStr(void)
+DLLEXPORT char* DLLCALL rdr_tjGetErrorStr(void)
 {
 	return errStr;
 }
 
 
-DLLEXPORT int DLLCALL tjDestroy(tjhandle handle)
+DLLEXPORT int DLLCALL rdr_tjDestroy(tjhandle handle)
 {
 	getinstance(handle);
 	if(setjmp(this->jerr.setjmp_buffer)) return -1;
@@ -482,7 +482,7 @@ static tjhandle _tjInitCompress(tjinstance *this)
 	return (tjhandle)this;
 }
 
-DLLEXPORT tjhandle DLLCALL tjInitCompress(void)
+DLLEXPORT tjhandle DLLCALL rdr_tjInitCompress(void)
 {
 	tjinstance *this=NULL;
 	if((this=(tjinstance *)malloc(sizeof(tjinstance)))==NULL)
@@ -496,7 +496,7 @@ DLLEXPORT tjhandle DLLCALL tjInitCompress(void)
 }
 
 
-DLLEXPORT unsigned long DLLCALL tjBufSize(int width, int height,
+DLLEXPORT unsigned long DLLCALL rdr_tjBufSize(int width, int height,
 	int jpegSubsamp)
 {
 	unsigned long retval=0;  int mcuw, mcuh, chromasf;
@@ -518,7 +518,7 @@ DLLEXPORT unsigned long DLLCALL tjBufSize(int width, int height,
 }
 
 
-DLLEXPORT unsigned long DLLCALL TJBUFSIZE(int width, int height)
+DLLEXPORT unsigned long DLLCALL rdr_TJBUFSIZE(int width, int height)
 {
 	unsigned long retval=0;
 	if(width<1 || height<1)
@@ -536,7 +536,7 @@ DLLEXPORT unsigned long DLLCALL TJBUFSIZE(int width, int height)
 }
 
 
-DLLEXPORT int DLLCALL tjCompress2(tjhandle handle, unsigned char *srcBuf,
+DLLEXPORT int DLLCALL rdr_tjCompress2(tjhandle handle, unsigned char *srcBuf,
 	int width, int pitch, int height, int pixelFormat, unsigned char **jpegBuf,
 	unsigned long *jpegSize, int jpegSubsamp, int jpegQual, int flags)
 {
@@ -612,7 +612,7 @@ DLLEXPORT int DLLCALL tjCompress2(tjhandle handle, unsigned char *srcBuf,
 	return retval;
 }
 
-DLLEXPORT int DLLCALL tjCompress(tjhandle handle, unsigned char *srcBuf,
+DLLEXPORT int DLLCALL rdr_tjCompress(tjhandle handle, unsigned char *srcBuf,
 	int width, int pitch, int height, int pixelSize, unsigned char *jpegBuf,
 	unsigned long *jpegSize, int jpegSubsamp, int jpegQual, int flags)
 {
@@ -669,7 +669,7 @@ static tjhandle _tjInitDecompress(tjinstance *this)
 	return (tjhandle)this;
 }
 
-DLLEXPORT tjhandle DLLCALL tjInitDecompress(void)
+DLLEXPORT tjhandle DLLCALL rdr_tjInitDecompress(void)
 {
 	tjinstance *this;
 	if((this=(tjinstance *)malloc(sizeof(tjinstance)))==NULL)
@@ -683,7 +683,7 @@ DLLEXPORT tjhandle DLLCALL tjInitDecompress(void)
 }
 
 
-DLLEXPORT int DLLCALL tjDecompressHeader2(tjhandle handle,
+DLLEXPORT int DLLCALL rdr_tjDecompressHeader2(tjhandle handle,
 	unsigned char *jpegBuf, unsigned long jpegSize, int *width, int *height,
 	int *jpegSubsamp)
 {
@@ -722,16 +722,16 @@ DLLEXPORT int DLLCALL tjDecompressHeader2(tjhandle handle,
 	return retval;
 }
 
-DLLEXPORT int DLLCALL tjDecompressHeader(tjhandle handle,
+DLLEXPORT int DLLCALL rdr_tjDecompressHeader(tjhandle handle,
 	unsigned char *jpegBuf, unsigned long jpegSize, int *width, int *height)
 {
 	int jpegSubsamp;
-	return tjDecompressHeader2(handle, jpegBuf, jpegSize, width, height,
+	return rdr_tjDecompressHeader2(handle, jpegBuf, jpegSize, width, height,
 		&jpegSubsamp);
 }
 
 
-DLLEXPORT tjscalingfactor* DLLCALL tjGetScalingFactors(int *numscalingfactors)
+DLLEXPORT tjscalingfactor* DLLCALL rdr_tjGetScalingFactors(int *numscalingfactors)
 {
 	if(numscalingfactors==NULL)
 	{
@@ -745,7 +745,7 @@ DLLEXPORT tjscalingfactor* DLLCALL tjGetScalingFactors(int *numscalingfactors)
 }
 
 
-DLLEXPORT int DLLCALL tjDecompress2(tjhandle handle, unsigned char *jpegBuf,
+DLLEXPORT int DLLCALL rdr_tjDecompress2(tjhandle handle, unsigned char *jpegBuf,
 	unsigned long jpegSize, unsigned char *dstBuf, int width, int pitch,
 	int height, int pixelFormat, int flags)
 {
@@ -849,10 +849,10 @@ DLLEXPORT int DLLCALL tjDecompress2(tjhandle handle, unsigned char *jpegBuf,
 	return retval;
 }
 
-DLLEXPORT int DLLCALL tjDecompress(tjhandle handle, unsigned char *jpegBuf,
+DLLEXPORT int DLLCALL rdr_tjDecompress(tjhandle handle, unsigned char *jpegBuf,
 	unsigned long jpegSize, unsigned char *dstBuf, int width, int pitch,
 	int height, int pixelSize, int flags)
 {
-	return tjDecompress2(handle, jpegBuf, jpegSize, dstBuf, width, pitch,
+	return rdr_tjDecompress2(handle, jpegBuf, jpegSize, dstBuf, width, pitch,
 		height, getPixelFormat(pixelSize, flags), flags);
 }

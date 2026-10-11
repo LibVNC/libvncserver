@@ -41,7 +41,7 @@
 	(void)retval; /* silence warning */				\
 	retval=-1; goto bailout;}
 #define _throwunix(m) _throw(m, strerror(errno))
-#define _throwtj(m) _throw(m, tjGetErrorStr())
+#define _throwtj(m) _throw(m, rdr_tjGetErrorStr())
 #define _throwbmp(m) _throw(m, bmpgeterr())
 
 int flags=0, decomponly=0, quiet=0, dotile=0, pf=TJPF_BGR;
@@ -97,8 +97,8 @@ int decomptest(unsigned char *srcbuf, unsigned char **jpegbuf,
 		qualstr[5]=0;
 	}
 
-	if((handle=tjInitDecompress())==NULL)
-		_throwtj("executing tjInitDecompress()");
+	if((handle=rdr_tjInitDecompress())==NULL)
+		_throwtj("executing rdr_tjInitDecompress()");
 
 	bufsize=pitch*scaledh;
 	if(dstbuf==NULL)
@@ -112,9 +112,9 @@ int decomptest(unsigned char *srcbuf, unsigned char **jpegbuf,
 	memset(dstbuf, 127, bufsize);
 
 	/* Execute once to preload cache */
-	if(tjDecompress2(handle, jpegbuf[0], jpegsize[0], dstbuf, scaledw,
+	if(rdr_rdr_tjDecompress2(handle, jpegbuf[0], jpegsize[0], dstbuf, scaledw,
 		pitch, scaledh, pf, flags)==-1)
-		_throwtj("executing tjDecompress2()");
+		_throwtj("executing rdr_rdr_tjDecompress2()");
 
 	/* Benchmark */
 	for(i=0, start=gettime(); (elapsed=gettime()-start)<benchtime; i++)
@@ -126,14 +126,14 @@ int decomptest(unsigned char *srcbuf, unsigned char **jpegbuf,
 			{
 				int width=dotile? min(tilew, w-col*tilew):scaledw;
 				int height=dotile? min(tileh, h-row*tileh):scaledh;
-				if(tjDecompress2(handle, jpegbuf[tile], jpegsize[tile], dstptr2, width,
+				if(rdr_rdr_tjDecompress2(handle, jpegbuf[tile], jpegsize[tile], dstptr2, width,
 					pitch, height, pf, flags)==-1)
-					_throwtj("executing tjDecompress2()");
+					_throwtj("executing rdr_rdr_tjDecompress2()");
 			}
 		}
 	}
 
-	if(tjDestroy(handle)==-1) _throwtj("executing tjDestroy()");
+	if(rdr_tjDestroy(handle)==-1) _throwtj("executing rdr_tjDestroy()");
 	handle=NULL;
 
 	if(quiet)
@@ -200,7 +200,7 @@ int decomptest(unsigned char *srcbuf, unsigned char **jpegbuf,
 
 	bailout:
 	if(file) {fclose(file);  file=NULL;}
-	if(handle) {tjDestroy(handle);  handle=NULL;}
+	if(handle) {rdr_tjDestroy(handle);  handle=NULL;}
 	if(dstbuf && dstbufalloc) {free(dstbuf);  dstbuf=NULL;}
 	return retval;
 }
@@ -242,7 +242,7 @@ void dotest(unsigned char *srcbuf, int w, int h, int subsamp, int jpegqual,
 
 		for(i=0; i<ntilesw*ntilesh; i++)
 		{
-			if((jpegbuf[i]=(unsigned char *)malloc(tjBufSize(tilew, tileh,
+			if((jpegbuf[i]=(unsigned char *)malloc(rdr_tjBufSize(tilew, tileh,
 				subsamp)))==NULL)
 				_throwunix("allocating JPEG tiles");
 		}
@@ -253,13 +253,13 @@ void dotest(unsigned char *srcbuf, int w, int h, int subsamp, int jpegqual,
 				(flags&TJFLAG_BOTTOMUP)? "BU":"TD", subNameLong[subsamp], jpegqual);
 		for(i=0; i<h; i++)
 			memcpy(&tmpbuf[pitch*i], &srcbuf[w*ps*i], w*ps);
-		if((handle=tjInitCompress())==NULL)
-			_throwtj("executing tjInitCompress()");
+		if((handle=rdr_tjInitCompress())==NULL)
+			_throwtj("executing rdr_tjInitCompress()");
 
 		/* Execute once to preload cache */
-		if(tjCompress2(handle, srcbuf, tilew, pitch, tileh, pf, &jpegbuf[0],
+		if(rdr_rdr_tjCompress2(handle, srcbuf, tilew, pitch, tileh, pf, &jpegbuf[0],
 			&jpegsize[0], subsamp, jpegqual, flags)==-1)
-			_throwtj("executing tjCompress2()");
+			_throwtj("executing rdr_rdr_tjCompress2()");
 
 		/* Benchmark */
 		for(i=0, start=gettime(); (elapsed=gettime()-start)<benchtime; i++)
@@ -273,15 +273,15 @@ void dotest(unsigned char *srcbuf, int w, int h, int subsamp, int jpegqual,
 				{
 					int width=min(tilew, w-col*tilew);
 					int height=min(tileh, h-row*tileh);
-					if(tjCompress2(handle, srcptr2, width, pitch, height, pf,
+					if(rdr_rdr_tjCompress2(handle, srcptr2, width, pitch, height, pf,
 						&jpegbuf[tile], &jpegsize[tile], subsamp, jpegqual, flags)==-1)
-						_throwtj("executing tjCompress()2");
+						_throwtj("executing rdr_tjCompress()2");
 					totaljpegsize+=jpegsize[tile];
 				}
 			}
 		}
 
-		if(tjDestroy(handle)==-1) _throwtj("executing tjDestroy()");
+		if(rdr_tjDestroy(handle)==-1) _throwtj("executing rdr_tjDestroy()");
 		handle=NULL;
 
 		if(quiet==1) printf("%-4d  %-4d\t", tilew, tileh);
@@ -345,7 +345,7 @@ void dotest(unsigned char *srcbuf, int w, int h, int subsamp, int jpegqual,
 	}
 	if(jpegsize) {free(jpegsize);  jpegsize=NULL;}
 	if(tmpbuf) {free(tmpbuf);  tmpbuf=NULL;}
-	if(handle) {tjDestroy(handle);  handle=NULL;}
+	if(handle) {rdr_tjDestroy(handle);  handle=NULL;}
 	return;
 }
 
@@ -375,10 +375,10 @@ void dodecomptest(char *filename)
 	temp=strrchr(filename, '.');
 	if(temp!=NULL) *temp='\0';
 
-	if((handle=tjInitDecompress())==NULL)
-		_throwtj("executing tjInitDecompress()");
-	if(tjDecompressHeader2(handle, srcbuf, srcsize, &w, &h, &subsamp)==-1)
-		_throwtj("executing tjDecompressHeader2()");
+	if((handle=rdr_tjInitDecompress())==NULL)
+		_throwtj("executing rdr_tjInitDecompress()");
+	if(rdr_rdr_rdr_tjDecompressHeader2(handle, srcbuf, srcsize, &w, &h, &subsamp)==-1)
+		_throwtj("executing rdr_rdr_rdr_tjDecompressHeader2()");
 
 	if(quiet==1)
 	{
@@ -410,7 +410,7 @@ void dodecomptest(char *filename)
 
 		for(i=0; i<ntilesw*ntilesh; i++)
 		{
-			if((jpegbuf[i]=(unsigned char *)malloc(tjBufSize(tilew, tileh,
+			if((jpegbuf[i]=(unsigned char *)malloc(rdr_tjBufSize(tilew, tileh,
 				subsamp)))==NULL)
 				_throwunix("allocating JPEG tiles");
 		}
@@ -465,7 +465,7 @@ void dodecomptest(char *filename)
 	}
 	if(jpegsize) {free(jpegsize);  jpegsize=NULL;}
 	if(srcbuf) {free(srcbuf);  srcbuf=NULL;}
-	if(handle) {tjDestroy(handle);  handle=NULL;}
+	if(handle) {rdr_tjDestroy(handle);  handle=NULL;}
 	return;
 }
 
@@ -515,8 +515,8 @@ int main(int argc, char *argv[])
 	int minqual=-1, maxqual=-1;  char *temp;
 	int minarg=2;  int retval=0;
 
-	if((scalingfactors=tjGetScalingFactors(&nsf))==NULL || nsf==0)
-		_throwtj("executing tjGetScalingFactors()");
+	if((scalingfactors=rdr_tjGetScalingFactors(&nsf))==NULL || nsf==0)
+		_throwtj("executing rdr_tjGetScalingFactors()");
 
 	if(argc<minarg) usage(argv[0]);
 

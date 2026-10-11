@@ -637,8 +637,8 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
     return client->GotJpeg(client, compressedData, compressedLen, x, y, w, h);
   
   if (!client->tjhnd) {
-    if ((client->tjhnd = tjInitDecompress()) == NULL) {
-      rfbClientLog("TurboJPEG error: %s\n", tjGetErrorStr());
+    if ((client->tjhnd = rdr_tjInitDecompress()) == NULL) {
+      rfbClientLog("TurboJPEG error: %s\n", rdr_tjGetErrorStr());
       free(compressedData);
       return FALSE;
     }
@@ -659,9 +659,9 @@ DecompressJpegRectBPP(rfbClient* client, int x, int y, int w, int h)
   dst = &client->frameBuffer[y * pitch + x * pixelSize];
 #endif
 
-  if (tjDecompress(client->tjhnd, compressedData, (unsigned long)compressedLen,
+  if (rdr_tjDecompress(client->tjhnd, compressedData, (unsigned long)compressedLen,
                    dst, w, pitch, h, pixelSize, flags)==-1) {
-    rfbClientLog("TurboJPEG error: %s\n", tjGetErrorStr());
+    rfbClientLog("TurboJPEG error: %s\n", rdr_tjGetErrorStr());
     free(compressedData);
     return FALSE;
   }
