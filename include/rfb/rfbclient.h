@@ -185,6 +185,13 @@ struct _rfbClient;
  */
 typedef void (*HandleTextChatProc)(struct _rfbClient* client, int value, char *text);
 /**
+ * Handles legacy FileTransfer messages received by LibVNCClient.
+ *
+ * The buffer is valid only for the duration of the callback. Applications
+ * must copy it if they need to keep the data after the callback returns.
+ */
+typedef void (*HandleFileTransferProc)(struct _rfbClient* client, uint8_t contentType, uint8_t contentParam, uint32_t size, const char *data, uint32_t length);
+/**
  * Handles XVP server messages. If your application sends XVP messages to the
  * server, you'll want to handle the server's XVP_FAIL and XVP_INIT responses.
  * Define a function with this prototype and set client->HandleXvpMsg to a
@@ -363,6 +370,7 @@ typedef struct _rfbClient {
 
 	/* hooks */
 	HandleTextChatProc         HandleTextChat;
+	HandleFileTransferProc     HandleFileTransfer;
 	HandleKeyboardLedStateProc HandleKeyboardLedState;
 	HandleCursorPosProc HandleCursorPos;
 	SoftCursorLockAreaProc SoftCursorLockArea;
@@ -671,6 +679,13 @@ extern rfbBool HandleRFBServerMessage(rfbClient* client);
  * @return true if the text was sent successfully, false otherwise
  */
 extern rfbBool TextChatSend(rfbClient* client, char *text);
+/**
+ * Sends a legacy FileTransfer message to the server if supported.
+ *
+ * This helper only sends the raw message envelope and optional payload. Higher
+ * level file transfer workflows remain the caller's responsibility.
+ */
+extern rfbBool FileTransferSend(rfbClient* client, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, const char *data);
 /**
  * Opens a text chat window on the server.
  * @param client The client through which to send the message
