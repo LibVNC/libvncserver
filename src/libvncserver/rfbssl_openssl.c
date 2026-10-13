@@ -127,9 +127,17 @@ int rfbssl_pending(rfbClientPtr cl)
 
 void rfbssl_destroy(rfbClientPtr cl)
 {
-    struct rfbssl_ctx *ctx = (struct rfbssl_ctx *)cl->sslctx;
+    struct rfbssl_ctx *ctx;
+
+    if (!cl || !cl->sslctx)
+	return;
+
+    ctx = (struct rfbssl_ctx *)cl->sslctx;
+    cl->sslctx = NULL;
+
     if (ctx->ssl)
 	SSL_free(ctx->ssl);
     if (ctx->ssl_ctx)
 	SSL_CTX_free(ctx->ssl_ctx);
+    free(ctx);
 }
