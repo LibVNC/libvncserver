@@ -204,6 +204,12 @@ typedef struct _rfbExtensionData {
  * rfbProcessEvents for each of these.
  */
 
+typedef enum {
+    rfbWebSocketsHandshakeAuto = 0,
+    rfbWebSocketsHandshakeRfb,
+    rfbWebSocketsHandshakeWebSockets
+} rfbWebSocketsHandshakeMode;
+
 typedef struct _rfbScreenInfo
 {
     /** this structure has children that are scaled versions of this screen */
@@ -351,6 +357,8 @@ typedef struct _rfbScreenInfo
     rfbXvpHookPtr xvpHook;
     char *sslkeyfile;
     char *sslcertfile;
+    /** How WebSockets connections are detected on the RFB socket. */
+    rfbWebSocketsHandshakeMode webSocketsHandshakeMode;
     int ipv6port; /**< The port to listen on when using IPv6.  */
     char* listen6Interface;
     /* We have an additional IPv6 listen socket since there are systems that
