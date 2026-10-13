@@ -126,7 +126,7 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 		inflateResult = inflateInit( &client->decompStream );
 
 		if ( inflateResult != Z_OK ) {
-			rfbClientLog(
+			rfbClientLogEx(client,
 					"inflateInit returned error: %d, msg: %s\n",
 					inflateResult,
 					client->decompStream.msg);
@@ -164,11 +164,11 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 
 		/* We never supply a dictionary for compression. */
 		if ( inflateResult == Z_NEED_DICT ) {
-			rfbClientLog("zlib inflate needs a dictionary!\n");
+			rfbClientLogEx(client, "zlib inflate needs a dictionary!\n");
 			return FALSE;
 		}
 		if ( inflateResult < 0 ) {
-			rfbClientLog(
+			rfbClientLogEx(client,
 					"zlib inflate returned error: %d, msg: %s\n",
 					inflateResult,
 					client->decompStream.msg);
@@ -180,7 +180,7 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 		 */
 		if (( client->decompStream.avail_in > 0 ) &&
 				( client->decompStream.avail_out <= 0 )) {
-			rfbClientLog("zlib inflate ran out of space!\n");
+			rfbClientLogEx(client, "zlib inflate ran out of space!\n");
 			return FALSE;
 		}
 
@@ -201,7 +201,7 @@ HandleZRLE (rfbClient* client, int rx, int ry, int rw, int rh)
 				int result=HandleZRLETile(client,(uint8_t *)buf,remaining,rx+i,ry+j,subWidth,subHeight);
 
 				if(result<0) {
-					rfbClientLog("ZRLE decoding failed (%d)\n",result);
+					rfbClientLogEx(client, "ZRLE decoding failed (%d)\n",result);
 return TRUE;
 					return FALSE;
 				}
@@ -212,7 +212,7 @@ return TRUE;
 	}
 	else {
 
-		rfbClientLog(
+		rfbClientLogEx(client,
 				"zlib inflate returned error: %d, msg: %s\n",
 				inflateResult,
 				client->decompStream.msg);
@@ -270,7 +270,9 @@ static int HandleZRLETile(rfbClient* client,
 			int i,j;
 
 			if(1+w*h*REALBPP/8>buffer_length) {
-				rfbClientLog("expected %d bytes, got only %d (%dx%d)\n",1+w*h*REALBPP/8,buffer_length,w,h);
+				rfbClientLogEx(client, "expected %lu bytes, got only %lu (%dx%d)\n",
+					(unsigned long)(1 + w * h * REALBPP / 8),
+					(unsigned long)buffer_length, w, h);
 				return -3;
 			}
 
@@ -288,7 +290,7 @@ static int HandleZRLETile(rfbClient* client,
 
 			if(1+REALBPP/8>buffer_length)
 				return -4;
-				
+
 			client->GotFillRect(client, x, y, w, h, color);
 
 			buffer+=REALBPP/8;
@@ -355,7 +357,7 @@ static int HandleZRLETile(rfbClient* client,
 					}
 				}
 				if(length>0)
-					rfbClientLog("Warning: possible ZRLE corruption\n");
+					rfbClientLogEx(client, "Warning: possible ZRLE corruption\n");
 			}
 
 		}
@@ -407,12 +409,12 @@ static int HandleZRLETile(rfbClient* client,
 					}
 				}
 				if(length>0)
-					rfbClientLog("Warning: possible ZRLE corruption\n");
+					rfbClientLogEx(client, "Warning: possible ZRLE corruption\n");
 			}
 		}
 	}
 
-	return buffer-buffer_copy;	
+	return buffer-buffer_copy;
 }
 
 #undef CARDBPP
