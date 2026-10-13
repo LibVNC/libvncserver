@@ -506,6 +506,22 @@ typedef struct _rfbClient {
         rfbBool isUpdateRectManagedByLib;
 
         GetX509CertFingerprintMismatchDecisionProc GetX509CertFingerprintMismatchDecision;
+
+	/**
+	 * Optional local framebuffer viewport.
+	 *
+	 * When enabled before rfbClientInitialise(), update requests still use
+	 * framebuffer coordinates from the remote server, but the default framebuffer
+	 * allocation and default drawing callbacks store only this sub-rectangle
+	 * locally. Encodings that require pixels outside the requested viewport are
+	 * not requested by the default encoding negotiation while this mode is
+	 * enabled.
+	 */
+	rfbBool useFrameBufferViewport;
+	int frameBufferViewportX;
+	int frameBufferViewportY;
+	int frameBufferViewportW;
+	int frameBufferViewportH;
 } rfbClient;
 
 /* cursor.c */
@@ -528,6 +544,40 @@ extern rfbBool rfbEnableClientLogging;
 typedef void (*rfbClientLogProc)(const char *format, ...);
 extern rfbClientLogProc rfbClientLog,rfbClientErr;
 extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
+/**
+ * Enables the default LibVNCClient framebuffer viewport mode.
+ *
+ * The supplied rectangle is expressed in remote framebuffer coordinates. This
+ * must be called before rfbClientInitialise() or before any application-provided
+ * framebuffer allocation. Once client->frameBuffer is allocated, changing or
+ * clearing the viewport is rejected/ignored because the framebuffer stride and
+ * size have already been chosen.
+ *
+ * When active, the default framebuffer allocator will allocate storage only for
+ * this viewport, and the default drawing callbacks will clip incoming
+ * rectangles to it before writing into client->frameBuffer. The update
+ * rectangle is set to the same viewport.
+ *
+ * This mode is intentionally conservative: the default SetEncodings request is
+ * limited to encodings whose default callbacks can safely draw into the reduced
+ * local framebuffer. If an application overrides drawing callbacks such as
+ * GotBitmap, GotFillRect or GotCopyRect, that application is responsible for
+ * applying the same remote-to-local viewport mapping.
+ *
+ * Returns FALSE if the client is NULL, the rectangle is invalid, the viewport is
+ * outside the known remote framebuffer size, or client->frameBuffer has already
+ * been allocated.
+ */
+extern rfbBool rfbClientSetFrameBufferViewport(rfbClient *client, int x, int y, int w, int h);
+/**
+ * Disables the default LibVNCClient framebuffer viewport mode.
+ *
+ * This must also be called before rfbClientInitialise() or before any
+ * framebuffer allocation. If client->frameBuffer is already allocated, the
+ * function leaves the existing viewport enabled to avoid making the allocated
+ * framebuffer inconsistent with the requested update rectangle.
+ */
+extern void rfbClientClearFrameBufferViewport(rfbClient *client);
 extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
 extern void SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size);
 extern rfbBool InitialiseRFBConnection(rfbClient* client);
