@@ -714,7 +714,7 @@ void rfbShowCursor(rfbClientPtr cl)
  * region gets redrawn.
  */
 
-void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion)
+void rfbRedrawAfterHideCursor(rfbClientPtr cl, sraRegionPtr updateRegion, const sraRegionPtr requestedRegion)
 {
     rfbScreenInfoPtr s = cl->screen;
     rfbCursorPtr c = s->cursor;
@@ -731,7 +731,10 @@ void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion)
 	    sraRegionPtr rect;
 	    rect = sraRgnCreateRect(x,y,x2,y2);
 	    if(updateRegion) {
-	    	sraRgnOr(updateRegion,rect);
+		    if(requestedRegion)
+			sraRgnAnd(rect, requestedRegion);
+		    if(!sraRgnEmpty(rect))
+			sraRgnOr(updateRegion, rect);
 	    } else {
 		    LOCK(cl->updateMutex);
 		    sraRgnOr(cl->modifiedRegion,rect);
@@ -771,7 +774,7 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
     iterator=rfbGetClientIterator(rfbScreen);
     while((cl=rfbClientIteratorNext(iterator)))
 	if(!cl->enableCursorShapeUpdates)
-	  rfbRedrawAfterHideCursor(cl,NULL);
+	  rfbRedrawAfterHideCursor(cl, NULL, NULL);
     rfbReleaseClientIterator(iterator);
 
     if(rfbScreen->cursor->cleanup)
@@ -784,7 +787,7 @@ void rfbSetCursor(rfbScreenInfoPtr rfbScreen,rfbCursorPtr c)
   while((cl=rfbClientIteratorNext(iterator))) {
     cl->cursorWasChanged = TRUE;
     if(!cl->enableCursorShapeUpdates)
-      rfbRedrawAfterHideCursor(cl,NULL);
+      rfbRedrawAfterHideCursor(cl, NULL, NULL);
   }
   rfbReleaseClientIterator(iterator);
 
