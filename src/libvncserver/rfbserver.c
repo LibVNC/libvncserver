@@ -2389,6 +2389,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
         /* Reset all flags to defaults (allows us to switch between PointerPos and Server Drawn Cursors) */
         cl->preferredEncoding=-1;
+        cl->supportsH264Encoding     = FALSE;
         cl->useCopyRect              = FALSE;
         cl->useNewFBSize             = FALSE;
         cl->useExtDesktopSize        = FALSE;
@@ -2447,6 +2448,14 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 
                 break;
+	    case rfbEncodingOpenH264:
+		/* Only usable when the application supplies encoded frames */
+		if (cl->screen->getH264FrameHook == NULL)
+		    break;
+		cl->supportsH264Encoding = TRUE;
+		if (cl->preferredEncoding == -1)
+		    cl->preferredEncoding = enc;
+		break;
 	    case rfbEncodingXCursor:
 		if(!cl->screen->dontConvertRichCursorToXCursor) {
 		    rfbLog("Enabling X-style cursor updates for client %s\n",
@@ -3203,7 +3212,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     rfbBool sendSupportedEncodings = FALSE;
     rfbBool sendServerIdentity = FALSE;
     rfbBool result = TRUE;
-    
+    rfbBool streamingOpenH264 = FALSE;
+    char *h264Frame = NULL;
+    size_t h264FrameSize = 0;
+
 
     if(cl->screen->displayHook)
       cl->screen->displayHook(cl);
@@ -3305,6 +3317,14 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         cl->enableServerIdentity = FALSE;
     }
 
+    /*
+     * The Open H.264 encoding is stream-oriented: instead of encoding
+     * modified framebuffer regions, each update carries the next pre-encoded
+     * access unit obtained from the getH264FrameHook.
+     */
+    streamingOpenH264 = cl->preferredEncoding == rfbEncodingOpenH264 &&
+        cl->screen->getH264FrameHook != NULL;
+
     LOCK(cl->updateMutex);
 
     /*
@@ -3346,6 +3366,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     sraRgnOr(updateRegion,cl->copyRegion);
     if(!sraRgnAnd(updateRegion,cl->requestedRegion) &&
        sraRgnEmpty(updateRegion) &&
+       !streamingOpenH264 &&
        (cl->enableCursorShapeUpdates ||
 	(cl->cursorX == cl->screen->cursorX && cl->cursorY == cl->screen->cursorY)) &&
        !sendCursorShape && !sendCursorPos && !sendKeyboardLedState &&
@@ -3376,6 +3397,14 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     dy = cl->copyDY;
 
     /*
+     * CopyRect makes no sense within an H.264 stream: every access unit
+     * repaints the full rectangle anyway, so fold any scheduled copies into
+     * the ordinary update region.
+     */
+    if (streamingOpenH264)
+        sraRgnMakeEmpty(updateCopyRegion);
+
+    /*
      * Next we remove updateCopyRegion from updateRegion so that updateRegion
      * is the part of this update which is sent as ordinary pixel data (i.e not
      * a copy).
@@ -3390,17 +3419,60 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
      * carry over a copyRegion for a future update.
      */
 
-     sraRgnOr(cl->modifiedRegion,cl->copyRegion);
-     sraRgnSubtract(cl->modifiedRegion,updateRegion);
-     sraRgnSubtract(cl->modifiedRegion,updateCopyRegion);
+     if (streamingOpenH264) {
+         /*
+          * Any pixel damage is superseded by the next access unit, so drop
+          * the whole modified region rather than subtracting updateRegion,
+          * which is bounded by the client's requested region: a client whose
+          * requests never covered the full screen would otherwise leave
+          * residue that keeps the update loop spinning. The client also
+          * keeps its streaming subscription (requestedRegion): new access
+          * units are pushed via rfbNotifyH264FrameAvailable() without one
+          * framebuffer update request per frame.
+          */
+         sraRgnMakeEmpty(cl->modifiedRegion);
+     } else {
+         sraRgnOr(cl->modifiedRegion,cl->copyRegion);
+         sraRgnSubtract(cl->modifiedRegion,updateRegion);
+         sraRgnSubtract(cl->modifiedRegion,updateCopyRegion);
 
-     sraRgnMakeEmpty(cl->requestedRegion);
+         sraRgnMakeEmpty(cl->requestedRegion);
+     }
      sraRgnMakeEmpty(cl->copyRegion);
      cl->copyDX = 0;
      cl->copyDY = 0;
-   
+
      UNLOCK(cl->updateMutex);
-   
+
+    /*
+     * Fetch the access unit only after the wake-up mark has been consumed
+     * above: a rfbNotifyH264FrameAvailable() arriving from here on re-marks
+     * the modified region and triggers the next update, while one that
+     * arrived earlier already made its access unit visible to this fetch.
+     * The hook must not block. It is called per client, outside updateMutex.
+     */
+    if (streamingOpenH264) {
+        if (!cl->screen->getH264FrameHook(cl, &h264Frame, &h264FrameSize) ||
+            h264Frame == NULL || h264FrameSize == 0) {
+            free(h264Frame);
+            h264Frame = NULL;
+        }
+        if (h264Frame == NULL &&
+            (cl->enableCursorShapeUpdates ||
+             (cl->cursorX == cl->screen->cursorX &&
+              cl->cursorY == cl->screen->cursorY)) &&
+            !sendCursorShape && !sendCursorPos && !sendKeyboardLedState &&
+            !sendSupportedMessages && !sendSupportedEncodings &&
+            !sendServerIdentity) {
+            /* Nothing to send: the wake-up raced ahead of the frame source */
+            sraRgnDestroy(updateRegion);
+            sraRgnDestroy(updateCopyRegion);
+            if(cl->screen->displayFinishedHook)
+                cl->screen->displayFinishedHook(cl, TRUE);
+            return TRUE;
+        }
+    }
+
     if (!cl->enableCursorShapeUpdates) {
       if(cl->cursorX != cl->screen->cursorX || cl->cursorY != cl->screen->cursorY) {
 	rfbRedrawAfterHideCursor(cl,updateRegion);
@@ -3418,7 +3490,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
      */
     
     rfbStatRecordMessageSent(cl, rfbFramebufferUpdate, 0, 0);
-    if (cl->preferredEncoding == rfbEncodingCoRRE) {
+    if (streamingOpenH264) {
+        /* One full-frame rectangle per access unit, none if no new frame */
+        nUpdateRegionRects = h264Frame != NULL ? 1 : 0;
+    } else if (cl->preferredEncoding == rfbEncodingCoRRE) {
         nUpdateRegionRects = 0;
 
         for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
@@ -3582,6 +3657,11 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	        goto updateFailed;
     }
 
+    if (streamingOpenH264) {
+        if (h264Frame != NULL &&
+            !rfbSendRectEncodingOpenH264(cl, h264Frame, h264FrameSize))
+            goto updateFailed;
+    } else
     for(i = sraRgnGetIterator(updateRegion); sraRgnIteratorNext(i,&rect);){
         int x = rect.x1;
         int y = rect.y1;
@@ -3595,6 +3675,10 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
         switch (cl->preferredEncoding) {
 	case -1:
         case rfbEncodingRaw:
+        /* An Open H.264 client can only reach the generic loop if the
+         * application removed getH264FrameHook at runtime; degrade to Raw
+         * instead of sending a header whose rectangles never follow. */
+        case rfbEncodingOpenH264:
             if (!rfbSendRectEncodingRaw(cl, x, y, w, h))
 	        goto updateFailed;
             break;
@@ -3657,6 +3741,7 @@ updateFailed:
       rfbHideCursor(cl);
     }
 
+    free(h264Frame);
     if(i)
         sraRgnReleaseIterator(i);
     sraRgnDestroy(updateRegion);
@@ -3665,6 +3750,67 @@ updateFailed:
     if(cl->screen->displayFinishedHook)
       cl->screen->displayFinishedHook(cl, result);
     return result;
+}
+
+
+/*
+ * Send one full-frame rectangle in the Open H.264 encoding. The rectangle
+ * payload is a header of two big-endian uint32 values, the access unit
+ * length and the decoder reset flags, followed by one complete H.264 access
+ * unit. Access units routinely exceed UPDATE_BUF_SIZE, so the payload is
+ * written directly to the socket instead of going through updateBuf.
+ */
+
+rfbBool
+rfbSendRectEncodingOpenH264(rfbClientPtr cl,
+                            const char *frame,
+                            size_t frameSize)
+{
+    rfbFramebufferUpdateRectHeader rect;
+    char *packet;
+    size_t packetSize;
+    uint32_t value;
+
+    if (frame == NULL || frameSize == 0 || frameSize > UINT32_MAX ||
+        frameSize > SIZE_MAX - sz_rfbFramebufferUpdateRectHeader - 8)
+        return FALSE;
+
+    packetSize = sz_rfbFramebufferUpdateRectHeader + 8 + frameSize;
+    if (packetSize > INT_MAX)
+        return FALSE;
+
+    packet = (char *)malloc(packetSize);
+    if (packet == NULL)
+        return FALSE;
+
+    rect.r.x = 0;
+    rect.r.y = 0;
+    rect.r.w = Swap16IfLE(cl->screen->width);
+    rect.r.h = Swap16IfLE(cl->screen->height);
+    rect.encoding = Swap32IfLE(rfbEncodingOpenH264);
+    memcpy(packet, &rect, sz_rfbFramebufferUpdateRectHeader);
+
+    value = Swap32IfLE((uint32_t)frameSize);
+    memcpy(packet + sz_rfbFramebufferUpdateRectHeader, &value, sizeof(value));
+    value = 0;
+    memcpy(packet + sz_rfbFramebufferUpdateRectHeader + 4, &value,
+           sizeof(value));
+    memcpy(packet + sz_rfbFramebufferUpdateRectHeader + 8, frame, frameSize);
+
+    if (!rfbSendUpdateBuf(cl) ||
+        rfbWriteExact(cl, packet, (int)packetSize) < 0) {
+        free(packet);
+        return FALSE;
+    }
+    free(packet);
+
+    rfbStatRecordEncodingSent(cl, rfbEncodingOpenH264,
+                              (int)packetSize,
+                              sz_rfbFramebufferUpdateRectHeader +
+                              cl->screen->width *
+                              (cl->format.bitsPerPixel / 8) *
+                              cl->screen->height);
+    return TRUE;
 }
 
 
