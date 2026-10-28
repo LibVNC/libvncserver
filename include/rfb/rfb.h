@@ -879,7 +879,6 @@ extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
 extern rfbBool rfbSendFileTransferChunk(rfbClientPtr cl);
 extern rfbBool rfbSendDirContent(rfbClientPtr cl, int length, char *buffer);
 extern rfbBool rfbSendFileTransferMessage(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, const char *buffer);
-extern char *rfbProcessFileTransferReadBuffer(rfbClientPtr cl, uint32_t length);
 extern rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length);
 
 void rfbGotXCutText(rfbScreenInfoPtr rfbScreen, char *str, int len);
