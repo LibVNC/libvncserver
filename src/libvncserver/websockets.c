@@ -168,6 +168,8 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     char *sec_ws_origin = NULL;
     char *sec_ws_key = NULL;
     char sec_ws_version = 0;
+    const char *proto_binary;
+    const char *proto_base64;
     ws_ctx_t *wsctx = NULL;
 
     buf = (char *) malloc(WEBSOCKETS_MAX_HANDSHAKE_LEN);
@@ -289,13 +291,15 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         return FALSE;
     }
 
-    if ((protocol) && (strstr(protocol, "base64"))) {
+    proto_binary = protocol ? strstr(protocol, "binary") : NULL;
+    proto_base64 = protocol ? strstr(protocol, "base64") : NULL;
+    if ((protocol) && (proto_base64 && (!proto_binary || proto_base64 < proto_binary))) {
         rfbLog("  - webSocketsHandshake: using base64 encoding\n");
         base64 = TRUE;
         protocol = "base64";
     } else {
         rfbLog("  - webSocketsHandshake: using binary/raw encoding\n");
-        if ((protocol) && (strstr(protocol, "binary"))) {
+        if ((protocol) && (proto_binary)) {
             protocol = "binary";
         } else {
             protocol = "";
