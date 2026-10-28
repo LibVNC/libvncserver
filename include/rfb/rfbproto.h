@@ -340,6 +340,7 @@ typedef char rfbProtocolVersionMsg[13];	/* allow extra byte for null */
 #define rfbVncAuthOK 0
 #define rfbVncAuthFailed 1
 #define rfbVncAuthTooMany 2
+#define rfbVncAuthContinue 0xFFFFFFFF
 
 
 /*-----------------------------------------------------------------------------
