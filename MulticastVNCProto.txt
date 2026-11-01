@@ -202,10 +202,19 @@
  |4                   |U32                 |id-of-partial-update     | 
  |2                   |U16                 |id-of-whole-update	     |
  |2                   |U16                 |number-of-rectangles     |
- +--------------------+--------------------+-------------------------+ 
+ |4                   |U32                 |send-timestamp-ms        |
+ +--------------------+--------------------+-------------------------+
 
  where  'number-of-rectangles' is the number of rectangles per
  'MulticastFramebufferUpdate' message, not per whole update.
+
+ 'send-timestamp-ms' is the server's send time in milliseconds, taken from
+ a free-running clock and allowed to wrap. It lets a client measure the
+ one-way delay of each message (receive time minus send time) for
+ delay-based rate control. The two hosts' clocks need not be synchronised:
+ the (large, constant) offset between them cancels when the client uses only
+ the inflation of the one-way delay above its own running minimum, so what
+ remains is the queuing delay.
 
 
  2.3.3 MulticastFramebufferUpdateNACK

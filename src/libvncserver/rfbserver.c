@@ -4501,6 +4501,13 @@ rfbPutMulticastHeader(rfbClientPtr cl, uint16_t idWholeUpd, uint32_t idPartialUp
   mfu->idPartialUpd = Swap32IfLE(idPartialUpd);
   mfu->idWholeUpd = Swap16IfLE(idWholeUpd);
   mfu->nRects = Swap16IfLE(nRects);
+  {
+    /* stamp the send time (ms, wrapping) so the client can measure one-way delay
+       for delay-based rate control (see MulticastVNCProto.txt) */
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    mfu->sendTimestampMs = Swap32IfLE((uint32_t)(tv.tv_sec*1000 + tv.tv_usec/1000));
+  }
 
   cl->screen->mcublen = sz_rfbMulticastFramebufferUpdateMsg;
 

@@ -2335,6 +2335,42 @@ HandleRFBServerMessage(rfbClient* client)
 
 	      /* calculate lost partial updates from sequence numbers */
 	      client->multicastPktsRcvd++;
+
+	      /* MulticastVNC delay-based rate control signal: one-way delay of this
+		 packet = recv_ms - send_ms. The large, constant inter-host clock offset
+		 cancels via the running minimum (empty-queue baseline), so
+		 qd = owd - owd_min is the queuing delay. */
+	      {
+		struct timeval now;
+		uint32_t sendMs, recvMs;
+		int32_t owd;
+		gettimeofday(&now, NULL);
+		sendMs = rfbClientSwap32IfLE(msg.mfu.sendTimestampMs);
+		recvMs = (uint32_t)(now.tv_sec*1000 + now.tv_usec/1000);
+		owd = (int32_t)(recvMs - sendMs); /* offset+delay; int32 wrap-safe */
+		if(!client->multicastOwdHaveMin || owd < client->multicastOwdMinMs) {
+		  client->multicastOwdMinMs = owd;
+		  client->multicastOwdHaveMin = TRUE;
+		}
+		client->multicastQueuingDelayMs = owd - client->multicastOwdMinMs;
+#if defined(MULTICAST_DELAY_DEBUG)
+		{
+		  /* once per second: peak queuing delay (the knee signal) + buffer fill */
+		  static time_t dbgLastSec = 0;
+		  static int32_t dbgQdMax = 0;
+		  if(client->multicastQueuingDelayMs > dbgQdMax)
+		    dbgQdMax = client->multicastQueuingDelayMs;
+		  if(now.tv_sec != dbgLastSec) {
+		    rfbClientLog("MulticastVNC DELAY: qd_max %d ms (owd_min %d ms) | rcvbuf %d bytes / %lu pkts\n",
+				 dbgQdMax, client->multicastOwdMinMs, client->multicastRcvBufLen,
+				 (unsigned long)ghpringbuf_count((ghpringbuf*)client->multicastPacketBuf));
+		    dbgLastSec = now.tv_sec;
+		    dbgQdMax = 0;
+		  }
+		}
+#endif
+	      }
+
 	      if(client->multicastLastWholeUpd >= 0) /* only check on the second and later runs */
 		{
 		  /* it can happen that we get a mis-ordered partial update

@@ -534,6 +534,13 @@ typedef struct _rfbClient {
         size_t  multicastPktsRcvd;     /* counts received multicast packets */
         size_t  multicastPktsNACKed;   /* counts NACKed multicast packets */
         size_t  multicastPktsLost;     /* counts lost multicast packets */
+        /* MulticastVNC delay-based rate control: one-way-delay signal.
+           owd = recv_time - server_send_time (from the header's sendTimestampMs);
+           the constant inter-host clock offset cancels via the running minimum, so
+           qd = owd - owd_min is the queuing delay. */
+        rfbBool multicastOwdHaveMin;      /* owd_min baseline established yet */
+        int32_t multicastOwdMinMs;        /* running minimum one-way delay (empty-queue baseline) */
+        int32_t multicastQueuingDelayMs;  /* qd = owd - owd_min, the knee signal */
         rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
         void   *multicastMissing;      /* outstanding missing partial updates awaiting (re-)NACK */
         size_t  multicastMissingCount; /* live gauge: partials currently missing and still being re-NACKed;

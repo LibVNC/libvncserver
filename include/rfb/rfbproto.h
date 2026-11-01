@@ -622,10 +622,14 @@ typedef struct {
     uint32_t idPartialUpd;              /* id of this partial update */
     uint16_t idWholeUpd;                /* id of the update as a whole */
     uint16_t nRects;                    /* number of rectangles per message, not per whole update */
+    uint32_t sendTimestampMs;           /* server send time in ms, wrapping; lets the client measure
+                                           one-way delay for delay-based rate control (the constant
+                                           inter-host clock offset cancels via the client's running
+                                           minimum). */
     /* followed by nRects rectangles */
 } rfbMulticastFramebufferUpdateMsg;
 
-#define sz_rfbMulticastFramebufferUpdateMsg 12
+#define sz_rfbMulticastFramebufferUpdateMsg 16
 
 
 /*
