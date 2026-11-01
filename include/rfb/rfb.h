@@ -420,6 +420,9 @@ typedef struct _rfbScreenInfo
 						and multicastMaxSendRateIncrementInterval */
 #endif
     int multicastDeferUpdateTime;
+    int multicastDelayReportInterval; /* ms; interval the server asks clients to report their
+					 queuing delay at (advertised in the session info). 0 lets a
+					 client report as often as it receives updates. */
     /* multicast flow control stuff */
 #define MULTICAST_MAXSENDRATE_RATE_START 131072            /**< Initial maximum multicast send rate */
 #define MULTICAST_MAXSENDRATE_INCREMENT_START 8192         /**< Initial multicast send rate increment value: a gentle additive step (~1/16 of RATE_START) so the startup ramp doesn't overshoot the channel before the rate controller gets a loss signal */
@@ -799,6 +802,11 @@ typedef struct _rfbClientRec {
 					 same pixelformat and encoding */
     uint16_t* multicastWholeUpdId;    /**< shared by all clients with the same pixelformat and encoding */
     uint32_t* multicastPartialUpdId;  /**< shared by all clients with the same pixelformat and encoding */
+    /* delay-based rate control: last queuing delay this client reported, and when.
+       The timestamp is {0,0} until the first report; stale reports are aged out
+       where the value is consumed. */
+    int32_t multicastClientQueuingDelayMs;
+    struct timeval multicastClientQueuingDelayTimestamp;
     /* multicast NACK stuff */
 #define MULTICAST_PART_UPD_RGN_BUF_SIZE 52428800 /**< Server should keep a backlog of at max this many sent bytes */
     void* multicastPartUpdRgnBuf;      /**< a ringbuffer holding partial update <-> region mappings.

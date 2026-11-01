@@ -109,6 +109,10 @@
     * 'y-position' set to the UDP port to listen on
     * 'width' set to the multicast update interval in milliseconds,
       which must be bigger than zero
+    * 'height' set to the delay-report interval in milliseconds: the
+      interval at which the server asks clients to report their queuing
+      delay (see 2.3.4). Zero means the server does not throttle reporting,
+      so a client may report as often as it receives updates.
     * the pixel data set to an IPv4 address (or IPv6 address) in
       network byte order, 4 (or 16) bytes long.
 
@@ -245,6 +249,41 @@
  |2                   |U16                 |number-of-partial-upds   |
  |4                   |U32                 |id-of-partial-update     |
  +--------------------+--------------------+-------------------------+
+
+
+ 2.3.4 MulticastDelayReport
+
+ For delay-based rate control, a client periodically reports its current
+ multicast queuing delay to the server by sending a 'MulticastDelayReport'
+ client-to-server message (message type 243). The queuing delay is the
+ inflation of the one-way delay of received 'MulticastFramebufferUpdate'
+ messages (see 'send-timestamp-ms' in 2.3.2) above the client's own observed
+ minimum, in milliseconds and never negative. The report also carries the id
+ of the partial update the delay was measured on, so the server can relate it
+ to what it was sending at that time. If that partial update was a repair (not
+ newer than all previously received ones), the client sets the 'repair' flag:
+ the delay is still current, but it belongs to a retransmission of that
+ partial update, not to its original transmission. A client sends these reports
+ while it is subscribed to the multicast group; a non-member does not report.
+ The server indicates a delay-report interval in the session info; a client
+ SHOULD report at that interval, but never more often than the multicast update
+ interval, since it cannot produce a fresh value faster than it receives (it
+ uses the larger of the two). A server MUST tolerate any report rate (bursts,
+ gaps, or none), SHOULD age out stale reports, and MAY use them (e.g. the
+ largest across its clients) to pace the send rate, or ignore them.
+
+ +--------------------+--------------------+-------------------------+
+ |No. of bytes        |Type        [Value] |Description              |
+ +--------------------+--------------------+-------------------------+
+ |1                   |U8            243   |message-type             |
+ |1                   |U8                  |flags                    |
+ |2                   |U16                 |padding                  |
+ |4                   |S32                 |queuing-delay-ms         |
+ |4                   |U32                 |id-of-partial-update     |
+ +--------------------+--------------------+-------------------------+
+
+ 'flags' is a bit field: bit 0 (value 1) is the 'repair' flag. The other bits
+ are reserved; a client sets them to zero and a server ignores them.
 
 
 

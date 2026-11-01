@@ -1106,6 +1106,7 @@ rfbSendSupportedMessages(rfbClientPtr cl)
     rfbSetBit(msgs.client2server, rfbPalmVNCSetScaleFactor);
     rfbSetBit(msgs.client2server, rfbMulticastFramebufferUpdateRequest);
     rfbSetBit(msgs.client2server, rfbMulticastFramebufferUpdateNACK);
+    rfbSetBit(msgs.client2server, rfbMulticastDelayReport);
 
     rfbSetBit(msgs.server2client, rfbFramebufferUpdate);
     rfbSetBit(msgs.server2client, rfbSetColourMapEntries);
@@ -1321,7 +1322,7 @@ rfbSendMulticastVNCSessionInfo(rfbClientPtr cl)
    rect.r.x = Swap16IfLE(cl->multicastPixelformatEncId);
    rect.r.y = Swap16IfLE(cl->screen->multicastPort);
    rect.r.w = Swap16IfLE(cl->screen->multicastDeferUpdateTime);
-   rect.r.h = 0;
+   rect.r.h = Swap16IfLE(cl->screen->multicastDelayReportInterval); /* delay-report interval */
 
    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
 	  sz_rfbFramebufferUpdateRectHeader);
@@ -3083,6 +3084,34 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	return;
     }
+
+    case rfbMulticastDelayReport:
+
+	if ((n = rfbReadExact(cl, ((char *)&msg) + 1,
+			      sz_rfbMulticastDelayReportMsg - 1)) <= 0) {
+	    if (n != 0)
+		rfbLogPerror("rfbProcessClientNormalMessage: read");
+	    rfbCloseClient(cl);
+	    return;
+	}
+
+	rfbStatRecordMessageRcvd(cl, msg.type,
+				 sz_rfbMulticastDelayReportMsg,
+				 sz_rfbMulticastDelayReportMsg);
+
+	/* store the client's reported queuing delay and the receipt time for
+	   delay-based rate control. Nothing consumes it yet; the rate controller
+	   reads it (and ages out stale reports) in a later change. */
+	cl->multicastClientQueuingDelayMs = (int32_t)Swap32IfLE((uint32_t)msg.mdr.queuingDelayMs);
+	gettimeofday(&cl->multicastClientQueuingDelayTimestamp, NULL);
+#if defined(MULTICAST_DELAY_DEBUG) || defined(MULTICAST_RATE_DEBUG)
+	rfbLog("MulticastVNC DELAY: client %s reported queuing delay %d ms on partial %u%s\n",
+	       cl->host, cl->multicastClientQueuingDelayMs,
+	       (unsigned)Swap32IfLE(msg.mdr.idPartialUpd),
+	       (msg.mdr.flags & rfbMulticastDelayReportFlagRepair) ? " (repair)" : "");
+#endif
+
+	return;
 
     case rfbKeyEvent:
 

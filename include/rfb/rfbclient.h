@@ -541,6 +541,12 @@ typedef struct _rfbClient {
         rfbBool multicastOwdHaveMin;      /* owd_min baseline established yet */
         int32_t multicastOwdMinMs;        /* running minimum one-way delay (empty-queue baseline) */
         int32_t multicastQueuingDelayMs;  /* qd = owd - owd_min, the knee signal */
+        uint32_t multicastQueuingDelayIdPartialUpd; /* id of the partial update qd was measured on */
+        rfbBool multicastQueuingDelayOnRepair; /* qd was measured on a repair */
+        struct timeval multicastDelayReportTimestamp; /* when qd was last reported to the server */
+        size_t multicastDelayReportInterval; /* ms; interval the server asked us to report qd at
+						(from the session info). 0 = report as often as we
+						receive updates. */
         rfbBool multicastDisabled;  /* flag to temporarily disable multicast and fallback to unicast */
         void   *multicastMissing;      /* outstanding missing partial updates awaiting (re-)NACK */
         size_t  multicastMissingCount; /* live gauge: partials currently missing and still being re-NACKed;
@@ -616,6 +622,7 @@ extern rfbBool SendFramebufferUpdateRequest(rfbClient* client,
 					 rfbBool incremental);
 extern rfbBool SendMulticastFramebufferUpdateRequest(rfbClient* client, rfbBool incremental);
 extern rfbBool SendMulticastFramebufferUpdateNACK(rfbClient* client, uint32_t idPartialUpd, uint16_t nPartialUpds);
+extern rfbBool SendMulticastDelayReport(rfbClient* client);
 extern void HandleMulticastNACKRetries(rfbClient* client);
 extern rfbBool SendScaleSetting(rfbClient* client,int scaleSetting);
 /**

@@ -1584,6 +1584,31 @@ SendMulticastFramebufferUpdateNACK(rfbClient* client, uint32_t idPartialUpd, uin
 
 
 /*
+ * SendMulticastDelayReport. Reports the client's current multicast queuing
+ * delay to the server for delay-based rate control.
+ */
+
+rfbBool
+SendMulticastDelayReport(rfbClient* client)
+{
+  rfbMulticastDelayReportMsg mdr;
+
+  if (!SupportsClient2Server(client, rfbMulticastDelayReport)) return TRUE;
+
+  mdr.type = rfbMulticastDelayReport;
+  mdr.flags = client->multicastQueuingDelayOnRepair ? rfbMulticastDelayReportFlagRepair : 0;
+  mdr.pad = 0;
+  mdr.queuingDelayMs = rfbClientSwap32IfLE((uint32_t)client->multicastQueuingDelayMs);
+  mdr.idPartialUpd = rfbClientSwap32IfLE(client->multicastQueuingDelayIdPartialUpd);
+
+  if (!WriteToRFBServer(client, (char *)&mdr, sz_rfbMulticastDelayReportMsg))
+    return FALSE;
+
+  return TRUE;
+}
+
+
+/*
  * Bounded re-NACK of missing multicast partial updates.
  *
  * The client tracks each still-missing partial id in an outstanding set and
@@ -2339,12 +2364,19 @@ HandleRFBServerMessage(rfbClient* client)
 	      /* MulticastVNC delay-based rate control signal: one-way delay of this
 		 packet = recv_ms - send_ms. The large, constant inter-host clock offset
 		 cancels via the running minimum (empty-queue baseline), so
-		 qd = owd - owd_min is the queuing delay. */
+		 qd = owd - owd_min is the queuing delay. A partial not newer than
+		 any seen so far (the wrap-aware test that also advances
+		 multicastLastPartialUpd) is a repair: it carries a fresh send time
+		 but its original, older id, so its qd is current but not tied to
+		 that id's send rate, which the report flags. */
 	      {
 		struct timeval now;
 		uint32_t sendMs, recvMs;
 		int32_t owd;
 		gettimeofday(&now, NULL);
+		client->multicastQueuingDelayOnRepair =
+		  !(msg.mfu.idPartialUpd > client->multicastLastPartialUpd ||
+		    client->multicastLastPartialUpd - msg.mfu.idPartialUpd > 0x0FFF0000);
 		sendMs = rfbClientSwap32IfLE(msg.mfu.sendTimestampMs);
 		recvMs = (uint32_t)(now.tv_sec*1000 + now.tv_usec/1000);
 		owd = (int32_t)(recvMs - sendMs); /* offset+delay; int32 wrap-safe */
@@ -2353,6 +2385,7 @@ HandleRFBServerMessage(rfbClient* client)
 		  client->multicastOwdHaveMin = TRUE;
 		}
 		client->multicastQueuingDelayMs = owd - client->multicastOwdMinMs;
+		client->multicastQueuingDelayIdPartialUpd = msg.mfu.idPartialUpd;
 #if defined(MULTICAST_DELAY_DEBUG)
 		{
 		  /* once per second: peak queuing delay (the knee signal) + buffer fill */
@@ -2369,6 +2402,28 @@ HandleRFBServerMessage(rfbClient* client)
 		  }
 		}
 #endif
+	      }
+
+	      /* report our current queuing delay to the server for delay-based rate
+		 control, while we are receiving the multicast stream, at the larger of
+		 the server's requested report interval (multicastDelayReportInterval)
+		 and our own update interval: a client cannot produce a fresh qd faster
+		 than it receives, so the update interval is a hard floor; the server's
+		 value throttles further (e.g. to bound per-client report load with many
+		 clients). Both come from the mandatory session info. */
+	      {
+		struct timeval nowr;
+		struct timeval *last = &client->multicastDelayReportTimestamp;
+		size_t interval = client->multicastDelayReportInterval > client->multicastUpdInterval
+		                  ? client->multicastDelayReportInterval : client->multicastUpdInterval;
+		gettimeofday(&nowr, NULL);
+		if((last->tv_sec == 0 && last->tv_usec == 0)        /* first report */
+		   || nowr.tv_sec < last->tv_sec                    /* clock stepped back */
+		   || (size_t)((nowr.tv_sec - last->tv_sec)*1000
+			       + (nowr.tv_usec - last->tv_usec)/1000) >= interval) {
+		  *last = nowr;
+		  SendMulticastDelayReport(client);
+		}
 	      }
 
 	      if(client->multicastLastWholeUpd >= 0) /* only check on the second and later runs */
@@ -2773,6 +2828,7 @@ HandleRFBServerMessage(rfbClient* client)
 
 	client->multicastSock = CreateMulticastSocket(multicastSockAddr, client->multicastSocketRcvBufSize);
 	client->multicastUpdInterval = rect.r.w > 0 ? rect.r.w : 1;
+	client->multicastDelayReportInterval = rect.r.h; /* server's requested qd-report interval; 0 = per update */
 	client->multicastPixelformatEncId = rect.r.x;
 	client->multicastPacketBuf = ghpringbuf_create(client->multicastRcvBufSize/516 + 1, /* 576 is the minimum evry host is required to handle. 576-60header=516. */
 						       sizeof(Packet),

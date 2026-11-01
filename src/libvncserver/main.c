@@ -1065,6 +1065,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->multicastPort=5900;
    screen->multicastTTL=1;
    screen->multicastDeferUpdateTime=30;
+   screen->multicastDelayReportInterval=50;
    screen->multicastPacketSize = MULTICAST_DFLT_PACKETSIZE;
 
    INIT_MUTEX(screen->multicastOutputMutex);

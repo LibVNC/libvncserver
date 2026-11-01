@@ -451,6 +451,7 @@ typedef struct {
 #define rfbPalmVNCSetScaleFactor 0xF
 #define rfbMulticastFramebufferUpdateRequest 242
 #define rfbMulticastFramebufferUpdateNACK 240
+#define rfbMulticastDelayReport 243
 /* Xvp message - bidirectional */
 #define rfbXvp 250
 /* SetDesktopSize client -> server message */
@@ -1464,6 +1465,28 @@ typedef struct {
 
 #define sz_rfbMulticastFramebufferUpdateNACKMsg 8
 
+/*-----------------------------------------------------------------------------
+ * MulticastDelayReport - the client reports its current multicast queuing
+ * delay (the inflation of the one-way delay above the client's own observed
+ * minimum) to the server, for delay-based rate control. Sent periodically
+ * while the client is subscribed to the multicast group.
+ */
+
+typedef struct {
+    uint8_t type;			/* always rfbMulticastDelayReport */
+    uint8_t flags;                      /* rfbMulticastDelayReportFlag* */
+    uint16_t pad;
+    int32_t queuingDelayMs;             /* qd = owd - owd_min, >= 0, in milliseconds */
+    uint32_t idPartialUpd;              /* id of the partial update the delay was measured on */
+} rfbMulticastDelayReportMsg;
+
+#define sz_rfbMulticastDelayReportMsg 12
+
+/* the delay was measured on a repair (a partial update not newer than all
+   previously received ones): it is a current delay, but it belongs to a
+   retransmission of idPartialUpd, not to its original transmission */
+#define rfbMulticastDelayReportFlagRepair 0x01
+
 
 
 /*-----------------------------------------------------------------------------
@@ -1650,6 +1673,7 @@ typedef union {
 	rfbSetDesktopSizeMsg sdm;
         rfbMulticastFramebufferUpdateRequestMsg mfur;
         rfbMulticastFramebufferUpdateNACKMsg mfun;
+        rfbMulticastDelayReportMsg mdr;
 } rfbClientToServerMsg;
 
 /* 
