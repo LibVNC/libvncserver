@@ -430,6 +430,9 @@ typedef struct _rfbScreenInfo
 #define MULTICAST_MAXSENDRATE_INCREMENT_UP_AFTER 10        /**< After this many consecutive increments the increment itself is increased */
 #define MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL 50        /**< This regulates how long to wait between send rate increments */
 #define MULTICAST_MAXSENDRATE_NACKS_REQUIRED 3             /**< The number of consecutive NACKs required to decrease max send rate */
+#define MULTICAST_MAXSENDRATE_QUEUINGDELAY_MARGIN_MS 25 /**< A client's reported queuing delay (time spent waiting in queues, on top of the path's base latency) above this counts as a standing queue */
+#define MULTICAST_MAXSENDRATE_QUEUINGDELAY_PERSIST_REPORTS 4 /**< This many consecutive reports must be above the margin before the max send rate increase is held, so isolated delay spikes are ignored */
+#define MULTICAST_MAXSENDRATE_QUEUINGDELAY_STALE_REPORTS 4 /**< A client's queuing delay report counts only while it is at most this many report intervals old */
     struct timeval lastMulticastSendCreditRefill;
     uint32_t multicastSendCredit;
     uint32_t multicastMaxSendRate;
@@ -807,6 +810,9 @@ typedef struct _rfbClientRec {
        where the value is consumed. */
     int32_t multicastClientQueuingDelayMs;
     struct timeval multicastClientQueuingDelayTimestamp;
+    int multicastClientQueuingDelayHighReports; /**< number of consecutive queuing delay reports above
+						   MULTICAST_MAXSENDRATE_QUEUINGDELAY_MARGIN_MS, capped at
+						   MULTICAST_MAXSENDRATE_QUEUINGDELAY_PERSIST_REPORTS */
     /* multicast NACK stuff */
 #define MULTICAST_PART_UPD_RGN_BUF_SIZE 52428800 /**< Server should keep a backlog of at max this many sent bytes */
     void* multicastPartUpdRgnBuf;      /**< a ringbuffer holding partial update <-> region mappings.

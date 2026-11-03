@@ -1234,6 +1234,55 @@ rfbWriteExact(rfbClientPtr cl,
 
 
 /*
+ * Delay-based rate control: returns TRUE if any multicast client reports a
+ * standing queue, i.e. its queuing delay was above
+ * MULTICAST_MAXSENDRATE_QUEUINGDELAY_MARGIN_MS in
+ * MULTICAST_MAXSENDRATE_QUEUINGDELAY_PERSIST_REPORTS consecutive reports (so
+ * isolated delay spikes don't count), the last of which is still fresh.
+ * Clients that never reported, or whose last report is older than
+ * MULTICAST_MAXSENDRATE_QUEUINGDELAY_STALE_REPORTS report intervals, don't
+ * count.
+ */
+static rfbBool
+rfbMulticastQueuingDelayElevated(rfbScreenInfoPtr rfbScreen, const struct timeval *now)
+{
+  rfbClientIteratorPtr i;
+  rfbClientPtr cl;
+  rfbBool elevated = FALSE;
+  /* clients report at the larger of the delay-report and the update interval */
+  long interval = rfbScreen->multicastDelayReportInterval > rfbScreen->multicastDeferUpdateTime
+                  ? rfbScreen->multicastDelayReportInterval : rfbScreen->multicastDeferUpdateTime;
+  long staleMs = MULTICAST_MAXSENDRATE_QUEUINGDELAY_STALE_REPORTS * interval;
+
+  i = rfbGetClientIterator(rfbScreen);
+  while((cl = rfbClientIteratorNext(i))) {
+    const struct timeval *last = &cl->multicastClientQueuingDelayTimestamp;
+    long ageMs;
+
+    if(!cl->useMulticastVNC || cl->state != RFB_NORMAL)
+      continue;
+    if(cl->multicastClientQueuingDelayHighReports < MULTICAST_MAXSENDRATE_QUEUINGDELAY_PERSIST_REPORTS)
+      continue;
+    ageMs = (now->tv_sec - last->tv_sec)*1000 + (now->tv_usec - last->tv_usec)/1000;
+    if(ageMs > staleMs)
+      continue;
+
+#if defined(MULTICAST_DELAY_DEBUG) || defined(MULTICAST_RATE_DEBUG)
+    rfbLog("MulticastVNC DELAY: holding max send rate %u, client %s queuing delay %d ms above %d ms\n",
+	   rfbScreen->multicastMaxSendRate, cl->host, cl->multicastClientQueuingDelayMs,
+	   MULTICAST_MAXSENDRATE_QUEUINGDELAY_MARGIN_MS);
+#endif
+    elevated = TRUE;
+    break;
+  }
+  rfbReleaseClientIterator(i);
+
+  return elevated;
+}
+
+
+
+/*
  * WriteExactMulticast writes an exact number of bytes to the 
  * screen's multicast socket.
  * Returns 1 if those bytes have been written, or -1 if an error
@@ -1314,15 +1363,25 @@ rfbWriteExactMulticast(rfbScreenInfoPtr rfbScreen, const char* buf, int len)
       if(len > rfbScreen->multicastSendCredit) {
 
 	if(!rfbScreen->multicastMaxSendRateFixed) {
+	  rfbBool due, hold;
 	  LOCK(rfbScreen->multicastSharedMutex);
 	  /* we do the send rate increase here because that's when current send rate at max send rate */
 	  gettimeofday(&now,NULL);
 	  if(now.tv_sec < rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec) /* at midnight on win32 */
 	    now.tv_sec = rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec;
 
-	  if((size_t)((now.tv_sec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec)*1000
-		      +(now.tv_usec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_usec)/1000)
-	     >= MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL) {
+	  due = (size_t)((now.tv_sec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_sec)*1000
+			 +(now.tv_usec-rfbScreen->lastMulticastMaxSendRateIncrement.tv_usec)/1000)
+	    >= MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL;
+
+	  /* don't increase while a client reports a standing queue */
+	  hold = due && rfbMulticastQueuingDelayElevated(rfbScreen, &now);
+
+	  if(hold)
+	    /* a held increase counts as done for interval pacing, so the check
+	       runs at most once per MULTICAST_MAXSENDRATE_INCREMENT_INTERVAL */
+	    rfbScreen->lastMulticastMaxSendRateIncrement = now;
+	  else if(due) {
 	    /* increment send rate */
 	    rfbScreen->multicastMaxSendRate += rfbScreen->multicastMaxSendRateIncrement;
 	    /* increase the increment itself */

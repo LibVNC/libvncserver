@@ -3100,10 +3100,16 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 				 sz_rfbMulticastDelayReportMsg);
 
 	/* store the client's reported queuing delay and the receipt time for
-	   delay-based rate control. Nothing consumes it yet; the rate controller
-	   reads it (and ages out stale reports) in a later change. */
+	   delay-based rate control, and count the consecutive reports above the
+	   margin. Reports measured on repairs count the same: their delay is
+	   current. */
 	cl->multicastClientQueuingDelayMs = (int32_t)Swap32IfLE((uint32_t)msg.mdr.queuingDelayMs);
 	gettimeofday(&cl->multicastClientQueuingDelayTimestamp, NULL);
+	if(cl->multicastClientQueuingDelayMs > MULTICAST_MAXSENDRATE_QUEUINGDELAY_MARGIN_MS) {
+	    if(cl->multicastClientQueuingDelayHighReports < MULTICAST_MAXSENDRATE_QUEUINGDELAY_PERSIST_REPORTS)
+		cl->multicastClientQueuingDelayHighReports++;
+	} else
+	    cl->multicastClientQueuingDelayHighReports = 0;
 #if defined(MULTICAST_DELAY_DEBUG) || defined(MULTICAST_RATE_DEBUG)
 	rfbLog("MulticastVNC DELAY: client %s reported queuing delay %d ms on partial %u%s\n",
 	       cl->host, cl->multicastClientQueuingDelayMs,
