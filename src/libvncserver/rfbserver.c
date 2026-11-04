@@ -2323,6 +2323,9 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
             return;
         }
 
+        /* The output thread must not see the pixel format and translation
+           tables change in the middle of a framebuffer update. */
+        LOCK(cl->sendMutex);
         cl->format.bitsPerPixel = msg.spf.format.bitsPerPixel;
         cl->format.depth = msg.spf.format.depth;
         cl->format.bigEndian = (msg.spf.format.bigEndian ? TRUE : FALSE);
@@ -2336,6 +2339,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 	cl->readyForSetColourMapEntries = TRUE;
         cl->screen->setTranslateFunction(cl);
+        UNLOCK(cl->sendMutex);
 
         rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbSetPixelFormatMsg, sz_rfbSetPixelFormatMsg);
 
