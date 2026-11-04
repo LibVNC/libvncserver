@@ -2119,6 +2119,11 @@ fail:
 }
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
+/*
+ * These are called with sendMutex held and leave closing the client on failure
+ * to the caller, after releasing sendMutex: rfbCloseClient() runs the close()
+ * callbacks of protocol extensions, which may send to the client themselves.
+ */
 static rfbBool
 rfbSendExtendedClipboardCapability(rfbClientPtr cl) {
     char buf[16] = {
@@ -2129,7 +2134,6 @@ rfbSendExtendedClipboardCapability(rfbClientPtr cl) {
     };
     if (rfbWriteExact(cl, buf, sizeof(buf)) < 0) {
         rfbLogPerror("rfbSendExtendedClipboardCapability: write");
-        rfbCloseClient(cl);
         return FALSE;
     }
     rfbStatRecordMessageSent(cl, rfbServerCutText, sizeof(buf), sizeof(buf));
@@ -2145,7 +2149,6 @@ rfbSendExtendedClipboardNotify(rfbClientPtr cl) {
     };
     if (rfbWriteExact(cl, buf, sizeof(buf)) < 0) {
         rfbLogPerror("rfbSendExtendedClipboardNotify: write");
-        rfbCloseClient(cl);
         return FALSE;
     }
     rfbStatRecordMessageSent(cl, rfbServerCutText, sizeof(buf), sizeof(buf));
@@ -2162,7 +2165,6 @@ rfbSendExtendedServerCutTextData(rfbClientPtr cl, const char *data, int len) {
     bufBeforeZlib = (char *)malloc(len + 4);
     if (bufBeforeZlib == NULL) {
         rfbLogPerror("rfbSendExtendedClipboardCapability: failed to allocate memory");
-        rfbCloseClient(cl);
         return FALSE;
     }
     tmpInt = Swap32IfLE(len);
@@ -2173,14 +2175,12 @@ rfbSendExtendedServerCutTextData(rfbClientPtr cl, const char *data, int len) {
     if (bufAfterZlib == NULL) {
         rfbLogPerror("rfbSendExtendedClipboardCapability: failed to allocate memory");
         free(bufBeforeZlib);
-        rfbCloseClient(cl);
         return FALSE;
     }
     if (compress((unsigned char *)bufAfterZlib + 12, &size, (unsigned char *)bufBeforeZlib, len + 4) != Z_OK) {
         rfbLogPerror("rfbSendExtendedClipboardCapability: zlib deflation error");
         free(bufBeforeZlib);
         free(bufAfterZlib);
-        rfbCloseClient(cl);
         return FALSE;
     }
     bufAfterZlib[0] = 3;
@@ -2195,7 +2195,6 @@ rfbSendExtendedServerCutTextData(rfbClientPtr cl, const char *data, int len) {
         rfbLogPerror("rfbSendExtendedClipboardCapability: write");
         free(bufBeforeZlib);
         free(bufAfterZlib);
-        rfbCloseClient(cl);
         return FALSE;
     }
     rfbStatRecordMessageSent(cl, rfbServerCutText, 12 + size, 12 + size);
@@ -2571,6 +2570,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                     if (!rfbSendExtendedClipboardCapability(cl)) {
                         UNLOCK(cl->sendMutex);
                         free(encodings);
+                        rfbCloseClient(cl);
                         return;
                     }
                 }
@@ -3024,6 +3024,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                 cl->extClipboardData != NULL && cl->extClipboardDataSize > 0) {
                 if (!rfbSendExtendedServerCutTextData(cl, cl->extClipboardData, cl->extClipboardDataSize)) {
                     UNLOCK(cl->sendMutex);
+                    rfbCloseClient(cl);
                     free(str);
                     return;
                 }
@@ -3035,6 +3036,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                 cl->extClipboardData != NULL && cl->extClipboardDataSize > 0) {
                 if (!rfbSendExtendedClipboardNotify(cl)) {
                     UNLOCK(cl->sendMutex);
+                    rfbCloseClient(cl);
                     free(str);
                     return;
                 }
@@ -4190,11 +4192,13 @@ rfbSendServerCutTextUTF8(rfbScreenInfoPtr rfbScreen,char *str, int len, char *fa
             if ((cl->extClipboardUserCap & rfbExtendedClipboard_Provide) && len <= cl->extClipboardMaxUnsolicitedSize) {
                 if (!rfbSendExtendedServerCutTextData(cl, cl->extClipboardData, len + 1)) {
                     UNLOCK(cl->sendMutex);
+                    rfbCloseClient(cl);
                     continue;
                 }
             } else if (cl->extClipboardUserCap & rfbExtendedClipboard_Notify) {
                 if (!rfbSendExtendedClipboardNotify(cl)) {
                     UNLOCK(cl->sendMutex);
+                    rfbCloseClient(cl);
                     continue;
                 }
             }
