@@ -2981,21 +2981,29 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
             free(str);
             return;
         } else if (extClipboardFlags & rfbExtendedClipboard_Request) {
+            /* like rfbSendServerCutTextUTF8(), which also changes extClipboardData,
+               don't interleave with a framebuffer update */
+            LOCK(cl->sendMutex);
             if ((cl->extClipboardUserCap & rfbExtendedClipboard_Provide) &&
                 cl->extClipboardData != NULL && cl->extClipboardDataSize > 0) {
                 if (!rfbSendExtendedServerCutTextData(cl, cl->extClipboardData, cl->extClipboardDataSize)) {
+                    UNLOCK(cl->sendMutex);
                     free(str);
                     return;
                 }
             }
+            UNLOCK(cl->sendMutex);
         } else if (extClipboardFlags & rfbExtendedClipboard_Peek) {
+            LOCK(cl->sendMutex);
             if ((cl->extClipboardUserCap & rfbExtendedClipboard_Notify) &&
                 cl->extClipboardData != NULL && cl->extClipboardDataSize > 0) {
                 if (!rfbSendExtendedClipboardNotify(cl)) {
+                    UNLOCK(cl->sendMutex);
                     free(str);
                     return;
                 }
             }
+            UNLOCK(cl->sendMutex);
         } else if (extClipboardFlags & rfbExtendedClipboard_Provide) {
             if (!rfbProcessExtendedServerCutTextData(cl, extClipboardFlags, str + 4, msg.cct.length - 4)) {
                 free(str);
