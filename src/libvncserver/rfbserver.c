@@ -2322,6 +2322,27 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
             return;
         }
 
+        /* The default rfbSetTranslateFunction() closes the client for these formats. Check
+           them before taking sendMutex: rfbCloseClient() runs the close() callbacks of
+           protocol extensions, which may send to the client themselves. */
+        if (cl->screen->setTranslateFunction == rfbSetTranslateFunction) {
+            if (msg.spf.format.bitsPerPixel != 8 && msg.spf.format.bitsPerPixel != 16 &&
+#ifdef LIBVNCSERVER_ALLOW24BPP
+                msg.spf.format.bitsPerPixel != 24 &&
+#endif
+                msg.spf.format.bitsPerPixel != 32) {
+                rfbErr("rfbProcessClientNormalMessage: client bits per pixel not 8, 16 or 32\n");
+                rfbCloseClient(cl);
+                return;
+            }
+            if (!msg.spf.format.trueColour && msg.spf.format.bitsPerPixel != 8) {
+                rfbErr("rfbProcessClientNormalMessage: client has colour map but %d-bit - "
+                       "can only cope with 8-bit colour maps\n", msg.spf.format.bitsPerPixel);
+                rfbCloseClient(cl);
+                return;
+            }
+        }
+
         /* The output thread must not see the pixel format and translation
            tables change in the middle of a framebuffer update. */
         LOCK(cl->sendMutex);
