@@ -2989,26 +2989,31 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         memcpy(&extClipboardFlags, str, 4);
         extClipboardFlags = Swap32IfLE(extClipboardFlags);
         if (extClipboardFlags & rfbExtendedClipboard_Caps) {
-            cl->extClipboardUserCap = extClipboardFlags;
+            uint32_t maxUnsolicitedSize = 0;
             for (i = 0; i < 16; i++) {
                 if (extClipboardFlags & (1 << i)) {
                     extClipboardFormats++;
                 }
             }
-            if (extClipboardFormats == 0) {
-                cl->enableExtendedClipboard = FALSE;
-            } else if (msg.cct.length != 4 + extClipboardFormats * 4) {
+            if (extClipboardFormats != 0 && msg.cct.length != 4 + extClipboardFormats * 4) {
                 rfbLogPerror("rfbProcessClientNormalMessage: extended clipboard message is corrupted");
                 rfbCloseClient(cl);
                 free(str);
                 return;
             }
             if (extClipboardFlags & rfbExtendedClipboard_Text) {
-                memcpy(&cl->extClipboardMaxUnsolicitedSize, str + 4, 4);
-                cl->extClipboardMaxUnsolicitedSize = Swap32IfLE(cl->extClipboardMaxUnsolicitedSize);
+                memcpy(&maxUnsolicitedSize, str + 4, 4);
+                maxUnsolicitedSize = Swap32IfLE(maxUnsolicitedSize);
+            }
+            /* rfbSendServerCutTextUTF8() reads these under sendMutex */
+            LOCK(cl->sendMutex);
+            cl->extClipboardUserCap = extClipboardFlags;
+            if (extClipboardFlags & rfbExtendedClipboard_Text) {
+                cl->extClipboardMaxUnsolicitedSize = maxUnsolicitedSize;
             } else {
                 cl->enableExtendedClipboard = FALSE;
             }
+            UNLOCK(cl->sendMutex);
             free(str);
             return;
         } else if (extClipboardFlags & rfbExtendedClipboard_Request) {
