@@ -402,10 +402,15 @@ static int readServerMsg(int fd, ServerMsg *m, int bytesPerPixel)
             return -1;
         rects = getU16(buf + 1);
         for (i = 0; i < rects; i++) {
-            if (readFull(fd, buf, 12) < 0 || getU32(buf + 8) != rfbEncodingRaw)
+            size_t len;
+
+            /* rectangles never exceed the framebuffer, which keeps rawBytes within int */
+            if (readFull(fd, buf, 12) < 0 || getU32(buf + 8) != rfbEncodingRaw ||
+                getU16(buf + 4) > WIDTH || getU16(buf + 6) > HEIGHT)
                 return -1;
-            m->rawBytes += getU16(buf + 4) * getU16(buf + 6) * bytesPerPixel;
-            if (skip(fd, getU16(buf + 4) * getU16(buf + 6) * bytesPerPixel) < 0)
+            len = (size_t)getU16(buf + 4) * getU16(buf + 6) * bytesPerPixel;
+            m->rawBytes += (int)len;
+            if (skip(fd, len) < 0)
                 return -1;
         }
         return 0;
