@@ -380,7 +380,8 @@ static int readServerMsg(int fd, ServerMsg *m, int bytesPerPixel)
         m->extended = m->length < 0;
         if (!m->extended)
             return skip(fd, m->length);
-        if (-m->length < 4 || readFull(fd, buf, 4) < 0)
+        /* INT32_MIN cannot be negated, and no sender with int sizes produces it */
+        if (m->length == INT32_MIN || -m->length < 4 || readFull(fd, buf, 4) < 0)
             return -1;
         m->flags = getU32(buf);
         return skip(fd, -m->length - 4);
@@ -755,6 +756,40 @@ static rfbBool setEncodingsCapsAndXvp(void)
 }
 
 
+/* ---------- the test's own message parser ---------- */
+
+static rfbBool parserLimits(void)
+{
+    static const struct { const char *what; unsigned char msg[16]; size_t len; } msgs[] = {
+        { "cut text length INT32_MIN", { rfbServerCutText, 0, 0, 0, 0x80, 0, 0, 0 }, 8 },
+        { "cut text length -3", { rfbServerCutText, 0, 0, 0, 0xff, 0xff, 0xff, 0xfd }, 8 },
+        { "65535x65535 rectangle", { rfbFramebufferUpdate, 0, 0, 1, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff,
+                                     0, 0, 0, 0 /* raw */ }, 16 },
+    };
+    ServerMsg m;
+    size_t i;
+
+    for (i = 0; i < sizeof(msgs) / sizeof(msgs[0]); i++) {
+        unsigned char tail[4];
+        int sv[2];
+        rfbBool ok;
+
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) < 0)
+            return FALSE;
+        /* rejected without reading past the message, which is followed by 4 bytes and the end of stream */
+        ok = writeFull(sv[1], msgs[i].msg, msgs[i].len) == 0 && writeFull(sv[1], "tail", 4) == 0 &&
+            shutdown(sv[1], SHUT_WR) == 0 && readServerMsg(sv[0], &m, 4) < 0 && readFull(sv[0], tail, 4) == 0;
+        close(sv[0]);
+        close(sv[1]);
+        if (!ok) {
+            fprintf(stderr, "    %s: not rejected before the end of the message\n", msgs[i].what);
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+
 /* ---------- driver ---------- */
 
 typedef struct {
@@ -776,6 +811,7 @@ static const Scenario scenarios[] = {
     { "caps-while-sending", capsWhileSending },
     { "concurrent-close", concurrentClose },
     { "setencodings-caps-xvp", setEncodingsCapsAndXvp },
+    { "parser-limits", parserLimits },
 };
 
 /* "PASS", or why the scenario failed */
