@@ -4170,6 +4170,9 @@ rfbSendServerCutTextUTF8(rfbScreenInfoPtr rfbScreen,char *str, int len, char *fa
             }
             UNLOCK(cl->sendMutex);
             rfbStatRecordMessageSent(cl, rfbServerCutText, sz_rfbServerCutTextMsg+len, sz_rfbServerCutTextMsg+len);
+        } else {
+            /* nothing to send to this client */
+            UNLOCK(cl->sendMutex);
         }
     }
     rfbReleaseClientIterator(iterator);
