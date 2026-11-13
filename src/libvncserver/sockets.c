@@ -662,6 +662,16 @@ rfbCloseClient(rfbClientPtr cl)
 #endif
     rfbExtensionData* extension;
 
+    /* may be called concurrently from several threads; the close path below
+       frees per-client data and must run exactly once */
+    LOCK(cl->closeMutex);
+    if (cl->closeStarted) {
+	UNLOCK(cl->closeMutex);
+	return;
+    }
+    cl->closeStarted = TRUE;
+    UNLOCK(cl->closeMutex);
+
     for(extension=cl->extensions; extension; extension=extension->next)
         if(extension->extension->close) {
 	    extension->extension->close(cl, extension->data);
