@@ -460,7 +460,7 @@ typedef struct {
 #define rfbEncodingZRLE 16
 #define rfbEncodingZYWRLE 17
 
-#define rfbEncodingH264               0x48323634
+#define rfbEncodingH264 50
 
 /* Cache & XOR-Zlib - rdv@2002 */
 #define rfbEncodingCache                 0xFFFF0000
@@ -890,6 +890,23 @@ typedef struct {
 #define rfbTightFilterGradient         0x02
 
 #endif
+
+/*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ * h264 - h264 encoding.  We have an rfbH264Header structure giving the number
+ * of bytes following and control flags. Finally the data that follows is an
+ * H.264 encoded frame stream for the rectangle.
+ */
+
+typedef struct {
+    uint32_t length;
+	uint32_t flags;
+} rfbH264Header;
+
+#define sz_rfbH264Header 8
+
+#define rfbH264FlagNone          0u
+#define rfbH264FlagResetContext  1u  /* reset the decoder for the matching rectangle */
+#define rfbH264FlagResetAllContexts  2u  /* drop all cached H.264 decoder contexts */
 
 /*- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
  * XCursor encoding. This is a special encoding used to transmit X-style

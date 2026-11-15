@@ -99,6 +99,7 @@ char *encodingName(uint32_t type, char *buf, int len) {
     case rfbEncodingRRE:                snprintf(buf, len, "RRE");         break;
     case rfbEncodingCoRRE:              snprintf(buf, len, "CoRRE");       break;
     case rfbEncodingHextile:            snprintf(buf, len, "hextile");     break;
+    case rfbEncodingH264:               snprintf(buf, len, "h264");        break;
     case rfbEncodingZlib:               snprintf(buf, len, "zlib");        break;
     case rfbEncodingTight:              snprintf(buf, len, "tight");       break;
     case rfbEncodingTightPng:           snprintf(buf, len, "tightPng");    break;
