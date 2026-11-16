@@ -32,6 +32,9 @@
 
 #if defined(_WIN32) && defined(DLLDEFINE)
 #define DLLEXPORT __declspec(dllexport)
+#elif defined(__GNUC__) && __GNUC__ >= 4
+/* Private implementation: must not be exported from the shared library. */
+#define DLLEXPORT __attribute__((visibility("hidden")))
 #else
 #define DLLEXPORT
 #endif
@@ -292,6 +295,27 @@ typedef void* tjhandle;
 #define TJSCALED(dimension, scalingFactor) ((dimension * scalingFactor.num \
   + scalingFactor.denom - 1) / scalingFactor.denom)
 
+
+/*
+ * This is a private copy of the TurboJPEG API, compiled into libvncserver and
+ * libvncclient. Rename its entry points so that this copy can neither interpose on
+ * nor be interposed on a real libjpeg-turbo in the same process. Without this, an
+ * application linking both libraries gets our bundled tjCompress2 instead of the
+ * one it asked for. See issue #729.
+ */
+#define tjInitCompress rfb_tjInitCompress
+#define tjCompress2 rfb_tjCompress2
+#define tjCompress rfb_tjCompress
+#define tjBufSize rfb_tjBufSize
+#define TJBUFSIZE rfb_TJBUFSIZE
+#define tjInitDecompress rfb_tjInitDecompress
+#define tjDecompressHeader2 rfb_tjDecompressHeader2
+#define tjDecompressHeader rfb_tjDecompressHeader
+#define tjDecompress2 rfb_tjDecompress2
+#define tjDecompress rfb_tjDecompress
+#define tjGetScalingFactors rfb_tjGetScalingFactors
+#define tjDestroy rfb_tjDestroy
+#define tjGetErrorStr rfb_tjGetErrorStr
 
 #ifdef __cplusplus
 extern "C" {
