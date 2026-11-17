@@ -40,7 +40,7 @@ static unsigned char reverseByte(unsigned char b) {
    return b;
 }
 
-int hash_md5(void *out, const void *in, const size_t in_len)
+int libvnc_hash_md5(void *out, const void *in, const size_t in_len)
 {
     MD5_CTX md5;
     if(!MD5_Init(&md5))
@@ -53,7 +53,7 @@ int hash_md5(void *out, const void *in, const size_t in_len)
 }
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-int hash_sha1(void *out, const void *in, const size_t in_len)
+int libvnc_hash_sha1(void *out, const void *in, const size_t in_len)
 {
     SHA_CTX sha1;
     if(!SHA1_Init(&sha1))

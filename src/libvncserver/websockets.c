@@ -104,7 +104,7 @@ static void webSocketsGenSha1Key(char *target, int size, char *key)
     char tmp[strlen(key) + sizeof(GUID) - 1];
     memcpy(tmp, key, strlen(key));
     memcpy(tmp + strlen(key), GUID, sizeof(GUID) - 1);
-    hash_sha1(hash, tmp, sizeof(tmp));
+    libvnc_hash_sha1(hash, tmp, sizeof(tmp));
     if (-1 == rfbBase64NtoP(hash, sizeof(hash), target, size))
 	rfbErr("rfbBase64NtoP failed\n");
 }

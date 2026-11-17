@@ -8,11 +8,11 @@
 #define MD5_HASH_SIZE 16
 
 /* Generates an MD5 hash of 'in' and writes it to 'out', which must be 16 bytes in size. */
-int hash_md5(void *out, const void *in, const size_t in_len);
+int libvnc_hash_md5(void *out, const void *in, const size_t in_len);
 
 /* Generates an SHA1 hash of 'in' and writes it to 'out', which must be 20 bytes in size. */
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
-int hash_sha1(void *out, const void *in, const size_t in_len);
+int libvnc_hash_sha1(void *out, const void *in, const size_t in_len);
 #endif
 
 /* Fill 'out' with 'len' random bytes. */
