@@ -667,6 +667,22 @@ rfbCloseClient(rfbClientPtr cl)
     LOCK(cl->closeMutex);
     if (cl->closeStarted) {
 	UNLOCK(cl->closeMutex);
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+	if (cl->screen->backgroundLoop) {
+	    /*
+	      ...but a repeated call still marks the client as shutting down:
+	      its own thread may have stored a handshake state (RFB_NORMAL)
+	      over the RFB_SHUTDOWN of the first call. Its next read of the
+	      shut-down socket fails and lands here, and has to end the loop
+	      in clientInput(), which would otherwise go round on a socket
+	      that reads EOF forever.
+	    */
+	    LOCK(cl->updateMutex);
+	    cl->state = RFB_SHUTDOWN;
+	    TSIGNAL(cl->updateCond);
+	    UNLOCK(cl->updateMutex);
+	}
+#endif
 	return;
     }
     cl->closeStarted = TRUE;
