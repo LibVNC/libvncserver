@@ -690,6 +690,11 @@ if(DEFINED ENV{LIB_FUZZING_ENGINE} AND WITH_LIBVNCSERVER)
   target_link_libraries(fuzz_server vncserver ${CMAKE_THREAD_LIBS_INIT} $ENV{LIB_FUZZING_ENGINE})
 endif()
 
+if(DEFINED ENV{LIB_FUZZING_ENGINE} AND WITH_LIBVNCCLIENT)
+  add_executable(fuzz_client ${TESTS_DIR}/fuzz_client.c)
+  target_link_libraries(fuzz_client vncclient ${CMAKE_THREAD_LIBS_INIT} $ENV{LIB_FUZZING_ENGINE})
+endif()
+
 if(UNIX)
     set(ADDITIONAL_TEST_LIBS m)
 endif(UNIX)
