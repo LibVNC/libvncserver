@@ -356,8 +356,10 @@ ConnectClientToTcpAddrWithTimeout(unsigned int host, int port, unsigned int time
     return RFB_INVALID_SOCKET;
   }
 
-  if (!SetNonBlocking(sock))
-    return FALSE;
+  if (!SetNonBlocking(sock)) {
+    rfbCloseSocket(sock);
+    return RFB_INVALID_SOCKET;
+  }
 
   if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
 #ifdef WIN32
