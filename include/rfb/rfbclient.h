@@ -502,10 +502,16 @@ typedef struct _rfbClient {
 	 */
         GotXCutTextUTF8Proc GotXCutTextUTF8;
 
-        /* flag to indicate wheter updateRect is managed by lib or user */
-        rfbBool isUpdateRectManagedByLib;
+	        /* flag to indicate wheter updateRect is managed by lib or user */
+	        rfbBool isUpdateRectManagedByLib;
 
-        GetX509CertFingerprintMismatchDecisionProc GetX509CertFingerprintMismatchDecision;
+	        GetX509CertFingerprintMismatchDecisionProc GetX509CertFingerprintMismatchDecision;
+
+	/** Optional configuration for ARD Kerberos auth.
+	 * Appended here to preserve offsets of pre-existing public struct fields. */
+	char *ardAuthRealm;
+	char *ardAuthClientPrincipal;
+	char *ardAuthServicePrincipal;
 } rfbClient;
 
 /* cursor.c */
@@ -530,6 +536,9 @@ extern rfbClientLogProc rfbClientLog,rfbClientErr;
 extern rfbBool ConnectToRFBServer(rfbClient* client,const char *hostname, int port);
 extern rfbBool ConnectToRFBRepeater(rfbClient* client,const char *repeaterHost, int repeaterPort, const char *destHost, int destPort);
 extern void SetClientAuthSchemes(rfbClient* client,const uint32_t *authSchemes, int size);
+extern rfbBool rfbClientSetARDAuthRealm(rfbClient *client, const char *realm);
+extern rfbBool rfbClientSetARDAuthClientPrincipal(rfbClient *client, const char *principal);
+extern rfbBool rfbClientSetARDAuthServicePrincipal(rfbClient *client, const char *principal);
 extern rfbBool InitialiseRFBConnection(rfbClient* client);
 /**
  * Sends format and encoding parameters to the server. Your application can

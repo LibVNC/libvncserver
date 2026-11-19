@@ -396,6 +396,9 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->listen6Sock = RFB_INVALID_SOCKET;
   client->listen6Address = NULL;
   client->clientAuthSchemes = NULL;
+  client->ardAuthRealm = NULL;
+  client->ardAuthClientPrincipal = NULL;
+  client->ardAuthServicePrincipal = NULL;
 
 #ifdef LIBVNCSERVER_HAVE_SASL
   client->GetSASLMechanism = NULL;
@@ -588,6 +591,9 @@ void rfbClientCleanup(rfbClient* client) {
   free(client->serverHost);
   free(client->destHost);
   free(client->clientAuthSchemes);
+  free(client->ardAuthRealm);
+  free(client->ardAuthClientPrincipal);
+  free(client->ardAuthServicePrincipal);
   free(client->rcSource);
   free(client->rcMask);
 
