@@ -225,12 +225,12 @@ return TRUE;
 
 #if REALBPP!=BPP && defined(UNCOMP) && UNCOMP!=0
 #if UNCOMP>0
-#define UncompressCPixel(pointer) ((*(CARDBPP*)pointer)>>UNCOMP)
+#define UncompressCPixel(pointer) ({CARDBPP pixel=0;memcpy(&pixel,pointer,REALBPP/8);pixel>>UNCOMP;})
 #else
-#define UncompressCPixel(pointer) ((*(CARDBPP*)pointer)<<(-(UNCOMP)))
+#define UncompressCPixel(pointer) ({CARDBPP pixel=0;memcpy(&pixel,pointer,REALBPP/8);pixel<<(-UNCOMP);})
 #endif
 #else
-#define UncompressCPixel(pointer) (*(CARDBPP*)pointer)
+#define UncompressCPixel(pointer) ({CARDBPP pixel=0;memcpy(&pixel,pointer,REALBPP/8);pixel;})
 #endif
 
 static int HandleZRLETile(rfbClient* client,
