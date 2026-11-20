@@ -714,6 +714,10 @@ typedef struct _rfbClientRec {
     ClientFramebufferUpdateRequestHookPtr clientFramebufferUpdateRequestHook;
 
     rfbBool useExtDesktopSize;
+    /** Whether the initial ExtDesktopSize pseudo-rectangle has already been sent
+        to this client. Used to avoid re-sending it on every non-incremental
+        update, which some viewers (e.g. UltraVNC) request repeatedly. */
+    rfbBool extDesktopSizeSent;
     int requestedDesktopSizeChange;
     int lastDesktopSizeChangeError;
 
