@@ -197,6 +197,20 @@ SupportsServer2Client(rfbClient* client, int messageType)
     return (client->supportedMessages.server2client[((messageType & 0xFF)/8)] & (1<<(messageType % 8)) ? TRUE : FALSE);
 }
 
+static rfbBool
+CanUseTightJPEG(rfbClient* client)
+{
+  if (!client->appData.enableJPEG)
+    return FALSE;
+
+  if (!client->format.trueColour || client->format.bitsPerPixel <= 8)
+    return FALSE;
+
+  return client->format.redMax <= 0xFF &&
+         client->format.greenMax <= 0xFF &&
+         client->format.blueMax <= 0xFF;
+}
+
 void
 SetClient2Server(rfbClient* client, int messageType)
 {
@@ -1304,7 +1318,7 @@ SetFormatAndEncodings(rfbClient* client)
 	requestLastRectEncoding = TRUE;
 	if (client->appData.compressLevel >= 0 && client->appData.compressLevel <= 9)
 	  requestCompressLevel = TRUE;
-	if (client->appData.enableJPEG)
+	if (CanUseTightJPEG(client))
 	  requestQualityLevel = TRUE;
 #endif
 #endif
@@ -1397,7 +1411,7 @@ SetFormatAndEncodings(rfbClient* client)
       encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingCompressLevel1);
     }
 
-    if (client->appData.enableJPEG) {
+    if (CanUseTightJPEG(client)) {
       if (client->appData.qualityLevel < 0 || client->appData.qualityLevel > 9)
 	client->appData.qualityLevel = 5;
       encs[se->nEncodings++] = rfbClientSwap32IfLE(client->appData.qualityLevel +
