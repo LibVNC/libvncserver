@@ -611,6 +611,7 @@ endif(X11_xcb_FOUND AND X11_xcb_xtest_FOUND AND X11_xcb_keysyms_FOUND)
 
 set(LIBVNCCLIENT_EXAMPLES
     backchannel
+    filetransfer
     ppmtest
 )
 
@@ -712,6 +713,13 @@ if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT) AN
      )
 endif(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT) AND WITH_LIBVNCSERVER AND WITH_LIBVNCCLIENT)
 
+if(UNIX AND WITH_LIBVNCCLIENT)
+  set(SIMPLETESTS
+      ${SIMPLETESTS}
+      client_filetransfer_test
+     )
+endif(UNIX AND WITH_LIBVNCCLIENT)
+
 foreach(t ${SIMPLETESTS})
   add_executable(test_${t} ${TESTS_DIR}/${t}.c)
   set_target_properties(test_${t} PROPERTIES OUTPUT_NAME ${t})
@@ -759,6 +767,9 @@ endif(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
 if(WITH_LIBVNCSERVER)
   add_test(NAME cargs COMMAND test_cargstest)
 endif(WITH_LIBVNCSERVER)
+if(UNIX AND WITH_LIBVNCCLIENT)
+  add_test(NAME client_filetransfer COMMAND test_client_filetransfer_test)
+endif(UNIX AND WITH_LIBVNCCLIENT)
 if(UNIX)
   if(WITH_LIBVNCSERVER)
     add_test(NAME includetest_server COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} ${CMAKE_MAKE_PROGRAM} "rfb/rfb.h")
