@@ -1445,6 +1445,8 @@ SetFormatAndEncodings(rfbClient* client)
 
   if (se->nEncodings < MAX_ENCODINGS)
     encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingQemuExtendedKeyEvent);
+  if (se->nEncodings < MAX_ENCODINGS)
+    encs[se->nEncodings++] = rfbClientSwap32IfLE(rfbEncodingExtendedMouseButtons);
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ
   /* extendedclipboard. tell server we support it if client has the callback set */
@@ -1661,17 +1663,30 @@ rfbBool
 SendPointerEvent(rfbClient* client,int x, int y, int buttonMask)
 {
   rfbPointerEventMsg pe;
+  uint8_t extendedButtonMask;
+  rfbBool sendExtended = client->extendedMouseButtonsEnabled &&
+                         ((buttonMask & ~0x7f) != 0);
 
   if (!SupportsClient2Server(client, rfbPointerEvent)) return TRUE;
+  if ((buttonMask & ~0xff) != 0 && !client->extendedMouseButtonsEnabled) return FALSE;
 
   pe.type = rfbPointerEvent;
-  pe.buttonMask = buttonMask;
+  pe.buttonMask = (uint8_t)(buttonMask & (sendExtended ? 0x7f : 0xff));
+  if (sendExtended)
+    pe.buttonMask |= rfbPointerEventExtendedButtonMask;
   if (x < 0) x = 0;
   if (y < 0) y = 0;
 
   pe.x = rfbClientSwap16IfLE(x);
   pe.y = rfbClientSwap16IfLE(y);
-  return WriteToRFBServer(client, (char *)&pe, sz_rfbPointerEventMsg);
+  if (!WriteToRFBServer(client, (char *)&pe, sz_rfbPointerEventMsg))
+    return FALSE;
+
+  if (!sendExtended)
+    return TRUE;
+
+  extendedButtonMask = (uint8_t)((buttonMask >> 7) & 0xff);
+  return WriteToRFBServer(client, (char *)&extendedButtonMask, 1);
 }
 
 
@@ -2142,6 +2157,11 @@ HandleRFBServerMessage(rfbClient* client)
               client->HandleKeyboardLedState(client, rect.r.x, 0);
           /* stash it for the future */
           client->CurrentKeyboardLedState = rect.r.x;
+          continue;
+      }
+
+      if (rect.encoding == rfbEncodingExtendedMouseButtons) {
+          client->extendedMouseButtonsEnabled = TRUE;
           continue;
       }
 

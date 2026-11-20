@@ -501,6 +501,8 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
       cl->useRichCursorEncoding = FALSE;
       cl->enableLastRectEncoding = FALSE;
       cl->enableKeyboardLedState = FALSE;
+      cl->enableExtendedMouseButtons = FALSE;
+      cl->extendedMouseButtonsPending = FALSE;
       cl->enableSupportedMessages = FALSE;
       cl->enableSupportedEncodings = FALSE;
       cl->enableServerIdentity = FALSE;
@@ -1032,6 +1034,39 @@ rfbSendKeyboardLedState(rfbClientPtr cl)
 #define rfbSetBit(buffer, position)  (buffer[(position & 255) / 8] |= (1 << (position % 8)))
 
 /*
+ * Send rfbEncodingExtendedMouseButtons acknowledgement.
+ */
+
+static rfbBool
+rfbSendExtendedMouseButtons(rfbClientPtr cl)
+{
+    rfbFramebufferUpdateRectHeader rect;
+
+    if (cl->ublen + sz_rfbFramebufferUpdateRectHeader > UPDATE_BUF_SIZE) {
+        if (!rfbSendUpdateBuf(cl))
+            return FALSE;
+    }
+
+    rect.r.x = 0;
+    rect.r.y = 0;
+    rect.r.w = 0;
+    rect.r.h = 0;
+    rect.encoding = Swap32IfLE(rfbEncodingExtendedMouseButtons);
+
+    memcpy(&cl->updateBuf[cl->ublen], (char *)&rect,
+        sz_rfbFramebufferUpdateRectHeader);
+    cl->ublen += sz_rfbFramebufferUpdateRectHeader;
+
+    rfbStatRecordEncodingSent(cl, rfbEncodingExtendedMouseButtons,
+        sz_rfbFramebufferUpdateRectHeader, sz_rfbFramebufferUpdateRectHeader);
+    if (!rfbSendUpdateBuf(cl))
+        return FALSE;
+
+    return TRUE;
+}
+
+
+/*
  * Send rfbEncodingSupportedMessages.
  */
 
@@ -1133,6 +1168,7 @@ rfbSendSupportedEncodings(rfbClientPtr cl)
 	rfbEncodingNewFBSize,
 	rfbEncodingExtDesktopSize,
 	rfbEncodingKeyboardLedState,
+	rfbEncodingExtendedMouseButtons,
 	rfbEncodingSupportedMessages,
 	rfbEncodingSupportedEncodings,
 	rfbEncodingServerIdentity,
@@ -2400,6 +2436,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->enableCursorShapeUpdates = FALSE;
         cl->enableLastRectEncoding   = FALSE;
         cl->enableKeyboardLedState   = FALSE;
+        cl->enableExtendedMouseButtons = FALSE;
+        cl->extendedMouseButtonsPending = FALSE;
         cl->enableSupportedMessages  = FALSE;
         cl->enableSupportedEncodings = FALSE;
         cl->enableServerIdentity     = FALSE;
@@ -2508,7 +2546,15 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                           "%s\n", cl->host);
                   cl->enableKeyboardLedState = TRUE;
                 }
-                break;           
+                break;
+            case rfbEncodingExtendedMouseButtons:
+                if (!cl->enableExtendedMouseButtons) {
+                  rfbLog("Enabling ExtendedMouseButtons protocol extension for client "
+                          "%s\n", cl->host);
+                  cl->enableExtendedMouseButtons = TRUE;
+                  cl->extendedMouseButtonsPending = TRUE;
+                }
+                break;
             case rfbEncodingSupportedMessages:
                 if (!cl->enableSupportedMessages) {
                   rfbLog("Enabling SupportedMessages protocol extension for client "
@@ -2761,7 +2807,25 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 	    return;
 	}
 
-	rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbPointerEventMsg, sz_rfbPointerEventMsg);
+	if (cl->enableExtendedMouseButtons &&
+	    (msg.pe.buttonMask & rfbPointerEventExtendedButtonMask)) {
+	    uint8_t extendedButtonMask;
+	    if ((n = rfbReadExact(cl, (char *)&extendedButtonMask, 1)) <= 0) {
+		if (n != 0)
+		    rfbLogPerror("rfbProcessClientNormalMessage: read");
+		rfbCloseClient(cl);
+		return;
+	    }
+	    msg.pe.buttonMask = (msg.pe.buttonMask & ~rfbPointerEventExtendedButtonMask) |
+	                        (extendedButtonMask << 7);
+	    rfbStatRecordMessageRcvd(cl, msg.type,
+	                             sz_rfbExtendedPointerEventMsg,
+	                             sz_rfbExtendedPointerEventMsg);
+	} else {
+	    rfbStatRecordMessageRcvd(cl, msg.type,
+	                             sz_rfbPointerEventMsg,
+	                             sz_rfbPointerEventMsg);
+	}
 	
 	if (cl->screen->pointerClient && cl->screen->pointerClient != cl)
 	    return;
@@ -3201,6 +3265,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     rfbBool sendCursorShape = FALSE;
     rfbBool sendCursorPos = FALSE;
     rfbBool sendKeyboardLedState = FALSE;
+    rfbBool sendExtendedMouseButtons = FALSE;
     rfbBool sendSupportedMessages = FALSE;
     rfbBool sendSupportedEncodings = FALSE;
     rfbBool sendServerIdentity = FALSE;
@@ -3271,6 +3336,15 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
             sendKeyboardLedState = TRUE;
             cl->lastKeyboardLedState=x;
         }
+    }
+
+    /*
+     * Do we plan to acknowledge ExtendedMouseButtons support?
+     */
+    if (cl->extendedMouseButtonsPending)
+    {
+        sendExtendedMouseButtons = TRUE;
+        cl->extendedMouseButtonsPending = FALSE;
     }
 
     /*
@@ -3543,6 +3617,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
 	fu->nRects = Swap16IfLE((uint16_t)(sraRgnCountRects(updateCopyRegion) +
 					   nUpdateRegionRects +
 					   !!sendCursorShape + !!sendCursorPos + !!sendKeyboardLedState +
+                                           !!sendExtendedMouseButtons +
 					   !!sendSupportedMessages + !!sendSupportedEncodings + !!sendServerIdentity));
     } else {
 	fu->nRects = 0xFFFF;
@@ -3563,6 +3638,11 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
    
    if (sendKeyboardLedState) {
        if (!rfbSendKeyboardLedState(cl))
+           goto updateFailed;
+   }
+
+   if (sendExtendedMouseButtons) {
+       if (!rfbSendExtendedMouseButtons(cl))
            goto updateFailed;
    }
 

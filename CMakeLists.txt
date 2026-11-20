@@ -712,6 +712,13 @@ if(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT) AN
      )
 endif(WITH_THREADS AND (CMAKE_USE_PTHREADS_INIT OR CMAKE_USE_WIN32_THREADS_INIT) AND WITH_LIBVNCSERVER AND WITH_LIBVNCCLIENT)
 
+if(UNIX AND WITH_LIBVNCCLIENT)
+  set(SIMPLETESTS
+      ${SIMPLETESTS}
+      extended_mouse_buttons_test
+     )
+endif(UNIX AND WITH_LIBVNCCLIENT)
+
 foreach(t ${SIMPLETESTS})
   add_executable(test_${t} ${TESTS_DIR}/${t}.c)
   set_target_properties(test_${t} PROPERTIES OUTPUT_NAME ${t})
@@ -765,6 +772,7 @@ if(UNIX)
   endif(WITH_LIBVNCSERVER)
   if(WITH_LIBVNCCLIENT)
     add_test(NAME includetest_client COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} ${CMAKE_MAKE_PROGRAM} "rfb/rfbclient.h")
+    add_test(NAME extended_mouse_buttons COMMAND test_extended_mouse_buttons_test)
   endif(WITH_LIBVNCCLIENT)
 endif(UNIX)
 if(WITH_JPEG AND FOUND_LIBJPEG_TURBO)

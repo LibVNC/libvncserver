@@ -415,6 +415,9 @@ typedef struct _rfbClient {
         /** the QoS IP DSCP for this client */
         int QoS_DSCP;
 
+        /** server acknowledged ExtendedMouseButtons pointer events */
+        rfbBool extendedMouseButtonsEnabled;
+
         /** hook to handle xvp server messages */
 	HandleXvpMsgProc           HandleXvpMsg;
 

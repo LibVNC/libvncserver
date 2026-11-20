@@ -516,6 +516,7 @@ typedef struct {
 #define rfbEncodingLastRect           0xFFFFFF20
 #define rfbEncodingNewFBSize          0xFFFFFF21
 #define rfbEncodingExtDesktopSize     0xFFFFFECC
+#define rfbEncodingExtendedMouseButtons 0xFFFFFEC4 /* -316 */
 
 #define rfbEncodingQualityLevel0   0xFFFFFFE0
 #define rfbEncodingQualityLevel1   0xFFFFFFE1
@@ -1431,11 +1432,23 @@ typedef struct {
 #define rfbButton3Mask 4
 #define rfbButton4Mask 8
 #define rfbButton5Mask 16
+#define rfbButton6Mask 32
+#define rfbButton7Mask 64
+#define rfbButton8Mask 128
+#define rfbButton9Mask 256
+#define rfbButton10Mask 512
+#define rfbButton11Mask 1024
+#define rfbButton12Mask 2048
+#define rfbButton13Mask 4096
+#define rfbButton14Mask 8192
+#define rfbButton15Mask 16384
+#define rfbPointerEventExtendedButtonMask 128
 /* RealVNC 335 method */
 #define rfbWheelUpMask rfbButton4Mask
 #define rfbWheelDownMask rfbButton5Mask
 
 #define sz_rfbPointerEventMsg 6
+#define sz_rfbExtendedPointerEventMsg 7
 
 
 
