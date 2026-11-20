@@ -191,6 +191,18 @@ a URL to point your web browser to. There, you can click on the noVNC-Button to
 connect using the noVNC viewer git submodule (installable via
 `git submodule update --init`).
 
+By default, LibVNCServer auto-detects whether an incoming connection starts
+with a WebSocket handshake or with the regular RFB handshake. If the expected
+transport is known, the detection mode can be selected explicitly:
+
+    ../examples/example -websocketmode auto
+    ../examples/example -websocketmode rfb
+    ../examples/example -websocketmode ws
+
+`auto` keeps the default behavior. `rfb` skips WebSocket probing and treats the
+connection as regular RFB immediately. `ws` expects a WebSocket handshake before
+starting the RFB session.
+
 ### Using Secure Websockets
 
 If you don't already have an SSL cert that's trusted by your browser, the most
