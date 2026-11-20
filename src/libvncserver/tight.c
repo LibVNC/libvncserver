@@ -123,7 +123,7 @@ typedef struct PALETTE_s {
 void rfbFreeTightData (rfbClientPtr cl)
 {
     if (cl->tightTJ) {
-        tjDestroy(cl->tightTJ);
+        rdr_tjDestroy(cl->tightTJ);
 		/* Set freed resource handle to 0! */
         cl->tightTJ = 0;
 	}
@@ -1539,17 +1539,17 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
         return 0;
     }
     if (!cl->tightTJ) {
-        if ((cl->tightTJ = tjInitCompress()) == NULL) {
-            rfbLog("JPEG Error: %s\n", tjGetErrorStr());
+        if ((cl->tightTJ = rdr_tjInitCompress()) == NULL) {
+            rfbLog("JPEG Error: %s\n", rdr_tjGetErrorStr());
             return 0;
         }
     }
 
-    if (!cl->afterEncBuf || cl->afterEncBufSize < TJBUFSIZE(w, h)) {
+    if (!cl->afterEncBuf || cl->afterEncBufSize < rdr_TJBUFSIZE(w, h)) {
         if (cl->afterEncBuf == NULL)
-            cl->afterEncBuf = (char *)malloc(TJBUFSIZE(w, h));
+            cl->afterEncBuf = (char *)malloc(rdr_TJBUFSIZE(w, h));
         else {
-            char *reallocedAfterEncBuf = (char *)realloc(cl->afterEncBuf, TJBUFSIZE(w, h));
+            char *reallocedAfterEncBuf = (char *)realloc(cl->afterEncBuf, rdr_TJBUFSIZE(w, h));
             if (!reallocedAfterEncBuf) return FALSE;
             cl->afterEncBuf = reallocedAfterEncBuf;
         }
@@ -1558,7 +1558,7 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
             rfbLog("SendJpegRect: failed to allocate memory\n");
             return FALSE;
         }
-        cl->afterEncBufSize = TJBUFSIZE(w, h);
+        cl->afterEncBufSize = rdr_TJBUFSIZE(w, h);
     }
 
     if (ps == 2) {
@@ -1611,9 +1611,9 @@ SendJpegRect(rfbClientPtr cl, int x, int y, int w, int h, int quality)
             [y * pitch + x * ps];
     }
 
-    if (tjCompress(cl->tightTJ, srcbuf, w, pitch, h, ps, (unsigned char *)cl->afterEncBuf,
+    if (rdr_tjCompress(cl->tightTJ, srcbuf, w, pitch, h, ps, (unsigned char *)cl->afterEncBuf,
                    &size, subsamp, quality, flags) == -1) {
-        rfbLog("JPEG Error: %s\n", tjGetErrorStr());
+        rfbLog("JPEG Error: %s\n", rdr_tjGetErrorStr());
         if (tmpbuf) {
             free(tmpbuf);
             tmpbuf = NULL;

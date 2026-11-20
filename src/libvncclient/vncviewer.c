@@ -559,7 +559,7 @@ void rfbClientCleanup(rfbClient* client) {
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
   if(client->tjhnd){
-    tjDestroy(client->tjhnd);
+    rdr_tjDestroy(client->tjhnd);
     client->tjhnd = NULL;
   }
 #endif /* LIBVNCSERVER_HAVE_LIBJPEG */

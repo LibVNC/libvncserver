@@ -42,7 +42,7 @@
 #endif
 
 
-#define _throwtj() {printf("TurboJPEG ERROR:\n%s\n", tjGetErrorStr());  \
+#define _throwtj() {printf("TurboJPEG ERROR:\n%s\n", rdr_tjGetErrorStr());  \
 	bailout();}
 #define _tj(f) {if((f)==-1) _throwtj();}
 #define _throw(m) {printf("ERROR: %s\n", m);  bailout();}
@@ -252,8 +252,8 @@ void compTest(tjhandle handle, unsigned char **dstBuf,
 	if(*dstBuf && *dstSize>0) memset(*dstBuf, 0, *dstSize);
 
 	t=gettime();
-	*dstSize=tjBufSize(w, h, subsamp);
-	_tj(tjCompress2(handle, srcBuf, w, 0, h, pf, dstBuf, dstSize, subsamp,
+	*dstSize=rdr_tjBufSize(w, h, subsamp);
+	_tj(rdr_rdr_tjCompress2(handle, srcBuf, w, 0, h, pf, dstBuf, dstSize, subsamp,
 		jpegQual, flags));
 	t=gettime()-t;
 
@@ -285,7 +285,7 @@ void _decompTest(tjhandle handle, unsigned char *jpegBuf,
 		printf("%d/%d ... ", sf.num, sf.denom);
 	else printf("... ");
 
-	_tj(tjDecompressHeader2(handle, jpegBuf, jpegSize, &_hdrw, &_hdrh,
+	_tj(rdr_rdr_rdr_tjDecompressHeader2(handle, jpegBuf, jpegSize, &_hdrw, &_hdrh,
 		&_hdrsubsamp));
 	if(_hdrw!=w || _hdrh!=h || _hdrsubsamp!=subsamp)
 		_throw("Incorrect JPEG header");
@@ -296,7 +296,7 @@ void _decompTest(tjhandle handle, unsigned char *jpegBuf,
 	memset(dstBuf, 0, dstSize);
 
 	t=gettime();
-	_tj(tjDecompress2(handle, jpegBuf, jpegSize, dstBuf, scaledWidth, 0,
+	_tj(rdr_rdr_tjDecompress2(handle, jpegBuf, jpegSize, dstBuf, scaledWidth, 0,
 		scaledHeight, pf, flags));
 	t=gettime()-t;
 
@@ -315,7 +315,7 @@ void decompTest(tjhandle handle, unsigned char *jpegBuf,
 	int flags)
 {
 	int i, n=0;
-	tjscalingfactor *sf=tjGetScalingFactors(&n), sf1={1, 1};
+	tjscalingfactor *sf=rdr_tjGetScalingFactors(&n), sf1={1, 1};
 	if(!sf || !n) _throwtj();
 
 	if((subsamp==TJSAMP_444 || subsamp==TJSAMP_GRAY))
@@ -340,11 +340,11 @@ void doTest(int w, int h, const int *formats, int nformats, int subsamp,
 	unsigned char *dstBuf=NULL;
 	unsigned long size=0;  int pfi, pf, i;
 
-	size=tjBufSize(w, h, subsamp);
+	size=rdr_tjBufSize(w, h, subsamp);
 	if((dstBuf=(unsigned char *)malloc(size))==NULL)
 		_throw("Memory allocation failure.");
 
-	if((chandle=tjInitCompress())==NULL || (dhandle=tjInitDecompress())==NULL)
+	if((chandle=rdr_tjInitCompress())==NULL || (dhandle=rdr_tjInitDecompress())==NULL)
 		_throwtj();
 
 	for(pfi=0; pfi<nformats; pfi++)
@@ -367,8 +367,8 @@ void doTest(int w, int h, const int *formats, int nformats, int subsamp,
 	}
 
 	bailout:
-	if(chandle) tjDestroy(chandle);
-	if(dhandle) tjDestroy(dhandle);
+	if(chandle) rdr_tjDestroy(chandle);
+	if(dhandle) rdr_tjDestroy(dhandle);
 
 	free(dstBuf);
 }
@@ -381,7 +381,7 @@ void bufSizeTest(void)
 	tjhandle handle=NULL;
 	unsigned long jpegSize=0;
 
-	if((handle=tjInitCompress())==NULL) _throwtj();
+	if((handle=rdr_tjInitCompress())==NULL) _throwtj();
 
 	printf("Buffer size regression test\n");
 	for(subsamp=0; subsamp<TJ_NUMSAMP; subsamp++)
@@ -394,10 +394,10 @@ void bufSizeTest(void)
 				if(h%100==0) printf("%.4d x %.4d\b\b\b\b\b\b\b\b\b\b\b", w, h);
 				if((srcBuf=(unsigned char *)malloc(w*h*4))==NULL)
 					_throw("Memory allocation failure");
-				if((jpegBuf=(unsigned char *)malloc(tjBufSize(w, h, subsamp)))
+				if((jpegBuf=(unsigned char *)malloc(rdr_tjBufSize(w, h, subsamp)))
 					==NULL)
 					_throw("Memory allocation failure");
-				jpegSize=tjBufSize(w, h, subsamp);
+				jpegSize=rdr_tjBufSize(w, h, subsamp);
 
 				for(i=0; i<w*h*4; i++)
 				{
@@ -405,17 +405,17 @@ void bufSizeTest(void)
 					else srcBuf[i]=255;
 				}
 
-				_tj(tjCompress2(handle, srcBuf, w, 0, h, TJPF_BGRX, &jpegBuf,
+				_tj(rdr_rdr_tjCompress2(handle, srcBuf, w, 0, h, TJPF_BGRX, &jpegBuf,
 					&jpegSize, subsamp, 100, 0));
 				free(srcBuf);  srcBuf=NULL;
 				free(jpegBuf);  jpegBuf=NULL;
 
 				if((srcBuf=(unsigned char *)malloc(h*w*4))==NULL)
 					_throw("Memory allocation failure");
-				if((jpegBuf=(unsigned char *)malloc(tjBufSize(h, w, subsamp)))
+				if((jpegBuf=(unsigned char *)malloc(rdr_tjBufSize(h, w, subsamp)))
 					==NULL)
 					_throw("Memory allocation failure");
-				jpegSize=tjBufSize(h, w, subsamp);
+				jpegSize=rdr_tjBufSize(h, w, subsamp);
 
 				for(i=0; i<h*w*4; i++)
 				{
@@ -423,7 +423,7 @@ void bufSizeTest(void)
 					else srcBuf[i]=255;
 				}
 
-				_tj(tjCompress2(handle, srcBuf, h, 0, w, TJPF_BGRX, &jpegBuf,
+				_tj(rdr_rdr_tjCompress2(handle, srcBuf, h, 0, w, TJPF_BGRX, &jpegBuf,
 					&jpegSize, subsamp, 100, 0));
 				free(srcBuf);  srcBuf=NULL;
 				free(jpegBuf);  jpegBuf=NULL;
@@ -435,7 +435,7 @@ void bufSizeTest(void)
 	bailout:
 	free(srcBuf);
 	free(jpegBuf);
-	if(handle) tjDestroy(handle);
+	if(handle) rdr_tjDestroy(handle);
 }
 
 
