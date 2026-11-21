@@ -98,14 +98,14 @@ static rfbBool MallocFrameBuffer(rfbClient* client) {
   allocSize = (uint64_t)client->width * client->height * client->format.bitsPerPixel/8;
 
   if (allocSize >= SIZE_MAX) {
-    rfbClientErr("CRITICAL: cannot allocate frameBuffer, requested size is too large\n");
+    rfbClientErrEx(client, "CRITICAL: cannot allocate frameBuffer, requested size is too large\n");
     return FALSE;
   }
 
   client->frameBuffer=malloc( (size_t)allocSize );
 
   if (client->frameBuffer == NULL)
-    rfbClientErr("CRITICAL: frameBuffer allocation failed, requested size too large or not enough memory?\n");
+    rfbClientErrEx(client, "CRITICAL: frameBuffer allocation failed, requested size too large or not enough memory?\n");
 
   return client->frameBuffer?TRUE:FALSE;
 }
@@ -124,7 +124,7 @@ static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_
   }
 
   if (!CheckRect(client, x, y, w, h)) {
-    rfbClientLog("Rect out of bounds: %dx%d at (%d, %d)\n", x, y, w, h);
+    rfbClientLogEx(client, "Rect out of bounds: %dx%d at (%d, %d)\n", x, y, w, h);
     return;
   }
 
@@ -138,7 +138,7 @@ static void FillRectangle(rfbClient* client, int x, int y, int w, int h, uint32_
   case 16: FILL_RECT(16); break;
   case 32: FILL_RECT(32); break;
   default:
-    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
+    rfbClientLogEx(client, "Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
   }
 }
 
@@ -150,7 +150,7 @@ static void CopyRectangle(rfbClient* client, const uint8_t* buffer, int x, int y
   }
 
   if (!CheckRect(client, x, y, w, h)) {
-    rfbClientLog("Rect out of bounds: %dx%d at (%d, %d)\n", x, y, w, h);
+    rfbClientLogEx(client, "Rect out of bounds: %dx%d at (%d, %d)\n", x, y, w, h);
     return;
   }
 
@@ -168,7 +168,7 @@ static void CopyRectangle(rfbClient* client, const uint8_t* buffer, int x, int y
   case 16: COPY_RECT(16); break;
   case 32: COPY_RECT(32); break;
   default:
-    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
+    rfbClientLogEx(client, "Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
   }
 }
 
@@ -181,12 +181,12 @@ static void CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, 
   }
 
   if (!CheckRect(client, src_x, src_y, w, h)) {
-    rfbClientLog("Source rect out of bounds: %dx%d at (%d, %d)\n", src_x, src_y, w, h);
+    rfbClientLogEx(client, "Source rect out of bounds: %dx%d at (%d, %d)\n", src_x, src_y, w, h);
     return;
   }
 
   if (!CheckRect(client, dest_x, dest_y, w, h)) {
-    rfbClientLog("Dest rect out of bounds: %dx%d at (%d, %d)\n", dest_x, dest_y, w, h);
+    rfbClientLogEx(client, "Dest rect out of bounds: %dx%d at (%d, %d)\n", dest_x, dest_y, w, h);
     return;
   }
 
@@ -225,7 +225,7 @@ static void CopyRectangleFromRectangle(rfbClient* client, int src_x, int src_y, 
   case 16: COPY_RECT_FROM_RECT(16); break;
   case 32: COPY_RECT_FROM_RECT(32); break;
   default:
-    rfbClientLog("Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
+    rfbClientLogEx(client, "Unsupported bitsPerPixel: %d\n",client->format.bitsPerPixel);
   }
 }
 
@@ -296,12 +296,12 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 #endif
   rfbClient* client=(rfbClient*)calloc(sizeof(rfbClient),1);
   if(!client) {
-    rfbClientErr("Couldn't allocate client structure!\n");
+    rfbClientErrEx(client, "Couldn't allocate client structure!\n");
     return NULL;
   }
 #ifdef WIN32
   if((errno = WSAStartup(MAKEWORD(2,0), &unused)) != 0) {
-      rfbClientErr("Could not init Windows Sockets: %s\n", strerror(errno));
+      rfbClientErrEx(client, "Could not init Windows Sockets: %s\n", strerror(errno));
       return NULL;
   }
 #endif
@@ -547,14 +547,14 @@ void rfbClientCleanup(rfbClient* client) {
     if (client->zlibStreamActive[i] == TRUE ) {
       if (inflateEnd (&client->zlibStream[i]) != Z_OK &&
 	  client->zlibStream[i].msg != NULL)
-	rfbClientLog("inflateEnd: %s\n", client->zlibStream[i].msg);
+	rfbClientLogEx(client, "inflateEnd: %s\n", client->zlibStream[i].msg);
     }
   }
 
   if ( client->decompStreamInited == TRUE ) {
     if (inflateEnd (&client->decompStream) != Z_OK &&
 	client->decompStream.msg != NULL)
-      rfbClientLog("inflateEnd: %s\n", client->decompStream.msg );
+      rfbClientLogEx(client, "inflateEnd: %s\n", client->decompStream.msg );
   }
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
@@ -600,7 +600,7 @@ void rfbClientCleanup(rfbClient* client) {
 #ifdef WIN32
   if(WSACleanup() != 0) {
       errno=WSAGetLastError();
-      rfbClientErr("Could not terminate Windows Sockets: %s\n", strerror(errno));
+      rfbClientErrEx(client, "Could not terminate Windows Sockets: %s\n", strerror(errno));
   }
 #endif
 
