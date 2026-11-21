@@ -3145,6 +3145,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                     clp->requestedDesktopSizeChange = rfbExtDesktopSize_OtherClientRequestedChange;
                 UNLOCK(clp->updateMutex);
             }
+            rfbReleaseClientIterator(iterator);
         }
         else
         {
