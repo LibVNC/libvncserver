@@ -701,6 +701,7 @@ if(WITH_LIBVNCSERVER)
   list(APPEND SIMPLETESTS
     cargstest
     copyrecttest
+    http_no_dir_shutdown
   )
 endif(WITH_LIBVNCSERVER)
 
@@ -758,6 +759,7 @@ endif(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
 
 if(WITH_LIBVNCSERVER)
   add_test(NAME cargs COMMAND test_cargstest)
+  add_test(NAME http_no_dir_shutdown COMMAND test_http_no_dir_shutdown)
 endif(WITH_LIBVNCSERVER)
 if(UNIX)
   if(WITH_LIBVNCSERVER)
