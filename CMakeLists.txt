@@ -701,6 +701,7 @@ if(WITH_LIBVNCSERVER)
   list(APPEND SIMPLETESTS
     cargstest
     copyrecttest
+    cursor_update_region_test
   )
 endif(WITH_LIBVNCSERVER)
 
@@ -758,6 +759,7 @@ endif(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
 
 if(WITH_LIBVNCSERVER)
   add_test(NAME cargs COMMAND test_cargstest)
+  add_test(NAME cursor_update_region COMMAND test_cursor_update_region_test)
 endif(WITH_LIBVNCSERVER)
 if(UNIX)
   if(WITH_LIBVNCSERVER)
