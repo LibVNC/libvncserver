@@ -249,7 +249,11 @@ hexdump:
 rfbBool
 WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 {
+#ifdef RFB_USE_POLL
+  struct pollfd pfd;
+#else
   fd_set fds;
+#endif
   int i = 0;
   int j;
   const char *obuf = buf;
@@ -302,6 +306,18 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
               return FALSE;
           }
 
+#ifdef RFB_USE_POLL
+	  pfd.fd = client->sock;
+	  pfd.events = POLLOUT;
+	  pfd.revents = 0;
+
+	  if (poll(&pfd, 1, -1) <= 0) {
+	    rfbClientErr("poll\n");
+	    return FALSE;
+	  }
+	  /* POLLERR/POLLHUP need no special casing: the write() retried below
+	     reports the error just like it does in the select() case. */
+#else
 	  FD_ZERO(&fds);
 	  FD_SET(client->sock,&fds);
 
@@ -309,6 +325,7 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 	    rfbClientErr("select\n");
 	    return FALSE;
 	  }
+#endif
 	  j = 0;
 	} else {
 	  rfbClientErr("write\n");
@@ -855,8 +872,13 @@ PrintInHex(char *buf, int len)
 
 int WaitForMessage(rfbClient* client,unsigned int usecs)
 {
+#ifdef RFB_USE_POLL
+  struct pollfd pfd;
+  int timeout_ms;
+#else
   fd_set fds;
   struct timeval timeout;
+#endif
   int num;
 
   if (client->serverPort==-1)
@@ -868,18 +890,39 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
     return 1;
   }
 
-  timeout.tv_sec=(usecs/1000000);
-  timeout.tv_usec=(usecs%1000000);
-
   if(client->sock == RFB_INVALID_SOCKET) {
       errno = EBADF;
       return -1;
   }
 
+#ifdef RFB_USE_POLL
+  /* poll() only offers millisecond resolution, so round up: truncating a
+     sub-millisecond timeout to 0 would turn callers that wait for a short
+     while into busy loops. */
+  timeout_ms=(usecs/1000) + (usecs%1000 ? 1 : 0);
+
+  pfd.fd = client->sock;
+  pfd.events = POLLIN | POLLPRI;
+  pfd.revents = 0;
+
+  num=poll(&pfd, 1, timeout_ms);
+  /* Only a positive return value means revents was filled in. POLLERR and
+     POLLHUP are deliberately reported as ready, mirroring select() which marks
+     a hung-up socket readable so that the following read() drains whatever is
+     left and then reports the error. */
+  if(num>0 && (pfd.revents & POLLNVAL)) {
+    errno = EBADF;
+    num = -1;
+  }
+#else
+  timeout.tv_sec=(usecs/1000000);
+  timeout.tv_usec=(usecs%1000000);
+
   FD_ZERO(&fds);
   FD_SET(client->sock,&fds);
 
   num=select(client->sock+1, &fds, NULL, NULL, &timeout);
+#endif
   if(num<0) {
 #ifdef WIN32
     errno=WSAGetLastError();

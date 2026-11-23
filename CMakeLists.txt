@@ -168,6 +168,7 @@ check_include_file("dirent.h"      LIBVNCSERVER_HAVE_DIRENT_H)
 check_include_file("endian.h"      LIBVNCSERVER_HAVE_ENDIAN_H)
 check_include_file("fcntl.h"       LIBVNCSERVER_HAVE_FCNTL_H)
 check_include_file("netinet/in.h"  LIBVNCSERVER_HAVE_NETINET_IN_H)
+check_include_file("poll.h"        LIBVNCSERVER_HAVE_POLL_H)
 check_include_file("sys/endian.h"  LIBVNCSERVER_HAVE_SYS_ENDIAN_H)
 check_include_file("sys/socket.h"  LIBVNCSERVER_HAVE_SYS_SOCKET_H)
 check_include_file("sys/stat.h"    LIBVNCSERVER_HAVE_SYS_STAT_H)
@@ -203,6 +204,7 @@ check_function_exists(inet_ntoa       LIBVNCSERVER_HAVE_INET_NTOA)
 check_function_exists(memmove         LIBVNCSERVER_HAVE_MEMMOVE)
 check_function_exists(memset          LIBVNCSERVER_HAVE_MEMSET)
 check_function_exists(mkfifo          LIBVNCSERVER_HAVE_MKFIFO)
+check_function_exists(poll            LIBVNCSERVER_HAVE_POLL)
 check_function_exists(select          LIBVNCSERVER_HAVE_SELECT)
 check_function_exists(socket          LIBVNCSERVER_HAVE_SOCKET)
 check_function_exists(strchr          LIBVNCSERVER_HAVE_STRCHR)
@@ -702,6 +704,12 @@ if(WITH_LIBVNCSERVER)
     cargstest
     copyrecttest
   )
+  if(UNIX)
+    # uses BSD sockets directly to stand in for a repeater
+    list(APPEND SIMPLETESTS
+      repeatertest
+    )
+  endif(UNIX)
 endif(WITH_LIBVNCSERVER)
 
 
@@ -762,6 +770,9 @@ endif(WITH_LIBVNCSERVER)
 if(UNIX)
   if(WITH_LIBVNCSERVER)
     add_test(NAME includetest_server COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} ${CMAKE_MAKE_PROGRAM} "rfb/rfb.h")
+    add_test(NAME repeater COMMAND test_repeatertest)
+    # a broken connect completion wait fails after rfbMaxClientWait, don't hang forever
+    set_tests_properties(repeater PROPERTIES TIMEOUT 60)
   endif(WITH_LIBVNCSERVER)
   if(WITH_LIBVNCCLIENT)
     add_test(NAME includetest_client COMMAND ${TESTS_DIR}/includetest.sh ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR} ${CMAKE_MAKE_PROGRAM} "rfb/rfbclient.h")

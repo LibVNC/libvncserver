@@ -24,6 +24,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <string.h>
 
 #include "sockets.h"
@@ -53,37 +54,63 @@ rfbBool sock_set_nonblocking(rfbSocket sock, rfbBool non_blocking, void (*log)(c
 
 rfbBool sock_wait_for_connected(int socket, unsigned int timeout_seconds)
 {
+#ifdef RFB_USE_POLL
+  struct pollfd pfd;
+  int timeout_ms;
+#else
   fd_set writefds;
   fd_set exceptfds;
   struct timeval timeout;
-
-  timeout.tv_sec=timeout_seconds;
-  timeout.tv_usec=0;
+#endif /* RFB_USE_POLL */
 
   if(socket == RFB_INVALID_SOCKET) {
       errno = EBADF;
       return FALSE;
   }
 
+#ifdef RFB_USE_POLL
+  /* An absurdly large timeout means waiting forever, which poll() encodes as -1. */
+  timeout_ms = timeout_seconds > (unsigned int)(INT_MAX/1000) ? -1 : (int)(timeout_seconds*1000);
+
+  pfd.fd = socket;
+  /* Completion of a non-blocking connect() is signalled as writability, a
+     failed one additionally sets POLLERR and/or POLLHUP. */
+  pfd.events = POLLOUT;
+  pfd.revents = 0;
+
+  if (poll(&pfd, 1, timeout_ms) != 1)
+    return FALSE;
+
+  if (pfd.revents & (POLLERR|POLLHUP|POLLNVAL))
+    return FALSE;
+#else
+  timeout.tv_sec=timeout_seconds;
+  timeout.tv_usec=0;
+
   FD_ZERO(&writefds);
   FD_SET(socket, &writefds);
   FD_ZERO(&exceptfds);
   FD_SET(socket, &exceptfds);
-  if (select(socket+1, NULL, &writefds, &exceptfds, &timeout)==1) {
+  if (select(socket+1, NULL, &writefds, &exceptfds, &timeout)!=1)
+    return FALSE;
+
 #ifdef WIN32
-    if (FD_ISSET(socket, &exceptfds))
-      return FALSE;
-#else
+  if (FD_ISSET(socket, &exceptfds))
+    return FALSE;
+#endif /* WIN32 */
+#endif /* RFB_USE_POLL */
+
+#ifndef WIN32
+  {
     int so_error;
     socklen_t len = sizeof so_error;
     getsockopt(socket, SOL_SOCKET, SO_ERROR, &so_error, &len);
     if (so_error!=0)
       return FALSE;
-#endif
-    return TRUE;
   }
+#endif
 
-  return FALSE;
+  return TRUE;
 }
 
 
