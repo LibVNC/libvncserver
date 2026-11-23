@@ -30,6 +30,28 @@
 #ifndef __TURBOJPEG_H__
 #define __TURBOJPEG_H__
 
+/* Rename TurboJPEG symbols to prevent global symbol collision */
+#define tjInitCompress vnc_tjInitCompress
+#define tjCompress2 vnc_tjCompress2
+#define tjCompress vnc_tjCompress
+#define tjBufSize vnc_tjBufSize
+#define TJBUFSIZE vnc_TJBUFSIZE
+#define tjInitDecompress vnc_tjInitDecompress
+#define tjDecompressHeader2 vnc_tjDecompressHeader2
+#define tjDecompressHeader vnc_tjDecompressHeader
+#define tjGetScalingFactors vnc_tjGetScalingFactors
+#define tjDecompress2 vnc_tjDecompress2
+#define tjDecompress vnc_tjDecompress
+#define tjDestroy vnc_tjDestroy
+#define tjGetErrorStr vnc_tjGetErrorStr
+#define tjMCUWidth vnc_tjMCUWidth
+#define tjMCUHeight vnc_tjMCUHeight
+#define tjRedOffset vnc_tjRedOffset
+#define tjGreenOffset vnc_tjGreenOffset
+#define tjBlueOffset vnc_tjBlueOffset
+#define tjPixelSize vnc_tjPixelSize
+
+
 #if defined(_WIN32) && defined(DLLDEFINE)
 #define DLLEXPORT __declspec(dllexport)
 #else
