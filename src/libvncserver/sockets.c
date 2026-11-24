@@ -97,6 +97,7 @@ int deny_severity=LOG_WARNING;
 #endif
 
 #include "sockets.h"
+#include "private.h"
 
 int rfbMaxClientWait = 20000;   /* time (ms) after which we decide client has
                                    gone away - needed to stop us hanging */
@@ -334,6 +335,31 @@ void rfbShutdownSockets(rfbScreenInfoPtr rfbScreen)
 	rfbLogPerror("Could not terminate Windows Sockets\n");
     }
 #endif
+}
+
+/*
+ * Return whether the given socket is still in TCP LISTEN state.
+ *
+ * When an interface goes down, an OS can drop a listener bound to its address
+ * out of LISTEN state while keeping the fd valid: select() on such a dead
+ * socket reports readable forever while accept() always fails, so callers
+ * must not poll it. A closed fd also reports FALSE.
+ */
+rfbBool
+rfbListenSocketIsListening(rfbSocket sock)
+{
+    int val = 0;
+    int optlen = sizeof(val);
+
+    if (sock == RFB_INVALID_SOCKET)
+        return FALSE;
+#ifdef WIN32
+    if (getsockopt(sock, SOL_SOCKET, SO_ACCEPTCONN, (char *)&val, &optlen) != 0)
+#else
+    if (getsockopt(sock, SOL_SOCKET, SO_ACCEPTCONN, &val, (socklen_t *)&optlen) != 0)
+#endif
+        return FALSE;
+    return val != 0;
 }
 
 /*
@@ -635,6 +661,32 @@ rfbCloseClient(rfbClientPtr cl)
     cl->sock = RFB_INVALID_SOCKET;
 #endif
     rfbExtensionData* extension;
+
+    /* may be called concurrently from several threads; the close path below
+       frees per-client data and must run exactly once */
+    LOCK(cl->closeMutex);
+    if (cl->closeStarted) {
+	UNLOCK(cl->closeMutex);
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+	if (cl->screen->backgroundLoop) {
+	    /*
+	      ...but a repeated call still marks the client as shutting down:
+	      its own thread may have stored a handshake state (RFB_NORMAL)
+	      over the RFB_SHUTDOWN of the first call. Its next read of the
+	      shut-down socket fails and lands here, and has to end the loop
+	      in clientInput(), which would otherwise go round on a socket
+	      that reads EOF forever.
+	    */
+	    LOCK(cl->updateMutex);
+	    cl->state = RFB_SHUTDOWN;
+	    TSIGNAL(cl->updateCond);
+	    UNLOCK(cl->updateMutex);
+	}
+#endif
+	return;
+    }
+    cl->closeStarted = TRUE;
+    UNLOCK(cl->closeMutex);
 
     for(extension=cl->extensions; extension; extension=extension->next)
         if(extension->extension->close) {

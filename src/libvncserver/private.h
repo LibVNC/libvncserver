@@ -11,6 +11,13 @@ void rfbRedrawAfterHideCursor(rfbClientPtr cl,sraRegionPtr updateRegion);
 
 rfbClientPtr rfbClientIteratorHead(rfbClientIteratorPtr i);
 
+/* from sockets.c */
+
+/** Return whether sock is still in TCP LISTEN state. A listener dropped out of
+ * LISTEN state by the OS when its interface went down must not be select()ed
+ * on: it reports readable forever while accept() always fails. */
+rfbBool rfbListenSocketIsListening(rfbSocket sock);
+
 /* from tight.c */
 
 #ifdef LIBVNCSERVER_HAVE_LIBZ

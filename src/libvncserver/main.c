@@ -639,9 +639,14 @@ listenerRun(void *data)
         client_fd = -1;
         cl = NULL;
         FD_ZERO(&listen_fds);
-	if(screen->listenSock != RFB_INVALID_SOCKET)
+	/* Only select() on listeners that are actually listening: a listener
+	   dropped out of LISTEN state when its interface went down reports
+	   readable forever while accept() always fails, which would spin this
+	   loop. rfbRequestListenRebind() swaps in fresh listeners when the
+	   interface returns. */
+	if(rfbListenSocketIsListening(screen->listenSock))
 	  FD_SET(screen->listenSock, &listen_fds);
-	if(screen->listen6Sock != RFB_INVALID_SOCKET)
+	if(rfbListenSocketIsListening(screen->listen6Sock))
 	  FD_SET(screen->listen6Sock, &listen_fds);
 #ifndef WIN32
 	FD_SET(screen->pipe_notify_listener_thread[0], &listen_fds);

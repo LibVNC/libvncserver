@@ -58,6 +58,7 @@
 #endif
 
 #include "sockets.h"
+#include "private.h"
 
 #ifdef USE_LIBWRAP
 #include <tcpd.h>
@@ -202,8 +203,12 @@ rfbHttpCheckFds(rfbScreenInfoPtr rfbScreen)
 	return;
 
     FD_ZERO(&fds);
-    FD_SET(rfbScreen->httpListenSock, &fds);
-    if (rfbScreen->httpListen6Sock != RFB_INVALID_SOCKET) {
+    /* Like the RFB listener in listenerRun(): only poll listeners that are
+       actually listening, else a dead listener would spin the calling loop. */
+    if (rfbListenSocketIsListening(rfbScreen->httpListenSock)) {
+	FD_SET(rfbScreen->httpListenSock, &fds);
+    }
+    if (rfbListenSocketIsListening(rfbScreen->httpListen6Sock)) {
 	FD_SET(rfbScreen->httpListen6Sock, &fds);
     }
     if (rfbScreen->httpSock != RFB_INVALID_SOCKET) {

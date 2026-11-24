@@ -740,6 +740,12 @@ typedef struct _rfbClientRec {
     ClientPeekAtSocket peekAtSocket;             /* Peek at data from socket */
     ClientHasPendingOnSocket hasPendingOnSocket; /* Has pending data on socket */
     ClientWriteToSocket writeToSocket;           /* Write data to socket */
+
+#if defined(LIBVNCSERVER_HAVE_LIBPTHREAD) || defined(LIBVNCSERVER_HAVE_WIN32THREADS)
+    MUTEX(closeMutex);
+#endif
+    /** set once rfbCloseClient() starts closing this client */
+    rfbBool closeStarted;
 } rfbClientRec, *rfbClientPtr;
 
 /**

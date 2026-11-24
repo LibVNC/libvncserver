@@ -461,6 +461,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 
       INIT_MUTEX(cl->updateMutex);
       INIT_COND(cl->updateCond);
+      INIT_MUTEX(cl->closeMutex);
 
       cl->requestedRegion = sraRgnCreate();
 
@@ -709,6 +710,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
 
     TINI_COND(cl->updateCond);
     TINI_MUTEX(cl->updateMutex);
+    TINI_MUTEX(cl->closeMutex);
 
     /* make sure outputMutex is unlocked before destroying */
     LOCK(cl->outputMutex);
