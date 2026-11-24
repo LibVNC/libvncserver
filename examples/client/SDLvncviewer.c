@@ -6,6 +6,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <signal.h>
+#include <time.h>
 #include <rfb/rfbclient.h>
 
 struct { int sdl; int rfb; } buttonMapping[]={
