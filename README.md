@@ -1,5 +1,4 @@
 [![CI](https://github.com/LibVNC/libvncserver/actions/workflows/ci.yml/badge.svg)](https://github.com/LibVNC/libvncserver/actions/workflows/ci.yml)
-[![Build status](https://ci.appveyor.com/api/projects/status/fao6m1md3q4g2bwn/branch/master?svg=true)](https://ci.appveyor.com/project/bk138/libvncserver/branch/master)
 [![Help making this possible](https://img.shields.io/badge/liberapay-donate-yellow.png)](https://liberapay.com/LibVNC/donate) [![Join the chat at https://gitter.im/LibVNC/libvncserver](https://badges.gitter.im/LibVNC/libvncserver.svg)](https://gitter.im/LibVNC/libvncserver?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 LibVNCServer: A library for easy implementation of a VNC server.
@@ -104,7 +103,7 @@ Transport Layer Security support in LibVNCClient and LibVNCServer can use:
  * GnuTLS  (`-DWITH_OPENSSL=OFF -DWITH_GNUTLS=ON`)
 
 For some more comprehensive examples that include installation of dependencies, see
-the [Unix CI](.travis.yml) and [Windows CI](.appveyor.yml) build setups.
+the [CI workflow](.github/workflows/ci.yml) build setup.
 
 Crosscompiling from Unix to Android
 -----------------------------------
