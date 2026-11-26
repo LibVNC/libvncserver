@@ -140,15 +140,9 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 #ifdef LIBVNCSERVER_HAVE_SASL
       if (client->saslconn)
         i = ReadFromSASL(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
-      else {
+      else
 #endif /* LIBVNCSERVER_HAVE_SASL */
-        i = read(client->sock, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
-#ifdef WIN32
-	if (i < 0) errno=WSAGetLastError();
-#endif
-#ifdef LIBVNCSERVER_HAVE_SASL
-      }
-#endif
+        i = client->sockOps->read(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
   
       if (i <= 0) {
 	if (i < 0) {
@@ -194,7 +188,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
         i = ReadFromSASL(client, out, n);
       else
 #endif
-        i = read(client->sock, out, n);
+        i = client->sockOps->read(client, out, n);
 
       if (i <= 0) {
 	if (i < 0) {
@@ -249,9 +243,7 @@ hexdump:
 rfbBool
 WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
 {
-  fd_set fds;
   int i = 0;
-  int j;
   const char *obuf = buf;
 #ifdef LIBVNCSERVER_HAVE_SASL
   const char *output;
@@ -284,44 +276,7 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
   }
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
-  while (i < n) {
-    j = write(client->sock, obuf + i, (n - i));
-    if (j <= 0) {
-      if (j < 0) {
-#ifdef WIN32
-	 errno=WSAGetLastError();
-#endif
-	if (errno == EWOULDBLOCK ||
-#ifdef LIBVNCSERVER_ENOENT_WORKAROUND
-		errno == ENOENT ||
-#endif
-		errno == EAGAIN) {
-          if(client->sock == RFB_INVALID_SOCKET) {
-              errno = EBADF;
-              rfbClientErr("socket invalid\n");
-              return FALSE;
-          }
-
-	  FD_ZERO(&fds);
-	  FD_SET(client->sock,&fds);
-
-	  if (select(client->sock+1, NULL, &fds, NULL, NULL) <= 0) {
-	    rfbClientErr("select\n");
-	    return FALSE;
-	  }
-	  j = 0;
-	} else {
-	  rfbClientErr("write\n");
-	  return FALSE;
-	}
-      } else {
-	rfbClientLog("write failed\n");
-	return FALSE;
-      }
-    }
-    i += j;
-  }
-  return TRUE;
+  return client->sockOps->write(client, obuf, n);
 }
 
 
@@ -855,10 +810,6 @@ PrintInHex(char *buf, int len)
 
 int WaitForMessage(rfbClient* client,unsigned int usecs)
 {
-  fd_set fds;
-  struct timeval timeout;
-  int num;
-
   if (client->serverPort==-1)
     /* playing back vncrec file */
     return 1;
@@ -868,13 +819,90 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
     return 1;
   }
 
-  timeout.tv_sec=(usecs/1000000);
-  timeout.tv_usec=(usecs%1000000);
-
   if(client->sock == RFB_INVALID_SOCKET) {
       errno = EBADF;
       return -1;
   }
+
+  return client->sockOps->wait(client, usecs);
+}
+
+/*
+ * Default socket transport ops: plain BSD sockets.
+ */
+
+int
+rfbDefaultSocketRead(rfbClient* client, char* buf, unsigned int len)
+{
+  int i = read(client->sock, buf, len);
+#ifdef WIN32
+  if (i < 0) errno=WSAGetLastError();
+#endif
+  return i;
+}
+
+rfbBool
+rfbDefaultSocketWrite(rfbClient* client, const char* buf, unsigned int n)
+{
+  fd_set fds;
+  int i = 0;
+  int j;
+
+  while (i < n) {
+    j = write(client->sock, buf + i, (n - i));
+    if (j <= 0) {
+      if (j < 0) {
+#ifdef WIN32
+	 errno=WSAGetLastError();
+#endif
+	if (errno == EWOULDBLOCK ||
+#ifdef LIBVNCSERVER_ENOENT_WORKAROUND
+		errno == ENOENT ||
+#endif
+		errno == EAGAIN) {
+          if(client->sock == RFB_INVALID_SOCKET) {
+              errno = EBADF;
+              rfbClientErr("socket invalid\n");
+              return FALSE;
+          }
+
+	  FD_ZERO(&fds);
+	  FD_SET(client->sock,&fds);
+
+	  if (select(client->sock+1, NULL, &fds, NULL, NULL) <= 0) {
+	    rfbClientErr("select\n");
+	    return FALSE;
+	  }
+	  j = 0;
+	} else {
+	  rfbClientErr("write\n");
+	  return FALSE;
+	}
+      } else {
+	rfbClientLog("write failed\n");
+	return FALSE;
+      }
+    }
+    i += j;
+  }
+  return TRUE;
+}
+
+void
+rfbDefaultSocketClose(rfbClient* client)
+{
+  rfbCloseSocket(client->sock);
+}
+
+int
+rfbDefaultSocketWait(rfbClient* client, unsigned int usecs)
+{
+  fd_set fds;
+  struct timeval timeout;
+  int num;
+
+  timeout.tv_sec=(usecs/1000000);
+  timeout.tv_usec=(usecs%1000000);
 
   FD_ZERO(&fds);
   FD_SET(client->sock,&fds);
@@ -889,5 +917,13 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 
   return num;
 }
+
+const rfbSocketOps rfbDefaultSocketOps = {
+  rfbDefaultSocketConnect,
+  rfbDefaultSocketRead,
+  rfbDefaultSocketWrite,
+  rfbDefaultSocketClose,
+  rfbDefaultSocketWait
+};
 
 

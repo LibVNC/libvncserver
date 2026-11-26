@@ -287,6 +287,32 @@ IsUnixSocket(const char *name)
 #endif
 
 /*
+ * Default socket transport connect op: plain BSD socket (TCP or UNIX socket).
+ */
+
+rfbSocket
+rfbDefaultSocketConnect(rfbClient* client, const char* hostname, int port)
+{
+#ifndef WIN32
+  if(IsUnixSocket(hostname))
+    /* serverHost is a UNIX socket. */
+    return ConnectClientToUnixSockWithTimeout(hostname, client->connectTimeout);
+#endif
+#ifdef LIBVNCSERVER_IPv6
+  return ConnectClientToTcpAddr6WithTimeout(hostname, port, client->connectTimeout);
+#else
+  unsigned int host;
+
+  /* serverHost is a hostname */
+  if (!StringToIPAddr(hostname, &host)) {
+    rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
+    return RFB_INVALID_SOCKET;
+  }
+  return ConnectClientToTcpAddrWithTimeout(host, port, client->connectTimeout);
+#endif
+}
+
+/*
  * ConnectToRFBServer.
  */
 
@@ -324,26 +350,7 @@ ConnectToRFBServer(rfbClient* client,const char *hostname, int port)
     return TRUE;
   }
 
-#ifndef WIN32
-  if(IsUnixSocket(hostname))
-    /* serverHost is a UNIX socket. */
-    client->sock = ConnectClientToUnixSockWithTimeout(hostname, client->connectTimeout);
-  else
-#endif
-  {
-#ifdef LIBVNCSERVER_IPv6
-    client->sock = ConnectClientToTcpAddr6WithTimeout(hostname, port, client->connectTimeout);
-#else
-    unsigned int host;
-
-    /* serverHost is a hostname */
-    if (!StringToIPAddr(hostname, &host)) {
-      rfbClientLog("Couldn't convert '%s' to host address\n", hostname);
-      return FALSE;
-    }
-    client->sock = ConnectClientToTcpAddrWithTimeout(host, port, client->connectTimeout);
-#endif
-  }
+  client->sock = client->sockOps->connect(client, hostname, port);
 
   if (client->sock == RFB_INVALID_SOCKET) {
     rfbClientLog("Unable to connect to VNC server\n");

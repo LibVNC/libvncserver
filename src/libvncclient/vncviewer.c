@@ -289,6 +289,10 @@ static void parse_host_and_port(const char *input, char **host, int *port) {
     }
 }
 
+void rfbClientSetSocketOps(rfbClient* client, const rfbSocketOps* ops) {
+  client->sockOps = ops ? ops : &rfbDefaultSocketOps;
+}
+
 rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
 			int bytesPerPixel) {
 #ifdef WIN32
@@ -391,6 +395,7 @@ rfbClient* rfbGetClient(int bitsPerSample,int samplesPerPixel,
   client->LockWriteToTLS = NULL;
   client->UnlockWriteToTLS = NULL;
   client->sock = RFB_INVALID_SOCKET;
+  rfbClientSetSocketOps(client, &rfbDefaultSocketOps);
   client->listenSock = RFB_INVALID_SOCKET;
   client->listenAddress = NULL;
   client->listen6Sock = RFB_INVALID_SOCKET;
@@ -579,7 +584,7 @@ void rfbClientCleanup(rfbClient* client) {
   free(client->vncRec);
 
   if (client->sock != RFB_INVALID_SOCKET)
-    rfbCloseSocket(client->sock);
+    client->sockOps->close(client);
   if (client->listenSock != RFB_INVALID_SOCKET)
     rfbCloseSocket(client->listenSock);
   if (client->listen6Sock != RFB_INVALID_SOCKET)

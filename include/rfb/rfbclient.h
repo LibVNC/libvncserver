@@ -253,6 +253,25 @@ typedef char* (*GetUserProc)(struct _rfbClient* client);
 typedef char* (*GetSASLMechanismProc)(struct _rfbClient* client, char* mechlist);
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
+/**
+ * Socket transport operations. libvncclient's plain socket I/O goes through
+ * these. Install a custom transport with rfbClientSetSocketOps() after
+ * rfbGetClient(); it defaults to rfbDefaultSocketOps (BSD sockets).
+ */
+typedef rfbSocket (*rfbSocketConnectProc)(struct _rfbClient* client, const char* hostname, int port);
+typedef int (*rfbSocketReadProc)(struct _rfbClient* client, char* buf, unsigned int len);
+typedef rfbBool (*rfbSocketWriteProc)(struct _rfbClient* client, const char* buf, unsigned int len);
+typedef void (*rfbSocketCloseProc)(struct _rfbClient* client);
+typedef int (*rfbSocketWaitProc)(struct _rfbClient* client, unsigned int usecs);
+
+typedef struct rfbSocketOps {
+	rfbSocketConnectProc connect;
+	rfbSocketReadProc read;
+	rfbSocketWriteProc write;
+	rfbSocketCloseProc close;
+	rfbSocketWaitProc wait;
+} rfbSocketOps;
+
 typedef struct _rfbClient {
 	uint8_t* frameBuffer;
 	int width, height;
@@ -506,6 +525,10 @@ typedef struct _rfbClient {
         rfbBool isUpdateRectManagedByLib;
 
         GetX509CertFingerprintMismatchDecisionProc GetX509CertFingerprintMismatchDecision;
+
+        /** Socket transport ops. Set via rfbClientSetSocketOps(); defaults
+         *  to rfbDefaultSocketOps in rfbGetClient(). */
+        const rfbSocketOps *sockOps;
 } rfbClient;
 
 /* cursor.c */
@@ -826,6 +849,19 @@ extern rfbBool SameMachine(rfbSocket sock);
  * @return the return value of the underlying select() call
  */
 extern int WaitForMessage(rfbClient* client,unsigned int usecs);
+
+/* sockets.c / rfbclient.c */
+/** Default socket transport ops (plain BSD sockets), installed by rfbGetClient(). */
+extern const rfbSocketOps rfbDefaultSocketOps;
+extern rfbSocket rfbDefaultSocketConnect(rfbClient* client, const char* hostname, int port);
+extern int rfbDefaultSocketRead(rfbClient* client, char* buf, unsigned int len);
+extern rfbBool rfbDefaultSocketWrite(rfbClient* client, const char* buf, unsigned int len);
+extern void rfbDefaultSocketClose(rfbClient* client);
+extern int rfbDefaultSocketWait(rfbClient* client, unsigned int usecs);
+
+/* vncviewer.c */
+/** Install a custom socket transport ops table; NULL restores the default. */
+extern void rfbClientSetSocketOps(rfbClient* client, const rfbSocketOps* ops);
 
 /* vncviewer.c */
 /**
