@@ -460,6 +460,9 @@ typedef struct {
 #define rfbEncodingZRLE 16
 #define rfbEncodingZYWRLE 17
 
+/* Open H.264 encoding, as implemented by the TigerVNC and noVNC viewers */
+#define rfbEncodingOpenH264 50
+
 #define rfbEncodingH264               0x48323634
 
 /* Cache & XOR-Zlib - rdv@2002 */
