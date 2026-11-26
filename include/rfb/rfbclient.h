@@ -266,8 +266,8 @@ typedef int (*rfbSocketWaitProc)(struct _rfbClient* client, unsigned int usecs);
 
 typedef struct rfbSocketOps {
 	rfbSocketConnectProc connect;
-	rfbSocketReadProc read;
-	rfbSocketWriteProc write;
+	rfbSocketReadProc recv;
+	rfbSocketWriteProc send;
 	rfbSocketCloseProc close;
 	rfbSocketWaitProc wait;
 } rfbSocketOps;

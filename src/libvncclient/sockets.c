@@ -142,7 +142,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
         i = ReadFromSASL(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
       else
 #endif /* LIBVNCSERVER_HAVE_SASL */
-        i = client->sockOps->read(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
+        i = client->sockOps->recv(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
   
       if (i <= 0) {
 	if (i < 0) {
@@ -188,7 +188,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
         i = ReadFromSASL(client, out, n);
       else
 #endif
-        i = client->sockOps->read(client, out, n);
+        i = client->sockOps->recv(client, out, n);
 
       if (i <= 0) {
 	if (i < 0) {
@@ -276,7 +276,7 @@ WriteToRFBServer(rfbClient* client, const char *buf, unsigned int n)
   }
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
-  return client->sockOps->write(client, obuf, n);
+  return client->sockOps->send(client, obuf, n);
 }
 
 
