@@ -117,6 +117,8 @@ rfbProcessArguments(rfbScreenInfoPtr rfbScreen,int* argc, char *argv[])
 
         } else if (strcmp(argv[i], "-permitfiletransfer") == 0) {  /* -permitfiletransfer  */
             rfbScreen->permitFileTransfer = TRUE;
+        } else if (strcmp(argv[i], "-ultradsm") == 0) {  /* -ultradsm  */
+            rfbScreen->ultradsm = TRUE;
         } else if (strcmp(argv[i], "-rfbversion") == 0) {  /* -rfbversion 3.6  */
             if (i + 1 >= *argc) {
 		rfbUsage();

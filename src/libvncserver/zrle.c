@@ -28,6 +28,14 @@
 #include "private.h"
 #include "zrleoutstream.h"
 
+static int dsm_debug_enabled(void) {
+    static int v = -1;
+    if (v < 0) {
+        v = (getenv("X11VNC_DEBUG_DSM") != NULL);
+    }
+    return v;
+}
+
 
 #define GET_IMAGE_INTO_BUF(tx,ty,tw,th,buf)                                \
 {  char *fbptr = (cl->scaledScreen->frameBuffer                                   \
@@ -105,7 +113,7 @@ rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
 {
   zrleOutStream* zos;
   rfbFramebufferUpdateRectHeader rect;
-  rfbZRLEHeader hdr;
+  rfbZRLEHeader hdr,hdr2;
   int i;
   char *zrleBeforeBuf;
 
@@ -207,7 +215,20 @@ rfbBool rfbSendRectEncodingZRLE(rfbClientPtr cl, int x, int y, int w, int h)
          sz_rfbFramebufferUpdateRectHeader);
   cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
-  hdr.length = Swap32IfLE(ZRLE_BUFFER_LENGTH(&zos->out));
+  int zsize = ZRLE_BUFFER_LENGTH(&zos->out);
+  hdr.length = zsize;
+  if (cl->screen->ultradsm) {
+    int hdr2len = zsize + 4;
+    hdr2.length = hdr2len;
+    hdr2.length = Swap32IfLE(hdr2.length);
+    memcpy(cl->updateBuf+cl->ublen, (char *)&hdr2, sz_rfbZRLEHeader);
+    cl->ublen += sz_rfbZRLEHeader;
+    if (dsm_debug_enabled()) {
+      rfbLog("DSM: ZRLE rect=(%d,%d %dx%d) zsize=%d hdr2len=%d ublen=%d\n",
+             x, y, w, h, zsize, hdr2len, cl->ublen);
+    }
+  }
+  hdr.length = Swap32IfLE(hdr.length);
 
   memcpy(cl->updateBuf+cl->ublen, (char *)&hdr, sz_rfbZRLEHeader);
   cl->ublen += sz_rfbZRLEHeader;

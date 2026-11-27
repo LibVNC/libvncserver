@@ -51,6 +51,10 @@
 
 #include "sockets.h"
 
+#if !defined(WIN32) && (defined(LIBVNCSERVER_HAVE_SYS_SOCKET_H) || defined(HAVE_SYS_SOCKET_H))
+#include <sys/un.h>
+#endif
+
 #ifdef DEBUGPROTO
 #undef DEBUGPROTO
 #define DEBUGPROTO(x) x
@@ -99,6 +103,46 @@
 #define S_ISDIR(m)	(((m) & S_IFDIR) == S_IFDIR)
 #endif
 #endif
+
+static char chatkey[256] = "";
+
+static void load_chatkey(void)
+{
+#ifdef X11VNC_COMPILED_CHAT_KEY
+    snprintf(chatkey, sizeof(chatkey), "%s", X11VNC_COMPILED_CHAT_KEY);
+    return;
+#else
+    const char *value = getenv("X11VNC_CHAT_KEY");
+    const char *path = getenv("X11VNC_CHAT_KEY_FILE");
+    FILE *fp;
+
+    if (value && *value) {
+        snprintf(chatkey, sizeof(chatkey), "%s", value);
+        return;
+    }
+    if (!path || !*path) {
+        const char *home = getenv("HOME");
+        if (!home || !*home) return;
+        static char default_path[512];
+        snprintf(default_path, sizeof(default_path), "%s/.local/share/x11vnc/chatkey", home);
+        path = default_path;
+    }
+    fp = fopen(path, "r");
+    if (!fp) return;
+    if (fgets(chatkey, sizeof(chatkey), fp)) {
+        chatkey[strcspn(chatkey, "\r\n")] = '\0';
+    }
+    fclose(fp);
+#endif
+}
+
+static void removeTextChatFiles(void)
+{
+    remove("/tmp/.impc-chat-r");
+    remove("/tmp/.impc-chat-s");
+}
+
+static void readSendedTextChatFromFile(rfbClientPtr cl, const char *filepath);
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
 /*
@@ -394,23 +438,46 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
     if(isUDP) {
       rfbLog(" accepted UDP client\n");
 	} else {
-#ifdef LIBVNCSERVER_IPv6
-		char host[1024];
-#endif
       int one=1;
+      int is_unix = 0;
       size_t otherClientsCount = 0;
 
-      getpeername(sock, (struct sockaddr *)&addr, &addrlen);
-#ifdef LIBVNCSERVER_IPv6
-      if(getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
-	rfbLogPerror("rfbNewClient: error in getnameinfo");
-	cl->host = strdup("");
-      }
-      else
-	cl->host = strdup(host);
-#else
-      cl->host = strdup(inet_ntoa(addr.sin_addr));
+      memset(&addr, 0, sizeof(addr));
+      if (getpeername(sock, (struct sockaddr *)&addr, &addrlen) < 0) {
+	cl->host = strdup("NON_SOCKET");
+#ifndef WIN32
+      } else if (((struct sockaddr *)&addr)->sa_family == AF_UNIX) {
+	struct sockaddr_un uaddr;
+	socklen_t uaddrlen = sizeof(uaddr);
+	is_unix = 1;
+	memset(&uaddr, 0, sizeof(uaddr));
+	if (getsockname(sock, (struct sockaddr *)&uaddr, &uaddrlen) < 0) {
+	  cl->host = strdup("NAMEFAIL_AF_UNIX");
+	} else if (!strcmp(uaddr.sun_path, "")) {
+	  cl->host = strdup("UNNAMED_AF_UNIX");
+	} else {
+	  cl->host = strdup(uaddr.sun_path);
+	}
 #endif
+      } else if (((struct sockaddr *)&addr)->sa_family == AF_INET
+#if defined(AF_INET6)
+		 || ((struct sockaddr *)&addr)->sa_family == AF_INET6
+#endif
+		 ) {
+#ifdef LIBVNCSERVER_IPv6
+	char host[1024];
+	if (getnameinfo((struct sockaddr*)&addr, addrlen, host, sizeof(host), NULL, 0, NI_NUMERICHOST) != 0) {
+	  rfbLogPerror("rfbNewClient: error in getnameinfo");
+	  cl->host = strdup("");
+	}
+	else
+	  cl->host = strdup(host);
+#else
+	cl->host = strdup(inet_ntoa(addr.sin_addr));
+#endif
+      } else {
+	cl->host = strdup("UNKNOWN_AF");
+      }
 
       cl->destPort = -1;
 
@@ -426,7 +493,7 @@ rfbNewTCPOrUDPClient(rfbScreenInfoPtr rfbScreen,
 	return NULL;
       }
 
-      if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
+      if (!is_unix && setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		     (char *)&one, sizeof(one)) < 0) {
 	rfbLogPerror("setsockopt failed: can't set TCP_NODELAY flag, non TCP socket?");
       }
@@ -732,6 +799,7 @@ rfbClientConnectionGone(rfbClientPtr cl)
     rfbResetStats(cl);
 
     free(cl);
+    removeTextChatFiles();
 }
 
 
@@ -1245,6 +1313,7 @@ rfbSendXvp(rfbClientPtr cl, uint8_t version, uint8_t code)
 {
     rfbXvpMsg xvp;
 
+    currentMsg = rfbXvp;
     xvp.type = rfbXvp;
     xvp.pad = 0;
     xvp.version = version;
@@ -1269,6 +1338,7 @@ rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *buffer)
     int bytesToSend=0;
 
     memset((char *)&tc, 0, sizeof(tc)); 
+    currentMsg = rfbTextChat;
     tc.type = rfbTextChat;
     tc.length = Swap32IfLE(length);
     
@@ -1303,6 +1373,126 @@ rfbBool rfbSendTextChatMessage(rfbClientPtr cl, uint32_t length, char *buffer)
     return TRUE;
 }
 
+static uint8_t nibbleFromChar(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return 255;
+}
+
+static char *hexStringToBytes(const char *inhex)
+{
+    char *retval;
+    char *p;
+    size_t len = strlen(inhex) / 2;
+    size_t i;
+
+    retval = malloc(len + 1);
+    if (retval == NULL)
+        return NULL;
+    for (i = 0, p = (char *)inhex; i < len; i++) {
+        retval[i] = (nibbleFromChar(*p) << 4) | nibbleFromChar(*(p + 1));
+        p += 2;
+    }
+    retval[len] = '\0';
+    return retval;
+}
+
+static char *encryptDecrypt(const char *toEncrypt, rfbBool enc)
+{
+    char *output;
+    size_t messagelen;
+    size_t keylen;
+    size_t i;
+
+    load_chatkey();
+    messagelen = strlen(toEncrypt);
+    keylen = strlen(chatkey);
+
+    if (!enc) {
+        messagelen = messagelen / 2;
+        output = hexStringToBytes(toEncrypt);
+    } else {
+        output = strdup(toEncrypt);
+    }
+    if (output == NULL || keylen == 0)
+        return output;
+
+    for (i = 0; i < messagelen; i++) {
+        if (enc) output[i] = output[i] ^ ((keylen + i + (chatkey[0] % 20)) % 255);
+        output[i] = output[i] ^ chatkey[i % keylen];
+        if (!enc) output[i] = output[i] ^ ((keylen + i + (chatkey[0] % 20)) % 255);
+    }
+    output[messagelen] = '\0';
+
+    if (enc) {
+        char *str_buf = malloc((2 * messagelen) + 1);
+        char *str_out;
+        size_t j;
+
+        if (str_buf == NULL) {
+            free(output);
+            return NULL;
+        }
+        str_out = str_buf;
+        for (j = 0; j < messagelen; j++) {
+            sprintf(str_buf, "%02X", (unsigned char)output[j]);
+            str_buf += 2;
+        }
+        *str_buf = '\0';
+        free(output);
+        return str_out;
+    }
+    return output;
+}
+
+static void writeReceivedTextChatToFile(const char *filepath, const char *data)
+{
+    char *str;
+    FILE *fp = fopen(filepath, "a");
+
+    if (fp == NULL)
+        return;
+    str = encryptDecrypt(data, 1);
+    if (str != NULL) {
+        fputs(str, fp);
+        fputs("\n", fp);
+        free(str);
+    }
+    fclose(fp);
+    chmod(filepath, 0666);
+}
+
+static void readSendedTextChatFromFile(rfbClientPtr cl, const char *filepath)
+{
+    char *str = NULL;
+    FILE *handler;
+    char line[4096];
+
+    if (cl->state != RFB_NORMAL)
+        return;
+    if (access(filepath, F_OK) == -1)
+        return;
+
+    handler = fopen(filepath, "r");
+    if (handler == NULL)
+        return;
+
+    while (1) {
+        if (fgets(line, sizeof(line), handler) == NULL) break;
+        if (ferror(handler) || feof(handler)) break;
+        line[strcspn(line, "\r\n")] = '\0';
+        str = encryptDecrypt(line, 0);
+        if (str != NULL) {
+            rfbSendTextChatMessage(cl, strlen(str), str);
+            free(str);
+        }
+    }
+    fclose(handler);
+    remove(filepath);
+}
+
 #define FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN(msg, cl, ret) \
 	if ((cl->screen->getFileTransferPermission != NULL \
 	    && cl->screen->getFileTransferPermission(cl) != TRUE) \
@@ -1317,6 +1507,7 @@ int DB = 1;
 rfbBool rfbSendFileTransferMessage(rfbClientPtr cl, uint8_t contentType, uint8_t contentParam, uint32_t size, uint32_t length, const char *buffer)
 {
     rfbFileTransferMsg ft;
+    currentMsg = rfbFileTransfer;
     ft.type = rfbFileTransfer;
     ft.contentType = contentType;
     ft.contentParam = contentParam;
@@ -1384,6 +1575,250 @@ typedef struct {
 #define RFB_FILE_ATTRIBUTE_NORMAL     0x80
 #define RFB_FILE_ATTRIBUTE_TEMPORARY  0x100
 #define RFB_FILE_ATTRIBUTE_COMPRESSED 0x800
+
+static rfbBool isDirectoryTransfer(const char *szFileName)
+{
+    const char *base = strrchr(szFileName, '/');
+    base = base ? base + 1 : szFileName;
+    return strncmp(base, "!UVNCDIR-", 9) == 0;
+}
+
+static void cleanTempF(char *szFileName)
+{
+    char *p;
+
+    if (!isDirectoryTransfer(szFileName))
+        return;
+    p = strrchr(szFileName, ',');
+    if (p != NULL)
+        *p = '\0';
+    if (DB) rfbLog("rfbProcessFileTransfer() zip:removed file=%s\n", szFileName);
+    remove(szFileName);
+}
+
+static int remove_directory(const char *path)
+{
+    DIR *d = opendir(path);
+    size_t path_len = strlen(path);
+    int r = -1;
+
+    if (d)
+    {
+        struct dirent *p;
+
+        r = 0;
+        while (!r && (p = readdir(d)))
+        {
+            int r2 = -1;
+            char *buf;
+            size_t len;
+
+            if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, ".."))
+                continue;
+
+            len = path_len + strlen(p->d_name) + 2;
+            buf = malloc(len);
+            if (buf)
+            {
+                struct stat st;
+
+                snprintf(buf, len, "%s/%s", path, p->d_name);
+                if (!stat(buf, &st))
+                {
+                    if (S_ISDIR(st.st_mode))
+                        r2 = remove_directory(buf);
+                    else
+                        r2 = unlink(buf);
+                }
+                free(buf);
+            }
+            r = r2;
+        }
+        closedir(d);
+    }
+
+    if (!r)
+        r = rmdir(path);
+    return r;
+}
+
+static char *replace_substr(const char *str, const char *oldstr, const char *newstr)
+{
+    size_t oldlen = strlen(oldstr);
+    size_t newlen = strlen(newstr);
+    size_t count = 0;
+    size_t len;
+    const char *p = str;
+    const char *found;
+    char *result;
+    char *out;
+
+    if (oldlen == 0)
+        return strdup(str);
+
+    while ((p = strstr(p, oldstr)) != NULL)
+    {
+        count++;
+        p += oldlen;
+    }
+
+    len = strlen(str) - count * oldlen + count * newlen;
+    result = malloc(len + 1);
+    if (result == NULL)
+        return NULL;
+
+    out = result;
+    p = str;
+    while ((found = strstr(p, oldstr)) != NULL)
+    {
+        memcpy(out, p, found - p);
+        out += found - p;
+        memcpy(out, newstr, newlen);
+        out += newlen;
+        p = found + oldlen;
+    }
+    strcpy(out, p);
+    return result;
+}
+
+static void shell_quote(const char *src, char *dst, size_t dstlen)
+{
+    size_t i = 0;
+    size_t j = 0;
+
+    if (dstlen < 4) {
+        if (dstlen) dst[0] = '\0';
+        return;
+    }
+    dst[j++] = '\'';
+    while (src[i] && j + 5 < dstlen) {
+        if (src[i] == '\'') {
+            dst[j++] = '\'';
+            dst[j++] = '\\';
+            dst[j++] = '\'';
+            dst[j++] = '\'';
+        } else {
+            dst[j++] = src[i];
+        }
+        i++;
+    }
+    dst[j++] = '\'';
+    dst[j] = '\0';
+}
+
+static void ZipPossibleDirectory(char *szFileName, size_t nameMax)
+{
+    char *folder_path = strdup(szFileName);
+    char *tmp;
+    const char *base;
+    char name[MAX_PATH];
+    char zip_path[MAX_PATH];
+    char qfolder[2048];
+    char qzip[2048];
+    char cmd[4096];
+    DIR *dir;
+    int status;
+
+    if (folder_path == NULL)
+        return;
+
+    tmp = replace_substr(folder_path, "[ ", "");
+    free(folder_path);
+    folder_path = tmp;
+    if (folder_path == NULL)
+        return;
+
+    tmp = replace_substr(folder_path, " ]", "");
+    free(folder_path);
+    folder_path = tmp;
+    if (folder_path == NULL)
+        return;
+
+    dir = opendir(folder_path);
+    if (dir == NULL) {
+        free(folder_path);
+        return;
+    }
+    closedir(dir);
+
+    base = strrchr(folder_path, '/');
+    base = base ? base + 1 : folder_path;
+    snprintf(name, sizeof(name), "!UVNCDIR-%s", base);
+    snprintf(zip_path, sizeof(zip_path), "/tmp/%s.zip", name);
+    remove(zip_path);
+
+    shell_quote(folder_path, qfolder, sizeof(qfolder));
+    shell_quote(zip_path, qzip, sizeof(qzip));
+#ifdef __APPLE__
+    snprintf(cmd, sizeof(cmd), "ditto -ck --norsrc %s %s", qfolder, qzip);
+#else
+    snprintf(cmd, sizeof(cmd), "cd %s && { if command -v 7z >/dev/null 2>&1; then 7z -r a %s *; else zip -r %s *; fi; }", qfolder, qzip, qzip);
+#endif
+    status = system(cmd);
+    if (status == 0 && access(zip_path, F_OK) == 0) {
+        snprintf(szFileName, nameMax, "%s", zip_path);
+        if (DB) rfbLog("rfbProcessFileTransfer() zip:created file=%s\n", zip_path);
+    } else {
+        if (DB) rfbLog("rfbProcessFileTransfer() zip failed status=%d file=%s\n", status, zip_path);
+    }
+    free(folder_path);
+}
+
+static void GetZippedFolderPathName(const char *szZipFile, char *path)
+{
+    char *folder_path = strdup(szZipFile);
+    char *tmp;
+    const char *parts[] = {"!UVNCDIR-", ".zip", "[ ", " ]"};
+    size_t i;
+
+    if (folder_path == NULL) {
+        path[0] = '\0';
+        return;
+    }
+
+    for (i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
+        tmp = replace_substr(folder_path, parts[i], "");
+        free(folder_path);
+        folder_path = tmp;
+        if (folder_path == NULL) {
+            path[0] = '\0';
+            return;
+        }
+    }
+
+    snprintf(path, 1024, "%s", folder_path);
+    free(folder_path);
+}
+
+static void UnzipPossibleDirectory(const char *szFileName)
+{
+    char cmd[4096];
+    char szDirName[1024];
+    char qfile[2048];
+    char qdir[2048];
+    int status;
+
+    if (DB) rfbLog("rfbProcessFileTransfer() unzip:candidate file=%s\n", szFileName);
+    if (!isDirectoryTransfer(szFileName))
+        return;
+
+    GetZippedFolderPathName(szFileName, szDirName);
+    remove_directory(szDirName);
+    mkdir(szDirName, 0777);
+    if (DB) rfbLog("rfbProcessFileTransfer() unzip:make_folder dir=%s\n", szDirName);
+
+    shell_quote(szFileName, qfile, sizeof(qfile));
+    shell_quote(szDirName, qdir, sizeof(qdir));
+#ifdef __APPLE__
+    snprintf(cmd, sizeof(cmd), "ditto -xk %s %s && chmod -R g+rw %s", qfile, qdir, qdir);
+#else
+    snprintf(cmd, sizeof(cmd), "cd %s && { if command -v 7z >/dev/null 2>&1; then 7z x %s; elif command -v unzip >/dev/null 2>&1; then unzip -o %s; else false; fi; } && chmod -R g+rw %s", qdir, qfile, qfile, qdir);
+#endif
+    status = system(cmd);
+    if (DB) rfbLog("rfbProcessFileTransfer() unzip:unzip status:%d file=%s dir=%s\n", status, szFileName, szDirName);
+    if (status == 0)
+        remove(szFileName);
+}
 
 rfbBool rfbFilenameTranslate2UNIX(rfbClientPtr cl, /* in */ char *path, /* out */ char *unixPath, size_t unixPathMaxLen)
 {
@@ -1633,6 +2068,8 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
     int nRetC = 0;
 #endif
 
+    readSendedTextChatFromFile(cl, "/tmp/.impc-chat-s");
+
     /*
      * Don't close the client if we get into this one because 
      * it is called from many places to service file transfers.
@@ -1676,6 +2113,7 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
                 */
                 retval = rfbSendFileTransferMessage(cl, rfbEndOfFile, 0, 0, 0, NULL);
                 close(cl->fileTransfer.fd);
+                cleanTempF(cl->fileTransfer.filename);
                 cl->fileTransfer.fd = -1;
                 cl->fileTransfer.sending   = 0;
                 cl->fileTransfer.receiving = 0;
@@ -1688,6 +2126,7 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
                 rfbLog("rfbSendFileTransferChunk(): %s\n",strerror(errno));
                 retval = rfbSendFileTransferMessage(cl, rfbAbortFileTransfer, 0, 0, 0, NULL);
                 close(cl->fileTransfer.fd);
+                cleanTempF(cl->fileTransfer.filename);
                 cl->fileTransfer.fd = -1;
                 cl->fileTransfer.sending   = 0;
                 cl->fileTransfer.receiving = 0;
@@ -1731,6 +2170,8 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
     struct stat statbuf;
     uint32_t sizeHtmp=0;
     int n=0;
+    int was_receiving=0;
+    int had_fd=0;
     char timespec[64];
 #ifdef LIBVNCSERVER_HAVE_LIBZ
     unsigned char compBuff[sz_rfbBlockSize];
@@ -1815,7 +2256,9 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         /* The client requests a File */
         if (!rfbFilenameTranslate2UNIX(cl, buffer, filename1, sizeof(filename1)))
             goto fail;
+        ZipPossibleDirectory(filename1, sizeof(filename1));
         cl->fileTransfer.fd=open(filename1, O_RDONLY, 0744);
+        snprintf(cl->fileTransfer.filename, sizeof(cl->fileTransfer.filename), "%s", filename1);
 
         /*
         */
@@ -1824,6 +2267,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         if (cl->fileTransfer.fd!=-1) {
             if (fstat(cl->fileTransfer.fd, &statbuf)!=0) {
                 close(cl->fileTransfer.fd);
+                cleanTempF(cl->fileTransfer.filename);
                 cl->fileTransfer.fd=-1;
             }
             else
@@ -1883,6 +2327,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         if (size==-1) {
             rfbLog("rfbProcessFileTransfer() rfbFileHeader (error, aborting)\n");
             close(cl->fileTransfer.fd);
+            cleanTempF(cl->fileTransfer.filename);
             cl->fileTransfer.fd=-1;
             return TRUE;
         }
@@ -1934,6 +2379,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         
         if (!rfbFilenameTranslate2UNIX(cl, buffer, filename1, sizeof(filename1)))
             goto fail;
+        snprintf(cl->fileTransfer.filename, sizeof(cl->fileTransfer.filename), "%s", filename1);
 
         /* If the file exists... We can send a rfbFileChecksums back to the client before we send an rfbFileAcceptHeader */
         /* TODO: Delta Transfer */
@@ -1994,25 +2440,32 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
         if (DB) rfbLog("rfbProcessFileTransfer() rfbEndOfFile\n");
         /*
         */
+        was_receiving = cl->fileTransfer.receiving;
         if (cl->fileTransfer.fd!=-1)
             close(cl->fileTransfer.fd);
         cl->fileTransfer.fd=-1;
         cl->fileTransfer.sending   = 0;
         cl->fileTransfer.receiving = 0;
+        if (was_receiving)
+            UnzipPossibleDirectory(cl->fileTransfer.filename);
+        cl->fileTransfer.filename[0] = '\0';
         break;
 
     case rfbAbortFileTransfer:
         if (DB) rfbLog("rfbProcessFileTransfer() rfbAbortFileTransfer\n");
         /*
         */
-        if (cl->fileTransfer.fd!=-1)
+        had_fd = (cl->fileTransfer.fd != -1);
+        if (had_fd)
         {
             close(cl->fileTransfer.fd);
             cl->fileTransfer.fd=-1;
             cl->fileTransfer.sending   = 0;
             cl->fileTransfer.receiving = 0;
+            cleanTempF(cl->fileTransfer.filename);
         }
-        else
+        cl->fileTransfer.filename[0] = '\0';
+        if (!had_fd)
         {
             /* We use this message for FileTransfer rights (<=RC18 versions)
              * The client asks for FileTransfer permission
@@ -2077,7 +2530,7 @@ rfbBool rfbProcessFileTransfer(rfbClientPtr cl, uint8_t contentType, uint8_t con
             if (stat(filename1,&statbuf)==0)
             {
                 if (S_ISDIR(statbuf.st_mode))
-                    retval = rmdir(filename1);
+                    retval = remove_directory(filename1);
                 else
                     retval = unlink(filename1);
             }
@@ -2306,6 +2759,13 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
     int extClipboardFormats = 0;
 #endif
 
+    if (cl->screen->ultradsm)
+        if ((n = rfbReadExact(cl, (char *)&msg, 1)) <= 0) {
+            if (n != 0)
+                rfbLogPerror("rfbProcessClientNormalMessage: read");
+            rfbCloseClient(cl);
+            return;
+        }
     if ((n = rfbReadExact(cl, (char *)&msg, 1)) <= 0) {
         if (n != 0)
             rfbLogPerror("rfbProcessClientNormalMessage: read");
@@ -2335,6 +2795,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
         cl->format.redShift = msg.spf.format.redShift;
         cl->format.greenShift = msg.spf.format.greenShift;
         cl->format.blueShift = msg.spf.format.blueShift;
+        cl->format.pad1 = msg.spf.format.pad1;
 
 	cl->readyForSetColourMapEntries = TRUE;
         cl->screen->setTranslateFunction(cl);
@@ -2390,7 +2851,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
             lastPreferredEncoding = cl->preferredEncoding;
 
         /* Reset all flags to defaults (allows us to switch between PointerPos and Server Drawn Cursors) */
-        cl->preferredEncoding=-1;
+        if (!cl->screen->ultradsm)
+            cl->preferredEncoding=-1;
         cl->useCopyRect              = FALSE;
         cl->useNewFBSize             = FALSE;
         cl->useExtDesktopSize        = FALSE;
@@ -2858,11 +3320,12 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
             /* Why couldn't they have used the pad byte??? */
             str=NULL;
             rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbTextChatMsg, sz_rfbTextChatMsg);
+            removeTextChatFiles();
             break;
         default:
             if ((msg.tc.length>0) && (msg.tc.length<rfbTextMaxSize))
             {
-                str = (char *)malloc(msg.tc.length);
+                str = (char *)malloc(msg.tc.length + 1);
                 if (str==NULL)
                 {
                     rfbLog("Unable to malloc %d bytes for a TextChat Message\n", msg.tc.length);
@@ -2876,7 +3339,10 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                     rfbCloseClient(cl);
                     return;
                 }
+                str[msg.tc.length] = '\0';
                 rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbTextChatMsg+msg.tc.length, sz_rfbTextChatMsg+msg.tc.length);
+                if (n == 1)
+                    writeReceivedTextChatToFile("/tmp/.impc-chat-r", str);
             }
             else
             {
@@ -3220,6 +3686,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
       cl->newFBSizePending = FALSE;
       UNLOCK(cl->updateMutex);
       fu->type = rfbFramebufferUpdate;
+      currentMsg = rfbFramebufferUpdate;
       fu->nRects = Swap16IfLE(1);
       cl->ublen = sz_rfbFramebufferUpdateMsg;
 
@@ -3516,6 +3983,7 @@ rfbSendFramebufferUpdate(rfbClientPtr cl,
     }
 
     fu->type = rfbFramebufferUpdate;
+    currentMsg = rfbFramebufferUpdate;
     if (nUpdateRegionRects != 0xFFFF) {
 	if(cl->screen->maxRectsPerUpdate>0
 	   /* CoRRE splits the screen into smaller squares */
@@ -4017,6 +4485,7 @@ rfbSendSetColourMapEntries(rfbClientPtr cl,
     rgb = (uint16_t *)(&wbuf[sz_rfbSetColourMapEntriesMsg]);
 
     scme->type = rfbSetColourMapEntries;
+    currentMsg = rfbSetColourMapEntries;
 
     scme->firstColour = Swap16IfLE(firstColour);
     scme->nColours = Swap16IfLE(nColours);
@@ -4068,6 +4537,7 @@ rfbSendBell(rfbScreenInfoPtr rfbScreen)
     i = rfbGetClientIterator(rfbScreen);
     while((cl=rfbClientIteratorNext(i))) {
 	b.type = rfbBell;
+	currentMsg = rfbBell;
         LOCK(cl->sendMutex);
 	if (rfbWriteExact(cl, (char *)&b, sz_rfbBellMsg) < 0) {
 	    rfbLogPerror("rfbSendBell: write");
@@ -4096,6 +4566,7 @@ rfbSendServerCutText(rfbScreenInfoPtr rfbScreen,char *str, int len)
     iterator = rfbGetClientIterator(rfbScreen);
     while ((cl = rfbClientIteratorNext(iterator)) != NULL) {
         sct.type = rfbServerCutText;
+        currentMsg = rfbServerCutText;
         sct.length = Swap32IfLE(len);
         LOCK(cl->sendMutex);
         if (rfbWriteExact(cl, (char *)&sct,

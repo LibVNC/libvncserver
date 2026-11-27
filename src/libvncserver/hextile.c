@@ -60,6 +60,14 @@ rfbSendRectEncodingHextile(rfbClientPtr cl,
            sz_rfbFramebufferUpdateRectHeader);
     cl->ublen += sz_rfbFramebufferUpdateRectHeader;
 
+    if (cl->screen->ultradsm) {
+        rfbZRLEHeader hdr2;
+        hdr2.length = (w * (cl->format.bitsPerPixel / 8) * h);
+        hdr2.length = Swap32IfLE(hdr2.length);
+        memcpy(cl->updateBuf+cl->ublen, (char *)&hdr2, sz_rfbZRLEHeader);
+        cl->ublen += sz_rfbZRLEHeader;
+    }
+
     rfbStatRecordEncodingSent(cl, rfbEncodingHextile,
           sz_rfbFramebufferUpdateRectHeader,
           sz_rfbFramebufferUpdateRectHeader + w * (cl->format.bitsPerPixel / 8) * h);

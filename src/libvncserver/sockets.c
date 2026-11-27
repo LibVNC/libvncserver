@@ -57,6 +57,10 @@
 #include <sys/types.h>
 #endif
 
+#if !defined(WIN32) && (defined(LIBVNCSERVER_HAVE_SYS_SOCKET_H) || defined(HAVE_SYS_SOCKET_H))
+#include <sys/un.h>
+#endif
+
 #ifdef LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
@@ -1041,6 +1045,16 @@ rfbWriteToSocket(rfbClientPtr cl,
  * ETIMEDOUT if it timed out).
  */
 
+int currentMsg = -1;
+
+static int dsm_debug_enabled(void) {
+    static int v = -1;
+    if (v < 0) {
+        v = (getenv("X11VNC_DEBUG_DSM") != NULL);
+    }
+    return v;
+}
+
 int
 rfbWriteExact(rfbClientPtr cl,
               const char *buf,
@@ -1089,6 +1103,21 @@ rfbWriteExact(rfbClientPtr cl,
 #endif
 
     LOCK(cl->outputMutex);
+
+    if (cl->screen->ultradsm && currentMsg >= 0) {
+        int msg = currentMsg;
+        currentMsg = -1;
+        if (dsm_debug_enabled()) {
+            rfbLog("DSM: prefix msg=%d type=%d sock=%d payload=%d\n",
+                   msg, (int)(unsigned char)buf[0], (int)sock, len);
+        }
+        write(sock, buf, 1);
+    } else if (cl->screen->ultradsm && dsm_debug_enabled()) {
+        rfbLog("DSM: no prefix sock=%d type=%d len=%d\n",
+               (int)sock, (int)(unsigned char)buf[0], len);
+    }
+    currentMsg = -1;
+
     while (len > 0) {
         if(sock == RFB_INVALID_SOCKET) {
             errno = EBADF;
@@ -1211,6 +1240,94 @@ rfbListenOnTCPPort(int port,
     return sock;
 }
 
+rfbSocket
+rfbListenOnUnixSocket(char *file,
+                      rfbScreenInfoPtr rfbScreen)
+{
+#ifdef WIN32
+    rfbLog("Windows doesn't support UNIX sockets\n");
+    return RFB_INVALID_SOCKET;
+#else
+    rfbSocket sock;
+    struct sockaddr_un addr;
+
+    if (rfbScreen) {
+        if (rfbScreen->socketState != RFB_SOCKET_READY) {
+            rfbLog("rfbScreen is not in RFB_SOCKET_READY state.\n");
+            return RFB_INVALID_SOCKET;
+        } else if (rfbScreen->inetdSock != RFB_INVALID_SOCKET) {
+            rfbLog("Cannot have inetdSock and listenSock simultaneously.\n");
+            return RFB_INVALID_SOCKET;
+        }
+    }
+
+    if (!file || strlen(file) >= sizeof(addr.sun_path)) {
+        rfbLog("rfbListenOnUnixSocket: invalid filename '%s'.\n",
+               file ? file : "null");
+        return RFB_INVALID_SOCKET;
+    }
+
+    sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock == RFB_INVALID_SOCKET) {
+        rfbLogPerror("rfbListenOnUnixSocket: socket failed");
+        return RFB_INVALID_SOCKET;
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, file);
+
+    unlink(file);
+
+    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        rfbLogPerror("rfbListenOnUnixSocket: bind failed");
+        rfbCloseSocket(sock);
+        return RFB_INVALID_SOCKET;
+    }
+
+    if (listen(sock, 32) < 0) {
+        rfbLogPerror("rfbListenOnUnixSocket: listen failed");
+        rfbCloseSocket(sock);
+        return RFB_INVALID_SOCKET;
+    }
+
+    if (rfbScreen) {
+        if (rfbScreen->listenSock != RFB_INVALID_SOCKET) {
+            rfbSocket old = rfbScreen->listenSock;
+            FD_CLR(old, &rfbScreen->allFds);
+            rfbCloseSocket(old);
+            rfbScreen->listenSock = RFB_INVALID_SOCKET;
+            rfbLog("Switched to listening on Unix Socket: %s\n", file);
+        } else {
+            rfbLog("Listening on Unix Socket: %s\n", file);
+        }
+        rfbScreen->listenSock = sock;
+        FD_SET(rfbScreen->listenSock, &(rfbScreen->allFds));
+        if (rfbScreen->listenSock > rfbScreen->maxFd) {
+            rfbScreen->maxFd = rfbScreen->listenSock;
+        }
+    }
+    return sock;
+#endif
+}
+
+rfbSocket
+rfbAcceptUnixSocket(rfbSocket sock)
+{
+#ifdef WIN32
+    rfbLog("Windows doesn't support UNIX sockets\n");
+    return RFB_INVALID_SOCKET;
+#else
+    struct sockaddr_un addr;
+    socklen_t fromlen = sizeof(addr);
+    rfbSocket fd = accept(sock, (struct sockaddr *)&addr, &fromlen);
+    if (fd == RFB_INVALID_SOCKET) {
+        rfbLogPerror("rfbAcceptUnixSocket: accept failed");
+        return RFB_INVALID_SOCKET;
+    }
+    return fd;
+#endif
+}
 
 rfbSocket
 rfbListenOnTCP6Port(int port,

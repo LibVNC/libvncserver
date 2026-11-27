@@ -31,6 +31,8 @@ static rfbBool rfbSetClientColourMapBGR233(rfbClientPtr cl);
 
 rfbBool rfbEconomicTranslate = FALSE;
 
+extern int currentMsg;
+
 /*
  * Some standard pixel formats.
  */
@@ -215,6 +217,33 @@ static rfbTranslateFnType rfbTranslateWithRGBTablesFns[COUNT_OFFSETS][COUNT_OFFS
       rfbTranslateWithRGBTables32to32 }
 };
 
+static rfbTranslateFnType rfbTranslateGreyFns[COUNT_OFFSETS][COUNT_OFFSETS] = {
+    { rfbTranslateGrey8to8,
+      rfbTranslateGrey8to16,
+#ifdef LIBVNCSERVER_ALLOW24BPP
+      rfbTranslateGrey8to24,
+#endif
+      rfbTranslateGrey8to32 },
+    { rfbTranslateGrey16to8,
+      rfbTranslateGrey16to16,
+#ifdef LIBVNCSERVER_ALLOW24BPP
+      rfbTranslateGrey16to24,
+#endif
+      rfbTranslateGrey16to32 },
+#ifdef LIBVNCSERVER_ALLOW24BPP
+    { rfbTranslateGrey24to8,
+      rfbTranslateGrey24to16,
+      rfbTranslateGrey24to24,
+      rfbTranslateGrey24to32 },
+#endif
+    { rfbTranslateGrey32to8,
+      rfbTranslateGrey32to16,
+#ifdef LIBVNCSERVER_ALLOW24BPP
+      rfbTranslateGrey32to24,
+#endif
+      rfbTranslateGrey32to32 }
+};
+
 
 
 /*
@@ -246,6 +275,19 @@ rfbSetTranslateFunction(rfbClientPtr cl)
 {
     rfbLog("Pixel format for client %s:\n",cl->host);
     PrintPixelFormat(&cl->format);
+
+    int greyScale = (cl->format.pad1 >= rfbPF8GreyColors);
+    if (!greyScale && cl->format.pad1 == 1 && cl->format.trueColour &&
+        cl->format.bitsPerPixel == 8 &&
+        cl->format.redMax == cl->format.greenMax &&
+        cl->format.greenMax == cl->format.blueMax &&
+        cl->format.redMax <= 3) {
+        greyScale = 1;
+    }
+    if (greyScale) {
+        rfbLog("greyscale pixel format requested (pad1=%d)\n",
+               (int) cl->format.pad1);
+    }
 
     /*
      * Check that bits per pixel values are valid
@@ -302,16 +344,24 @@ rfbSetTranslateFunction(rfbClientPtr cl)
             return FALSE;
 
         cl->format = BGR233Format;
+        cl->format.pad1 = greyScale;
     }
 
     /* truecolour -> truecolour */
 
-    if (PF_EQ(cl->format,cl->screen->serverFormat)) {
+    if (!greyScale && PF_EQ(cl->format,cl->screen->serverFormat)) {
 
         /* client & server the same */
 
         rfbLog("no translation needed\n");
         cl->translateFn = rfbTranslateNone;
+        return TRUE;
+    }
+
+    if (greyScale) {
+        cl->translateFn = rfbTranslateGreyFns
+            [BPP2OFFSET(cl->screen->serverFormat.bitsPerPixel)]
+            [BPP2OFFSET(cl->format.bitsPerPixel)];
         return TRUE;
     }
 
@@ -377,6 +427,7 @@ rfbSetClientColourMapBGR233(rfbClientPtr cl)
     }
     
     scme->type = rfbSetColourMapEntries;
+    currentMsg = rfbSetColourMapEntries;
 
     scme->firstColour = Swap16IfLE(0);
     scme->nColours = Swap16IfLE(256);

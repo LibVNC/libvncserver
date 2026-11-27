@@ -345,6 +345,9 @@ typedef struct _rfbScreenInfo
     /** command line authorization of file transfers */
     rfbBool permitFileTransfer;
 
+    /** command line ultradsm spec comm */
+    rfbBool ultradsm;
+
     /** displayFinishedHook is called just after a frame buffer update */
     rfbDisplayFinishedHookPtr displayFinishedHook;
     /** xvpHook is called to handle an xvp client message */
@@ -427,6 +430,7 @@ typedef struct _rfbFileTransferData {
   int numPackets;
   int receiving;
   int sending;
+  char filename[1024];
 } rfbFileTransferData;
 
 
@@ -707,11 +711,12 @@ typedef struct _rfbClientRec {
     int pipe_notify_client_thread[2];
 #endif
 
-    /**
-     * clientFramebufferUpdateRequestHook is called when a client requests a frame
-     * buffer update.
-     */
+     /**
+      * clientFramebufferUpdateRequestHook is called when a client requests a frame
+      * buffer update.
+      */
     ClientFramebufferUpdateRequestHookPtr clientFramebufferUpdateRequestHook;
+
 
     rfbBool useExtDesktopSize;
     int requestedDesktopSizeChange;
@@ -817,10 +822,14 @@ extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern rfbSocket rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
 extern rfbSocket rfbConnectToTcpAddr(char* host, int port);
 extern rfbSocket rfbListenOnTCPPort(int port, in_addr_t iface);
+extern rfbSocket rfbListenOnUnixSocket(char *file, rfbScreenInfoPtr rfbScreen);
+extern rfbSocket rfbAcceptUnixSocket(rfbSocket sock);
 extern rfbSocket rfbListenOnTCP6Port(int port, const char* iface);
 extern rfbSocket rfbListenOnUDPPort(int port, in_addr_t iface);
 extern int rfbStringToAddr(char* string,in_addr_t* addr);
 extern rfbBool rfbSetNonBlocking(rfbSocket sock);
+
+#define LIBVNCSERVER_ALLOW_NON_AF_INET_SOCKETS
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
 /* websockets.c */

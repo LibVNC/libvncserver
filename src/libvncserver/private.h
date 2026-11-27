@@ -1,6 +1,8 @@
 #ifndef RFB_PRIVATE_H
 #define RFB_PRIVATE_H
 
+extern int currentMsg;
+
 /* from cursor.c */
 
 void rfbShowCursor(rfbClientPtr cl);
