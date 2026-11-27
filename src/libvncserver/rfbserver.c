@@ -106,6 +106,15 @@
 
 static char chatkey[256] = "";
 
+static int chat_debug_enabled(void)
+{
+    static int v = -1;
+    if (v < 0) {
+        v = (getenv("X11VNC_DEBUG_CHAT") != NULL);
+    }
+    return v;
+}
+
 static void load_chatkey(void)
 {
 #ifdef X11VNC_COMPILED_CHAT_KEY
@@ -136,10 +145,21 @@ static void load_chatkey(void)
 #endif
 }
 
+static void removeSendedTextChatFile(void)
+{
+    if (chat_debug_enabled()) {
+        rfbLog("CHAT: removing sended file\n");
+    }
+    remove("/tmp/.impc-chat-s");
+}
+
 static void removeTextChatFiles(void)
 {
+    if (chat_debug_enabled()) {
+        rfbLog("CHAT: removing received file\n");
+    }
     remove("/tmp/.impc-chat-r");
-    remove("/tmp/.impc-chat-s");
+    removeSendedTextChatFile();
 }
 
 static void readSendedTextChatFromFile(rfbClientPtr cl, const char *filepath);
@@ -1456,6 +1476,9 @@ static void writeReceivedTextChatToFile(const char *filepath, const char *data)
         return;
     str = encryptDecrypt(data, 1);
     if (str != NULL) {
+        if (chat_debug_enabled()) {
+            rfbLog("CHAT: received len=%lu, appending\n", (unsigned long)strlen(data));
+        }
         fputs(str, fp);
         fputs("\n", fp);
         free(str);
@@ -1479,6 +1502,11 @@ static void readSendedTextChatFromFile(rfbClientPtr cl, const char *filepath)
     if (handler == NULL)
         return;
 
+    remove(filepath);
+    if (chat_debug_enabled()) {
+        rfbLog("CHAT: detached sended file before reading\n");
+    }
+
     while (1) {
         if (fgets(line, sizeof(line), handler) == NULL) break;
         if (ferror(handler) || feof(handler)) break;
@@ -1490,7 +1518,6 @@ static void readSendedTextChatFromFile(rfbClientPtr cl, const char *filepath)
         }
     }
     fclose(handler);
-    remove(filepath);
 }
 
 #define FILEXFER_ALLOWED_OR_CLOSE_AND_RETURN(msg, cl, ret) \
@@ -3320,7 +3347,11 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
             /* Why couldn't they have used the pad byte??? */
             str=NULL;
             rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbTextChatMsg, sz_rfbTextChatMsg);
-            removeTextChatFiles();
+            if (chat_debug_enabled()) {
+                rfbLog("CHAT: control length=%lu, keeping received file\n",
+                       (unsigned long)msg.tc.length);
+            }
+            removeSendedTextChatFile();
             break;
         default:
             if ((msg.tc.length>0) && (msg.tc.length<rfbTextMaxSize))
