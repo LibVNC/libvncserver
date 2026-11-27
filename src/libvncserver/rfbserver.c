@@ -70,7 +70,7 @@
 #include <unistd.h>
 #endif
 
-#ifndef WIN32
+#if !defined(WIN32) || defined(__MINGW32__)
 /* readdir() */
 #include <dirent.h>
 #endif
@@ -1483,8 +1483,10 @@ static void writeReceivedTextChatToFile(const char *filepath, const char *data)
         fputs("\n", fp);
         free(str);
     }
+#if !defined(WIN32)
+    fchmod(fileno(fp), 0666);
+#endif
     fclose(fp);
-    chmod(filepath, 0666);
 }
 
 static void readSendedTextChatFromFile(rfbClientPtr cl, const char *filepath)
@@ -1494,8 +1496,6 @@ static void readSendedTextChatFromFile(rfbClientPtr cl, const char *filepath)
     char line[4096];
 
     if (cl->state != RFB_NORMAL)
-        return;
-    if (access(filepath, F_OK) == -1)
         return;
 
     handler = fopen(filepath, "r");
@@ -1647,16 +1647,11 @@ static int remove_directory(const char *path)
             buf = malloc(len);
             if (buf)
             {
-                struct stat st;
-
                 snprintf(buf, len, "%s/%s", path, p->d_name);
-                if (!stat(buf, &st))
-                {
-                    if (S_ISDIR(st.st_mode))
-                        r2 = remove_directory(buf);
-                    else
-                        r2 = unlink(buf);
-                }
+                if (remove(buf) == 0)
+                    r2 = 0;
+                else
+                    r2 = remove_directory(buf);
                 free(buf);
             }
             r = r2;

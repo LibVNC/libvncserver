@@ -1111,7 +1111,7 @@ rfbWriteExact(rfbClientPtr cl,
             rfbLog("DSM: prefix msg=%d type=%d sock=%d payload=%d\n",
                    msg, (int)(unsigned char)buf[0], (int)sock, len);
         }
-        write(sock, buf, 1);
+        rfbWriteToSocket(cl, buf, 1);
     } else if (cl->screen->ultradsm && dsm_debug_enabled()) {
         rfbLog("DSM: no prefix sock=%d type=%d len=%d\n",
                (int)sock, (int)(unsigned char)buf[0], len);
