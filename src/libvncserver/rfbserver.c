@@ -45,6 +45,9 @@
 
 #ifdef WIN32
 #include <io.h>
+#if !defined(__MINGW32__)
+#include <stdint.h>
+#endif
 #else
 #include <pwd.h>
 #endif
@@ -1623,11 +1626,67 @@ static void cleanTempF(char *szFileName)
     remove(szFileName);
 }
 
+static int path_is_directory(const char *path)
+{
+#if defined(WIN32) && !defined(__MINGW32__)
+    struct _stat st;
+    return _stat(path, &st) == 0 && (st.st_mode & _S_IFDIR) != 0;
+#else
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+#endif
+}
+
+static int path_exists(const char *path)
+{
+#if defined(WIN32) && !defined(__MINGW32__)
+    return _access(path, 0) == 0;
+#else
+    return access(path, F_OK) == 0;
+#endif
+}
+
 static int remove_directory(const char *path)
 {
-    DIR *d = opendir(path);
     size_t path_len = strlen(path);
     int r = -1;
+
+#if defined(WIN32) && !defined(__MINGW32__)
+    char pattern[MAX_PATH];
+    struct _finddata_t fd;
+    intptr_t h;
+
+    snprintf(pattern, sizeof(pattern), "%s/*", path);
+    h = _findfirst(pattern, &fd);
+    if (h != -1)
+    {
+        r = 0;
+        do
+        {
+            int r2 = -1;
+            char *buf;
+            size_t len;
+
+            if (!strcmp(fd.name, ".") || !strcmp(fd.name, ".."))
+                continue;
+
+            len = path_len + strlen(fd.name) + 2;
+            buf = malloc(len);
+            if (buf)
+            {
+                snprintf(buf, len, "%s/%s", path, fd.name);
+                if (remove(buf) == 0)
+                    r2 = 0;
+                else
+                    r2 = remove_directory(buf);
+                free(buf);
+            }
+            r = r2;
+        } while (!r && _findnext(h, &fd) == 0);
+        _findclose(h);
+    }
+#else
+    DIR *d = opendir(path);
 
     if (d)
     {
@@ -1658,9 +1717,16 @@ static int remove_directory(const char *path)
         }
         closedir(d);
     }
+#endif
 
     if (!r)
+    {
+#if defined(WIN32) && !defined(__MINGW32__)
+        r = _rmdir(path);
+#else
         r = rmdir(path);
+#endif
+    }
     return r;
 }
 
@@ -1738,7 +1804,6 @@ static void ZipPossibleDirectory(char *szFileName, size_t nameMax)
     char qfolder[2048];
     char qzip[2048];
     char cmd[4096];
-    DIR *dir;
     int status;
 
     if (folder_path == NULL)
@@ -1756,12 +1821,10 @@ static void ZipPossibleDirectory(char *szFileName, size_t nameMax)
     if (folder_path == NULL)
         return;
 
-    dir = opendir(folder_path);
-    if (dir == NULL) {
+    if (!path_is_directory(folder_path)) {
         free(folder_path);
         return;
     }
-    closedir(dir);
 
     base = strrchr(folder_path, '/');
     base = base ? base + 1 : folder_path;
@@ -1777,7 +1840,7 @@ static void ZipPossibleDirectory(char *szFileName, size_t nameMax)
     snprintf(cmd, sizeof(cmd), "cd %s && { if command -v 7z >/dev/null 2>&1; then 7z -r a %s *; else zip -r %s *; fi; }", qfolder, qzip, qzip);
 #endif
     status = system(cmd);
-    if (status == 0 && access(zip_path, F_OK) == 0) {
+    if (status == 0 && path_exists(zip_path)) {
         snprintf(szFileName, nameMax, "%s", zip_path);
         if (DB) rfbLog("rfbProcessFileTransfer() zip:created file=%s\n", zip_path);
     } else {
