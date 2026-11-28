@@ -711,10 +711,10 @@ typedef struct _rfbClientRec {
     int pipe_notify_client_thread[2];
 #endif
 
-     /**
-      * clientFramebufferUpdateRequestHook is called when a client requests a frame
-      * buffer update.
-      */
+    /**
+     * clientFramebufferUpdateRequestHook is called when a client requests a frame
+     * buffer update.
+     */
     ClientFramebufferUpdateRequestHookPtr clientFramebufferUpdateRequestHook;
 
 
