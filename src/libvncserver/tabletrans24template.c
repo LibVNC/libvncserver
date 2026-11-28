@@ -119,6 +119,58 @@ rfbTranslateWithRGBTables24to24 (char *table, rfbPixelFormat *in,
     }
 }
 
+static void
+rfbTranslateGrey24to24 (char *table, rfbPixelFormat *in,
+                        rfbPixelFormat *out,
+                        char *iptr, char *optr,
+                        int bytesBetweenInputLines,
+                        int width, int height)
+{
+    uint8_t *ip = (uint8_t *)iptr;
+    uint8_t *op = (uint8_t *)optr;
+    int ipextra = bytesBetweenInputLines - width * 3;
+    uint8_t *opLineEnd;
+    int inMaxR = in->redMax ? in->redMax : 1;
+    int inMaxG = in->greenMax ? in->greenMax : 1;
+    int inMaxB = in->blueMax ? in->blueMax : 1;
+    int outMax = out->redMax;
+    int shift = rfbEndianTest ? 0 : 8;
+    uint32_t outValue;
+    uint8_t c;
+
+    (void)table;
+
+    while (height > 0) {
+        opLineEnd = op + width * 3;
+
+        while (op < opLineEnd) {
+            uint32_t inValue = ((*(uint32_t *)ip) >> shift) & 0x00ffffff;
+            int ir = (inValue >> in->redShift) & inMaxR;
+            int ig = (inValue >> in->greenShift) & inMaxG;
+            int ib = (inValue >> in->blueShift) & inMaxB;
+            int rn = (ir * 255 + inMaxR / 2) / inMaxR;
+            int gn = (ig * 255 + inMaxG / 2) / inMaxG;
+            int bn = (ib * 255 + inMaxB / 2) / inMaxB;
+            int y = (rn * 77 + gn * 150 + bn * 29) / 256;
+            int gray = (y * outMax + 127) / 255;
+
+            outValue = 0;
+            if (out->redShift < 24)   outValue |= ((uint32_t)gray << out->redShift);
+            if (out->greenShift < 24) outValue |= ((uint32_t)gray << out->greenShift);
+            if (out->blueShift < 24)  outValue |= ((uint32_t)gray << out->blueShift);
+            memcpy(op, &outValue, 3);
+            if (out->bigEndian != in->bigEndian) {
+                c = op[0]; op[0] = op[2]; op[2] = c;
+            }
+            op += 3;
+            ip += 3;
+        }
+
+        ip += ipextra;
+        height--;
+    }
+}
+
 #else
 
 #define IN_T CONCAT3E(uint,BPP,_t)
@@ -131,6 +183,11 @@ rfbTranslateWithRGBTables24to24 (char *table, rfbPixelFormat *in,
                                 CONCAT4E(rfbTranslateWithRGBTables,24,to,BPP)
 #define rfbTranslateWithRGBTablesINto24 \
                                 CONCAT4E(rfbTranslateWithRGBTables,BPP,to,24)
+#define rfbTranslateGrey24toOUT \
+                                CONCAT4E(rfbTranslateGrey,24,to,BPP)
+#define rfbTranslateGreyINto24 \
+                                CONCAT4E(rfbTranslateGrey,BPP,to,24)
+#define SwapOUT(x) CONCAT2E(Swap,BPP(x))
 
 /*
  * rfbTranslateWithSingleTableINtoOUT translates a rectangle of pixel data
@@ -271,11 +328,118 @@ rfbTranslateWithRGBTablesINto24 (char *table, rfbPixelFormat *in,
     }
 }
 
+static void
+rfbTranslateGrey24toOUT (char *table, rfbPixelFormat *in,
+                         rfbPixelFormat *out,
+                         char *iptr, char *optr,
+                         int bytesBetweenInputLines,
+                         int width, int height)
+{
+    uint8_t *ip = (uint8_t *)iptr;
+    OUT_T *op = (OUT_T *)optr;
+    int ipextra = bytesBetweenInputLines - width * 3;
+    OUT_T *opLineEnd;
+    int inMaxR = in->redMax ? in->redMax : 1;
+    int inMaxG = in->greenMax ? in->greenMax : 1;
+    int inMaxB = in->blueMax ? in->blueMax : 1;
+    int outMax = out->redMax;
+    int shift = rfbEndianTest ? 0 : 8;
+    int doSwap = (out->bigEndian != in->bigEndian);
+
+    (void)table;
+
+    while (height > 0) {
+        opLineEnd = op + width;
+
+        while (op < opLineEnd) {
+            uint32_t inValue = ((*(uint32_t *)ip) >> shift) & 0x00ffffff;
+            int ir = (inValue >> in->redShift) & inMaxR;
+            int ig = (inValue >> in->greenShift) & inMaxG;
+            int ib = (inValue >> in->blueShift) & inMaxB;
+            int rn = (ir * 255 + inMaxR / 2) / inMaxR;
+            int gn = (ig * 255 + inMaxG / 2) / inMaxG;
+            int bn = (ib * 255 + inMaxB / 2) / inMaxB;
+            int y = (rn * 77 + gn * 150 + bn * 29) / 256;
+            int gray = (y * outMax + 127) / 255;
+            OUT_T v = 0;
+
+            if (out->redShift < BPP)   v |= ((OUT_T)gray << out->redShift);
+            if (out->greenShift < BPP) v |= ((OUT_T)gray << out->greenShift);
+            if (out->blueShift < BPP)  v |= ((OUT_T)gray << out->blueShift);
+#if (BPP != 8)
+            if (doSwap) {
+                v = SwapOUT(v);
+            }
+#else
+            (void)doSwap;
+#endif
+            *(op++) = v;
+            ip += 3;
+        }
+
+        ip += ipextra;
+        height--;
+    }
+}
+
+static void
+rfbTranslateGreyINto24 (char *table, rfbPixelFormat *in,
+                        rfbPixelFormat *out,
+                        char *iptr, char *optr,
+                        int bytesBetweenInputLines,
+                        int width, int height)
+{
+    IN_T *ip = (IN_T *)iptr;
+    uint8_t *op = (uint8_t *)optr;
+    int ipextra = bytesBetweenInputLines / sizeof(IN_T) - width;
+    uint8_t *opLineEnd;
+    int inMaxR = in->redMax ? in->redMax : 1;
+    int inMaxG = in->greenMax ? in->greenMax : 1;
+    int inMaxB = in->blueMax ? in->blueMax : 1;
+    int outMax = out->redMax;
+    uint32_t outValue;
+    uint8_t c;
+
+    (void)table;
+
+    while (height > 0) {
+        opLineEnd = op + width * 3;
+
+        while (op < opLineEnd) {
+            IN_T p = *(ip++);
+            int ir = (p >> in->redShift) & inMaxR;
+            int ig = (p >> in->greenShift) & inMaxG;
+            int ib = (p >> in->blueShift) & inMaxB;
+            int rn = (ir * 255 + inMaxR / 2) / inMaxR;
+            int gn = (ig * 255 + inMaxG / 2) / inMaxG;
+            int bn = (ib * 255 + inMaxB / 2) / inMaxB;
+            int y = (rn * 77 + gn * 150 + bn * 29) / 256;
+            int gray = (y * outMax + 127) / 255;
+
+            outValue = 0;
+            if (out->redShift < 24)   outValue |= ((uint32_t)gray << out->redShift);
+            if (out->greenShift < 24) outValue |= ((uint32_t)gray << out->greenShift);
+            if (out->blueShift < 24)  outValue |= ((uint32_t)gray << out->blueShift);
+            memcpy(op, &outValue, 3);
+            if (out->bigEndian != in->bigEndian) {
+                c = op[0]; op[0] = op[2]; op[2] = c;
+            }
+            op += 3;
+        }
+
+        ip += ipextra;
+        height--;
+    }
+}
+
 #undef IN_T
 #undef OUT_T
 #undef rfbTranslateWithSingleTable24toOUT
 #undef rfbTranslateWithRGBTables24toOUT
 #undef rfbTranslateWithSingleTableINto24
 #undef rfbTranslateWithRGBTablesINto24
+#undef rfbTranslateGrey24toOUT
+#undef rfbTranslateGreyINto24
+#undef SwapOUT
 
 #endif

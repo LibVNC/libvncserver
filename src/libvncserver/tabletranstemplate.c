@@ -45,6 +45,9 @@
                                 CONCAT4E(rfbTranslateWithSingleTable,IN,to,OUT)
 #define rfbTranslateWithRGBTablesINtoOUT \
                                 CONCAT4E(rfbTranslateWithRGBTables,IN,to,OUT)
+#define rfbTranslateGreyINtoOUT \
+                                CONCAT4E(rfbTranslateGrey,IN,to,OUT)
+#define SwapOUT(x) CONCAT2E(Swap,OUT(x))
 
 /*
  * rfbTranslateWithSingleTableINtoOUT translates a rectangle of pixel data
@@ -111,7 +114,61 @@ rfbTranslateWithRGBTablesINtoOUT (char *table, rfbPixelFormat *in,
     }
 }
 
+static void
+rfbTranslateGreyINtoOUT (char *table, rfbPixelFormat *in,
+                         rfbPixelFormat *out,
+                         char *iptr, char *optr,
+                         int bytesBetweenInputLines,
+                         int width, int height)
+{
+    IN_T *ip = (IN_T *)iptr;
+    OUT_T *op = (OUT_T *)optr;
+    int ipextra = bytesBetweenInputLines / sizeof(IN_T) - width;
+    OUT_T *opLineEnd;
+    int inMaxR = in->redMax ? in->redMax : 1;
+    int inMaxG = in->greenMax ? in->greenMax : 1;
+    int inMaxB = in->blueMax ? in->blueMax : 1;
+    int outMax = out->redMax;
+    int doSwap = (out->bigEndian != in->bigEndian);
+
+    (void)table;
+
+    while (height > 0) {
+        opLineEnd = op + width;
+
+        while (op < opLineEnd) {
+            IN_T p = *(ip++);
+            int ir = (p >> in->redShift) & inMaxR;
+            int ig = (p >> in->greenShift) & inMaxG;
+            int ib = (p >> in->blueShift) & inMaxB;
+            int rn = (ir * 255 + inMaxR / 2) / inMaxR;
+            int gn = (ig * 255 + inMaxG / 2) / inMaxG;
+            int bn = (ib * 255 + inMaxB / 2) / inMaxB;
+            int y = (rn * 77 + gn * 150 + bn * 29) / 256;
+            int gray = (y * outMax + 127) / 255;
+            OUT_T v = 0;
+
+            if (out->redShift < OUT)   v |= ((OUT_T)gray << out->redShift);
+            if (out->greenShift < OUT) v |= ((OUT_T)gray << out->greenShift);
+            if (out->blueShift < OUT)  v |= ((OUT_T)gray << out->blueShift);
+#if (OUT != 8)
+            if (doSwap) {
+                v = SwapOUT(v);
+            }
+#else
+            (void)doSwap;
+#endif
+            *(op++) = v;
+        }
+
+        ip += ipextra;
+        height--;
+    }
+}
+
 #undef IN_T
 #undef OUT_T
 #undef rfbTranslateWithSingleTableINtoOUT
 #undef rfbTranslateWithRGBTablesINtoOUT
+#undef rfbTranslateGreyINtoOUT
+#undef SwapOUT

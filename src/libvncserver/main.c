@@ -1035,6 +1035,7 @@ rfbScreenInfoPtr rfbGetScreen(int* argc,char** argv,
    screen->protocolMinorVersion = rfbProtocolMinorVersion;
 
    screen->permitFileTransfer = FALSE;
+   screen->ultradsm = FALSE;
 
    if(!rfbProcessArguments(screen,argc,argv)) {
      free(screen);

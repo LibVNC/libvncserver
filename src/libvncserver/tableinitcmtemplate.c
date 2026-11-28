@@ -41,6 +41,8 @@
 #define SwapOUT(x) CONCAT2E(Swap,OUT(x))
 #define rfbInitColourMapSingleTableOUT \
                                 CONCAT2E(rfbInitColourMapSingleTable,OUT)
+#define rfbInitColourMapGreySingleTableOUT \
+                                CONCAT2E(rfbInitColourMapGreySingleTable,OUT)
 
 static void
 rfbInitColourMapSingleTableOUT(char **table, rfbPixelFormat *in,
@@ -79,6 +81,52 @@ rfbInitColourMapSingleTableOUT(char **table, rfbPixelFormat *in,
     }
 }
 
+static void
+rfbInitColourMapGreySingleTableOUT(char **table, rfbPixelFormat *in,
+                            rfbPixelFormat *out,rfbColourMap* colourMap)
+{
+    uint32_t i;
+    int r, g, b, rn, gn, bn, y, gray;
+    OUT_T *t;
+    uint32_t nEntries = 1 << in->bitsPerPixel;
+    int max = colourMap->is16 ? 65535 : 255;
+    int outMax = out->redMax;
+
+    if (*table) free(*table);
+    *table = (char *)malloc(nEntries * sizeof(OUT_T));
+    t = (OUT_T *)*table;
+
+    for (i = 0; i < nEntries; i++) {
+        r = g = b = 0;
+	if(i < colourMap->count) {
+	  if(colourMap->is16) {
+	    r = colourMap->data.shorts[3*i+0];
+	    g = colourMap->data.shorts[3*i+1];
+	    b = colourMap->data.shorts[3*i+2];
+	  } else {
+	    r = colourMap->data.bytes[3*i+0];
+	    g = colourMap->data.bytes[3*i+1];
+	    b = colourMap->data.bytes[3*i+2];
+	  }
+	}
+	rn = (r * 255 + max / 2) / max;
+	gn = (g * 255 + max / 2) / max;
+	bn = (b * 255 + max / 2) / max;
+	y = (rn * 77 + gn * 150 + bn * 29) / 256;
+	gray = (y * outMax + 127) / 255;
+	t[i] = 0;
+	if (out->redShift < OUT)   t[i] |= ((OUT_T)gray << out->redShift);
+	if (out->greenShift < OUT) t[i] |= ((OUT_T)gray << out->greenShift);
+	if (out->blueShift < OUT)  t[i] |= ((OUT_T)gray << out->blueShift);
+#if (OUT != 8)
+        if (out->bigEndian != in->bigEndian) {
+            t[i] = SwapOUT(t[i]);
+        }
+#endif
+    }
+}
+
 #undef OUT_T
 #undef SwapOUT
 #undef rfbInitColourMapSingleTableOUT
+#undef rfbInitColourMapGreySingleTableOUT

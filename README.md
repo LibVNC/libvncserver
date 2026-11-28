@@ -155,6 +155,11 @@ In case you prefer to learn LibVNCServer by example, have a look at the servers 
 
 For LibVNCClient, examples can be found in [examples/client](examples/client).
 
+UltraVNC DSM (`-ultradsm`)
+--------------------------
+
+The `-ultradsm` server option implements UltraVNC SecureVNCPlugin.dsm v1 behavior only. SecureVNCPlugin.dsm v2 uses a different mechanism and is not supported by this option. Use `ultravnc_dsm_helper` from the SSVNC source tree on the viewer side with `-ultradsm`.
+
 Incorporating LibVNCServer/LibVNCClient into your build system
 --------------------------------------------------------------
 

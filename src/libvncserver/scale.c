@@ -396,6 +396,7 @@ int rfbSendNewScaleSize(rfbClientPtr cl)
     if (cl->PalmVNC==TRUE)
     {
         rfbPalmVNCReSizeFrameBufferMsg pmsg;
+        currentMsg = rfbPalmVNCReSizeFrameBuffer;
         pmsg.type = rfbPalmVNCReSizeFrameBuffer;
         pmsg.pad1 = 0;
         pmsg.desktop_w = Swap16IfLE(cl->screen->width);
@@ -417,6 +418,7 @@ int rfbSendNewScaleSize(rfbClientPtr cl)
     else
     {
         rfbResizeFrameBufferMsg        rmsg;
+        currentMsg = rfbResizeFrameBuffer;
         rmsg.type = rfbResizeFrameBuffer;
         rmsg.pad1=0;
         rmsg.framebufferWidth  = Swap16IfLE(cl->scaledScreen->width);
