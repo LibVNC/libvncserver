@@ -153,7 +153,7 @@ static void removeSendedTextChatFile(void)
     if (chat_debug_enabled()) {
         rfbLog("CHAT: removing sended file\n");
     }
-    remove("/tmp/.impc-chat-s");
+    remove("/tmp/.vnc-chat-s");
 }
 
 static void removeTextChatFiles(void)
@@ -161,7 +161,7 @@ static void removeTextChatFiles(void)
     if (chat_debug_enabled()) {
         rfbLog("CHAT: removing received file\n");
     }
-    remove("/tmp/.impc-chat-r");
+    remove("/tmp/.vnc-chat-r");
     removeSendedTextChatFile();
 }
 
@@ -2153,7 +2153,7 @@ rfbBool rfbSendFileTransferChunk(rfbClientPtr cl)
     int nRetC = 0;
 #endif
 
-    readSendedTextChatFromFile(cl, "/tmp/.impc-chat-s");
+    readSendedTextChatFromFile(cl, "/tmp/.vnc-chat-s");
 
     /*
      * Don't close the client if we get into this one because 
@@ -3431,7 +3431,7 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                 str[msg.tc.length] = '\0';
                 rfbStatRecordMessageRcvd(cl, msg.type, sz_rfbTextChatMsg+msg.tc.length, sz_rfbTextChatMsg+msg.tc.length);
                 if (n == 1)
-                    writeReceivedTextChatToFile("/tmp/.impc-chat-r", str);
+                    writeReceivedTextChatToFile("/tmp/.vnc-chat-r", str);
             }
             else
             {
